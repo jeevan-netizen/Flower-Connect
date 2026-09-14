@@ -12,7 +12,7 @@ The project has a working repository scaffold with database schema and placehold
 
 ### Phase 0 — Scaffold (Complete)
 
-- [x] Repository initialized with git (3 commits on `master`)
+- [x] Repository initialized with git (4 commits on `main`)
 - [x] Backend scaffold: Spring Boot 3.2.5 application skeleton
   - `FlowerConnectApplication.java` with `@EnableAsync`, `@EnableScheduling`
   - `application.yml` with datasource, Flyway, JPA, and actuator config
