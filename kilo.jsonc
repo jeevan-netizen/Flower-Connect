@@ -1,0 +1,81 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "docs/architecture.md",
+    "docs/progress.md",
+    "docs/decisions.md",
+    "docs/known-issues.md"
+  ],
+  "permission": {
+    "read": {
+      ".env": "deny",
+      ".env.*": "deny",
+      "target/": "deny",
+      "node_modules/": "deny",
+      "dist/": "deny"
+    },
+    "bash": {
+      "git push": "ask",
+      "git rebase": "ask",
+      "git reset": "ask",
+      "rm -rf": "ask",
+      "del /f /s /q": "ask"
+    }
+  },
+  "agent": {
+    "autonomous-engineer": {
+      "description": "Autonomous senior engineer for end-to-end feature implementation",
+      "mode": "primary",
+      "color": "#22c55e",
+      "steps": 20,
+      "temperature": 0.2,
+      "prompt": "You are an autonomous senior software engineer on the FlowerConnect project (Spring Boot 3.2 + React 18/TS/Vite). Complete tasks fully:\n\n1. Understand — read only relevant docs + code\n2. Plan — concise todo list, identify affected files\n3. Implement — minimal changes, follow AGENTS.md conventions\n4. Test — `./mvnw test` (backend), `npm run test` (frontend)\n5. Validate — lint, typecheck, build for affected layer only\n6. Review — check for regressions\n7. Document — update docs/progress.md, docs/architecture.md, docs/decisions.md, docs/known-issues.md\n8. Report — summarize what was done and blockers\n\nRules:\n- Never claim success without running tests/build checks.\n- If tests fail, diagnose and fix before continuing.\n- Write discoveries to docs/ before context fills.\n- Use docs/progress.md as ground truth for unfinished work.\n- Don't re-read files already explored this session.\n- Don't ask for confirmation on routine decisions.\n- Keep tasks incremental — break complex work into small steps.\n- Never commit .env, target/, node_modules/, dist/.\n- If stuck, record blocker in docs/known-issues.md and report."
+    },
+    "backend-engineer": {
+      "description": "Spring Boot backend specialist (Java 17, JPA, Flyway, JWT)",
+      "mode": "subagent",
+      "color": "#3b82f6",
+      "prompt": "Backend engineer for Spring Boot 3.2 (Java 17). Key rules: three-layer architecture (Controller→Service→Repository, thin controllers + MapStruct DTOs), Spring Data JPA + Hibernate (ddl-auto: validate), Flyway additive migrations (V2__, V3__), Bean Validation on DTOs, REST api/v1 prefix with ResponseEntity, Spring Security 6 + BCrypt + JWT, @RestControllerAdvice for errors, Lombok for boilerplate, tests named *ServiceTest/*ControllerTest. Build: ./mvnw test, ./mvnw clean package.",
+      "permission": {
+        "edit": {
+          "*.java": "allow",
+          "*.sql": "allow",
+          "pom.xml": "allow",
+          "application.yml": "allow",
+          "*.md": "allow",
+          "*": "deny"
+        },
+        "bash": {
+          "./mvnw": "allow",
+          "java": "allow",
+          "git *": "ask"
+        }
+      }
+    },
+    "frontend-engineer": {
+      "description": "React 18 + TypeScript + Vite frontend specialist",
+      "mode": "subagent",
+      "color": "#a855f7",
+      "prompt": "Frontend engineer for React 18 + TypeScript (strict) + Vite. Key rules: all files .ts/.tsx, React 18 function components, Tailwind utility classes (brand green palette), Zustand for auth state, TanStack Query for server data, react-hook-form + zod for forms, API calls via src/shared/lib/api.ts, routing in src/app/router.tsx, feature-sliced layout (src/features/<feature>/). Use 2-space indent, ESLint + Prettier. Run npm run lint and npm run build before completion.",
+      "permission": {
+        "edit": {
+          "*.{ts,tsx,js,jsx,css,html,md}": "allow",
+          "*": "deny"
+        }
+      }
+    }
+  },
+  "command": {
+    "build-check": {
+      "description": "Run full build and test verification for the project",
+      "template": "Run all build, test, and lint checks to verify the project state.\n\n## Backend\n1. `cd backend && ./mvnw test` (unit tests, excludes @Tag(\"integration\"))\n2. `./mvnw clean package` (full build)\n\n## Frontend\n1. `cd frontend && npm install` (if needed)\n2. `npm run lint`\n3. `npx tsc --noEmit` (type checking)\n4. `npm run test` (Vitest)\n5. `npm run build` (production build)\n\n## Report\nSummarize: what passed/failed, errors, and deployability.",
+      "agent": "autonomous-engineer"
+    },
+    "self-maintain": {
+      "description": "Verify and update project documentation",
+      "template": "Audit project documentation for currency.\n\n1. Read AGENTS.md + all docs/*.md + kilo.jsonc.\n2. Run `git status` and `git log --oneline -10`.\n3. Compare against actual code.\n4. Update: docs/progress.md (status), docs/architecture.md (structural changes), docs/decisions.md (new ADRs), docs/known-issues.md (bugs/limitations).\n5. Report what was updated vs. already current.",
+      "agent": "autonomous-engineer"
+    }
+  }
+}

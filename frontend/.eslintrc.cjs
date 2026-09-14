@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   root: true,
   extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended", "prettier"],
   parser: "@typescript-eslint/parser",
@@ -16,5 +16,5 @@ export default {
     "react/react-in-jsx-scope": "off",
     "react/prop-types": "off",
   },
-  ignorePatterns: ["dist", "node", "vite.config.ts"],
+  ignorePatterns: ["dist", "node", "vite.config.ts", "tailwind.config.ts", "postcss.config.js", "server.mjs"],
 };
