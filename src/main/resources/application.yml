@@ -1,0 +1,43 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: flowerconnect
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/flowerconnect}
+    username: ${DB_USER:flowerconnect}
+    password: ${DB_PASS:flowerconnect}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: false
+        use_new_id_mappings: false
+    open-in-view: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+logging:
+  level:
+    com.flowerconnect: INFO
+    org.flywaydb: INFO
+    org.springframework.security: WARN
