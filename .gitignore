@@ -6,6 +6,8 @@ mvnw.cmd
 node_modules/
 dist/
 package-lock.json
+tsconfig.tsbuildinfo
+*.tsbuildinfo
 
 # Environment
 .env

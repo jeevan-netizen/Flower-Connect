@@ -21,18 +21,12 @@
 
 | ID  | Area       | Description                                           | Impact |
 |-----|------------|-------------------------------------------------------|--------|
-| 001 | Backend    | No REST controllers/services/repositories implemented | No API endpoints available. Frontend routes are placeholders. |
-| 002 | Backend    | Spring Security starter is present but no config       | All endpoints are unauthenticated. Security must be implemented in Phase 1. |
-| 003 | Backend    | No Redis configuration in `application.yml`            | Redis runs in Docker but backend doesn't connect to it yet. |
-| 004 | Frontend   | No real authentication flow                            | Login page is a placeholder. Token management code is scaffold but unused. |
-| 005 | Frontend   | `api.ts` reads token from `localStorage` instead of Zustand | Inconsistent with Zustand persist store. Should unify in Phase 1. |
-| 006 | Frontend   | No error boundary component                           | Unhandled errors will crash the app. Should add in Phase 1. |
-| 007 | Frontend   | No loading states or suspense in routes                | All routes render immediately. Add skeleton loaders later. |
-| 008 | Testing    | Backend has zero unit tests                           | No test coverage. Need to add tests alongside each feature. |
-| 009 | Testing    | Frontend has only a smoke test (DOM element check)     | Need real component tests as features are built. |
-| 010 | Docker     | No `.env` file required for `docker compose up`      | Compose uses defaults from `.env.example`. Production deployments need a real `.env`. |
-| 011 | Docker     | No health check for backend DB/Redis connectivity    | Backend may start before DB is ready if healthcheck fails silently. |
-| 012 | Docker     | Docker not available on this machine                  | Full-stack Docker verification pending. Local services used as substitute. |
+| 001 | Backend    | No Redis configuration in `application.yml`            | Redis runs in Docker but backend doesn't connect to it yet. |
+| 002 | Frontend   | No error boundary component                           | Unhandled errors will crash the app. Should add in Phase 2. |
+| 003 | Frontend   | No loading states or suspense in routes                | All routes render immediately. Add skeleton loaders later. |
+| 004 | Docker     | No `.env` file required for `docker compose up`      | Compose uses defaults from `.env.example`. Production deployments need a real `.env`. |
+| 005 | Docker     | No health check for backend DB/Redis connectivity    | Backend may start before DB is ready if healthcheck fails silently. |
+| 006 | Docker     | Docker not available on this machine                  | Full-stack Docker verification pending. Local services used as substitute. |
 
 ## Discovered Problems
 

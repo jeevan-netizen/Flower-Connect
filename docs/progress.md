@@ -4,9 +4,9 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 1 — Authentication** (complete)
+**Phase 1 — Authentication** (Complete)
 
-JWT-based authentication system with access/refresh token rotation, BCrypt password hashing, and Spring Security filter chain. All backend endpoints implemented and unit-tested (51 tests pass). Integration tests require Docker running.
+JWT-based authentication system with access/refresh token rotation, BCrypt password hashing, and Spring Security filter chain. Backend fully implemented and unit-tested (51 tests pass). Frontend authentication complete with login/register UI, protected routes, token refresh/retry interceptor, and 41 frontend tests passing.
 
 ## Completed Work
 
@@ -70,9 +70,15 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] Scheduled cleanup job for expired/revoked refresh tokens
 - [x] Unit tests: 51 tests pass (JWT, auth service, controllers, mappers)
 - [x] Integration tests: 4 tests (require Docker + Testcontainers MySQL 8)
-- [ ] Frontend login/register UI with react-hook-form + zod
-- [ ] Protected routes and auth guard in React Router
-- [ ] Token storage and refresh logic in `api.ts`
+- [x] Frontend types (`types.ts`): RegisterRequest, LoginRequest, RefreshRequest, AuthResponse, UserResponse, ErrorResponse
+- [x] Auth API client (`api.ts`): register, login, refresh, logout, fetchCurrentUser wrappers
+- [x] Zustand auth store (`auth-store.ts`): login, register, refresh, logout, loadCurrentUser, setAuth with persistence
+- [x] Axios interceptors (`shared/lib/api.ts`): request interceptor (Bearer token on non-public endpoints), response interceptor (401 handling with singleton refresh promise, retry-once, `/auth/refresh` excluded from refresh logic to prevent deadlock)
+- [x] Login page (`LoginPage.tsx`): email/password form with zod validation, loading state, backend errors, navigation with `from` redirect
+- [x] Register page (`RegisterPage.tsx`): fullName/email/phone/password/confirmPassword form with zod validation, CUSTOMER role only
+- [x] Auth hooks (`useAuth.tsx`): RequireAuth/RequireUnauth guards, useInitAuth for initial user load, hasLoadedInitial edge case fix (sets true even when /users/me fails)
+- [x] Router (`router.tsx`): /browse, /cart, /orders protected; /login, /register require unauth
+- [x] Frontend tests: 41 tests pass (auth-store, LoginPage, RegisterPage, useAuth, api interceptors) — smoke test plus 40 new tests
 
 #### Phase 2 — Catalog (Not Started)
 - [ ] Florist entity and catalog CRUD
@@ -97,6 +103,10 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 | 2026-09-14 | Created persistent project memory (optimized for limited models) | `AGENTS.md`, `CLAUDE.md`, `docs/*`, `kilo.jsonc` |
 | 2026-09-14 | Fixed unit test failures across all test classes | `JwtService.java`, `AuthControllerTest.java`, `UserControllerTest.java`, `AuthServiceTest.java`, `RefreshTokenServiceTest.java` |
 | 2026-09-14 | Completed Phase 1 authentication backend | V2/V3 migrations, auth services, controllers, 51 unit tests |
+| 2026-09-15 | Completed Phase 1 authentication frontend | login/register pages, auth API client, Zustand store, route guards, init hook, token refresh/retry interceptor, 41 frontend tests |
+| 2026-09-15 | Fixed /auth/refresh 401-deadlock in axios interceptor | `shared/lib/api.ts` response interceptor skips public endpoints |
+| 2026-09-15 | Fixed init edge case: hasLoadedInitial now set on /users/me failure | `auth-store.ts` loadCurrentUser catch block |
+| 2026-09-15 | Housekeeping: gitignored build artifacts | `.gitignore` (added tsconfig.tsbuildinfo, *.tsbuildinfo) |
 
 ## Session Notes
 
@@ -106,3 +116,4 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - All Kilo configuration lives in `kilo.jsonc` (validated). Agent and command `.md` files in `.kilo/` directories fail YAML validation in this Kilo CLI build.
 - `docs/progress.md` is the ground truth for unfinished work — always check before starting new tasks.
 - Phase 1 backend complete with 51 unit tests passing. Integration tests (4 tests) require Docker running for Testcontainers MySQL 8.
+- Phase 1 frontend auth complete: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor, 41 frontend tests passing (54 total including smoke test).

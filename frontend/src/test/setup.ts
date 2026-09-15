@@ -1,1 +1,1 @@
-// Vitest setup file. Add global mocks/imports here.
+import "@testing-library/jest-dom";

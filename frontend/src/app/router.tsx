@@ -1,4 +1,7 @@
 import { createBrowserRouter, Outlet, Link, RouterProvider } from "react-router-dom";
+import { useInitAuth, RequireAuth, RequireUnauth } from "@/features/auth/hooks/useAuth";
+import { LoginPage } from "@/features/auth/pages/LoginPage";
+import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 
 function Layout() {
   return (
@@ -46,16 +49,43 @@ function Placeholder({ title }: { title: string }) {
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <Layout />,
+    element: <LayoutWithAuth />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: "browse", element: <Placeholder title="Browse" /> },
-      { path: "cart", element: <Placeholder title="Cart" /> },
-      { path: "orders", element: <Placeholder title="Orders" /> },
-      { path: "login", element: <Placeholder title="Login" /> },
+      {
+        path: "browse",
+        element: (
+          <RequireAuth>
+            <Placeholder title="Browse" />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "cart",
+        element: (
+          <RequireAuth>
+            <Placeholder title="Cart" />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "orders",
+        element: (
+          <RequireAuth>
+            <Placeholder title="Orders" />
+          </RequireAuth>
+        ),
+      },
+      { path: "login", element: <RequireUnauth><LoginPage /></RequireUnauth> },
+      { path: "register", element: <RequireUnauth><RegisterPage /></RequireUnauth> },
     ],
   },
 ]);
+
+function LayoutWithAuth() {
+  useInitAuth();
+  return <Layout />;
+}
 
 export function AppRouter() {
   return <RouterProvider router={router} />;
