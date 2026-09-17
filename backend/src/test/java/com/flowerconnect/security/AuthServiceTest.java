@@ -129,7 +129,7 @@ class AuthServiceTest {
         Authentication auth = mock(Authentication.class);
         when(auth.getPrincipal()).thenReturn(userDetails);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(auth);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdWithRole(1L)).thenReturn(Optional.of(user));
         when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("access-token");
         when(refreshTokenService.createRefreshToken(1L)).thenReturn("refresh-token");
         when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
@@ -142,7 +142,7 @@ class AuthServiceTest {
         assertEquals("Bearer", response.getTokenType());
 
         verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
-        verify(userRepository).findById(1L);
+        verify(userRepository).findByIdWithRole(1L);
     }
 
     @Test
@@ -212,7 +212,7 @@ class AuthServiceTest {
         Authentication auth = mock(Authentication.class);
         when(auth.getPrincipal()).thenReturn(userDetails);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(auth);
-        when(userRepository.findById(2L)).thenReturn(Optional.of(userWithoutRole));
+        when(userRepository.findByIdWithRole(2L)).thenReturn(Optional.of(userWithoutRole));
         when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("access-token");
         when(refreshTokenService.createRefreshToken(2L)).thenReturn("refresh-token");
         when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);

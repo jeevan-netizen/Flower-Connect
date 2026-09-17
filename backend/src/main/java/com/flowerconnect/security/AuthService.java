@@ -79,8 +79,8 @@ public class AuthService {
             Authentication authentication = authenticationManager.authenticate(authToken);
             UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-            User user = userRepository.findById(userDetails.getId())
-                    .orElseThrow(() -> new IllegalStateException("User not found after authentication"));
+             User user = userRepository.findByIdWithRole(userDetails.getId())
+                     .orElseThrow(() -> new IllegalStateException("User not found after authentication"));
 
             return createAuthResponse(user);
         } catch (BadCredentialsException e) {
