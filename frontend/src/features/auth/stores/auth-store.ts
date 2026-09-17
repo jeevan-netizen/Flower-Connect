@@ -20,6 +20,7 @@ interface AuthState {
 
   setAuth: (auth: AuthResponse) => void;
   setError: (error: string | null) => void;
+  setHasLoadedInitial: (value: boolean) => void;
   logout: () => void;
 
   login: (email: string, password: string) => Promise<void>;
@@ -49,6 +50,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setError: (error: string | null) => set({ error }),
+      setHasLoadedInitial: (value: boolean) => set({ hasLoadedInitial: value }),
 
       logout: () => {
         const { refreshToken } = get();
@@ -117,7 +119,10 @@ export const useAuthStore = create<AuthState>()(
 
       loadCurrentUser: async () => {
         const { accessToken } = get();
-        if (!accessToken) return;
+        if (!accessToken) {
+          set({ hasLoadedInitial: true });
+          return;
+        }
         try {
           const user = await fetchCurrentUser();
           set({ user, isAuthenticated: true, hasLoadedInitial: true });

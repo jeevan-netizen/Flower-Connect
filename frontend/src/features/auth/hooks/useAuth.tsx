@@ -15,12 +15,16 @@ export function useInitAuth() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const hasLoadedInitial = useAuthStore((state) => state.hasLoadedInitial);
   const loadCurrentUser = useAuthStore((state) => state.loadCurrentUser);
+  const setHasLoadedInitial = useAuthStore((state) => state.setHasLoadedInitial);
 
   useEffect(() => {
-    if (accessToken && !hasLoadedInitial) {
+    if (hasLoadedInitial) return;
+    if (accessToken) {
       void loadCurrentUser();
+    } else {
+      setHasLoadedInitial(true);
     }
-  }, [accessToken, hasLoadedInitial, loadCurrentUser]);
+  }, [accessToken, hasLoadedInitial, loadCurrentUser, setHasLoadedInitial]);
 
   return { hasLoadedInitial };
 }
