@@ -17,7 +17,7 @@
 | 011 | Dev        | Local MySQL lacked `flowerconnect` user with privileges | Environment | Backend uses `DB_USER=flowerconnect`/`DB_PASS=flowerconnect`. Local MySQL had only `root` (passwordless). User must be created manually for local dev, or Docker Compose handles it automatically. |
 | 012 | Docker     | Docker not available on this machine | Resolved | Docker is now available. Full-stack verified with `docker compose up --build`. All services pass healthchecks. |
 | 013 | Docker     | `docker-compose.yml` DB_URL used `${DB_HOST:-mysql}:${DB_PORT:-3306}` which resolved from root `.env` (host-side: `localhost:3307`) instead of internal Docker defaults | Fixed in `docker-compose.yml` | `DB_URL` now hardcodes `mysql:3306` (internal Docker network). Compose-level `${DB_HOST}` substitution is not used for the JDBC URL since the backend always connects to MySQL via the internal network. |
-| 014 | DB Schema  | V1 `roles` table missing `created_at` column (Role entity expects it via `@CreationTimestamp`) | Fixed via V4 migration | Added `V4__add_roles_created_at.sql` with `ALTER TABLE roles ADD COLUMN created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)`. Per Flyway ADR, V1 was not edited. |
+| 015 | DB / Auth  | `User.role` was `FetchType.LAZY` but `UserRepository.findByEmail` and `findById` lacked `JOIN FETCH`, causing `LazyInitializationException` during login and token refresh | Fixed | Added `@Query` with `JOIN FETCH u.role` to `UserRepository.findByEmail` and a new `findByIdWithRole` method. Added `@Query` with `JOIN FETCH rt.user u JOIN FETCH u.role` to `RefreshTokenRepository.findByTokenHash`. Updated `AuthService.login` to use `findByIdWithRole`. Updated `AuthServiceTest` mocks accordingly. |
 
 ## Known Limitations
 
@@ -40,6 +40,7 @@
 - Docker was unavailable in prior sessions; `docker compose up --build` could not be validated directly and local services were used as a substitute. Docker is now available and full-stack has been verified.
 - `docker-compose.yml` DB_URL line used `${DB_HOST:-mysql}:${DB_PORT:-3306}` template substitution, which resolved to `localhost:3307` (from root `.env` file intended for host-side tooling) instead of the internal Docker hostname `mysql:3306`. Fixed by hardcoding `mysql:3306` in the DB_URL env var.
 - V1__baseline.sql `roles` table omitted the `created_at` column that the `Role` entity maps via `@CreationTimestamp`. Hibernate `ddl-auto: validate` rejected the schema at startup. Fixed with V4 migration (`ALTER TABLE roles ADD COLUMN created_at ...`) rather than editing the applied V1 baseline.
+- `User.role` (FetchType.LAZY) was not eagerly fetched by `UserRepository.findByEmail` and `findById`, causing `LazyInitializationException` when `UserDetailsImpl.fromUser()` or `AuthService.createAuthResponse()` accessed `role.getName()` outside the Hibernate session. Fixed by adding `@Query` with `JOIN FETCH` to `findByEmail`, adding `findByIdWithRole`, and eager-fetching Role in `RefreshTokenRepository.findByTokenHash`.
 
 ## Blocked Work
 
