@@ -1,9 +1,13 @@
-import { createBrowserRouter, Outlet, Link, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Outlet, Link, RouterProvider, useNavigate } from "react-router-dom";
 import { useInitAuth, RequireAuth, RequireUnauth } from "@/features/auth/hooks/useAuth";
+import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 
 function Layout() {
+  const navigate = useNavigate();
+  const { isAuthenticated, logout } = useAuthStore();
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-brand-600 text-white">
@@ -12,9 +16,27 @@ function Layout() {
             FlowerConnect
           </Link>
           <div className="flex gap-4 text-sm">
-            <Link to="/browse">Browse</Link>
-            <Link to="/cart">Cart</Link>
-            <Link to="/orders">Orders</Link>
+            {isAuthenticated ? (
+              <>
+                <Link to="/browse">Browse</Link>
+                <Link to="/cart">Cart</Link>
+                <Link to="/orders">Orders</Link>
+                <button
+                  onClick={() => {
+                    logout();
+                    navigate("/", { replace: true });
+                  }}
+                  className="hover:underline"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login">Login</Link>
+                <Link to="/register">Register</Link>
+              </>
+            )}
           </div>
         </nav>
       </header>
