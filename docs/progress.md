@@ -18,6 +18,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
   - `application.yml` with datasource, Flyway, JPA, and actuator config
   - Maven build via `mvnw` wrapper + multi-stage Dockerfile
   - `V1__baseline.sql` migration: `roles` and `users` tables with FK, unique constraints, and indexes
+  - `V4__add_roles_created_at.sql` migration: adds `created_at` column to `roles` table (V1 omits it; Role entity expects it via `@CreationTimestamp`)
   - MySQL container with utf8mb4 charset/collation and init script
 - [x] Frontend scaffold: React 18 + Vite + TypeScript
   - `main.tsx` entry with ThemeProvider, QueryClientProvider, React Router
