@@ -56,10 +56,12 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
     private String accessToken;
     private String refreshToken;
     private final String userEmail = "apitest@test.com";
+    private final String duplicatePhoneEmail = "duplicate-phone@test.com";
 
     @BeforeEach
     void setUp() {
         userRepository.findByEmail(userEmail).ifPresent(userRepository::delete);
+        userRepository.findByEmail(duplicatePhoneEmail).ifPresent(userRepository::delete);
         accessToken = null;
         refreshToken = null;
     }
@@ -67,6 +69,7 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
     @AfterEach
     void tearDown() {
         userRepository.findByEmail(userEmail).ifPresent(userRepository::delete);
+        userRepository.findByEmail(duplicatePhoneEmail).ifPresent(userRepository::delete);
     }
 
     @Test
@@ -109,6 +112,37 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Email already in use"));
+    }
+
+    @Test
+    void shouldRejectDuplicateRegistrationWith409ForDuplicatePhone() throws Exception {
+        RegisterRequest firstRequest = RegisterRequest.builder()
+                .email(userEmail)
+                .password("password123")
+                .fullName("API Test User")
+                .phone("+1234567890")
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(firstRequest)))
+                .andExpect(status().isOk());
+
+        RegisterRequest secondRequest = RegisterRequest.builder()
+                .email(duplicatePhoneEmail)
+                .password("password123")
+                .fullName("Duplicate Phone User")
+                .phone("+1234567890")
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(secondRequest)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Phone number already in use"));
+
+        assertFalse(userRepository.findByEmail(duplicatePhoneEmail).isPresent(),
+                "Second user with duplicate phone should not be persisted");
     }
 
     @Test

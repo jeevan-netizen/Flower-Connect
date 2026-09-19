@@ -76,6 +76,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.existsByEmail("new@test.com")).thenReturn(false);
+        when(userRepository.existsByPhone("+1234567890")).thenReturn(false);
         when(roleRepository.findByName("CUSTOMER")).thenReturn(Optional.of(customerRole));
         when(passwordEncoder.encode("password123")).thenReturn("$2a$10$encoded");
         when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("access-token");
@@ -116,6 +117,51 @@ class AuthServiceTest {
         assertThrows(ResourceConflictException.class, () -> authService.register(request));
 
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldThrowConflictWhenPhoneExists() {
+        RegisterRequest request = RegisterRequest.builder()
+                .email("new@test.com")
+                .password("password123")
+                .fullName("New User")
+                .phone("+1234567890")
+                .build();
+
+        when(userRepository.existsByEmail("new@test.com")).thenReturn(false);
+        when(userRepository.existsByPhone("+1234567890")).thenReturn(true);
+
+        assertThrows(ResourceConflictException.class, () -> authService.register(request));
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRegisterSuccessfullyWhenPhoneIsNull() {
+        RegisterRequest request = RegisterRequest.builder()
+                .email("new@test.com")
+                .password("password123")
+                .fullName("New User")
+                .phone(null)
+                .build();
+
+        when(userRepository.existsByEmail("new@test.com")).thenReturn(false);
+        when(roleRepository.findByName("CUSTOMER")).thenReturn(Optional.of(customerRole));
+        when(passwordEncoder.encode("password123")).thenReturn("$2a$10$encoded");
+        when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("access-token");
+        when(refreshTokenService.createRefreshToken(1L)).thenReturn("refresh-token");
+        when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User saved = inv.getArgument(0);
+            saved.setId(1L);
+            return saved;
+        });
+
+        AuthResponse response = authService.register(request);
+
+        assertNotNull(response);
+        verify(userRepository, never()).existsByPhone(anyString());
+        verify(userRepository).save(any(User.class));
     }
 
     @Test

@@ -133,6 +133,25 @@ class AuthControllerTest {
     }
 
     @Test
+    void shouldReturn409ForDuplicatePhone() throws Exception {
+        RegisterRequest request = RegisterRequest.builder()
+                .email("new@test.com")
+                .password("password123")
+                .fullName("New User")
+                .phone("+1234567890")
+                .build();
+
+        when(authService.register(any(RegisterRequest.class)))
+                .thenThrow(new ResourceConflictException("Phone number already in use"));
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Phone number already in use"));
+    }
+
+    @Test
     void shouldRefreshSuccessfully() throws Exception {
         RefreshRequest request = RefreshRequest.builder().refreshToken("old-refresh-token").build();
         AuthResponse response = AuthResponse.of("new-access-token", "new-refresh-token", 900000L);

@@ -56,6 +56,10 @@ public class AuthService {
             throw new ResourceConflictException("Email already in use");
         }
 
+        if (request.getPhone() != null && userRepository.existsByPhone(request.getPhone())) {
+            throw new ResourceConflictException("Phone number already in use");
+        }
+
         Role customerRole = roleRepository.findByName("CUSTOMER")
                 .orElseThrow(() -> new IllegalStateException("CUSTOMER role not found"));
 

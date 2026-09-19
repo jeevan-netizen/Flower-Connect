@@ -24,6 +24,7 @@
         <mysql.connector.version>8.3.0</mysql.connector.version>
         <flyway.version>9.22.3</flyway.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
+        <testcontainers.version>1.20.2</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -121,13 +122,19 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>mysql</artifactId>
-            <version>1.19.8</version>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>1.19.8</version>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

@@ -55,6 +55,8 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 #### Phase 1 — Authentication (Complete)
 - [x] V2 migration: `refresh_tokens` table with SHA-256 token hashes
 - [x] V3 migration: Seed CUSTOMER, FLORIST, ADMIN roles
+- [x] V4 migration: Add `created_at` column to `roles` table
+- [x] V5 migration: Add unique constraint on `users(phone)`
 - [x] JPA entities: Role, User, RefreshToken with repositories
 - [x] JWT service: token generation, validation, parsing (HS256)
 - [x] Password hashing with BCryptPasswordEncoder
@@ -110,6 +112,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 | 2026-09-15 | Housekeeping: gitignored build artifacts | `.gitignore` (added tsconfig.tsbuildinfo, *.tsbuildinfo) |
 | 2026-09-17 | Added auth-aware navigation with logout (nav component) | `frontend/src/app/router.tsx` |
 | 2026-09-17 | Fixed login LazyInitializationException (eager Role fetch in JPA queries) | `UserRepository.java`, `RefreshTokenRepository.java`, `AuthService.java`, `AuthServiceTest.java` |
+| 2026-09-18 | Added phone-number uniqueness to registration (app-level + DB constraint) | V5 migration, `UserRepository.java`, `AuthService.java`, `User.java`, tests |
 
 ## Session Notes
 
@@ -118,5 +121,5 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - `package-lock.json` is gitignored — use `npm install`, not `npm ci`, for local dev.
 - All Kilo configuration lives in `kilo.jsonc` (validated). Agent and command `.md` files in `.kilo/` directories fail YAML validation in this Kilo CLI build.
 - `docs/progress.md` is the ground truth for unfinished work — always check before starting new tasks.
-- Phase 1 backend complete with 51 unit tests passing. Integration tests (4 tests) require Docker running for Testcontainers MySQL 8.
+- Phase 1 backend complete with 58 unit tests passing (3 new tests for phone uniqueness). Integration tests (5 tests) require Docker running for Testcontainers MySQL 8.
 - Phase 1 frontend auth complete: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor, 41 frontend tests passing (54 total including smoke test).
