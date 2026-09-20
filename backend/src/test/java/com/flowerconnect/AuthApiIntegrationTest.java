@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.*;
@@ -53,6 +54,9 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
     @Autowired
     private RefreshTokenService refreshTokenService;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private String accessToken;
     private String refreshToken;
     private final String userEmail = "apitest@test.com";
@@ -68,8 +72,14 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
 
     @AfterEach
     void tearDown() {
-        userRepository.findByEmail(userEmail).ifPresent(userRepository::delete);
-        userRepository.findByEmail(duplicatePhoneEmail).ifPresent(userRepository::delete);
+        userRepository.findByEmail(userEmail).ifPresent(user -> {
+            jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", user.getId());
+            userRepository.delete(user);
+        });
+        userRepository.findByEmail(duplicatePhoneEmail).ifPresent(user -> {
+            jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", user.getId());
+            userRepository.delete(user);
+        });
     }
 
     @Test
