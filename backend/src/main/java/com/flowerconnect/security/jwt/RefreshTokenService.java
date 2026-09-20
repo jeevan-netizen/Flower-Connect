@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -38,6 +39,10 @@ public class RefreshTokenService {
     }
 
     public String createRefreshToken(Long userId) {
+        return doCreateRefreshToken(userId, UUID.randomUUID().toString()).rawToken;
+    }
+
+    private TokenCreationResult doCreateRefreshToken(Long userId, String familyId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new TokenRefreshException("User not found"));
         String rawToken = jwtService.generateRefreshToken();
@@ -47,11 +52,20 @@ public class RefreshTokenService {
                 .user(user)
                 .tokenHash(tokenHash)
                 .expiresAt(expiresAt)
-                .revoked(false)
+                .familyId(familyId)
                 .build();
-        refreshTokenRepository.save(refreshToken);
-        log.debug("Created refresh token for user id={}", userId);
-        return rawToken;
+        RefreshToken saved = refreshTokenRepository.save(refreshToken);
+        return new TokenCreationResult(rawToken, saved);
+    }
+
+    private static class TokenCreationResult {
+        final String rawToken;
+        final RefreshToken entity;
+
+        TokenCreationResult(String rawToken, RefreshToken entity) {
+            this.rawToken = rawToken;
+            this.entity = entity;
+        }
     }
 
     public String rotateRefreshToken(String rawToken) {
@@ -68,10 +82,14 @@ public class RefreshTokenService {
             throw new TokenRefreshException("Refresh token has expired");
         }
 
-        storedToken.setRevoked(true);
+        TokenCreationResult result = doCreateRefreshToken(storedToken.getUser().getId(), storedToken.getFamilyId());
+
+        storedToken.setRevokedAt(LocalDateTime.now());
+        storedToken.setReplacedById(result.entity.getId());
         refreshTokenRepository.save(storedToken);
 
-        return createRefreshToken(storedToken.getUser().getId());
+        log.debug("Rotated refresh token for user id={}", storedToken.getUser().getId());
+        return result.rawToken;
     }
 
     public User validateAndReturnUser(String rawToken) {
@@ -96,7 +114,7 @@ public class RefreshTokenService {
         Optional<RefreshToken> opt = refreshTokenRepository.findByTokenHash(tokenHash);
         if (opt.isPresent()) {
             RefreshToken token = opt.get();
-            token.setRevoked(true);
+            token.setRevokedAt(LocalDateTime.now());
             refreshTokenRepository.save(token);
             log.debug("Revoked refresh token for user id={}", token.getUser().getId());
         }

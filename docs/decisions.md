@@ -218,3 +218,24 @@ forgot-password only.
 - Login and forgot-password must not leak account existence. The section 14
   acceptance criterion is scoped to those two endpoints.
 - Rate limiting (task 1.11) is the mitigation to consider against bulk probing.
+
+---
+
+## D-9: Migrations rewritten before first deployment
+
+**Status:** Accepted
+**Date:** Phase 1
+
+### Context
+
+The project uses Flyway with `baseline-on-migrate: true` and an additive-only migration rule (ADR-002). Before the first deployment, the initial schema may need to be corrected — adding columns, constraints, or tables that were missing from V1. The question is whether to fix these issues by editing V1 or by writing a new migration.
+
+### Decision
+
+Migrations are rewritten before the first deployment. The additive-only migration rule (ADR-002) applies from the first deployment onward. Before deployment, V1 through the current version can be replaced entirely. After the first deployment, all migrations are additive — never edit an applied migration.
+
+### Consequences
+
+- Before deployment: schema corrections are straightforward — replace the migration files and let Flyway apply the corrected schema from scratch.
+- After deployment: corrections must be additive — new V[n+1]__ migrations that fix issues introduced by earlier files. Editing applied migrations is forbidden.
+- Flyway `validate-on-migrate: true` ensures schema drift is caught immediately if the migration files and database state diverge.

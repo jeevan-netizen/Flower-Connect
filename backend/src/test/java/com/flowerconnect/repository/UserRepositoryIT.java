@@ -30,7 +30,7 @@ class UserRepositoryIT extends IntegrationTestBase {
                 .fullName("Test User")
                 .phone("+1234567890")
                 .role(role)
-                .active(true)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .build();
         return userRepository.save(user);
     }
@@ -44,7 +44,7 @@ class UserRepositoryIT extends IntegrationTestBase {
                 .fullName("Test User")
                 .phone("+1234567890")
                 .role(role)
-                .active(true)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .build();
 
         User saved = userRepository.save(user);
@@ -68,7 +68,9 @@ class UserRepositoryIT extends IntegrationTestBase {
                 .email("unique@test.com")
                 .passwordHash("$2a$10$hash1")
                 .fullName("User One")
+                .phone("+1234567890")
                 .role(role)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .build();
         userRepository.saveAndFlush(user1);
 
@@ -76,7 +78,9 @@ class UserRepositoryIT extends IntegrationTestBase {
                 .email("unique@test.com")
                 .passwordHash("$2a$10$hash2")
                 .fullName("User Two")
+                .phone("+1234567890")
                 .role(role)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .build();
 
         assertThrows(Exception.class, () -> {

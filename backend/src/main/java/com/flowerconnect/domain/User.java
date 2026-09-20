@@ -36,8 +36,13 @@ public class User {
     @Column(name = "phone", length = 32, unique = true)
     private String phone;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean active = true;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private Status status;
+
+    public enum Status {
+        ACTIVE, SUSPENDED, DISABLED
+    }
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

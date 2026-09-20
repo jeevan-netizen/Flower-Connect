@@ -47,7 +47,7 @@ class RefreshTokenServiceTest {
                 .passwordHash("$2a$10$encoded")
                 .fullName("Test User")
                 .role(role)
-                .active(true)
+                .status(User.Status.ACTIVE)
                 .build();
     }
 
@@ -62,7 +62,7 @@ class RefreshTokenServiceTest {
 
         assertNotNull(rawToken);
         assertEquals("raw-token-string", rawToken);
-        verify(refreshTokenRepository).save(any(RefreshToken.class));
+        verify(refreshTokenRepository).save(argThat(t -> t.getFamilyId() != null));
     }
 
     @Test
@@ -82,7 +82,6 @@ class RefreshTokenServiceTest {
                 .user(user)
                 .tokenHash(hash)
                 .expiresAt(LocalDateTime.now().plusDays(7))
-                .revoked(false)
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(storedToken));
@@ -91,6 +90,7 @@ class RefreshTokenServiceTest {
         refreshTokenService.revokeRefreshToken(rawToken);
 
         assertTrue(storedToken.isRevoked());
+        assertNotNull(storedToken.getRevokedAt());
         verify(refreshTokenRepository).save(storedToken);
     }
 
@@ -115,7 +115,7 @@ class RefreshTokenServiceTest {
                 .user(user)
                 .tokenHash(hash)
                 .expiresAt(LocalDateTime.now().plusDays(7))
-                .revoked(false)
+
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(storedToken));
@@ -135,7 +135,7 @@ class RefreshTokenServiceTest {
                 .user(user)
                 .tokenHash(hash)
                 .expiresAt(LocalDateTime.now().plusDays(7))
-                .revoked(true)
+                .revokedAt(LocalDateTime.now())
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(storedToken));
@@ -153,7 +153,7 @@ class RefreshTokenServiceTest {
                 .user(user)
                 .tokenHash(hash)
                 .expiresAt(LocalDateTime.now().minusDays(1))
-                .revoked(false)
+
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(storedToken));
@@ -175,13 +175,12 @@ class RefreshTokenServiceTest {
     void shouldRotateRefreshToken() {
         String oldRawToken = "old-token";
         String oldHash = refreshTokenService.hashToken(oldRawToken);
-
         RefreshToken storedToken = RefreshToken.builder()
                 .id(1L)
                 .user(user)
                 .tokenHash(oldHash)
+                .familyId("test-family")
                 .expiresAt(LocalDateTime.now().plusDays(7))
-                .revoked(false)
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(oldHash)).thenReturn(Optional.of(storedToken));
@@ -195,6 +194,8 @@ class RefreshTokenServiceTest {
         assertNotNull(newRawToken);
         assertEquals("new-raw-token", newRawToken);
         assertTrue(storedToken.isRevoked());
+        assertEquals("test-family", storedToken.getFamilyId());
+        assertNotNull(storedToken.getRevokedAt());
         verify(refreshTokenRepository).save(storedToken);
         verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
     }
@@ -209,7 +210,7 @@ class RefreshTokenServiceTest {
                 .user(user)
                 .tokenHash(hash)
                 .expiresAt(LocalDateTime.now().plusDays(7))
-                .revoked(true)
+                .revokedAt(LocalDateTime.now())
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(storedToken));
@@ -227,7 +228,7 @@ class RefreshTokenServiceTest {
                 .user(user)
                 .tokenHash(hash)
                 .expiresAt(LocalDateTime.now().minusDays(1))
-                .revoked(false)
+
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(storedToken));
@@ -281,5 +282,66 @@ class RefreshTokenServiceTest {
         refreshTokenService.cleanupExpiredTokens();
 
         verify(refreshTokenRepository).deleteExpiredAndRevokedBefore(any(LocalDateTime.class));
+    }
+
+    @Test
+    void shouldGenerateFamilyIdOnLogin() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(jwtService.generateRefreshToken()).thenReturn("raw-token");
+        when(jwtProperties.getRefreshTtlMs()).thenReturn(604800000L);
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        refreshTokenService.createRefreshToken(1L);
+
+        verify(refreshTokenRepository).save(argThat(t -> t.getFamilyId() != null && !t.getFamilyId().isEmpty()));
+    }
+
+    @Test
+    void shouldPreserveFamilyIdOnRotation() {
+        String oldRawToken = "old-token";
+        String oldHash = refreshTokenService.hashToken(oldRawToken);
+
+        RefreshToken storedToken = RefreshToken.builder()
+                .id(1L)
+                .user(user)
+                .tokenHash(oldHash)
+                .familyId("same-family-id")
+                .expiresAt(LocalDateTime.now().plusDays(7))
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(oldHash)).thenReturn(Optional.of(storedToken));
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.generateRefreshToken()).thenReturn("new-raw-token");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(jwtProperties.getRefreshTtlMs()).thenReturn(604800000L);
+
+        refreshTokenService.rotateRefreshToken(oldRawToken);
+
+        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
+        verify(refreshTokenRepository).save(argThat(t -> "same-family-id".equals(t.getFamilyId()) && t.getRevokedAt() == null));
+    }
+
+    @Test
+    void shouldSetReplacedByIdOnRotation() {
+        String oldRawToken = "old-token";
+        String oldHash = refreshTokenService.hashToken(oldRawToken);
+
+        RefreshToken storedToken = RefreshToken.builder()
+                .id(1L)
+                .user(user)
+                .tokenHash(oldHash)
+                .familyId("fam")
+                .expiresAt(LocalDateTime.now().plusDays(7))
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(oldHash)).thenReturn(Optional.of(storedToken));
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.generateRefreshToken()).thenReturn("new-raw-token");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(jwtProperties.getRefreshTtlMs()).thenReturn(604800000L);
+
+        refreshTokenService.rotateRefreshToken(oldRawToken);
+
+        verify(refreshTokenRepository).save(eq(storedToken));
     }
 }

@@ -69,7 +69,7 @@ public class AuthService {
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
                 .role(customerRole)
-                .active(true)
+                .status(User.Status.ACTIVE)
                 .build();
         userRepository.save(user);
 

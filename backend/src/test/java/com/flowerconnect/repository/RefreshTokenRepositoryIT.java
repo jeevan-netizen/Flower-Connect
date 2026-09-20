@@ -35,7 +35,7 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
                 .passwordHash("$2a$10$dummyhash")
                 .fullName("Test User")
                 .role(role)
-                .active(true)
+                .status(User.Status.ACTIVE)
                 .build();
         return userRepository.save(user);
     }
@@ -47,7 +47,7 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
                 .user(user)
                 .tokenHash("sha256-hash-value")
                 .expiresAt(LocalDateTime.now().plusDays(7))
-                .revoked(false)
+
                 .build();
 
         refreshTokenRepository.save(token);
@@ -86,13 +86,13 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
                 .user(user)
                 .tokenHash("expired-hash")
                 .expiresAt(LocalDateTime.now().minusDays(1))
-                .revoked(true)
+                .revokedAt(LocalDateTime.now())
                 .build();
         RefreshToken valid = RefreshToken.builder()
                 .user(user)
                 .tokenHash("valid-hash")
                 .expiresAt(LocalDateTime.now().plusDays(7))
-                .revoked(false)
+
                 .build();
 
         refreshTokenRepository.saveAll(List.of(expired, valid));
@@ -111,7 +111,7 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
                 .user(user)
                 .tokenHash("active1-hash")
                 .expiresAt(LocalDateTime.now().plusDays(7))
-                .revoked(false)
+
                 .build();
         RefreshToken active2 = RefreshToken.builder()
                 .user(user)
@@ -122,7 +122,7 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
                 .user(user)
                 .tokenHash("revoked-hash")
                 .expiresAt(LocalDateTime.now().plusDays(7))
-                .revoked(true)
+                .revokedAt(LocalDateTime.now())
                 .build();
 
         refreshTokenRepository.saveAll(List.of(active1, active2, revoked));
@@ -130,7 +130,7 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
 
         refreshTokenRepository.revokeAllActiveTokensForUser(user);
 
-        List<RefreshToken> active = refreshTokenRepository.findByUserIdAndRevokedFalseOrderByCreatedAtDesc(user.getId());
+        List<RefreshToken> active = refreshTokenRepository.findByUserIdAndRevokedAtNullOrderCreatedAtDesc(user.getId());
         assertEquals(0, active.size());
     }
 }

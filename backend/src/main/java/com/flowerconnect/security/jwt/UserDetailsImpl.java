@@ -2,6 +2,7 @@ package com.flowerconnect.security.jwt;
 
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
+import com.flowerconnect.domain.User.Status;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -38,7 +39,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getPasswordHash(),
                 user.getFullName(),
                 roleName,
-                user.isActive());
+                user.getStatus() == Status.ACTIVE);
     }
 
     @Override

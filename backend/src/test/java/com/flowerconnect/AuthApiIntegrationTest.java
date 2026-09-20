@@ -315,7 +315,7 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
                 .fullName("API Test User")
                 .phone("+1234567890")
                 .role(role)
-                .active(true)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .build();
         userRepository.save(user);
     }

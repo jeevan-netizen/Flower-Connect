@@ -63,7 +63,7 @@ class UserControllerTest {
                 .fullName("Test User")
                 .phone("+1234567890")
                 .role(role)
-                .active(true)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .createdAt(LocalDateTime.of(2024, 1, 15, 10, 30))
                 .build();
 

@@ -62,7 +62,7 @@ class AuthServiceTest {
                 .fullName("Test User")
                 .phone("+1234567890")
                 .role(customerRole)
-                .active(true)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .build();
     }
 
@@ -95,6 +95,8 @@ class AuthServiceTest {
         assertEquals("refresh-token", response.getRefreshToken());
         assertEquals("Bearer", response.getTokenType());
         assertEquals(900000L, response.getExpiresIn());
+
+        verify(userRepository).save(argThat(u -> com.flowerconnect.domain.User.Status.ACTIVE == u.getStatus()));
 
         verify(userRepository).existsByEmail("new@test.com");
         verify(roleRepository).findByName("CUSTOMER");
@@ -246,7 +248,7 @@ class AuthServiceTest {
                 .passwordHash("$2a$10$encoded")
                 .fullName("User Two")
                 .role(null)
-                .active(true)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .build();
 
         LoginRequest request = LoginRequest.builder()
