@@ -188,3 +188,33 @@ The backend needs a clean, maintainable architecture that separates concerns.
 - Services contain transactional business logic.
 - Repositories abstract database access.
 - Test naming convention: `*ServiceTest`, `*ControllerTest`, `*RepositoryTest`.
+
+## D-8: Registration duplicate-email behaviour
+
+**Status:** Accepted
+**Date:** Phase 1
+
+### Context
+
+A user who already has an account and tries to register again needs to be told,
+or they get a confusing failure. A specific response reveals whether an email is
+registered, which is user enumeration. Login and forgot-password can avoid this
+by returning identical responses; registration cannot without a more complex
+flow (such as emailing the existing owner instead of responding), which is out
+of scope.
+
+### Decision
+
+Registration returns 409 Conflict with a specific message when the email is
+already in use (the same applies to a duplicate phone). This is an accepted UX
+trade-off. The "no user enumeration" requirement applies to login and
+forgot-password only.
+
+### Consequences
+
+- Better UX: a user who already has an account is told so and can log in or
+  reset the password.
+- Registration reveals whether an email or phone is registered; this is accepted.
+- Login and forgot-password must not leak account existence. The section 14
+  acceptance criterion is scoped to those two endpoints.
+- Rate limiting (task 1.11) is the mitigation to consider against bulk probing.
