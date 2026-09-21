@@ -51,12 +51,12 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] Run TypeScript type checks
 - [x] Run ESLint
 - [x] Verify backend + frontend health endpoints
-
 #### Phase 1 — Authentication (Complete)
-- [x] V2 migration: `refresh_tokens` table with SHA-256 token hashes
+
+- [x] V1 migration: roles, users with ENUM status column (ACTIVE/SUSPENDED/DISABLED)
+- [x] V2 migration: refresh_tokens (family_id, revoked_at, replaced_by_id), password_reset_tokens
 - [x] V3 migration: Seed CUSTOMER, FLORIST, ADMIN roles
-- [x] V4 migration: Add `created_at` column to `roles` table
-- [x] V5 migration: Add unique constraint on `users(phone)`
+- [x] User.Status enum replaces boolean active; RefreshToken.revokedAt/familyId/replacedById replace boolean revoked
 - [x] JPA entities: Role, User, RefreshToken with repositories
 - [x] JWT service: token generation, validation, parsing (HS256)
 - [x] Password hashing with BCryptPasswordEncoder
@@ -71,7 +71,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] DTOs with Bean Validation + MapStruct mappers
 - [x] Global exception handler (@RestControllerAdvice)
 - [x] Scheduled cleanup job for expired/revoked refresh tokens
-- [x] Unit tests: 51 tests pass (JWT, auth service, controllers, mappers)
+- [x] Unit tests: 61 tests pass (JWT, auth service, controllers, mappers)
 - [x] Integration tests: 24 tests (all pass, single Testcontainers MySQL 8 container)
 - [x] Frontend types (`types.ts`): RegisterRequest, LoginRequest, RefreshRequest, AuthResponse, UserResponse, ErrorResponse
 - [x] Auth API client (`api.ts`): register, login, refresh, logout, fetchCurrentUser wrappers

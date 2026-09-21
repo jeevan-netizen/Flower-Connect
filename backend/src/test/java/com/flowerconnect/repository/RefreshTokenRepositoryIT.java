@@ -130,7 +130,7 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
 
         refreshTokenRepository.revokeAllActiveTokensForUser(user);
 
-        List<RefreshToken> active = refreshTokenRepository.findByUserIdAndRevokedAtNullOrderCreatedAtDesc(user.getId());
+        List<RefreshToken> active = refreshTokenRepository.findByUserIdAndRevokedAtIsNullOrderByCreatedAtDesc(user.getId());
         assertEquals(0, active.size());
     }
 }

@@ -17,8 +17,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Query("SELECT rt FROM RefreshToken rt JOIN FETCH rt.user u JOIN FETCH u.role WHERE rt.tokenHash = :tokenHash")
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
-    @Query("SELECT rt FROM RefreshToken rt JOIN FETCH rt.user u JOIN FETCH u.role WHERE rt.user.id = :userId AND rt.revokedAt IS NULL ORDER BY rt.createdAt DESC")
-    List<RefreshToken> findByUserIdAndRevokedAtNullOrderCreatedAtDesc(Long userId);
+    List<RefreshToken> findByUserIdAndRevokedAtIsNullOrderByCreatedAtDesc(Long userId);
 
     @Transactional
     @Modifying
