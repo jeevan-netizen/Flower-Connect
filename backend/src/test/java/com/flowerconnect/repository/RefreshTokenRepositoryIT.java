@@ -4,14 +4,18 @@ import com.flowerconnect.domain.RefreshToken;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.test.IntegrationTestBase;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,12 +32,17 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
     @Autowired
     private RoleRepository roleRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private User createTestUser(String email) {
         Role role = roleRepository.findByName("CUSTOMER").orElseThrow();
+        String uniquePhone = "+1" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         User user = User.builder()
                 .email(email)
                 .passwordHash("$2a$10$dummyhash")
                 .fullName("Test User")
+                .phone(uniquePhone)
                 .role(role)
                 .status(User.Status.ACTIVE)
                 .build();
@@ -42,12 +51,12 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
 
     @Test
     void shouldSaveAndFindByTokenHash() {
-        User user = createTestUser("rt@test.com");
+        String uniqueEmail = "rt-" + UUID.randomUUID() + "@test.com";
+        User user = createTestUser(uniqueEmail);
         RefreshToken token = RefreshToken.builder()
                 .user(user)
                 .tokenHash("sha256-hash-value")
                 .expiresAt(LocalDateTime.now().plusDays(7))
-
                 .build();
 
         refreshTokenRepository.save(token);
@@ -59,8 +68,10 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
 
     @Test
     void shouldEnforceUniqueTokenHash() {
-        User user1 = createTestUser("rt1@test.com");
-        User user2 = createTestUser("rt2@test.com");
+        String uniqueEmail1 = "rt1-" + UUID.randomUUID() + "@test.com";
+        String uniqueEmail2 = "rt2-" + UUID.randomUUID() + "@test.com";
+        User user1 = createTestUser(uniqueEmail1);
+        User user2 = createTestUser(uniqueEmail2);
 
         RefreshToken token1 = RefreshToken.builder()
                 .user(user1)
@@ -80,7 +91,8 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
 
     @Test
     void shouldDeleteExpiredAndRevokedTokens() {
-        User user = createTestUser("rt3@test.com");
+        String uniqueEmail = "rt3-" + UUID.randomUUID() + "@test.com";
+        User user = createTestUser(uniqueEmail);
 
         RefreshToken expired = RefreshToken.builder()
                 .user(user)
@@ -92,7 +104,6 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
                 .user(user)
                 .tokenHash("valid-hash")
                 .expiresAt(LocalDateTime.now().plusDays(7))
-
                 .build();
 
         refreshTokenRepository.saveAll(List.of(expired, valid));
@@ -105,13 +116,13 @@ class RefreshTokenRepositoryIT extends IntegrationTestBase {
 
     @Test
     void shouldRevokeAllActiveTokensForUser() {
-        User user = createTestUser("rt4@test.com");
+        String uniqueEmail = "rt4-" + UUID.randomUUID() + "@test.com";
+        User user = createTestUser(uniqueEmail);
 
         RefreshToken active1 = RefreshToken.builder()
                 .user(user)
                 .tokenHash("active1-hash")
                 .expiresAt(LocalDateTime.now().plusDays(7))
-
                 .build();
         RefreshToken active2 = RefreshToken.builder()
                 .user(user)

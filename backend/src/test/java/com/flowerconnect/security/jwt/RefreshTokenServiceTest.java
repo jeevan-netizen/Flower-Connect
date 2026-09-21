@@ -21,6 +21,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import java.util.Optional;
+
+import org.mockito.ArgumentCaptor;
+
 @ExtendWith(MockitoExtension.class)
 class RefreshTokenServiceTest {
 
@@ -335,13 +339,29 @@ class RefreshTokenServiceTest {
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(oldHash)).thenReturn(Optional.of(storedToken));
-        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> {
+            RefreshToken arg = inv.getArgument(0);
+            if (arg.getId() == null) {
+                arg.setId(2L);
+            }
+            return arg;
+        });
         when(jwtService.generateRefreshToken()).thenReturn("new-raw-token");
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(jwtProperties.getRefreshTtlMs()).thenReturn(604800000L);
 
         refreshTokenService.rotateRefreshToken(oldRawToken);
 
-        verify(refreshTokenRepository).save(eq(storedToken));
+        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository, times(2)).save(captor.capture());
+
+        RefreshToken newToken = captor.getAllValues().get(0);
+        RefreshToken oldToken = captor.getAllValues().get(1);
+
+        assertEquals(storedToken.getId(), oldToken.getId());
+        assertEquals(newToken.getId(), oldToken.getReplacedById());
+        assertEquals(storedToken.getFamilyId(), newToken.getFamilyId());
+        assertNotNull(oldToken.getRevokedAt());
+        assertNull(newToken.getRevokedAt());
     }
 }

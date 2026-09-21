@@ -1,5 +1,7 @@
 package com.flowerconnect.security.jwt;
 
+import com.flowerconnect.domain.User;
+import com.flowerconnect.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,9 +22,11 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserRepository userRepository) {
         this.jwtService = jwtService;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -35,6 +39,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 if (jwtService.validateToken(token)) {
                     String email = jwtService.getEmailFromToken(token);
+                    
+                    // Load user from database to check status
+                    User user = userRepository.findByEmail(email).orElse(null);
+                    if (user == null || user.getStatus() != User.Status.ACTIVE) {
+                        log.debug("JWT authentication failed: user not found or not ACTIVE");
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Invalid or expired token\"}");
+                        return;
+                    }
+                    
                     List<String> authorities = jwtService.getAuthoritiesFromToken(token);
 
                     List<SimpleGrantedAuthority> granted = authorities.stream()

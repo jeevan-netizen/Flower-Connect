@@ -1,6 +1,7 @@
 package com.flowerconnect.config;
 
 import com.flowerconnect.config.CorsProperties;
+import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.security.jwt.JwtAuthenticationFilter;
 import com.flowerconnect.security.jwt.JwtService;
 import com.flowerconnect.security.jwt.UserDetailsServiceImpl;
@@ -36,6 +37,7 @@ public class SecurityConfig {
     private final CorsProperties corsProperties;
     private final CustomAuthenticationEntryPoint entryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;
+    private final UserRepository userRepository;
 
     public SecurityConfig(
             JwtService jwtService,
@@ -43,13 +45,15 @@ public class SecurityConfig {
             PasswordEncoder passwordEncoder,
             CorsProperties corsProperties,
             CustomAuthenticationEntryPoint entryPoint,
-            CustomAccessDeniedHandler accessDeniedHandler) {
+            CustomAccessDeniedHandler accessDeniedHandler,
+            UserRepository userRepository) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.corsProperties = corsProperties;
         this.entryPoint = entryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.userRepository = userRepository;
     }
 
     @Bean
@@ -69,7 +73,7 @@ public class SecurityConfig {
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler)
             )
-            .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -19,15 +19,15 @@ public class UserDetailsImpl implements UserDetails {
     private final String password;
     private final String fullName;
     private final String roleName;
-    private final boolean active;
+    private final Status status;
 
-    public UserDetailsImpl(Long id, String email, String password, String fullName, String roleName, boolean active) {
+    public UserDetailsImpl(Long id, String email, String password, String fullName, String roleName, Status status) {
         this.id = id;
         this.email = email;
         this.password = password;
         this.fullName = fullName;
         this.roleName = roleName;
-        this.active = active;
+        this.status = status;
     }
 
     public static UserDetailsImpl fromUser(User user) {
@@ -39,7 +39,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getPasswordHash(),
                 user.getFullName(),
                 roleName,
-                user.getStatus() == Status.ACTIVE);
+                user.getStatus());
     }
 
     @Override
@@ -59,21 +59,21 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isAccountNonExpired() {
-        return active;
+        return true;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return active;
+        return true;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return active;
+        return true;
     }
 
     @Override
     public boolean isEnabled() {
-        return active;
+        return true;
     }
 }

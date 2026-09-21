@@ -3,11 +3,13 @@ package com.flowerconnect.security.jwt;
 import com.flowerconnect.config.JwtProperties;
 import com.flowerconnect.domain.RefreshToken;
 import com.flowerconnect.domain.User;
+import com.flowerconnect.exception.AccountSuspendedException;
 import com.flowerconnect.exception.TokenRefreshException;
 import com.flowerconnect.repository.RefreshTokenRepository;
 import com.flowerconnect.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -68,6 +70,7 @@ public class RefreshTokenService {
         }
     }
 
+    @Transactional
     public String rotateRefreshToken(String rawToken) {
         String tokenHash = hashToken(rawToken);
         RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
@@ -82,13 +85,21 @@ public class RefreshTokenService {
             throw new TokenRefreshException("Refresh token has expired");
         }
 
-        TokenCreationResult result = doCreateRefreshToken(storedToken.getUser().getId(), storedToken.getFamilyId());
+        User user = storedToken.getUser();
+        if (user.getStatus() == User.Status.SUSPENDED) {
+            throw new AccountSuspendedException("Account suspended");
+        }
+        if (user.getStatus() == User.Status.DISABLED) {
+            throw new TokenRefreshException("Invalid refresh token");
+        }
+
+        TokenCreationResult result = doCreateRefreshToken(user.getId(), storedToken.getFamilyId());
 
         storedToken.setRevokedAt(LocalDateTime.now());
         storedToken.setReplacedById(result.entity.getId());
         refreshTokenRepository.save(storedToken);
 
-        log.debug("Rotated refresh token for user id={}", storedToken.getUser().getId());
+        log.debug("Rotated refresh token for user id={}", user.getId());
         return result.rawToken;
     }
 
@@ -106,7 +117,15 @@ public class RefreshTokenService {
             throw new TokenRefreshException("Refresh token has expired");
         }
 
-        return storedToken.getUser();
+        User user = storedToken.getUser();
+        if (user.getStatus() == User.Status.SUSPENDED) {
+            throw new AccountSuspendedException("Account suspended");
+        }
+        if (user.getStatus() == User.Status.DISABLED) {
+            throw new TokenRefreshException("Invalid refresh token");
+        }
+
+        return user;
     }
 
     public void revokeRefreshToken(String rawToken) {

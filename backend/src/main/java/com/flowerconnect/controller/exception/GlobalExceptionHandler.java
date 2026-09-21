@@ -1,5 +1,6 @@
 package com.flowerconnect.controller.exception;
 
+import com.flowerconnect.exception.AccountSuspendedException;
 import com.flowerconnect.exception.ResourceConflictException;
 import com.flowerconnect.exception.TokenRefreshException;
 import com.flowerconnect.security.dto.ErrorResponse;
@@ -35,6 +36,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(TokenRefreshException.class)
     public ResponseEntity<ErrorResponse> handleTokenRefresh(TokenRefreshException ex) {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
+    }
+
+    @ExceptionHandler(AccountSuspendedException.class)
+    public ResponseEntity<ErrorResponse> handleAccountSuspended(AccountSuspendedException ex) {
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage());
     }
 
     @ExceptionHandler(ResourceConflictException.class)

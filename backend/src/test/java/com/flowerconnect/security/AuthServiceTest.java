@@ -1,8 +1,10 @@
 package com.flowerconnect.security;
 
+import com.flowerconnect.domain.User.Status;
 import com.flowerconnect.config.JwtProperties;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
+import com.flowerconnect.exception.AccountSuspendedException;
 import com.flowerconnect.exception.ResourceConflictException;
 import com.flowerconnect.exception.TokenRefreshException;
 import com.flowerconnect.repository.RoleRepository;
@@ -26,6 +28,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,12 +53,14 @@ class AuthServiceTest {
     private AuthService authService;
 
     private Role customerRole;
-    private User user;
+    private User activeUser;
+    private User suspendedUser;
+    private User disabledUser;
 
     @BeforeEach
     void setUp() {
         customerRole = Role.builder().id(1L).name("CUSTOMER").build();
-        user = User.builder()
+        activeUser = User.builder()
                 .id(1L)
                 .email("user@test.com")
                 .passwordHash("$2a$10$encoded")
@@ -63,6 +68,24 @@ class AuthServiceTest {
                 .phone("+1234567890")
                 .role(customerRole)
                 .status(com.flowerconnect.domain.User.Status.ACTIVE)
+                .build();
+        suspendedUser = User.builder()
+                .id(2L)
+                .email("suspended@test.com")
+                .passwordHash("$2a$10$encoded")
+                .fullName("Suspended User")
+                .phone("+1234567891")
+                .role(customerRole)
+                .status(com.flowerconnect.domain.User.Status.SUSPENDED)
+                .build();
+        disabledUser = User.builder()
+                .id(3L)
+                .email("disabled@test.com")
+                .passwordHash("$2a$10$encoded")
+                .fullName("Disabled User")
+                .phone("+1234567892")
+                .role(customerRole)
+                .status(com.flowerconnect.domain.User.Status.DISABLED)
                 .build();
     }
 
@@ -107,9 +130,38 @@ class AuthServiceTest {
     }
 
     @Test
-    void shouldThrowConflictWhenEmailExists() {
+    void shouldRegisterUserWithEmailNormalizedToLowercase() {
         RegisterRequest request = RegisterRequest.builder()
-                .email("existing@test.com")
+                .email("Test@Example.COM")
+                .password("password123")
+                .fullName("New User")
+                .phone("+1234567890")
+                .build();
+
+        when(userRepository.existsByEmail("test@example.com")).thenReturn(false);
+        when(userRepository.existsByPhone("+1234567890")).thenReturn(false);
+        when(roleRepository.findByName("CUSTOMER")).thenReturn(Optional.of(customerRole));
+        when(passwordEncoder.encode("password123")).thenReturn("$2a$10$encoded");
+        when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("access-token");
+        when(refreshTokenService.createRefreshToken(1L)).thenReturn("refresh-token");
+        when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User saved = inv.getArgument(0);
+            saved.setId(1L);
+            return saved;
+        });
+
+        AuthResponse response = authService.register(request);
+
+        assertNotNull(response);
+        verify(userRepository).existsByEmail("test@example.com");
+        verify(userRepository).save(argThat(u -> "test@example.com".equals(u.getEmail())));
+    }
+
+    @Test
+    void shouldThrowConflictWhenEmailExistsCaseInsensitive() {
+        RegisterRequest request = RegisterRequest.builder()
+                .email("EXISTING@TEST.COM")
                 .password("password123")
                 .fullName("Existing User")
                 .build();
@@ -167,17 +219,17 @@ class AuthServiceTest {
     }
 
     @Test
-    void shouldLoginSuccessfully() {
+    void shouldLoginSuccessfullyForActiveUser() {
         LoginRequest request = LoginRequest.builder()
                 .email("user@test.com")
                 .password("password123")
                 .build();
 
-        UserDetailsImpl userDetails = UserDetailsImpl.fromUser(user);
+        UserDetailsImpl userDetails = UserDetailsImpl.fromUser(activeUser);
         Authentication auth = mock(Authentication.class);
         when(auth.getPrincipal()).thenReturn(userDetails);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(auth);
-        when(userRepository.findByIdWithRole(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdWithRole(1L)).thenReturn(Optional.of(activeUser));
         when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("access-token");
         when(refreshTokenService.createRefreshToken(1L)).thenReturn("refresh-token");
         when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
@@ -189,14 +241,108 @@ class AuthServiceTest {
         assertEquals("refresh-token", response.getRefreshToken());
         assertEquals("Bearer", response.getTokenType());
 
-        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(authenticationManager).authenticate(argThat(at -> "user@test.com".equals(at.getPrincipal())));
         verify(userRepository).findByIdWithRole(1L);
     }
 
     @Test
-    void shouldThrowBadCredentialsOnLoginFailure() {
+    void shouldLoginSuccessfullyForActiveUserWithMixedCaseEmail() {
+        LoginRequest request = LoginRequest.builder()
+                .email("USER@TEST.COM")
+                .password("password123")
+                .build();
+
+        UserDetailsImpl userDetails = UserDetailsImpl.fromUser(activeUser);
+        Authentication auth = mock(Authentication.class);
+        when(auth.getPrincipal()).thenReturn(userDetails);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(auth);
+        when(userRepository.findByIdWithRole(1L)).thenReturn(Optional.of(activeUser));
+        when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("access-token");
+        when(refreshTokenService.createRefreshToken(1L)).thenReturn("refresh-token");
+        when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
+
+        AuthResponse response = authService.login(request);
+
+        assertNotNull(response);
+        verify(authenticationManager).authenticate(argThat(at -> "user@test.com".equals(at.getPrincipal())));
+    }
+
+    @Test
+    void shouldThrowBadCredentialsOnLoginFailureForActiveUser() {
         LoginRequest request = LoginRequest.builder()
                 .email("user@test.com")
+                .password("wrongpassword")
+                .build();
+
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        BadCredentialsException ex = assertThrows(BadCredentialsException.class,
+                () -> authService.login(request));
+        assertEquals("Invalid email or password", ex.getMessage());
+    }
+
+    @Test
+    void shouldReturn403ForSuspendedUserWithCorrectPassword() {
+        LoginRequest request = LoginRequest.builder()
+                .email("suspended@test.com")
+                .password("password123")
+                .build();
+
+        UserDetailsImpl userDetails = UserDetailsImpl.fromUser(suspendedUser);
+        Authentication auth = mock(Authentication.class);
+        when(auth.getPrincipal()).thenReturn(userDetails);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(auth);
+        when(userRepository.findByIdWithRole(2L)).thenReturn(Optional.of(suspendedUser));
+
+        AccountSuspendedException ex = assertThrows(AccountSuspendedException.class,
+                () -> authService.login(request));
+        assertEquals("Account suspended", ex.getMessage());
+
+        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(userRepository).findByIdWithRole(2L);
+    }
+
+    @Test
+    void shouldReturn401ForDisabledUserWithCorrectPassword() {
+        LoginRequest request = LoginRequest.builder()
+                .email("disabled@test.com")
+                .password("password123")
+                .build();
+
+        UserDetailsImpl userDetails = UserDetailsImpl.fromUser(disabledUser);
+        Authentication auth = mock(Authentication.class);
+        when(auth.getPrincipal()).thenReturn(userDetails);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(auth);
+        when(userRepository.findByIdWithRole(3L)).thenReturn(Optional.of(disabledUser));
+
+        BadCredentialsException ex = assertThrows(BadCredentialsException.class,
+                () -> authService.login(request));
+        assertEquals("Invalid email or password", ex.getMessage());
+
+        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(userRepository).findByIdWithRole(3L);
+    }
+
+    @Test
+    void shouldReturnGenericErrorForSuspendedUserWithWrongPassword() {
+        LoginRequest request = LoginRequest.builder()
+                .email("suspended@test.com")
+                .password("wrongpassword")
+                .build();
+
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        BadCredentialsException ex = assertThrows(BadCredentialsException.class,
+                () -> authService.login(request));
+        assertEquals("Invalid email or password", ex.getMessage());
+    }
+
+    @Test
+    void shouldReturnGenericErrorForDisabledUserWithWrongPassword() {
+        LoginRequest request = LoginRequest.builder()
+                .email("disabled@test.com")
                 .password("wrongpassword")
                 .build();
 
@@ -214,7 +360,7 @@ class AuthServiceTest {
                 .refreshToken("old-refresh-token")
                 .build();
 
-        when(refreshTokenService.validateAndReturnUser("old-refresh-token")).thenReturn(user);
+        when(refreshTokenService.validateAndReturnUser("old-refresh-token")).thenReturn(activeUser);
         when(refreshTokenService.rotateRefreshToken("old-refresh-token")).thenReturn("new-refresh-token");
         when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("new-access-token");
         when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);

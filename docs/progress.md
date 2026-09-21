@@ -6,7 +6,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 **Phase 1 — Authentication** (Complete)
 
-JWT-based authentication system with access/refresh token rotation, BCrypt password hashing, and Spring Security filter chain. Backend fully implemented and unit-tested (51 tests pass). Frontend authentication complete with login/register UI, protected routes, token refresh/retry interceptor, and 41 frontend tests passing.
+JWT-based authentication system with access/refresh token rotation, BCrypt password hashing, and Spring Security filter chain. Backend fully implemented and unit-tested (67 tests pass). Frontend authentication complete with login/register UI, protected routes, token refresh/retry interceptor, and 41 frontend tests passing.
 
 ## Completed Work
 
@@ -51,7 +51,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] Run TypeScript type checks
 - [x] Run ESLint
 - [x] Verify backend + frontend health endpoints
-#### Phase 1 — Authentication (Complete)
+#### Phase 1 — Authentication (Realigning to plan v2.2)
 
 - [x] V1 migration: roles, users with ENUM status column (ACTIVE/SUSPENDED/DISABLED)
 - [x] V2 migration: refresh_tokens (family_id, revoked_at, replaced_by_id), password_reset_tokens
@@ -71,8 +71,8 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] DTOs with Bean Validation + MapStruct mappers
 - [x] Global exception handler (@RestControllerAdvice)
 - [x] Scheduled cleanup job for expired/revoked refresh tokens
-- [x] Unit tests: 61 tests pass (JWT, auth service, controllers, mappers)
-- [x] Integration tests: 24 tests (all pass, single Testcontainers MySQL 8 container)
+- [x] Unit tests: 67 tests pass (JWT, auth service, controllers, mappers)
+- [x] Integration tests: 25 tests pass (all pass, single Testcontainers MySQL 8 container)
 - [x] Frontend types (`types.ts`): RegisterRequest, LoginRequest, RefreshRequest, AuthResponse, UserResponse, ErrorResponse
 - [x] Auth API client (`api.ts`): register, login, refresh, logout, fetchCurrentUser wrappers
 - [x] Zustand auth store (`auth-store.ts`): login, register, refresh, logout, loadCurrentUser, setAuth with persistence
@@ -114,6 +114,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 | 2026-09-17 | Fixed login LazyInitializationException (eager Role fetch in JPA queries) | `UserRepository.java`, `RefreshTokenRepository.java`, `AuthService.java`, `AuthServiceTest.java` |
 | 2026-09-18 | Added phone-number uniqueness to registration (app-level + DB constraint) | V5 migration, `UserRepository.java`, `AuthService.java`, `User.java`, tests |
 | 2026-09-19 | Fixed Testcontainers per-class container lifecycle causing connection refused | Removed `@Container` from `IntegrationTestBase.MYSQL`, using singleton static container pattern |
+| 2026-09-21 | Completed Stage 1b: login status check, email normalization, stronger token tests, integration tests | `AuthService.java`, `UserDetailsImpl.java`, `UserDetailsServiceImpl.java`, `RefreshTokenService.java`, `AuthServiceTest.java`, `RefreshTokenServiceTest.java`, `AuthApiIntegrationTest.java`, `RefreshTokenRepositoryIT.java`, `UserRepositoryIT.java` |
 
 ## Session Notes
 
@@ -122,5 +123,5 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - `package-lock.json` is gitignored — use `npm install`, not `npm ci`, for local dev.
 - All Kilo configuration lives in `kilo.jsonc` (validated). Agent and command `.md` files in `.kilo/` directories fail YAML validation in this Kilo CLI build.
 - `docs/progress.md` is the ground truth for unfinished work — always check before starting new tasks.
-- Phase 1 backend complete with 58 unit tests passing (3 new tests for phone uniqueness). Integration tests: 24 tests pass with single Testcontainers MySQL 8 container.
+- Phase 1 backend complete with 67 unit tests passing. Integration tests: 25 tests pass with single Testcontainers MySQL 8 container (singleton pattern).
 - Phase 1 frontend auth complete: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor, 41 frontend tests passing (54 total including smoke test).
