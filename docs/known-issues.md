@@ -25,7 +25,7 @@
 
 | ID  | Area       | Description                                           | Impact |
 |-----|------------|-------------------------------------------------------|--------|
-| 001 | Backend    | No Redis configuration in `application.yml`            | Redis runs in Docker but backend doesn't connect to it yet. |
+| 001 | Backend    | Redis is provisioned in `docker-compose.yml` and configured in `application.yml` and `application-prod.yml`, but nothing in the backend uses it | Plan v2.2 says no Redis in v1. The container, config, and env vars are removed in stage 6 of the plan v2.2 realignment. |
 | 002 | Frontend   | No error boundary component                           | Unhandled errors will crash the app. Should add in Phase 2. |
 | 003 | Frontend   | No loading states or suspense in routes                | All routes render immediately. Add skeleton loaders later. |
 | 004 | Docker     | No `.env` file required for `docker compose up`      | Compose uses defaults from `.env.example`. Production deployments need a real `.env`. |
@@ -41,7 +41,7 @@
 - Local MySQL instance lacked the `flowerconnect` user with privileges; backend failed to start until the user was created manually. Docker Compose creates this user automatically.
 - Docker was unavailable in prior sessions; `docker compose up --build` could not be validated directly and local services were used as a substitute. Docker is now available and full-stack has been verified.
 - `docker-compose.yml` DB_URL line used `${DB_HOST:-mysql}:${DB_PORT:-3306}` template substitution, which resolved to `localhost:3307` (from root `.env` file intended for host-side tooling) instead of the internal Docker hostname `mysql:3306`. Fixed by hardcoding `mysql:3306` in the DB_URL env var.
-- V1__baseline.sql `roles` table omitted the `created_at` column that the `Role` entity maps via `@CreationTimestamp`. Hibernate `ddl-auto: validate` rejected the schema at startup. Fixed with V4 migration (`ALTER TABLE roles ADD COLUMN created_at ...`) rather than editing the applied V1 baseline.
+- The original V1 baseline `roles` table omitted the `created_at` column that the `Role` entity maps via `@CreationTimestamp`, and Hibernate `ddl-auto: validate` rejected the schema at startup. This was first fixed with a V4 migration. It is now fixed by including `created_at` in the rewritten V1 baseline (D-9: migrations were rewritten before first deployment, and V4 and V5 no longer exist).
 - `User.role` (FetchType.LAZY) was not eagerly fetched by `UserRepository.findByEmail` and `findById`, causing `LazyInitializationException` when `UserDetailsImpl.fromUser()` or `AuthService.createAuthResponse()` accessed `role.getName()` outside the Hibernate session. Fixed by adding `@Query` with `JOIN FETCH` to `findByEmail`, adding `findByIdWithRole`, and eager-fetching Role in `RefreshTokenRepository.findByTokenHash`.
 - `TestProbeController` (in `src/test/java`) mapped `GET /api/v1/users/me` and `GET /actuator/metrics`, conflicting with `UserController` when loaded in `@SpringBootTest` contexts (e.g., `AuthApiIntegrationTest`). Fixed by adding `@Profile("test-probe")` to `TestProbeController` and `@ActiveProfiles("test-probe")` to `RoleBoundaryTest` (which uses `@WebMvcTest(controllers = TestProbeController.class)`).
 - (a) Upgrading Testcontainers to 1.21.4 resolved Docker Desktop 29.x compatibility — `~/.docker-java.properties` with `api.version=1.44` is no longer required; verified via `mvn verify -Pintegration` without the file.

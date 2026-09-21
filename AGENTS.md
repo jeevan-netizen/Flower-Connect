@@ -18,7 +18,7 @@ frontend/ (React 18, TS, Vite)     backend/ (Spring Boot 3.2, Java 17)
 │   src/features/auth/            │
 │     stores/auth-store.ts        │
 │   src/shared/lib/api.ts         │
-└─► :8080/api/v1 └─► MySQL 8 + Redis 7 (Docker)
+└─► :8080/api/v1 └─► MySQL 8 (Docker)
 ```
 
 ## Technology Stack
@@ -27,7 +27,7 @@ frontend/ (React 18, TS, Vite)     backend/ (Spring Boot 3.2, Java 17)
 |--------|-----------------------------------|
 | Backend| Spring Boot 3.2.5, Java 17, Maven |
 | DB     | MySQL 8 (InnoDB, utf8mb4)         |
-| Cache  | Redis 7 (password-protected)      |
+| Cache  |None in v1 (Redis dropped by plan v2.2; removed in stage 6)|
 | ORM    | Spring Data JPA + Hibernate       |
 | Mig.   | Flyway (baseline V1)              |
 | Codegen| Lombok, MapStruct                 |

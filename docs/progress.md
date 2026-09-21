@@ -4,13 +4,13 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 1 — Authentication** (Complete)
+**Phase 1 — Authentication** (Realigning to plan v2.2)
 
-JWT-based authentication system with access/refresh token rotation, BCrypt password hashing, and Spring Security filter chain. Backend fully implemented and unit-tested (67 tests pass). Frontend authentication complete with login/register UI, protected routes, token refresh/retry interceptor, and 41 frontend tests passing.
+JWT-based authentication system with access/refresh token rotation, BCrypt password hashing, and Spring Security filter chain. Backend implemented and tested (67 unit tests + 32 integration tests pass). Frontend authentication implemented with login/register UI, protected routes, token refresh/retry interceptor, and 41 frontend tests passing. Currently being realigned to plan v2.2 on branch `plan-v2-2-alignment`.
 
 ## Completed Work
 
-### Phase 0 — Scaffold (Complete)
+### Phase 0 — Scaffold (Realigning to plan v2.2)
 
 - [x] Repository initialized with git (4 commits on `main`)
 - [x] Backend scaffold: Spring Boot 3.2.5 application skeleton
@@ -18,7 +18,6 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
   - `application.yml` with datasource, Flyway, JPA, and actuator config
   - Maven build via `mvnw` wrapper + multi-stage Dockerfile
   - `V1__baseline.sql` migration: `roles` and `users` tables with FK, unique constraints, and indexes
-  - `V4__add_roles_created_at.sql` migration: adds `created_at` column to `roles` table (V1 omits it; Role entity expects it via `@CreationTimestamp`)
   - MySQL container with utf8mb4 charset/collation and init script
 - [x] Frontend scaffold: React 18 + Vite + TypeScript
   - `main.tsx` entry with ThemeProvider, QueryClientProvider, React Router
@@ -123,5 +122,5 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - `package-lock.json` is gitignored — use `npm install`, not `npm ci`, for local dev.
 - All Kilo configuration lives in `kilo.jsonc` (validated). Agent and command `.md` files in `.kilo/` directories fail YAML validation in this Kilo CLI build.
 - `docs/progress.md` is the ground truth for unfinished work — always check before starting new tasks.
-- Phase 1 backend complete with 67 unit tests passing. Integration tests: 25 tests pass with single Testcontainers MySQL 8 container (singleton pattern).
-- Phase 1 frontend auth complete: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor, 41 frontend tests passing (54 total including smoke test).
+- Phase 1 backend implemented, realigning to plan v2.2: 67 unit tests and 32 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern).
+- Phase 1 frontend auth implemented, realigning to plan v2.2: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor; 41 frontend tests pass (including the smoke test).
