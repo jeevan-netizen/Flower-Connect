@@ -3,7 +3,7 @@ package com.flowerconnect.repository;
 import com.flowerconnect.domain.RefreshToken;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
-import com.flowerconnect.test.IntegrationTestBase;
+import com.flowerconnect.test.AbstractIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class RefreshTokenRepositoryIT extends IntegrationTestBase {
+class RefreshTokenRepositoryIT extends AbstractIntegrationTest {
 
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;

@@ -45,11 +45,14 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] Verify frontend builds with `npm run build`
 - [x] Verify full stack boots with `docker compose up --build`
 - [x] Run available backend tests
-- [x] Validate Flyway migrations (V1 baseline applied and validated)
 - [x] Run available frontend Vitest tests
 - [x] Run TypeScript type checks
 - [x] Run ESLint
 - [x] Verify backend + frontend health endpoints
+- [x] Validate Flyway migrations (V1 baseline applied and validated)
+- [x] **0.7 Error framework**: `ErrorCode` enum (VALIDATION_FAILED, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, ACCOUNT_SUSPENDED), `BusinessException` base with factory methods, `@RestControllerAdvice` handling with injected `ObjectMapper` + `Clock` bean, bean-validation and malformed-JSON error handling, Spring Security `AuthenticationEntryPoint`/`AccessDeniedHandler` returning structured `ErrorResponse` (401/403), all 4 existing exceptions refactored to extend `BusinessException`
+- [x] **0.8 Profiles**: `application-dev.yml` created, added `forward-headers-strategy`, `app.base-url`, `jwt.refresh-grace-seconds` to `application.yml`/`application-prod.yml`/`application-test.yml`, `AppProperties` registered in `@EnableConfigurationProperties`
+- [x] **0.T Test baseline**: Surefire excludes `integration` tag by default; Maven `integration` profile runs tagged tests via `mvn verify -Pintegration`; `IntegrationTestBase` renamed to `AbstractIntegrationTest` with singleton Testcontainers MySQL (started in static initializer, NOT `@Container`); 67 unit tests + 32 integration tests pass
 #### Phase 1 — Authentication (Realigning to plan v2.2)
 
 - [x] V1 migration: roles, users with ENUM status column (ACTIVE/SUSPENDED/DISABLED)
@@ -70,8 +73,8 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] DTOs with Bean Validation + MapStruct mappers
 - [x] Global exception handler (@RestControllerAdvice)
 - [x] Scheduled cleanup job for expired/revoked refresh tokens
-- [x] Unit tests: 67 tests pass (JWT, auth service, controllers, mappers)
-- [x] Integration tests: 25 tests pass (all pass, single Testcontainers MySQL 8 container)
+- [x] Unit tests: 72 tests pass (JWT, auth service, controllers, mappers, error handling, AppProperties binding)
+- [x] Integration tests: 34 tests pass (all pass, single Testcontainers MySQL 8 container)
 - [x] Frontend types (`types.ts`): RegisterRequest, LoginRequest, RefreshRequest, AuthResponse, UserResponse, ErrorResponse
 - [x] Auth API client (`api.ts`): register, login, refresh, logout, fetchCurrentUser wrappers
 - [x] Zustand auth store (`auth-store.ts`): login, register, refresh, logout, loadCurrentUser, setAuth with persistence
@@ -114,6 +117,9 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 | 2026-09-18 | Added phone-number uniqueness to registration (app-level + DB constraint) | V5 migration, `UserRepository.java`, `AuthService.java`, `User.java`, tests |
 | 2026-09-19 | Fixed Testcontainers per-class container lifecycle causing connection refused | Removed `@Container` from `IntegrationTestBase.MYSQL`, using singleton static container pattern |
 | 2026-09-21 | Completed Stage 1b: login status check, email normalization, stronger token tests, integration tests | `AuthService.java`, `UserDetailsImpl.java`, `UserDetailsServiceImpl.java`, `RefreshTokenService.java`, `AuthServiceTest.java`, `RefreshTokenServiceTest.java`, `AuthApiIntegrationTest.java`, `RefreshTokenRepositoryIT.java`, `UserRepositoryIT.java` |
+| 2026-09-21 | Phase 0 Finalize: completed 0.7 Error framework, 0.8 Profiles, 0.T Test baseline | `ErrorCode.java`, `BusinessException.java`, `ClockConfig.java`, `AppProperties.java`, `ErrorResponse.java`, `GlobalExceptionHandler.java`, `CustomAuthenticationEntryPoint.java`, `CustomAccessDeniedHandler.java`, `JwtService.java`, `RefreshTokenService.java`, `RefreshToken.java`, `JwtAuthenticationFilter.java`, `SecurityConfig.java`, `JwtProperties.java`, `FlowerConnectApplication.java`, `application.yml`, `application-dev.yml`, `application-prod.yml`, `application-test.yml`, `AbstractIntegrationTest.java`, 4 IT files, `JwtServiceTest.java`, `RefreshTokenServiceTest.java` |
+| 2026-09-21 | Stage 2b: Clock in GlobalExceptionHandler, JwtAuthenticationFilter SUSPENDED→403, code/timestamp assertions, AppProperties tests | `GlobalExceptionHandler.java`, `JwtAuthenticationFilter.java`, `ErrorResponse.java`, `AuthApiIntegrationTest.java`, `UserControllerTest.java`, `AuthControllerTest.java`, `RoleBoundaryTest.java`, `RefreshTokenServiceTest.java`, `MutableClock.java`, `AppPropertiesTest.java`, `application-test.yml` |
+| 2026-09-22 | Stage 2c: ddl-auto validate, shared TestClockConfig replaces @MockBean Clock, test property cleanup | `application-test.yml`, `TestClockConfig.java`, `AuthControllerTest.java`, `UserControllerTest.java`, `RoleBoundaryTest.java` |
 
 ## Session Notes
 
@@ -122,5 +128,5 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - `package-lock.json` is gitignored — use `npm install`, not `npm ci`, for local dev.
 - All Kilo configuration lives in `kilo.jsonc` (validated). Agent and command `.md` files in `.kilo/` directories fail YAML validation in this Kilo CLI build.
 - `docs/progress.md` is the ground truth for unfinished work — always check before starting new tasks.
-- Phase 1 backend implemented, realigning to plan v2.2: 67 unit tests and 32 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern).
+- Phase 1 backend implemented, realigning to plan v2.2: 72 unit tests and 34 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern).
 - Phase 1 frontend auth implemented, realigning to plan v2.2: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor; 41 frontend tests pass (including the smoke test).

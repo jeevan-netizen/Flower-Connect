@@ -12,7 +12,7 @@ import java.time.Duration;
 @Testcontainers
 @ActiveProfiles("test")
 @Tag("integration")
-public abstract class IntegrationTestBase {
+public abstract class AbstractIntegrationTest {
 
     protected static final MySQLContainer<?> MYSQL =
             new MySQLContainer<>("mysql:8.0.36")

@@ -1,17 +1,17 @@
 server:
-  port: ${SERVER_PORT:8080}
+  port: 8080
   shutdown: graceful
   forward-headers-strategy: framework
 
 spring:
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USER}
-    password: ${DB_PASS}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/flowerconnect}
+    username: ${DB_USER:flowerconnect}
+    password: ${DB_PASS:flowerconnect}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 20
-      minimum-idle: 10
+      minimum-idle: 5
   jpa:
     hibernate:
       ddl-auto: validate
@@ -27,16 +27,6 @@ spring:
     baseline-version: 1
     locations: classpath:db/migration
     validate-on-migrate: true
-  redis:
-    host: ${REDIS_HOST}
-    port: ${REDIS_PORT:6379}
-    password: ${REDIS_PASSWORD}
-    timeout: 5000ms
-    lettuce:
-      pool:
-        max-active: 8
-        max-idle: 8
-        min-idle: 0
 
 jwt:
   secret: ${JWT_SECRET}
@@ -45,23 +35,12 @@ jwt:
   refresh-grace-seconds: ${JWT_REFRESH_GRACE_SECONDS:10}
 
 app:
-  base-url: ${APP_BASE_URL}
+  base-url: ${APP_BASE_URL:http://localhost:5173}
   cors:
-    origins: ${APP_CORS_ORIGINS}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      show-details: never
-      probes:
-        enabled: true
+    origins: ${APP_CORS_ORIGINS:http://localhost:5173}
 
 logging:
   level:
-    com.flowerconnect: INFO
+    com.flowerconnect: DEBUG
     org.flywaydb: INFO
-    org.springframework.security: WARN
+    org.springframework.security: DEBUG

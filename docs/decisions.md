@@ -239,3 +239,44 @@ Migrations are rewritten before the first deployment. The additive-only migratio
 - Before deployment: schema corrections are straightforward — replace the migration files and let Flyway apply the corrected schema from scratch.
 - After deployment: corrections must be additive — new V[n+1]__ migrations that fix issues introduced by earlier files. Editing applied migrations is forbidden.
 - Flyway `validate-on-migrate: true` ensures schema drift is caught immediately if the migration files and database state diverge.
+
+---
+
+## D-10: Injectable Clock for testable time
+
+**Status:** Accepted
+**Date:** Phase 0 (Finalize)
+
+### Context
+
+`JwtService`, `RefreshTokenService`, and `RefreshToken` previously called `LocalDateTime.now()` / `new Date()` directly, making token-expiry logic non-deterministic in unit tests. Time-dependent security checks (token expiration, refresh-token reuse windows) must be controllable in tests.
+
+### Decision
+
+- Provide a `Clock` bean (`Clock.systemUTC()`) via `ClockConfig`, injected into `JwtService`, `RefreshTokenService`, `GlobalExceptionHandler`, and used in `JwtAuthenticationFilter` for request timestamps.
+- `JwtServiceTest` uses `Clock.systemUTC()` directly (not a fixed clock) because the `jjwt` `parseClaimsJws` validates token expiry against the real system clock — a fixed clock in the past would cause `ExpiredJwtException` on parsing.
+- `RefreshTokenServiceTest` uses `@Mock Clock` with `FIXED_TIME` so that token expiry dates in test data align with the mocked clock's `LocalDateTime.now(clock)`.
+- - `TestClockConfig` (`@TestConfiguration` with `Clock.fixed(Instant.parse("2025-01-15T10:00:00Z"), UTC)`) is `@Import`-ed by `@WebMvcTest` classes, providing a deterministic fixed-clock `Clock` bean for `GlobalExceptionHandler` timestamps.
+
+### Consequences
+
+- All time-dependent logic is injectable and testable.
+- `GlobalExceptionHandler` injects `Clock` (resolved via `@MockBean` in `@WebMvcTest` contexts).
+- `ErrorResponse` and `BusinessException` carry an `ErrorCode` enum value rather than a raw HTTP status, allowing the exception handler to map `ErrorCode` → `HttpStatus` centrally.
+- `ErrorResponse.errorCode` serialised as JSON `code` via `@JsonProperty("code")` so error bodies expose a `code` field consistently across the entry point, access-denied handler, and exception handler.
+
+---
+
+| ADR | Title                       | Type   | Status   | Date |
+|-----|-----------------------------|--------|----------|------|
+| 001 | Maven wrapper + thin Dockerfile | Decision | Accepted | Phase 0 |
+| 002 | Flyway baseline + additive migrations | Decision | Accepted | Phase 0 |
+| 003 | JWT access/refresh token pair | Decision | Accepted | Phase 0 |
+| 004 | Feature-sliced frontend layout | Decision | Accepted | Phase 0 |
+| 005 | Kilo AGENTS.md + docs/ for persistent memory | Decision | Accepted | Phase 0 |
+| 006 | Optimized for free/limited models via OmniRoute | Decision | Accepted | Phase 0, revised |
+| --- | ---                         | ---    | ---      | ---  |
+| 003 | Three-Layer Backend Architecture | Decision | Accepted | Phase 0 |
+| D-8 | Registration duplicate-email behaviour | Decision | Accepted | Phase 1 |
+| D-9 | Migrations rewritten before first deployment | Decision | Accepted | Phase 1 |
+| D-10 | Injectable Clock for testable time | Decision | Accepted | Phase 0 (Finalize) |

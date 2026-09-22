@@ -7,21 +7,24 @@ import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.TokenRefreshException;
 import com.flowerconnect.repository.RefreshTokenRepository;
 import com.flowerconnect.repository.UserRepository;
+import com.flowerconnect.test.MutableClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-
-import java.util.Optional;
 
 import org.mockito.ArgumentCaptor;
 
@@ -36,11 +39,14 @@ class RefreshTokenServiceTest {
     private JwtService jwtService;
     @Mock
     private JwtProperties jwtProperties;
+    @Mock
+    private Clock clock;
 
     @InjectMocks
     private RefreshTokenService refreshTokenService;
 
     private User user;
+    private static final LocalDateTime FIXED_TIME = LocalDateTime.of(2025, 1, 15, 10, 0, 0);
 
     @BeforeEach
     void setUp() {
@@ -53,6 +59,9 @@ class RefreshTokenServiceTest {
                 .role(role)
                 .status(User.Status.ACTIVE)
                 .build();
+        Instant fixedInstant = FIXED_TIME.toInstant(ZoneOffset.UTC);
+        lenient().when(clock.instant()).thenReturn(fixedInstant);
+        lenient().when(clock.getZone()).thenReturn(ZoneOffset.UTC);
     }
 
     @Test
@@ -85,7 +94,7 @@ class RefreshTokenServiceTest {
                 .id(1L)
                 .user(user)
                 .tokenHash(hash)
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .expiresAt(FIXED_TIME.plusDays(7))
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(storedToken));
@@ -118,7 +127,7 @@ class RefreshTokenServiceTest {
                 .id(1L)
                 .user(user)
                 .tokenHash(hash)
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .expiresAt(FIXED_TIME.plusDays(7))
 
                 .build();
 
@@ -138,8 +147,8 @@ class RefreshTokenServiceTest {
                 .id(1L)
                 .user(user)
                 .tokenHash(hash)
-                .expiresAt(LocalDateTime.now().plusDays(7))
-                .revokedAt(LocalDateTime.now())
+                .expiresAt(FIXED_TIME.plusDays(7))
+                .revokedAt(FIXED_TIME)
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(storedToken));
@@ -156,7 +165,7 @@ class RefreshTokenServiceTest {
                 .id(1L)
                 .user(user)
                 .tokenHash(hash)
-                .expiresAt(LocalDateTime.now().minusDays(1))
+                .expiresAt(FIXED_TIME.minusDays(1))
 
                 .build();
 
@@ -184,7 +193,7 @@ class RefreshTokenServiceTest {
                 .user(user)
                 .tokenHash(oldHash)
                 .familyId("test-family")
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .expiresAt(FIXED_TIME.plusDays(7))
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(oldHash)).thenReturn(Optional.of(storedToken));
@@ -213,8 +222,8 @@ class RefreshTokenServiceTest {
                 .id(1L)
                 .user(user)
                 .tokenHash(hash)
-                .expiresAt(LocalDateTime.now().plusDays(7))
-                .revokedAt(LocalDateTime.now())
+                .expiresAt(FIXED_TIME.plusDays(7))
+                .revokedAt(FIXED_TIME)
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(storedToken));
@@ -231,7 +240,7 @@ class RefreshTokenServiceTest {
                 .id(1L)
                 .user(user)
                 .tokenHash(hash)
-                .expiresAt(LocalDateTime.now().minusDays(1))
+                .expiresAt(FIXED_TIME.minusDays(1))
 
                 .build();
 
@@ -310,7 +319,7 @@ class RefreshTokenServiceTest {
                 .user(user)
                 .tokenHash(oldHash)
                 .familyId("same-family-id")
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .expiresAt(FIXED_TIME.plusDays(7))
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(oldHash)).thenReturn(Optional.of(storedToken));
@@ -335,7 +344,7 @@ class RefreshTokenServiceTest {
                 .user(user)
                 .tokenHash(oldHash)
                 .familyId("fam")
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .expiresAt(FIXED_TIME.plusDays(7))
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(oldHash)).thenReturn(Optional.of(storedToken));
@@ -363,5 +372,30 @@ class RefreshTokenServiceTest {
         assertEquals(storedToken.getFamilyId(), newToken.getFamilyId());
         assertNotNull(oldToken.getRevokedAt());
         assertNull(newToken.getRevokedAt());
+    }
+
+    @Test
+    void shouldDetectExpiryWhenClockMovesPastExpiresAt() {
+        MutableClock mutableClock = new MutableClock(FIXED_TIME.toInstant(ZoneOffset.UTC));
+        RefreshTokenService service = new RefreshTokenService(
+                refreshTokenRepository, userRepository, jwtService, jwtProperties, mutableClock);
+
+        String rawToken = "raw";
+        String hash = service.hashToken(rawToken);
+
+        RefreshToken token = RefreshToken.builder()
+                .id(1L)
+                .user(user)
+                .tokenHash(hash)
+                .expiresAt(FIXED_TIME.plusHours(1))
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(token));
+
+        assertEquals(user, service.validateAndReturnUser(rawToken));
+
+        mutableClock.advance(Duration.ofHours(2));
+
+        assertThrows(TokenRefreshException.class, () -> service.validateAndReturnUser(rawToken));
     }
 }

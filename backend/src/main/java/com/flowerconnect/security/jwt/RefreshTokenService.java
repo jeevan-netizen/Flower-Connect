@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
@@ -28,16 +29,19 @@ public class RefreshTokenService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
+    private final Clock clock;
 
     public RefreshTokenService(
             RefreshTokenRepository refreshTokenRepository,
             UserRepository userRepository,
             JwtService jwtService,
-            JwtProperties jwtProperties) {
+            JwtProperties jwtProperties,
+            Clock clock) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
+        this.clock = clock;
     }
 
     public String createRefreshToken(Long userId) {
@@ -49,7 +53,7 @@ public class RefreshTokenService {
                 .orElseThrow(() -> new TokenRefreshException("User not found"));
         String rawToken = jwtService.generateRefreshToken();
         String tokenHash = hashToken(rawToken);
-        LocalDateTime expiresAt = LocalDateTime.now().plus(Duration.ofMillis(jwtProperties.getRefreshTtlMs()));
+        LocalDateTime expiresAt = LocalDateTime.now(clock).plus(Duration.ofMillis(jwtProperties.getRefreshTtlMs()));
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
                 .tokenHash(tokenHash)
@@ -80,7 +84,7 @@ public class RefreshTokenService {
             throw new TokenRefreshException("Refresh token has been revoked");
         }
 
-        if (storedToken.isExpired()) {
+        if (storedToken.isExpired(LocalDateTime.now(clock))) {
             refreshTokenRepository.delete(storedToken);
             throw new TokenRefreshException("Refresh token has expired");
         }
@@ -95,7 +99,7 @@ public class RefreshTokenService {
 
         TokenCreationResult result = doCreateRefreshToken(user.getId(), storedToken.getFamilyId());
 
-        storedToken.setRevokedAt(LocalDateTime.now());
+        storedToken.setRevokedAt(LocalDateTime.now(clock));
         storedToken.setReplacedById(result.entity.getId());
         refreshTokenRepository.save(storedToken);
 
@@ -112,7 +116,7 @@ public class RefreshTokenService {
             throw new TokenRefreshException("Refresh token has been revoked");
         }
 
-        if (storedToken.isExpired()) {
+        if (storedToken.isExpired(LocalDateTime.now(clock))) {
             refreshTokenRepository.delete(storedToken);
             throw new TokenRefreshException("Refresh token has expired");
         }
@@ -133,7 +137,7 @@ public class RefreshTokenService {
         Optional<RefreshToken> opt = refreshTokenRepository.findByTokenHash(tokenHash);
         if (opt.isPresent()) {
             RefreshToken token = opt.get();
-            token.setRevokedAt(LocalDateTime.now());
+            token.setRevokedAt(LocalDateTime.now(clock));
             refreshTokenRepository.save(token);
             log.debug("Revoked refresh token for user id={}", token.getUser().getId());
         }
@@ -156,7 +160,7 @@ public class RefreshTokenService {
     }
 
     public void cleanupExpiredTokens() {
-        int deleted = refreshTokenRepository.deleteExpiredAndRevokedBefore(LocalDateTime.now());
+        int deleted = refreshTokenRepository.deleteExpiredAndRevokedBefore(LocalDateTime.now(clock));
         if (deleted > 0) {
             log.info("Cleaned up {} expired/revoked refresh tokens", deleted);
         }

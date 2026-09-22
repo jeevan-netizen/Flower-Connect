@@ -5,6 +5,7 @@ import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.security.jwt.JwtAuthenticationFilter;
 import com.flowerconnect.security.jwt.JwtService;
 import com.flowerconnect.security.jwt.UserDetailsServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +24,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
 
@@ -38,6 +40,8 @@ public class SecurityConfig {
     private final CustomAuthenticationEntryPoint entryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;
     private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     public SecurityConfig(
             JwtService jwtService,
@@ -46,7 +50,9 @@ public class SecurityConfig {
             CorsProperties corsProperties,
             CustomAuthenticationEntryPoint entryPoint,
             CustomAccessDeniedHandler accessDeniedHandler,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            ObjectMapper objectMapper,
+            Clock clock) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
@@ -54,6 +60,8 @@ public class SecurityConfig {
         this.entryPoint = entryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
         this.userRepository = userRepository;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     @Bean
@@ -73,7 +81,7 @@ public class SecurityConfig {
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler)
             )
-            .addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository), UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

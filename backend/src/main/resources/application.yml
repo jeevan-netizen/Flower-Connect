@@ -1,6 +1,7 @@
 server:
   port: 8080
   shutdown: graceful
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -39,8 +40,10 @@ jwt:
   secret: ${JWT_SECRET}
   access-ttl-ms: ${JWT_ACCESS_TTL_MS:900000}
   refresh-ttl-ms: ${JWT_REFRESH_TTL_MS:604800000}
+  refresh-grace-seconds: ${JWT_REFRESH_GRACE_SECONDS:10}
 
 app:
+  base-url: ${APP_BASE_URL:http://localhost:5173}
   cors:
     origins: ${APP_CORS_ORIGINS:http://localhost:5173}
 

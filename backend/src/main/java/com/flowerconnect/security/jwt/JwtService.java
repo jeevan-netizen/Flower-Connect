@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.util.*;
 
 @Slf4j
@@ -21,11 +22,13 @@ import java.util.*;
 public class JwtService {
 
     private final JwtProperties jwtProperties;
+    private final Clock clock;
     private SecretKey secretKey;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public JwtService(JwtProperties jwtProperties) {
+    public JwtService(JwtProperties jwtProperties, Clock clock) {
         this.jwtProperties = jwtProperties;
+        this.clock = clock;
     }
 
     @PostConstruct
@@ -41,7 +44,7 @@ public class JwtService {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
         claims.put("authorities", authorities != null ? authorities : Collections.emptyList());
-        Date now = new Date();
+        Date now = Date.from(java.time.Instant.now(clock));
         Date expiry = new Date(now.getTime() + jwtProperties.getAccessTtlMs());
         return Jwts.builder()
                 .setClaims(claims)

@@ -10,7 +10,7 @@ import com.flowerconnect.security.dto.LoginRequest;
 import com.flowerconnect.security.dto.RefreshRequest;
 import com.flowerconnect.security.dto.RegisterRequest;
 import com.flowerconnect.security.jwt.RefreshTokenService;
-import com.flowerconnect.test.IntegrationTestBase;
+import com.flowerconnect.test.AbstractIntegrationTest;
 import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +19,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.*;
 
 import java.util.List;
@@ -32,13 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@TestPropertySource(properties = {
-        "spring.jpa.hibernate.ddl-auto=none",
-        "spring.flyway.enabled=true",
-        "spring.flyway.baseline-on-migrate=true",
-        "spring.flyway.baseline-version=1"
-})
-class AuthApiIntegrationTest extends IntegrationTestBase {
+class AuthApiIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -227,6 +220,7 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_SUSPENDED"))
                 .andExpect(jsonPath("$.message").value("Account suspended"));
     }
 
@@ -280,15 +274,32 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
         setupUserAndLogin();
         Long userId = userRepository.findByEmail(userEmail).orElseThrow().getId();
 
-        // Suspend the user after login
         User user = userRepository.findById(userId).orElseThrow();
         user.setStatus(com.flowerconnect.domain.User.Status.SUSPENDED);
         userRepository.save(user);
 
-        // Try to access protected endpoint with old access token
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_SUSPENDED"))
+                .andExpect(jsonPath("$.message").value("Account suspended"))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void shouldRejectAccessTokenForDisabledUserOnProtectedEndpoint() throws Exception {
+        setupUserAndLogin();
+        Long userId = userRepository.findByEmail(userEmail).orElseThrow().getId();
+
+        User user = userRepository.findById(userId).orElseThrow();
+        user.setStatus(com.flowerconnect.domain.User.Status.DISABLED);
+        userRepository.save(user);
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     @Test
@@ -350,7 +361,9 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
     @Test
     void shouldRejectMissingTokenOnProtectedEndpoint() throws Exception {
         mockMvc.perform(get("/api/v1/users/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     @Test
@@ -358,6 +371,17 @@ class AuthApiIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer invalid-token-here"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn403WithCodeForAccessDenied() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(get("/actuator/metrics")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     @Test

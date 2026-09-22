@@ -1,5 +1,6 @@
 package com.flowerconnect.controller;
 
+import com.flowerconnect.config.TestClockConfig;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.mapper.UserMapper;
@@ -25,9 +26,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = UserController.class)
-@Import(UserControllerTest.TestSecurityConfig.class)
-class UserControllerTest {
+    @WebMvcTest(controllers = UserController.class)
+    @Import({UserControllerTest.TestSecurityConfig.class, TestClockConfig.class})
+    class UserControllerTest {
 
     @TestConfiguration
     static class TestSecurityConfig {
@@ -99,6 +100,9 @@ class UserControllerTest {
 
         mockMvc.perform(get("/api/v1/users/me")
                         .header("Authorization", "Bearer valid-token"))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().is5xxServerError())
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist());
     }
 }
