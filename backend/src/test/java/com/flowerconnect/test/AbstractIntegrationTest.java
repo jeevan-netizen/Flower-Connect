@@ -1,6 +1,8 @@
 package com.flowerconnect.test;
 
+import com.flowerconnect.config.TestClockConfig;
 import org.junit.jupiter.api.Tag;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -12,6 +14,7 @@ import java.time.Duration;
 @Testcontainers
 @ActiveProfiles("test")
 @Tag("integration")
+@Import(TestClockConfig.class)
 public abstract class AbstractIntegrationTest {
 
     protected static final MySQLContainer<?> MYSQL =

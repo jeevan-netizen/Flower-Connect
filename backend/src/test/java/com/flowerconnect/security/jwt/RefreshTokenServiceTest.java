@@ -4,6 +4,7 @@ import com.flowerconnect.config.JwtProperties;
 import com.flowerconnect.domain.RefreshToken;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
+import com.flowerconnect.exception.RefreshTokenReuseException;
 import com.flowerconnect.exception.TokenRefreshException;
 import com.flowerconnect.repository.RefreshTokenRepository;
 import com.flowerconnect.repository.UserRepository;
@@ -62,6 +63,7 @@ class RefreshTokenServiceTest {
         Instant fixedInstant = FIXED_TIME.toInstant(ZoneOffset.UTC);
         lenient().when(clock.instant()).thenReturn(fixedInstant);
         lenient().when(clock.getZone()).thenReturn(ZoneOffset.UTC);
+        lenient().when(jwtProperties.getRefreshGraceSeconds()).thenReturn(10L);
     }
 
     @Test
@@ -397,5 +399,129 @@ class RefreshTokenServiceTest {
         mutableClock.advance(Duration.ofHours(2));
 
         assertThrows(TokenRefreshException.class, () -> service.validateAndReturnUser(rawToken));
+    }
+
+    @Test
+    void shouldFollowReplacementChainAndRotateLiveTokenWhenReusedWithinGraceWindow() {
+        when(jwtProperties.getRefreshGraceSeconds()).thenReturn(10L);
+        String oldRawToken = "old-token";
+        String oldHash = refreshTokenService.hashToken(oldRawToken);
+
+        RefreshToken oldToken = RefreshToken.builder()
+                .id(1L)
+                .user(user)
+                .tokenHash(oldHash)
+                .familyId("test-family")
+                .expiresAt(FIXED_TIME.plusDays(7))
+                .revokedAt(FIXED_TIME)
+                .replacedById(2L)
+                .build();
+
+        RefreshToken liveToken = RefreshToken.builder()
+                .id(2L)
+                .user(user)
+                .tokenHash("live-hash")
+                .familyId("test-family")
+                .expiresAt(FIXED_TIME.plusDays(7))
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(oldHash)).thenReturn(Optional.of(oldToken));
+        when(refreshTokenRepository.findByIdWithUser(2L)).thenReturn(Optional.of(liveToken));
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> {
+            RefreshToken arg = inv.getArgument(0);
+            if (arg.getId() == null) {
+                arg.setId(3L);
+            }
+            return arg;
+        });
+        when(jwtService.generateRefreshToken()).thenReturn("new-raw-token");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(jwtProperties.getRefreshTtlMs()).thenReturn(604800000L);
+
+        String result = refreshTokenService.rotateRefreshToken(oldRawToken);
+
+        assertEquals("new-raw-token", result);
+        assertNotNull(liveToken.getRevokedAt());
+        assertEquals(3L, liveToken.getReplacedById());
+        verify(refreshTokenRepository).findByIdWithUser(2L);
+        verify(refreshTokenRepository, never()).revokeAllTokensInFamily(anyString());
+    }
+
+    @Test
+    void shouldThrowTokenRefreshExceptionWhenChainDeadEndsAtLogoutWithinGrace() {
+        when(jwtProperties.getRefreshGraceSeconds()).thenReturn(10L);
+        String oldRawToken = "revoked-by-rotation";
+        String oldHash = refreshTokenService.hashToken(oldRawToken);
+
+        RefreshToken oldToken = RefreshToken.builder()
+                .id(1L)
+                .user(user)
+                .tokenHash(oldHash)
+                .familyId("test-family")
+                .expiresAt(FIXED_TIME.plusDays(7))
+                .revokedAt(FIXED_TIME)
+                .replacedById(2L)
+                .build();
+
+        RefreshToken chainToken = RefreshToken.builder()
+                .id(2L)
+                .user(user)
+                .tokenHash("chain-hash")
+                .familyId("test-family")
+                .expiresAt(FIXED_TIME.plusDays(7))
+                .revokedAt(FIXED_TIME)
+                .replacedById(null)
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(oldHash)).thenReturn(Optional.of(oldToken));
+        when(refreshTokenRepository.findByIdWithUser(2L)).thenReturn(Optional.of(chainToken));
+
+        assertThrows(TokenRefreshException.class,
+                () -> refreshTokenService.rotateRefreshToken(oldRawToken));
+        verify(refreshTokenRepository, never()).revokeAllTokensInFamily(anyString());
+    }
+
+    @Test
+    void shouldThrowReuseExceptionWhenReusedOutsideGraceWindow() {
+        when(jwtProperties.getRefreshGraceSeconds()).thenReturn(10L);
+        String rawToken = "reused-token";
+        String hash = refreshTokenService.hashToken(rawToken);
+
+        RefreshToken revokedToken = RefreshToken.builder()
+                .id(1L)
+                .user(user)
+                .tokenHash(hash)
+                .familyId("test-family")
+                .expiresAt(FIXED_TIME.plusDays(7))
+                .revokedAt(FIXED_TIME.minusSeconds(11))
+                .replacedById(2L)
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(revokedToken));
+        when(refreshTokenRepository.revokeAllTokensInFamily("test-family")).thenReturn(1);
+
+        assertThrows(RefreshTokenReuseException.class, () -> refreshTokenService.rotateRefreshToken(rawToken));
+        verify(refreshTokenRepository).revokeAllTokensInFamily("test-family");
+    }
+
+    @Test
+    void shouldThrowReuseExceptionOnValidateWhenRevokedWithoutReplacement() {
+        String rawToken = "revoked-no-replacement";
+        String hash = refreshTokenService.hashToken(rawToken);
+
+        RefreshToken revokedToken = RefreshToken.builder()
+                .id(1L)
+                .user(user)
+                .tokenHash(hash)
+                .familyId("test-family")
+                .expiresAt(FIXED_TIME.plusDays(7))
+                .revokedAt(FIXED_TIME)
+                .replacedById(null)
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(revokedToken));
+
+        assertThrows(TokenRefreshException.class, () -> refreshTokenService.validateAndReturnUser(rawToken));
+        verify(refreshTokenRepository, never()).revokeAllTokensInFamily(anyString());
     }
 }

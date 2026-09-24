@@ -4,6 +4,7 @@ import com.flowerconnect.config.JwtProperties;
 import com.flowerconnect.domain.RefreshToken;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.AccountSuspendedException;
+import com.flowerconnect.exception.RefreshTokenReuseException;
 import com.flowerconnect.exception.TokenRefreshException;
 import com.flowerconnect.repository.RefreshTokenRepository;
 import com.flowerconnect.repository.UserRepository;
@@ -74,16 +75,42 @@ public class RefreshTokenService {
         }
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = RefreshTokenReuseException.class)
     public String rotateRefreshToken(String rawToken) {
         String tokenHash = hashToken(rawToken);
         RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new TokenRefreshException("Invalid refresh token"));
 
         if (storedToken.isRevoked()) {
-            throw new TokenRefreshException("Refresh token has been revoked");
+            if (storedToken.getReplacedById() == null) {
+                throw new TokenRefreshException("Refresh token has been revoked");
+            }
+            LocalDateTime now = LocalDateTime.now(clock);
+            if (!now.isAfter(storedToken.getRevokedAt().plusSeconds(jwtProperties.getRefreshGraceSeconds()))) {
+                RefreshToken liveToken = findCurrentLiveTokenInChain(storedToken.getReplacedById());
+                return rotateLiveToken(liveToken);
+            }
+            refreshTokenRepository.revokeAllTokensInFamily(storedToken.getFamilyId());
+            throw new RefreshTokenReuseException("Refresh token reuse detected outside grace window");
         }
 
+        return rotateLiveToken(storedToken);
+    }
+
+    private RefreshToken findCurrentLiveTokenInChain(Long startingTokenId) {
+        RefreshToken current = refreshTokenRepository.findByIdWithUser(startingTokenId)
+                .orElseThrow(() -> new TokenRefreshException("Invalid refresh token"));
+        while (current.isRevoked()) {
+            if (current.getReplacedById() == null) {
+                throw new TokenRefreshException("Refresh token has been revoked");
+            }
+            current = refreshTokenRepository.findByIdWithUser(current.getReplacedById())
+                    .orElseThrow(() -> new TokenRefreshException("Invalid refresh token"));
+        }
+        return current;
+    }
+
+    private String rotateLiveToken(RefreshToken storedToken) {
         if (storedToken.isExpired(LocalDateTime.now(clock))) {
             refreshTokenRepository.delete(storedToken);
             throw new TokenRefreshException("Refresh token has expired");
@@ -107,12 +134,13 @@ public class RefreshTokenService {
         return result.rawToken;
     }
 
+    @Transactional
     public User validateAndReturnUser(String rawToken) {
         String tokenHash = hashToken(rawToken);
         RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new TokenRefreshException("Invalid refresh token"));
 
-        if (storedToken.isRevoked()) {
+        if (storedToken.isRevoked() && storedToken.getReplacedById() == null) {
             throw new TokenRefreshException("Refresh token has been revoked");
         }
 

@@ -5,11 +5,13 @@ import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.repository.RoleRepository;
 import com.flowerconnect.repository.UserRepository;
+import com.flowerconnect.test.MutableClock;
 import com.flowerconnect.security.dto.AuthResponse;
 import com.flowerconnect.security.dto.LoginRequest;
 import com.flowerconnect.security.dto.RefreshRequest;
 import com.flowerconnect.security.dto.RegisterRequest;
 import com.flowerconnect.security.jwt.RefreshTokenService;
+import com.flowerconnect.config.JwtProperties;
 import com.flowerconnect.test.AbstractIntegrationTest;
 import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -21,6 +23,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.*;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,6 +58,9 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private MutableClock clock;
+
     private String accessToken;
     private String refreshToken;
     private final String userEmail = "apitest@test.com";
@@ -63,18 +70,18 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Clean only test-specific data by email
         jdbcTemplate.update("DELETE FROM users WHERE email IN (?, ?, ?, ?)",
                 userEmail, duplicatePhoneEmail, suspendedEmail, disabledEmail);
         accessToken = null;
         refreshToken = null;
+        clock.setInstant(Instant.now());
     }
 
     @AfterEach
     void tearDown() {
-        // Clean only test-specific data by email (refresh_tokens cascade via FK)
         jdbcTemplate.update("DELETE FROM users WHERE email IN (?, ?, ?, ?)",
                 userEmail, duplicatePhoneEmail, suspendedEmail, disabledEmail);
+        clock.setInstant(Instant.now());
     }
 
     @Test
@@ -403,7 +410,61 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldRejectReusedRefreshTokenAfterRotation() throws Exception {
+    void shouldAllowRapidRefreshWithinGraceWindow() throws Exception {
+        setupUserAndLogin();
+        String oldRefreshToken = refreshToken;
+
+        RefreshRequest request = RefreshRequest.builder()
+                .refreshToken(oldRefreshToken)
+                .build();
+
+        MvcResult firstRefreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String firstResponseBody = firstRefreshResult.getResponse().getContentAsString();
+        AuthResponse firstRefreshResponse = objectMapper.readValue(firstResponseBody, AuthResponse.class);
+        String firstNewRefreshToken = firstRefreshResponse.getRefreshToken();
+
+        // Second refresh with the SAME old (now-revoked) token within grace window
+        MvcResult secondRefreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String secondResponseBody = secondRefreshResult.getResponse().getContentAsString();
+        AuthResponse secondRefreshResponse = objectMapper.readValue(secondResponseBody, AuthResponse.class);
+        String secondNewRefreshToken = secondRefreshResponse.getRefreshToken();
+
+        // Each reuse within grace gets its own valid new token (not the same cached token)
+        assertNotEquals(firstNewRefreshToken, secondNewRefreshToken,
+                "Two reuses within grace should get different new tokens");
+
+        // Both new tokens must still be valid (usable for another refresh)
+        RefreshRequest refreshRequest1 = RefreshRequest.builder()
+                .refreshToken(firstNewRefreshToken)
+                .build();
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(refreshRequest1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty());
+
+        RefreshRequest refreshRequest2 = RefreshRequest.builder()
+                .refreshToken(secondNewRefreshToken)
+                .build();
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(refreshRequest2)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty());
+    }
+
+    @Test
+    void shouldRejectReusedRefreshTokenAfterRotationOutsideGraceWindow() throws Exception {
         setupUserAndLogin();
         String oldRefreshToken = refreshToken;
 
@@ -414,12 +475,120 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        clock.advance(java.time.Duration.ofSeconds(12));
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Refresh token reuse detected outside grace window"));
+    }
+
+    @Test
+    void shouldRevokeSiblingTokensWhenReusedOutsideGraceWindow() throws Exception {
+        setupUserAndLogin();
+        String oldRefreshToken = refreshToken;
+
+        RefreshRequest request = RefreshRequest.builder()
+                .refreshToken(oldRefreshToken)
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Long userId = userRepository.findByEmail(userEmail).orElseThrow().getId();
+
+        List<Map<String, Object>> tokensBeforeReuse = jdbcTemplate.queryForList(
+                "SELECT id, revoked_at, replaced_by_id, family_id FROM refresh_tokens WHERE user_id = ? ORDER BY created_at",
+                userId);
+        assertEquals(2, tokensBeforeReuse.size());
+
+        Long siblingTokenId = ((Number) tokensBeforeReuse.get(1).get("id")).longValue();
+        assertNull(tokensBeforeReuse.get(1).get("revoked_at"),
+                "Sibling token (new refresh token) should still be live before reuse");
+
+        clock.advance(java.time.Duration.ofSeconds(12));
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Refresh token reuse detected outside grace window"));
+
+        List<Map<String, Object>> tokensAfterReuse = jdbcTemplate.queryForList(
+                "SELECT id, revoked_at FROM refresh_tokens WHERE user_id = ? ORDER BY created_at",
+                userId);
+        assertEquals(2, tokensAfterReuse.size());
+
+        Map<String, Object> siblingTokenAfter = tokensAfterReuse.get(1);
+        assertEquals(siblingTokenId, ((Number) siblingTokenAfter.get("id")).longValue());
+        assertNotNull(siblingTokenAfter.get("revoked_at"),
+                "Sibling token in same family should be revoked by revokeAllTokensInFamily");
+    }
+
+    @Test
+    void shouldRejectReuseOfLoggedOutTokenWhenChainDeadEndsAtLogout() throws Exception {
+        setupUserAndLogin();
+        String oldRefreshToken = refreshToken;
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(RefreshRequest.builder()
+                        .refreshToken(oldRefreshToken)
+                        .build())))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String liveRefreshToken = mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(RefreshRequest.builder()
+                        .refreshToken(oldRefreshToken)
+                        .build())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        AuthResponse refreshResponse = objectMapper.readValue(liveRefreshToken, AuthResponse.class);
+        liveRefreshToken = refreshResponse.getRefreshToken();
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(RefreshRequest.builder()
+                        .refreshToken(liveRefreshToken)
+                        .build())))
+                .andExpect(status().isNoContent());
+
+        Long userId = userRepository.findByEmail(userEmail).orElseThrow().getId();
+
+        List<Map<String, Object>> tokensBefore = jdbcTemplate.queryForList(
+                "SELECT id, revoked_at, replaced_by_id FROM refresh_tokens WHERE user_id = ? ORDER BY created_at",
+                userId);
+        Map<String, Object> loggedOutToken = tokensBefore.get(tokensBefore.size() - 1);
+        assertNotNull(loggedOutToken.get("revoked_at"),
+                "Logged-out token should have revoked_at set");
+        assertNull(loggedOutToken.get("replaced_by_id"),
+                "Logged-out token should have replaced_by_id = null");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(RefreshRequest.builder()
+                        .refreshToken(oldRefreshToken)
+                        .build())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Refresh token has been revoked"));
+
+        List<Map<String, Object>> tokensAfter = jdbcTemplate.queryForList(
+                "SELECT id, revoked_at, replaced_by_id FROM refresh_tokens WHERE user_id = ? ORDER BY created_at",
+                userId);
+        assertEquals(tokensBefore.size(), tokensAfter.size());
+        for (int i = 0; i < tokensBefore.size(); i++) {
+            assertEquals(tokensBefore.get(i).get("revoked_at"), tokensAfter.get(i).get("revoked_at"),
+                    "No additional tokens should be revoked by family revocation after reuse of logged-out chain");
+        }
     }
 
     @Test

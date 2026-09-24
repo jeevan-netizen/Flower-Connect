@@ -1,17 +1,18 @@
 package com.flowerconnect.config;
 
+import com.flowerconnect.test.MutableClock;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 
 @TestConfiguration
 public class TestClockConfig {
 
     @Bean
-    public Clock clock() {
-        return Clock.fixed(Instant.parse("2025-01-15T10:00:00Z"), ZoneOffset.UTC);
+    @Primary
+    public MutableClock clock() {
+        return new MutableClock(Instant.now());
     }
 }
