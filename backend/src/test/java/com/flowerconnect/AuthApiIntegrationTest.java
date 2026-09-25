@@ -12,6 +12,7 @@ import com.flowerconnect.security.dto.RefreshRequest;
 import com.flowerconnect.security.dto.RegisterRequest;
 import com.flowerconnect.security.jwt.RefreshTokenService;
 import com.flowerconnect.config.AppProperties;
+import com.flowerconnect.config.CorsProperties;
 import com.flowerconnect.config.JwtProperties;
 import com.flowerconnect.test.AbstractIntegrationTest;
 import org.junit.jupiter.api.*;
@@ -20,6 +21,7 @@ import static org.hamcrest.Matchers.containsString;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +29,7 @@ import org.springframework.test.web.servlet.*;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,6 +43,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 class AuthApiIntegrationTest extends AbstractIntegrationTest {
+
+    private static final String CLIENT_HEADER_NAME = "X-FlowerConnect-Client";
+    private static final String CLIENT_HEADER_VALUE = "1";
 
     @Autowired
     private MockMvc mockMvc;
@@ -67,6 +73,9 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private AppProperties appProperties;
+
+    @Autowired
+    private CorsProperties corsProperties;
 
     private String accessToken;
     private String refreshToken;
@@ -413,7 +422,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldRefreshTokensAndRotateOldToken() throws Exception {
+    void shouldAllowBodyOnlyRefreshWithoutClientHeaderOrOrigin() throws Exception {
         setupUserAndLogin();
         String oldRefreshToken = refreshToken;
 
@@ -625,7 +634,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldLogoutAndRevokeRefreshToken() throws Exception {
+    void shouldAllowBodyOnlyLogoutWithoutClientHeaderOrOriginAndRevoke() throws Exception {
         setupUserAndLogin();
 
         RefreshRequest request = RefreshRequest.builder()
@@ -791,12 +800,112 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldRefreshUsingCookieInsteadOfBody() throws Exception {
+    void shouldRejectCookieRefreshWithoutClientHeader() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header(HttpHeaders.ORIGIN, allowedOrigin()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid client header"));
+    }
+
+    @Test
+    void shouldRejectCookieLogoutWithoutClientHeader() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header(HttpHeaders.ORIGIN, allowedOrigin()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid client header"));
+    }
+
+    @Test
+    void shouldRejectCookieRefreshWithMismatchedClientHeader() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header(CLIENT_HEADER_NAME, "invalid")
+                        .header(HttpHeaders.ORIGIN, allowedOrigin()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid client header"));
+    }
+
+    @Test
+    void shouldRejectCookieLogoutWithMismatchedClientHeader() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header(CLIENT_HEADER_NAME, "invalid")
+                        .header(HttpHeaders.ORIGIN, allowedOrigin()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid client header"));
+    }
+
+    @Test
+    void shouldRejectCookieRefreshWithoutOrigin() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header(CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid request origin"));
+    }
+
+    @Test
+    void shouldRejectCookieLogoutWithoutOrigin() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header(CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid request origin"));
+    }
+
+    @Test
+    void shouldRejectCookieRefreshWithMismatchedOrigin() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header(CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE)
+                        .header(HttpHeaders.ORIGIN, "https://attacker.example"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string("Invalid CORS request"));
+    }
+
+    @Test
+    void shouldRejectCookieLogoutWithMismatchedOrigin() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header(CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE)
+                        .header(HttpHeaders.ORIGIN, "https://attacker.example"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string("Invalid CORS request"));
+    }
+
+    @Test
+    void shouldRefreshUsingCookieWithClientHeaderAndAllowedOrigin() throws Exception {
         setupUserAndLogin();
         String oldRefreshToken = refreshToken;
 
         MvcResult result = mockMvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refresh_token", oldRefreshToken))
+                        .header(CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE)
+                        .header(HttpHeaders.ORIGIN, allowedOrigin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
@@ -821,6 +930,8 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refresh_token", oldRefreshToken))
+                        .header(CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE)
+                        .header(HttpHeaders.ORIGIN, allowedOrigin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -828,11 +939,13 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldClearCookieOnLogout() throws Exception {
+    void shouldClearCookieOnLogoutWithClientHeaderAndAllowedOrigin() throws Exception {
         setupUserAndLogin();
 
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .cookie(new Cookie("refresh_token", refreshToken)))
+                        .cookie(new Cookie("refresh_token", refreshToken))
+                        .header(CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE)
+                        .header(HttpHeaders.ORIGIN, allowedOrigin()))
                 .andExpect(status().isNoContent())
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=")))
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
@@ -844,6 +957,14 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    private String allowedOrigin() {
+        return Arrays.stream(corsProperties.getOrigins().split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .findFirst()
+                .orElseThrow();
     }
 
     private void setupUser() {

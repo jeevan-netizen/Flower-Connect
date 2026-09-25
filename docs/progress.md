@@ -69,6 +69,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] Login endpoint (`POST /api/v1/auth/login`) — issue JWT access + refresh tokens
 - [x] Token refresh endpoint (`POST /api/v1/auth/refresh`) — implements rotation
 - [x] Logout endpoint (`POST /api/v1/auth/logout`)
+- [x] Stage 4c CSRF mitigation: cookie-authenticated refresh/logout require `X-FlowerConnect-Client: 1` and an exact configured `Origin`; body-token compatibility remains header/Origin-free
 - [x] Current user endpoint (`GET /api/v1/users/me`)
 - [x] DTOs with Bean Validation + MapStruct mappers
 - [x] Global exception handler (@RestControllerAdvice)
@@ -119,6 +120,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 | 2026-09-21 | Completed Stage 1b: login status check, email normalization, stronger token tests, integration tests | `AuthService.java`, `UserDetailsImpl.java`, `UserDetailsServiceImpl.java`, `RefreshTokenService.java`, `AuthServiceTest.java`, `RefreshTokenServiceTest.java`, `AuthApiIntegrationTest.java`, `RefreshTokenRepositoryIT.java`, `UserRepositoryIT.java` |
 | 2026-09-21 | Phase 0 Finalize: completed 0.7 Error framework, 0.8 Profiles, 0.T Test baseline | `ErrorCode.java`, `BusinessException.java`, `ClockConfig.java`, `AppProperties.java`, `ErrorResponse.java`, `GlobalExceptionHandler.java`, `CustomAuthenticationEntryPoint.java`, `CustomAccessDeniedHandler.java`, `JwtService.java`, `RefreshTokenService.java`, `RefreshToken.java`, `JwtAuthenticationFilter.java`, `SecurityConfig.java`, `JwtProperties.java`, `FlowerConnectApplication.java`, `application.yml`, `application-dev.yml`, `application-prod.yml`, `application-test.yml`, `AbstractIntegrationTest.java`, 4 IT files, `JwtServiceTest.java`, `RefreshTokenServiceTest.java` |
 | 2026-09-21 | Stage 2b: Clock in GlobalExceptionHandler, JwtAuthenticationFilter SUSPENDED→403, code/timestamp assertions, AppProperties tests | `GlobalExceptionHandler.java`, `JwtAuthenticationFilter.java`, `ErrorResponse.java`, `AuthApiIntegrationTest.java`, `UserControllerTest.java`, `AuthControllerTest.java`, `RoleBoundaryTest.java`, `RefreshTokenServiceTest.java`, `MutableClock.java`, `AppPropertiesTest.java`, `application-test.yml` |
+| 2026-09-25 | Stage 4c: cookie-authenticated refresh/logout CSRF mitigation | `AuthController.java`, `AuthApiIntegrationTest.java`, `AuthControllerTest.java`, `shared/lib/api.ts`, `shared/lib/api.test.ts`, `docs/progress.md` |
 | 2026-09-22 | Stage 2c: ddl-auto validate, shared TestClockConfig replaces @MockBean Clock, test property cleanup | `application-test.yml`, `TestClockConfig.java`, `AuthControllerTest.java`, `UserControllerTest.java`, `RoleBoundaryTest.java` |
 
 ## Session Notes

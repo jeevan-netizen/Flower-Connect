@@ -1,6 +1,7 @@
 package com.flowerconnect.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowerconnect.config.CorsProperties;
 import com.flowerconnect.config.TestClockConfig;
 import com.flowerconnect.exception.ResourceConflictException;
 import com.flowerconnect.exception.TokenRefreshException;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -24,6 +26,8 @@ import java.util.Optional;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import jakarta.servlet.http.Cookie;
 
 @WebMvcTest(controllers = AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -41,6 +45,9 @@ class AuthControllerTest {
 
     @MockBean
     private RefreshTokenCookieService cookieService;
+
+    @MockBean
+    private CorsProperties corsProperties;
 
     @Test
     void shouldRegisterSuccessfully() throws Exception {
@@ -187,6 +194,21 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accessToken").value("new-access-token"))
                 .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"))
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=new-refresh-token")));
+    }
+
+    @Test
+    void shouldReturn403ForCookieRefreshWithMismatchedOrigin() throws Exception {
+        when(corsProperties.getOrigins()).thenReturn("http://localhost:5173");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", "refresh-token"))
+                        .header("X-FlowerConnect-Client", "1")
+                        .header(HttpHeaders.ORIGIN, "https://attacker.example"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid request origin"));
+
+        verifyNoInteractions(authService, cookieService);
     }
 
     @Test

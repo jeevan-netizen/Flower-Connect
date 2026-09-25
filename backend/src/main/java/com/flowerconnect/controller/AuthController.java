@@ -1,5 +1,6 @@
 package com.flowerconnect.controller;
 
+import com.flowerconnect.config.CorsProperties;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.security.AuthService;
 import com.flowerconnect.security.dto.AuthResponse;
@@ -24,13 +25,20 @@ import java.util.Arrays;
 public class AuthController {
 
     private static final String REFRESH_COOKIE_NAME = "refresh_token";
+    private static final String CLIENT_HEADER_NAME = "X-FlowerConnect-Client";
+    private static final String CLIENT_HEADER_VALUE = "1";
 
     private final AuthService authService;
     private final RefreshTokenCookieService cookieService;
+    private final CorsProperties corsProperties;
 
-    public AuthController(AuthService authService, RefreshTokenCookieService cookieService) {
+    public AuthController(
+            AuthService authService,
+            RefreshTokenCookieService cookieService,
+            CorsProperties corsProperties) {
         this.authService = authService;
         this.cookieService = cookieService;
+        this.corsProperties = corsProperties;
     }
 
     @PostMapping("/register")
@@ -95,12 +103,28 @@ public class AuthController {
     private String extractToken(HttpServletRequest request, RefreshRequest body) {
         String cookieToken = extractCookie(request, REFRESH_COOKIE_NAME);
         if (cookieToken != null && !cookieToken.isBlank()) {
+            validateCookieAuthentication(request);
             return cookieToken;
         }
         if (body != null) {
             return body.getRefreshToken();
         }
         return null;
+    }
+
+    private void validateCookieAuthentication(HttpServletRequest request) {
+        if (!CLIENT_HEADER_VALUE.equals(request.getHeader(CLIENT_HEADER_NAME))) {
+            throw BusinessException.forbidden("Missing or invalid client header");
+        }
+
+        String origin = request.getHeader(HttpHeaders.ORIGIN);
+        boolean allowedOrigin = Arrays.stream(corsProperties.getOrigins().split(","))
+                .map(String::trim)
+                .filter(allowed -> !allowed.isEmpty())
+                .anyMatch(allowed -> allowed.equals(origin));
+        if (!allowedOrigin) {
+            throw BusinessException.forbidden("Missing or invalid request origin");
+        }
     }
 
     private String extractCookie(HttpServletRequest request, String name) {

@@ -18,6 +18,9 @@ const api = axios.create({
 });
 
 const PUBLIC_ENDPOINTS = ["/auth/register", "/auth/login", "/auth/refresh", "/auth/logout"];
+const COOKIE_AUTH_ENDPOINTS = ["/auth/refresh", "/auth/logout"];
+const COOKIE_AUTH_HEADER = "X-FlowerConnect-Client";
+const COOKIE_AUTH_HEADER_VALUE = "1";
 
 let isRefreshing = false;
 let refreshPromise: Promise<AuthResponse | null> | null = null;
@@ -25,8 +28,12 @@ let refreshPromise: Promise<AuthResponse | null> | null = null;
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const { accessToken } = useAuthStore.getState();
   const isPublic = PUBLIC_ENDPOINTS.some((endpoint) => config.url?.startsWith(endpoint));
+  const isCookieAuth = COOKIE_AUTH_ENDPOINTS.some((endpoint) => config.url?.startsWith(endpoint));
   if (accessToken && !isPublic) {
     config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  if (isCookieAuth) {
+    config.headers[COOKIE_AUTH_HEADER] = COOKIE_AUTH_HEADER_VALUE;
   }
   return config;
 });
