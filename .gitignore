@@ -1,6 +1,6 @@
 # Maven
 target/
-mvnw.cmd
+**/bin/
 
 # Node / Vite
 node_modules/
