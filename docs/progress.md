@@ -128,5 +128,5 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - `package-lock.json` is gitignored — use `npm install`, not `npm ci`, for local dev.
 - All Kilo configuration lives in `kilo.jsonc` (validated). Agent and command `.md` files in `.kilo/` directories fail YAML validation in this Kilo CLI build.
 - `docs/progress.md` is the ground truth for unfinished work — always check before starting new tasks.
-- Phase 1 backend implemented, realigning to plan v2.2: 72 unit tests and 34 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern).
+- Phase 1 backend implemented, realigning to plan v2.2: 76 unit tests and 37 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern).
 - Phase 1 frontend auth implemented, realigning to plan v2.2: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor; 41 frontend tests pass (including the smoke test).
