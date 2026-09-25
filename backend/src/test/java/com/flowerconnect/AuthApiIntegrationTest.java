@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import jakarta.servlet.http.Cookie;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -749,6 +751,80 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         // Cleanup
         jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", userId);
         userRepository.delete(savedUser);
+    }
+
+    @Test
+    void shouldSetRefreshCookieOnRefresh() throws Exception {
+        setupUserAndLogin();
+        String oldRefreshToken = refreshToken;
+
+        RefreshRequest request = RefreshRequest.builder()
+                .refreshToken(oldRefreshToken)
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("HttpOnly")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("SameSite=Strict")));
+    }
+
+    @Test
+    void shouldRefreshUsingCookieInsteadOfBody() throws Exception {
+        setupUserAndLogin();
+        String oldRefreshToken = refreshToken;
+
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", oldRefreshToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String responseBody = result.getResponse().getContentAsString();
+        AuthResponse response = objectMapper.readValue(responseBody, AuthResponse.class);
+        assertNotNull(response.getAccessToken());
+        assertNotNull(response.getRefreshToken());
+        assertNotEquals(oldRefreshToken, response.getRefreshToken(),
+                "Refresh via cookie should rotate to a new token");
+    }
+
+    @Test
+    void shouldCookieTakePrecedenceOverBodyWhenBothPresent() throws Exception {
+        setupUserAndLogin();
+        String oldRefreshToken = refreshToken;
+
+        RefreshRequest request = RefreshRequest.builder()
+                .refreshToken("wrong-token-in-body")
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", oldRefreshToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
+    }
+
+    @Test
+    void shouldClearCookieOnLogout() throws Exception {
+        setupUserAndLogin();
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie("refresh_token", refreshToken)))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=")))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
+    }
+
+    @Test
+    void shouldRejectRefreshWhenEmptyBodyAndNoCookie() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
     }
 
     private void setupUser() {

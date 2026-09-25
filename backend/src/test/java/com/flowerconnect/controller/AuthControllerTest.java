@@ -6,6 +6,7 @@ import com.flowerconnect.exception.ResourceConflictException;
 import com.flowerconnect.exception.TokenRefreshException;
 import com.flowerconnect.security.AuthService;
 import com.flowerconnect.security.dto.*;
+import com.flowerconnect.security.jwt.RefreshTokenCookieService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.*;
 
@@ -36,6 +38,9 @@ class AuthControllerTest {
 
     @MockBean
     private AuthService authService;
+
+    @MockBean
+    private RefreshTokenCookieService cookieService;
 
     @Test
     void shouldRegisterSuccessfully() throws Exception {
@@ -161,21 +166,24 @@ class AuthControllerTest {
         RefreshRequest request = RefreshRequest.builder().refreshToken("old-refresh-token").build();
         AuthResponse response = AuthResponse.of("new-access-token", "new-refresh-token", 900000L);
 
-        when(authService.refresh(any(RefreshRequest.class))).thenReturn(response);
+        when(authService.refresh("old-refresh-token")).thenReturn(response);
+        when(cookieService.buildRefreshCookie("new-refresh-token"))
+                .thenReturn(ResponseCookie.from("refresh_token", "new-refresh-token").httpOnly(true).secure(false).sameSite("Strict").path("/api/v1/auth").maxAge(604).build());
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("new-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"));
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=new-refresh-token")));
     }
 
     @Test
     void shouldReturn401ForInvalidRefreshToken() throws Exception {
         RefreshRequest request = RefreshRequest.builder().refreshToken("invalid-token").build();
 
-        when(authService.refresh(any(RefreshRequest.class)))
+        when(authService.refresh("invalid-token"))
                 .thenThrow(new TokenRefreshException("Invalid refresh token"));
 
         mockMvc.perform(post("/api/v1/auth/refresh")
@@ -189,12 +197,16 @@ class AuthControllerTest {
     void shouldLogoutSuccessfully() throws Exception {
         RefreshRequest request = RefreshRequest.builder().refreshToken("refresh-token-to-revoke").build();
 
+        when(cookieService.buildClearCookie())
+                .thenReturn(ResponseCookie.from("refresh_token", "").httpOnly(true).secure(false).sameSite("Strict").path("/api/v1/auth").maxAge(0).build());
+
         mockMvc.perform(post("/api/v1/auth/logout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=")));
 
-        verify(authService).logout(any(RefreshRequest.class));
+        verify(authService).logout("refresh-token-to-revoke");
     }
 
     @Test
@@ -206,7 +218,25 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidJson))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Refresh token is required"))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void shouldReturn400ForEmptyRefreshTokenOnLogout() throws Exception {
+        String invalidJson = """
+                {"refreshToken":""}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Refresh token is required"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     @Test

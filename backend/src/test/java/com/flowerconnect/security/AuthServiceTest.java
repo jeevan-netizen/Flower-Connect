@@ -356,16 +356,12 @@ class AuthServiceTest {
 
     @Test
     void shouldRefreshTokens() {
-        RefreshRequest request = RefreshRequest.builder()
-                .refreshToken("old-refresh-token")
-                .build();
-
         when(refreshTokenService.validateAndReturnUser("old-refresh-token")).thenReturn(activeUser);
         when(refreshTokenService.rotateRefreshToken("old-refresh-token")).thenReturn("new-refresh-token");
         when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("new-access-token");
         when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
 
-        AuthResponse response = authService.refresh(request);
+        AuthResponse response = authService.refresh("old-refresh-token");
 
         assertNotNull(response);
         assertEquals("new-access-token", response.getAccessToken());
@@ -377,11 +373,7 @@ class AuthServiceTest {
 
     @Test
     void shouldLogoutAndRevokeToken() {
-        RefreshRequest request = RefreshRequest.builder()
-                .refreshToken("refresh-token-to-revoke")
-                .build();
-
-        authService.logout(request);
+        authService.logout("refresh-token-to-revoke");
 
         verify(refreshTokenService).revokeRefreshToken("refresh-token-to-revoke");
     }

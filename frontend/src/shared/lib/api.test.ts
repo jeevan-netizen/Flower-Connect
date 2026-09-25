@@ -3,7 +3,6 @@ import { type AxiosError, type AxiosAdapter, type InternalAxiosRequestConfig } f
 
 interface MockAuthState {
   accessToken: string | null;
-  refreshToken: string | null;
   user: unknown;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -31,7 +30,6 @@ vi.mock("@/features/auth/stores/auth-store", () => ({
 function defaultState(): MockAuthState {
   return {
     accessToken: "test-access-token",
-    refreshToken: "test-refresh-token",
     user: null,
     isAuthenticated: true,
     isLoading: false,

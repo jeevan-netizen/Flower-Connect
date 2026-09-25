@@ -3,7 +3,6 @@ import type {
   AuthResponse,
   LoginRequest,
   RegisterRequest,
-  RefreshRequest,
   UserResponse,
 } from "@/features/auth/types";
 
@@ -17,13 +16,13 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
   return response.data;
 }
 
-export async function refresh(data: RefreshRequest): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>("/auth/refresh", data);
+export async function refresh(): Promise<AuthResponse> {
+  const response = await api.post<AuthResponse>("/auth/refresh");
   return response.data;
 }
 
-export async function logout(data: RefreshRequest): Promise<void> {
-  await api.post("/auth/logout", data);
+export async function logout(): Promise<void> {
+  await api.post("/auth/logout");
 }
 
 export async function fetchCurrentUser(): Promise<UserResponse> {

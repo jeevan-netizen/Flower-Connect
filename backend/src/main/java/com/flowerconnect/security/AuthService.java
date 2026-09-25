@@ -109,9 +109,9 @@ public class AuthService {
         }
     }
 
-    public AuthResponse refresh(RefreshRequest request) {
-        User user = refreshTokenService.validateAndReturnUser(request.getRefreshToken());
-        String newRefreshToken = refreshTokenService.rotateRefreshToken(request.getRefreshToken());
+    public AuthResponse refresh(String rawToken) {
+        User user = refreshTokenService.validateAndReturnUser(rawToken);
+        String newRefreshToken = refreshTokenService.rotateRefreshToken(rawToken);
 
         String roleName = user.getRole() != null ? user.getRole().getName() : "CUSTOMER";
         String accessToken = jwtService.generateAccessToken(
@@ -122,8 +122,8 @@ public class AuthService {
         return AuthResponse.of(accessToken, newRefreshToken, jwtProperties.getAccessTtlMs());
     }
 
-    public void logout(RefreshRequest request) {
-        refreshTokenService.revokeRefreshToken(request.getRefreshToken());
+    public void logout(String rawToken) {
+        refreshTokenService.revokeRefreshToken(rawToken);
     }
 
     private AuthResponse createAuthResponse(User user) {

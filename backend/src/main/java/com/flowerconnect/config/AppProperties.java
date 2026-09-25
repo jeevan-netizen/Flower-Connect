@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 public class AppProperties {
 
     private String baseUrl = "http://localhost:5173";
+    private boolean refreshCookieSecure = true;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -15,5 +16,13 @@ public class AppProperties {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
+    }
+
+    public boolean isRefreshCookieSecure() {
+        return refreshCookieSecure;
+    }
+
+    public void setRefreshCookieSecure(boolean refreshCookieSecure) {
+        this.refreshCookieSecure = refreshCookieSecure;
     }
 }

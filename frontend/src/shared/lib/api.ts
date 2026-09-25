@@ -11,6 +11,7 @@ declare module "axios" {
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1",
   timeout: 15000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -31,8 +32,7 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 async function attemptRefresh(): Promise<string | null> {
-  const { refreshToken, setAuth } = useAuthStore.getState();
-  if (!refreshToken) return null;
+  const { setAuth } = useAuthStore.getState();
 
   if (isRefreshing && refreshPromise) {
     return refreshPromise.then((auth) => auth?.accessToken ?? null);
@@ -40,7 +40,7 @@ async function attemptRefresh(): Promise<string | null> {
 
   isRefreshing = true;
   refreshPromise = api
-    .post<AuthResponse>("/auth/refresh", { refreshToken })
+    .post<AuthResponse>("/auth/refresh")
     .then((response) => {
       const auth = response.data;
       setAuth(auth);
