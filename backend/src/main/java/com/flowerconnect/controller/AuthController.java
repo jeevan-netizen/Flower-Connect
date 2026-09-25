@@ -36,13 +36,13 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         AuthResponse response = authService.register(request);
-        return ResponseEntity.ok(response);
+        return responseWithRefreshCookie(response);
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(response);
+        return responseWithRefreshCookie(response);
     }
 
     @PostMapping("/refresh")
@@ -83,6 +83,13 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .headers(clearHeaders)
                 .build();
+    }
+
+    private ResponseEntity<AuthResponse> responseWithRefreshCookie(AuthResponse response) {
+        ResponseCookie refreshCookie = cookieService.buildRefreshCookie(response.getRefreshToken());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .body(response);
     }
 
     private String extractToken(HttpServletRequest request, RefreshRequest body) {

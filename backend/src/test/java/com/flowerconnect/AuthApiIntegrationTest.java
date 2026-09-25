@@ -11,10 +11,12 @@ import com.flowerconnect.security.dto.LoginRequest;
 import com.flowerconnect.security.dto.RefreshRequest;
 import com.flowerconnect.security.dto.RegisterRequest;
 import com.flowerconnect.security.jwt.RefreshTokenService;
+import com.flowerconnect.config.AppProperties;
 import com.flowerconnect.config.JwtProperties;
 import com.flowerconnect.test.AbstractIntegrationTest;
 import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.hamcrest.Matchers.containsString;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -63,6 +65,9 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private MutableClock clock;
 
+    @Autowired
+    private AppProperties appProperties;
+
     private String accessToken;
     private String refreshToken;
     private final String userEmail = "apitest@test.com";
@@ -102,7 +107,14 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.expiresIn").value(900000));
+                .andExpect(jsonPath("$.expiresIn").value(900000))
+                .andExpect(header().string("Set-Cookie", containsString("refresh_token=")))
+                .andExpect(header().string("Set-Cookie", containsString("HttpOnly")))
+                .andExpect(header().string("Set-Cookie", containsString("SameSite=Strict")))
+                .andExpect(header().string("Set-Cookie", containsString("Path=/api/v1/auth")))
+                .andExpect(header().string("Set-Cookie", appProperties.isRefreshCookieSecure()
+                        ? containsString("Secure")
+                        : org.hamcrest.Matchers.not(containsString("Secure"))));
 
         User saved = userRepository.findByEmail(userEmail).orElseThrow();
         assertEquals("CUSTOMER", saved.getRole().getName());
@@ -185,7 +197,14 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(header().string("Set-Cookie", containsString("refresh_token=")))
+                .andExpect(header().string("Set-Cookie", containsString("HttpOnly")))
+                .andExpect(header().string("Set-Cookie", containsString("SameSite=Strict")))
+                .andExpect(header().string("Set-Cookie", containsString("Path=/api/v1/auth")))
+                .andExpect(header().string("Set-Cookie", appProperties.isRefreshCookieSecure()
+                        ? containsString("Secure")
+                        : org.hamcrest.Matchers.not(containsString("Secure"))));
     }
 
     @Test

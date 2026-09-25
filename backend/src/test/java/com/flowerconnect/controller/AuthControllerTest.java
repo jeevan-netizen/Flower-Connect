@@ -54,6 +54,10 @@ class AuthControllerTest {
         AuthResponse response = AuthResponse.of("access-token", "refresh-token", 900000L);
 
         when(authService.register(any(RegisterRequest.class))).thenReturn(response);
+        when(cookieService.buildRefreshCookie("refresh-token"))
+                .thenReturn(ResponseCookie.from("refresh_token", "refresh-token")
+                        .httpOnly(true).secure(false).sameSite("Strict")
+                        .path("/api/v1/auth").maxAge(604).build());
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -62,7 +66,8 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
                 .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.expiresIn").value(900000));
+                .andExpect(jsonPath("$.expiresIn").value(900000))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=")));
     }
 
     @Test
@@ -87,12 +92,17 @@ class AuthControllerTest {
         AuthResponse response = AuthResponse.of("access-token", "refresh-token", 900000L);
 
         when(authService.login(any(LoginRequest.class))).thenReturn(response);
+        when(cookieService.buildRefreshCookie("refresh-token"))
+                .thenReturn(ResponseCookie.from("refresh_token", "refresh-token")
+                        .httpOnly(true).secure(false).sameSite("Strict")
+                        .path("/api/v1/auth").maxAge(604).build());
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("access-token"));
+                .andExpect(jsonPath("$.accessToken").value("access-token"))
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=")));
     }
 
     @Test
