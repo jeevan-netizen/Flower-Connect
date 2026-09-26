@@ -20,6 +20,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.*;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -34,9 +35,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import jakarta.servlet.http.Cookie;
 
 @WebMvcTest(controllers = AuthController.class)
-@AutoConfigureMockMvc(addFilters = false)
-@Import(TestClockConfig.class)
-class AuthControllerTest {
+    @AutoConfigureMockMvc(addFilters = false)
+    @Import(TestClockConfig.class)
+    class AuthControllerTest {
 
     @Autowired
     private MockMvc mockMvc;

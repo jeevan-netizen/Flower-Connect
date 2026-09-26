@@ -25,6 +25,9 @@
         <flyway.version>9.22.3</flyway.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
         <testcontainers.version>1.21.4</testcontainers.version>
+        <bucket4j.version>7.6.1</bucket4j.version>
+        <caffeine.version>3.1.8</caffeine.version>
+        <springdoc.version>2.3.0</springdoc.version>
     </properties>
 
     <dependencies>
@@ -112,6 +115,25 @@
             <artifactId>jjwt-jackson</artifactId>
             <version>0.12.5</version>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- Rate limiting: Bucket4j + Caffeine -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>${bucket4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>${caffeine.version}</version>
+        </dependency>
+
+        <!-- API Documentation: springdoc-openapi -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
 
         <!-- Test -->

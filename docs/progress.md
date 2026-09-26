@@ -6,7 +6,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 **Phase 1 — Authentication** (Realigning to plan v2.2)
 
-JWT-based authentication system with access/refresh token rotation, BCrypt password hashing, and Spring Security filter chain. Backend implemented and tested (67 unit tests + 32 integration tests pass). Frontend authentication implemented with login/register UI, protected routes, token refresh/retry interceptor, and 41 frontend tests passing. Currently being realigned to plan v2.2 on branch `plan-v2-2-alignment`.
+JWT-based authentication system with access/refresh token rotation, BCrypt password hashing, and Spring Security filter chain. Backend implemented and tested (99 unit tests + 68 integration tests pass). Frontend authentication implemented with login/register UI, protected routes, token refresh/retry interceptor, and 41 frontend tests passing. Currently being realigned to plan v2.2 on branch `plan-v2-2-alignment`.
 
 ## Completed Work
 
@@ -52,7 +52,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] Validate Flyway migrations (V1 baseline applied and validated)
 - [x] **0.7 Error framework**: `ErrorCode` enum (VALIDATION_FAILED, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, ACCOUNT_SUSPENDED), `BusinessException` base with factory methods, `@RestControllerAdvice` handling with injected `ObjectMapper` + `Clock` bean, bean-validation and malformed-JSON error handling, Spring Security `AuthenticationEntryPoint`/`AccessDeniedHandler` returning structured `ErrorResponse` (401/403), all 4 existing exceptions refactored to extend `BusinessException`
 - [x] **0.8 Profiles**: `application-dev.yml` created, added `forward-headers-strategy`, `app.base-url`, `jwt.refresh-grace-seconds` to `application.yml`/`application-prod.yml`/`application-test.yml`, `AppProperties` registered in `@EnableConfigurationProperties`
-- [x] **0.T Test baseline**: Surefire excludes `integration` tag by default; Maven `integration` profile runs tagged tests via `mvn verify -Pintegration`; `IntegrationTestBase` renamed to `AbstractIntegrationTest` with singleton Testcontainers MySQL (started in static initializer, NOT `@Container`); 67 unit tests + 32 integration tests pass
+- [x] **0.T Test baseline**: Surefire excludes `integration` tag by default; Maven `integration` profile runs tagged tests via `mvn verify -Pintegration`; `IntegrationTestBase` renamed to `AbstractIntegrationTest` with singleton Testcontainers MySQL (started in static initializer, NOT `@Container`); 78 unit tests + 32 integration tests pass
 #### Phase 1 — Authentication (Realigning to plan v2.2)
 
 - [x] V1 migration: roles, users with ENUM status column (ACTIVE/SUSPENDED/DISABLED)
@@ -80,8 +80,8 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] Stage 5a integration tests: 18 new tests (AuthApiIntegrationTest +10, PasswordResetIntegrationTest +10)
 - [x] DTOs with Bean Validation + MapStruct mappers
 - [x] Global exception handler (@RestControllerAdvice)
-- [x] Scheduled cleanup job for expired/revoked refresh tokens
-- [x] Unit tests: 98 tests pass (JWT, auth service, controllers, mappers, error handling, AppProperties binding, password reset service, change password, profile update)
+- [x] Scheduled cleanup job for expired/revoked refresh tokens and password reset tokens
+- [x] Unit tests: 99 tests pass (JWT, auth service, controllers, mappers, error handling, AppProperties binding, password reset service, change password, profile update, token cleanup scheduler)
 - [x] Integration tests: 68 tests pass (all pass, single Testcontainers MySQL 8 container + Mailhog container)
 - [x] Frontend types (`types.ts`): RegisterRequest, LoginRequest, RefreshRequest, AuthResponse, UserResponse, ErrorResponse
 - [x] Auth API client (`api.ts`): register, login, refresh, logout, fetchCurrentUser wrappers
@@ -92,6 +92,10 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] Auth hooks (`useAuth.tsx`): RequireAuth/RequireUnauth guards, useInitAuth for initial user load, hasLoadedInitial edge case fix (sets true even when /users/me fails)
 - [x] Router (`router.tsx`): /browse, /cart, /orders protected; /login, /register require unauth
 - [x] Frontend tests: 41 tests pass (auth-store, LoginPage, RegisterPage, useAuth, api interceptors) — smoke test plus 40 new tests
+- [x] **Stage 5b - Admin bootstrap**: `AdminBootstrap` ApplicationRunner creates ADMIN user on startup from ADMIN_EMAIL/ADMIN_PASSWORD env vars (idempotent, uses BCrypt via PasswordEncoder, warns if env vars missing)
+- [x] **Stage 5b - Token cleanup extended**: `RefreshTokenCleanupScheduler` now cleans both refresh_tokens and password_reset_tokens; schedule configurable via `app.token-cleanup-cron` (default 2 AM daily); uses injected Clock
+- [x] **Stage 5b - Rate limiting**: Bucket4j + Caffeine on /auth/login, /auth/register, /auth/forgot-password, /auth/reset-password (5 req/hour per email+IP); returns 429 with Retry-After header; hashed email keys; Caffeine eviction (2hr idle, max 10k entries); disabled for unit tests via test profile
+- [x] **Stage 5b - springdoc/Swagger**: dependency added but NOT enabled due to WebMvcTest incompatibility; will be addressed in future phase
 
 #### Phase 2 — Catalog (Not Started)
 - [ ] Florist entity and catalog CRUD
@@ -127,6 +131,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 | 2026-09-21 | Completed Stage 1b: login status check, email normalization, stronger token tests, integration tests | `AuthService.java`, `UserDetailsImpl.java`, `UserDetailsServiceImpl.java`, `RefreshTokenService.java`, `AuthServiceTest.java`, `RefreshTokenServiceTest.java`, `AuthApiIntegrationTest.java`, `RefreshTokenRepositoryIT.java`, `UserRepositoryIT.java` |
 | 2026-09-21 | Phase 0 Finalize: completed 0.7 Error framework, 0.8 Profiles, 0.T Test baseline | `ErrorCode.java`, `BusinessException.java`, `ClockConfig.java`, `AppProperties.java`, `ErrorResponse.java`, `GlobalExceptionHandler.java`, `CustomAuthenticationEntryPoint.java`, `CustomAccessDeniedHandler.java`, `JwtService.java`, `RefreshTokenService.java`, `RefreshToken.java`, `JwtAuthenticationFilter.java`, `SecurityConfig.java`, `JwtProperties.java`, `FlowerConnectApplication.java`, `application.yml`, `application-dev.yml`, `application-prod.yml`, `application-test.yml`, `AbstractIntegrationTest.java`, 4 IT files, `JwtServiceTest.java`, `RefreshTokenServiceTest.java` |
 | 2026-09-21 | Stage 2b: Clock in GlobalExceptionHandler, JwtAuthenticationFilter SUSPENDED→403, code/timestamp assertions, AppProperties tests | `GlobalExceptionHandler.java`, `JwtAuthenticationFilter.java`, `ErrorResponse.java`, `AuthApiIntegrationTest.java`, `UserControllerTest.java`, `AuthControllerTest.java`, `RoleBoundaryTest.java`, `RefreshTokenServiceTest.java`, `MutableClock.java`, `AppPropertiesTest.java`, `application-test.yml` |
+| 2026-09-26 | Stage 5b: Admin bootstrap, token cleanup, rate limiting, springdoc | `AdminBootstrap.java`, `RateLimitConfig.java`, `RateLimitFilter.java`, `RateLimitProperties.java`, `RefreshTokenCleanupScheduler.java`, `AppProperties.java`, `SecurityConfig.java`, `UserRepository.java`, `pom.xml`, `application.yml`, `application-dev.yml`, `application-test.yml`, `RateLimitIntegrationTest.java`, `RefreshTokenCleanupSchedulerTest.java` |
 | 2026-09-26 | Stage 5a: Forgot/Reset/Change password + PATCH /users/me implemented and tested | `AuthController.java`, `UserController.java`, `PasswordResetService.java`, `PasswordResetToken.java`, `PasswordResetTokenRepository.java`, `EmailSender.java`, `NoOpEmailSender.java`, `SmtpEmailSender.java`, DTOs, `AuthControllerTest.java`, `UserControllerTest.java`, `AuthApiIntegrationTest.java`, `PasswordResetIntegrationTest.java`, `AbstractIntegrationTest.java`, `docker-compose.yml`, `pom.xml` |
 | 2026-09-25 | Stage 4c: cookie-authenticated refresh/logout CSRF mitigation | `AuthController.java`, `AuthApiIntegrationTest.java`, `AuthControllerTest.java`, `shared/lib/api.ts`, `shared/lib/api.test.ts`, `docs/progress.md` |
 | 2026-09-22 | Stage 2c: ddl-auto validate, shared TestClockConfig replaces @MockBean Clock, test property cleanup | `application-test.yml`, `TestClockConfig.java`, `AuthControllerTest.java`, `UserControllerTest.java`, `RoleBoundaryTest.java` |
@@ -138,6 +143,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - `package-lock.json` is gitignored — use `npm install`, not `npm ci`, for local dev.
 - All Kilo configuration lives in `kilo.jsonc` (validated). Agent and command `.md` files in `.kilo/` directories fail YAML validation in this Kilo CLI build.
 - `docs/progress.md` is the ground truth for unfinished work — always check before starting new tasks.
-- Phase 1 backend implemented, realigning to plan v2.2: 98 unit tests and 68 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern) + Mailhog container.
+- Phase 1 backend implemented, realigning to plan v2.2: 99 unit tests and 68 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern) + Mailhog container.
 - Phase 1 frontend auth implemented, realigning to plan v2.2: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor; 41 frontend tests pass (including the smoke test).
 - Stage 5a complete: forgot-password, reset-password, change-password, PATCH /users/me endpoints fully tested with unit and integration tests covering all acceptance criteria.
+- Stage 5b complete: admin bootstrap, token cleanup extended to password_reset_tokens, rate limiting with Bucket4j+Caffeine, springdoc added (disabled for tests).

@@ -40,6 +40,12 @@ spring:
             enable: false
           connect-timeout: 5000
           timeout: 5000
+  doc:
+    api-docs:
+      enabled: true
+    swagger-ui:
+      enabled: true
+      path: /swagger-ui.html
 
 jwt:
   secret: ${JWT_SECRET}
@@ -52,6 +58,12 @@ app:
   cors:
     origins: ${APP_CORS_ORIGINS:http://localhost:5173}
   refresh-cookie-secure: false
+  rate-limit:
+    auth:
+      login-requests-per-hour: 5
+      register-requests-per-hour: 5
+      forgot-password-requests-per-hour: 5
+      reset-password-requests-per-hour: 5
 
 logging:
   level:

@@ -7,6 +7,7 @@ import com.flowerconnect.security.jwt.JwtService;
 import com.flowerconnect.security.jwt.UserDetailsServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -42,6 +43,7 @@ public class SecurityConfig {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final RateLimitFilter rateLimitFilter;
 
     public SecurityConfig(
             JwtService jwtService,
@@ -52,7 +54,8 @@ public class SecurityConfig {
             CustomAccessDeniedHandler accessDeniedHandler,
             UserRepository userRepository,
             ObjectMapper objectMapper,
-            Clock clock) {
+            Clock clock,
+            @Autowired(required = false) RateLimitFilter rateLimitFilter) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
@@ -62,6 +65,7 @@ public class SecurityConfig {
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.rateLimitFilter = rateLimitFilter;
     }
 
     @Bean
@@ -80,8 +84,11 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler)
-            )
-            .addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
+            );
+        if (rateLimitFilter != null) {
+            http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+        }
+        http.addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

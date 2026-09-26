@@ -59,6 +59,12 @@ app:
   base-url: ${APP_BASE_URL:http://localhost:5173}
   cors:
     origins: ${APP_CORS_ORIGINS:http://localhost:5173}
+  rate-limit:
+    auth:
+      login-requests-per-hour: 5
+      register-requests-per-hour: 5
+      forgot-password-requests-per-hour: 5
+      reset-password-requests-per-hour: 5
 
 management:
   endpoints:

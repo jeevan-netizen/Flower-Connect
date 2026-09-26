@@ -2,7 +2,9 @@ package com.flowerconnect.test;
 
 import com.flowerconnect.config.TestClockConfig;
 import org.junit.jupiter.api.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -17,6 +19,9 @@ import java.time.Duration;
 @Tag("integration")
 @Import(TestClockConfig.class)
 public abstract class AbstractIntegrationTest {
+
+    @Autowired
+    protected JdbcTemplate jdbcTemplate;
 
     protected static final MySQLContainer<?> MYSQL =
             new MySQLContainer<>("mysql:8.0.36")

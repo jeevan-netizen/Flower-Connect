@@ -23,6 +23,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.*;
 
 import java.time.LocalDateTime;
@@ -37,9 +38,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-    @WebMvcTest(controllers = UserController.class)
-    @Import({UserControllerTest.TestSecurityConfig.class, TestClockConfig.class})
-    class UserControllerTest {
+@WebMvcTest(controllers = UserController.class)
+@Import({UserControllerTest.TestSecurityConfig.class, TestClockConfig.class})
+class UserControllerTest {
 
     @TestConfiguration
     static class TestSecurityConfig {

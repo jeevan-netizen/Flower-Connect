@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,8 +31,11 @@ class RefreshTokenRepositoryIT extends AbstractIntegrationTest {
     @Autowired
     private RoleRepository roleRepository;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    @BeforeEach
+    void cleanUp() {
+        // Clean up tokens from other tests to ensure isolation
+        jdbcTemplate.update("DELETE FROM refresh_tokens");
+    }
 
     private User createTestUser(String email) {
         Role role = roleRepository.findByName("CUSTOMER").orElseThrow();
