@@ -3,11 +3,13 @@ package com.flowerconnect.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowerconnect.config.CorsProperties;
 import com.flowerconnect.config.TestClockConfig;
+import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.ResourceConflictException;
 import com.flowerconnect.exception.TokenRefreshException;
+import com.flowerconnect.repository.PasswordResetTokenRepository;
 import com.flowerconnect.security.AuthService;
-import com.flowerconnect.security.dto.*;
 import com.flowerconnect.security.jwt.RefreshTokenCookieService;
+import com.flowerconnect.security.dto.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,6 +23,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.*;
 
 import static org.mockito.ArgumentMatchers.any;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.mockito.Mockito.*;
@@ -48,6 +52,9 @@ class AuthControllerTest {
 
     @MockBean
     private CorsProperties corsProperties;
+
+    @MockBean
+    private com.flowerconnect.security.jwt.PasswordResetService passwordResetService;
 
     @Test
     void shouldRegisterSuccessfully() throws Exception {
@@ -277,5 +284,145 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn200ForForgotPasswordWithUnknownEmail() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                ForgotPasswordRequest.builder().email("unknown@test.com").build())))
+                .andExpect(status().isOk());
+    }
+
+@Test
+    void shouldReturn200ForForgotPasswordWithEmptyEmail() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                ForgotPasswordRequest.builder().email("").build())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn200ForForgotPasswordWithActiveEmailAndCreateToken() throws Exception {
+        String email = "active@test.com";
+        ForgotPasswordRequest request = ForgotPasswordRequest.builder().email(email).build();
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(passwordResetService).requestPasswordReset(email.toLowerCase());
+    }
+
+    @Test
+    void shouldReturnIdentical200ForForgotPasswordWithSuspendedEmail() throws Exception {
+        String email = "suspended@test.com";
+        ForgotPasswordRequest request = ForgotPasswordRequest.builder().email(email).build();
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(passwordResetService).requestPasswordReset(email.toLowerCase());
+    }
+
+    @Test
+    void shouldReturnIdentical200ForForgotPasswordWithDisabledEmail() throws Exception {
+        String email = "disabled@test.com";
+        ForgotPasswordRequest request = ForgotPasswordRequest.builder().email(email).build();
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(passwordResetService).requestPasswordReset(email.toLowerCase());
+    }
+
+    @Test
+    void shouldReturn400ForResetPasswordWithExpiredToken() throws Exception {
+        doThrow(new com.flowerconnect.exception.BusinessException(
+                com.flowerconnect.exception.ErrorCode.VALIDATION_FAILED,
+                "Invalid or expired reset token"))
+                .when(passwordResetService)
+                        .completePasswordReset("expired-token", "newPassword123");
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                ResetPasswordRequest.builder().token("expired-token").newPassword("newPassword123").build())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid or expired reset token"));
+    }
+
+    @Test
+    void shouldReturn400ForResetPasswordWithAlreadyUsedToken() throws Exception {
+        doThrow(new com.flowerconnect.exception.BusinessException(
+                com.flowerconnect.exception.ErrorCode.VALIDATION_FAILED,
+                "Invalid or expired reset token"))
+                .when(passwordResetService)
+                        .completePasswordReset("used-token", "newPassword123");
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                ResetPasswordRequest.builder().token("used-token").newPassword("newPassword123").build())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid or expired reset token"));
+    }
+
+    @Test
+    void shouldReturn400ForResetPasswordWithMalformedToken() throws Exception {
+        doThrow(new com.flowerconnect.exception.BusinessException(
+                com.flowerconnect.exception.ErrorCode.VALIDATION_FAILED,
+                "Invalid or expired reset token"))
+                .when(passwordResetService)
+                        .completePasswordReset("malformed-token", "newPassword123");
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                ResetPasswordRequest.builder().token("malformed-token").newPassword("newPassword123").build())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid or expired reset token"));
+    }
+
+    @Test
+    void shouldReturn400ForResetPasswordWithNonexistentToken() throws Exception {
+        doThrow(new com.flowerconnect.exception.BusinessException(
+                com.flowerconnect.exception.ErrorCode.VALIDATION_FAILED,
+                "Invalid or expired reset token"))
+                .when(passwordResetService)
+                        .completePasswordReset("nonexistent-token", "newPassword123");
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                ResetPasswordRequest.builder().token("nonexistent-token").newPassword("newPassword123").build())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid or expired reset token"));
+    }
+
+    @Test
+    void shouldReturnIdenticalGenericErrorForAllInvalidResetTokenCases() throws Exception {
+        doThrow(new com.flowerconnect.exception.BusinessException(
+                com.flowerconnect.exception.ErrorCode.VALIDATION_FAILED,
+                "Invalid or expired reset token"))
+                .when(passwordResetService)
+                        .completePasswordReset(anyString(), anyString());
+
+        String[] invalidTokens = {"expired", "used", "malformed", "nonexistent"};
+        for (String token : invalidTokens) {
+            mockMvc.perform(post("/api/v1/auth/reset-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    ResetPasswordRequest.builder().token(token).newPassword("newPassword123").build())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Invalid or expired reset token"));
+        }
     }
 }

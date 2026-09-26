@@ -41,6 +41,21 @@ services:
       retries: 10
       start_period: 10s
 
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: flowerconnect-mailhog
+    restart: unless-stopped
+    command: ["-host-interface=0.0.0.0", "-smtp-interface=0.0.0.0", "-api-interface=0.0.0.0"]
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8025/api/v2/messages"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   backend:
     build:
       context: ./backend
@@ -52,6 +67,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mailhog:
+        condition: service_healthy
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
@@ -62,6 +79,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-flowerconnect}
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
       JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_JWT_SECRET_256_BITS}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
     ports:

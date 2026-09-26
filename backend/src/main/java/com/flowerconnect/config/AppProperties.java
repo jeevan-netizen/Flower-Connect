@@ -9,6 +9,7 @@ public class AppProperties {
 
     private String baseUrl = "http://localhost:5173";
     private boolean refreshCookieSecure = true;
+    private int resetTokenTtlMinutes = 30;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -24,5 +25,13 @@ public class AppProperties {
 
     public void setRefreshCookieSecure(boolean refreshCookieSecure) {
         this.refreshCookieSecure = refreshCookieSecure;
+    }
+
+    public int getResetTokenTtlMinutes() {
+        return resetTokenTtlMinutes;
+    }
+
+    public void setResetTokenTtlMinutes(int resetTokenTtlMinutes) {
+        this.resetTokenTtlMinutes = resetTokenTtlMinutes;
     }
 }

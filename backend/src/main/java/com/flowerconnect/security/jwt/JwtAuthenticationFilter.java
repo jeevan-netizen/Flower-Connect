@@ -51,7 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (jwtService.validateToken(token)) {
                     String email = jwtService.getEmailFromToken(token);
 
-                    User user = userRepository.findByEmail(email).orElse(null);
+                    User user = userRepository.findByEmailWithRole(email).orElse(null);
                     if (user == null) {
                         log.debug("JWT authentication failed: user not found");
                         writeUnauthorized(response, request, "Invalid or expired token");

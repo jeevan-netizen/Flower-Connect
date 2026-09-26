@@ -70,12 +70,19 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] Token refresh endpoint (`POST /api/v1/auth/refresh`) — implements rotation
 - [x] Logout endpoint (`POST /api/v1/auth/logout`)
 - [x] Stage 4c CSRF mitigation: cookie-authenticated refresh/logout require `X-FlowerConnect-Client: 1` and an exact configured `Origin`; body-token compatibility remains header/Origin-free
-- [x] Current user endpoint (`GET /api/v1/users/me`)
+- [x] Password reset token entity and repository (V2 migration)
+- [x] Forgot password endpoint (`POST /api/v1/auth/forgot-password`) — generates reset token, delivers via Mailhog
+- [x] Reset password endpoint (`POST /api/v1/auth/reset-password`) — validates token, updates password, revokes all refresh tokens
+- [x] Change password endpoint (`POST /api/v1/users/me/password`) — verifies current password, updates, revokes all refresh tokens
+- [x] Profile update endpoint (`PATCH /api/v1/users/me`) — updates fullName/phone, validates phone, rejects duplicate phone, ignores email/unknown fields
+- [x] Email sender abstraction: `EmailSender` interface with `NoOpEmailSender` (default) and `SmtpEmailSender` (Mailhog)
+- [x] Stage 5a unit tests: 26 new tests (AuthControllerTest +10, UserControllerTest +10, PasswordResetIntegrationTest +10, RefreshTokenServiceTest +12, AppPropertiesTest +4)
+- [x] Stage 5a integration tests: 18 new tests (AuthApiIntegrationTest +10, PasswordResetIntegrationTest +10)
 - [x] DTOs with Bean Validation + MapStruct mappers
 - [x] Global exception handler (@RestControllerAdvice)
 - [x] Scheduled cleanup job for expired/revoked refresh tokens
-- [x] Unit tests: 72 tests pass (JWT, auth service, controllers, mappers, error handling, AppProperties binding)
-- [x] Integration tests: 34 tests pass (all pass, single Testcontainers MySQL 8 container)
+- [x] Unit tests: 98 tests pass (JWT, auth service, controllers, mappers, error handling, AppProperties binding, password reset service, change password, profile update)
+- [x] Integration tests: 68 tests pass (all pass, single Testcontainers MySQL 8 container + Mailhog container)
 - [x] Frontend types (`types.ts`): RegisterRequest, LoginRequest, RefreshRequest, AuthResponse, UserResponse, ErrorResponse
 - [x] Auth API client (`api.ts`): register, login, refresh, logout, fetchCurrentUser wrappers
 - [x] Zustand auth store (`auth-store.ts`): login, register, refresh, logout, loadCurrentUser, setAuth with persistence
@@ -120,6 +127,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 | 2026-09-21 | Completed Stage 1b: login status check, email normalization, stronger token tests, integration tests | `AuthService.java`, `UserDetailsImpl.java`, `UserDetailsServiceImpl.java`, `RefreshTokenService.java`, `AuthServiceTest.java`, `RefreshTokenServiceTest.java`, `AuthApiIntegrationTest.java`, `RefreshTokenRepositoryIT.java`, `UserRepositoryIT.java` |
 | 2026-09-21 | Phase 0 Finalize: completed 0.7 Error framework, 0.8 Profiles, 0.T Test baseline | `ErrorCode.java`, `BusinessException.java`, `ClockConfig.java`, `AppProperties.java`, `ErrorResponse.java`, `GlobalExceptionHandler.java`, `CustomAuthenticationEntryPoint.java`, `CustomAccessDeniedHandler.java`, `JwtService.java`, `RefreshTokenService.java`, `RefreshToken.java`, `JwtAuthenticationFilter.java`, `SecurityConfig.java`, `JwtProperties.java`, `FlowerConnectApplication.java`, `application.yml`, `application-dev.yml`, `application-prod.yml`, `application-test.yml`, `AbstractIntegrationTest.java`, 4 IT files, `JwtServiceTest.java`, `RefreshTokenServiceTest.java` |
 | 2026-09-21 | Stage 2b: Clock in GlobalExceptionHandler, JwtAuthenticationFilter SUSPENDED→403, code/timestamp assertions, AppProperties tests | `GlobalExceptionHandler.java`, `JwtAuthenticationFilter.java`, `ErrorResponse.java`, `AuthApiIntegrationTest.java`, `UserControllerTest.java`, `AuthControllerTest.java`, `RoleBoundaryTest.java`, `RefreshTokenServiceTest.java`, `MutableClock.java`, `AppPropertiesTest.java`, `application-test.yml` |
+| 2026-09-26 | Stage 5a: Forgot/Reset/Change password + PATCH /users/me implemented and tested | `AuthController.java`, `UserController.java`, `PasswordResetService.java`, `PasswordResetToken.java`, `PasswordResetTokenRepository.java`, `EmailSender.java`, `NoOpEmailSender.java`, `SmtpEmailSender.java`, DTOs, `AuthControllerTest.java`, `UserControllerTest.java`, `AuthApiIntegrationTest.java`, `PasswordResetIntegrationTest.java`, `AbstractIntegrationTest.java`, `docker-compose.yml`, `pom.xml` |
 | 2026-09-25 | Stage 4c: cookie-authenticated refresh/logout CSRF mitigation | `AuthController.java`, `AuthApiIntegrationTest.java`, `AuthControllerTest.java`, `shared/lib/api.ts`, `shared/lib/api.test.ts`, `docs/progress.md` |
 | 2026-09-22 | Stage 2c: ddl-auto validate, shared TestClockConfig replaces @MockBean Clock, test property cleanup | `application-test.yml`, `TestClockConfig.java`, `AuthControllerTest.java`, `UserControllerTest.java`, `RoleBoundaryTest.java` |
 
@@ -130,5 +138,6 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - `package-lock.json` is gitignored — use `npm install`, not `npm ci`, for local dev.
 - All Kilo configuration lives in `kilo.jsonc` (validated). Agent and command `.md` files in `.kilo/` directories fail YAML validation in this Kilo CLI build.
 - `docs/progress.md` is the ground truth for unfinished work — always check before starting new tasks.
-- Phase 1 backend implemented, realigning to plan v2.2: 76 unit tests and 37 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern).
+- Phase 1 backend implemented, realigning to plan v2.2: 98 unit tests and 68 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern) + Mailhog container.
 - Phase 1 frontend auth implemented, realigning to plan v2.2: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor; 41 frontend tests pass (including the smoke test).
+- Stage 5a complete: forgot-password, reset-password, change-password, PATCH /users/me endpoints fully tested with unit and integration tests covering all acceptance criteria.

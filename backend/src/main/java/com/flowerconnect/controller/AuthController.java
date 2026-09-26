@@ -4,19 +4,25 @@ import com.flowerconnect.config.CorsProperties;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.security.AuthService;
 import com.flowerconnect.security.dto.AuthResponse;
+import com.flowerconnect.security.dto.ForgotPasswordRequest;
 import com.flowerconnect.security.dto.LoginRequest;
 import com.flowerconnect.security.dto.RefreshRequest;
 import com.flowerconnect.security.dto.RegisterRequest;
+import com.flowerconnect.security.dto.ResetPasswordRequest;
+import com.flowerconnect.security.jwt.PasswordResetService;
 import com.flowerconnect.security.jwt.RefreshTokenCookieService;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import jakarta.servlet.http.Cookie;
 import java.util.Arrays;
 
 @Slf4j
@@ -31,14 +37,17 @@ public class AuthController {
     private final AuthService authService;
     private final RefreshTokenCookieService cookieService;
     private final CorsProperties corsProperties;
+    private final PasswordResetService passwordResetService;
 
     public AuthController(
             AuthService authService,
             RefreshTokenCookieService cookieService,
-            CorsProperties corsProperties) {
+            CorsProperties corsProperties,
+            PasswordResetService passwordResetService) {
         this.authService = authService;
         this.cookieService = cookieService;
         this.corsProperties = corsProperties;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/register")
@@ -91,6 +100,30 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .headers(clearHeaders)
                 .build();
+    }
+
+    /**
+     * Always returns 200 with an identical body, whether or not the email is
+     * registered and whether or not the account is ACTIVE (rules.md 5.6 - no
+     * user enumeration). Only ACTIVE accounts actually receive a token and an
+     * email; SUSPENDED/DISABLED/nonexistent accounts are silently ignored.
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.requestPasswordReset(request.getEmail());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Single-use token verification. Returns one generic 400 for not-found,
+     * expired, or already-used tokens so the token state is not observable.
+     * On success the password is re-hashed and all of the user's refresh
+     * tokens are revoked.
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.completePasswordReset(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok().build();
     }
 
     private ResponseEntity<AuthResponse> responseWithRefreshCookie(AuthResponse response) {

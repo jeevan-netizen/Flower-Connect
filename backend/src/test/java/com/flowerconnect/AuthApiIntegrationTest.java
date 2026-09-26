@@ -7,7 +7,9 @@ import com.flowerconnect.repository.RoleRepository;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.test.MutableClock;
 import com.flowerconnect.security.dto.AuthResponse;
+import com.flowerconnect.security.dto.ChangePasswordRequest;
 import com.flowerconnect.security.dto.LoginRequest;
+import com.flowerconnect.security.dto.ProfileUpdateRequest;
 import com.flowerconnect.security.dto.RefreshRequest;
 import com.flowerconnect.security.dto.RegisterRequest;
 import com.flowerconnect.security.jwt.RefreshTokenService;
@@ -37,6 +39,7 @@ import java.util.UUID;
 import jakarta.servlet.http.Cookie;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -956,6 +959,193 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldUpdateProfileWithValidFullNameAndPhone() throws Exception {
+        setupUserAndLogin();
+
+        String newPhone = "+1" + String.format("%010d", new java.util.Random().nextInt(1000000000));
+        String requestJson = objectMapper.writeValueAsString(
+                com.flowerconnect.security.dto.ProfileUpdateRequest.builder()
+                        .fullName("Updated Name")
+                        .phone(newPhone)
+                        .build());
+
+        mockMvc.perform(patch("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Updated Name"))
+                .andExpect(jsonPath("$.phone").value(newPhone))
+                .andExpect(jsonPath("$.email").value(userEmail));
+
+        // Verify persisted
+        User saved = userRepository.findByEmail(userEmail).orElseThrow();
+        assertEquals("Updated Name", saved.getFullName());
+        assertEquals(newPhone, saved.getPhone());
+    }
+
+    @Test
+    void shouldRejectProfileUpdateWithInvalidPhoneFormat() throws Exception {
+        setupUserAndLogin();
+
+        String requestJson = objectMapper.writeValueAsString(
+                com.flowerconnect.security.dto.ProfileUpdateRequest.builder()
+                        .phone("invalid-format")
+                        .build());
+
+        mockMvc.perform(patch("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectProfileUpdateWithDuplicatePhone() throws Exception {
+        // Create another user with a phone
+        String otherPhone = "+1" + String.format("%010d", new java.util.Random().nextInt(1000000000));
+        Role role = roleRepository.findByName("CUSTOMER").orElseThrow();
+        User otherUser = User.builder()
+                .email("other-" + UUID.randomUUID() + "@test.com")
+                .passwordHash(passwordEncoder.encode("password123"))
+                .fullName("Other User")
+                .phone(otherPhone)
+                .role(role)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
+                .build();
+        userRepository.save(otherUser);
+
+        setupUserAndLogin();
+
+        String requestJson = objectMapper.writeValueAsString(
+                com.flowerconnect.security.dto.ProfileUpdateRequest.builder()
+                        .phone(otherPhone)
+                        .build());
+
+        mockMvc.perform(patch("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Phone number already in use"));
+    }
+
+    @Test
+    void shouldIgnoreEmailFieldInProfileUpdate() throws Exception {
+        setupUserAndLogin();
+
+        String requestJson = """
+                {"fullName":"Updated","phone":"+19876543210","email":"attacker@test.com"}
+                """;
+
+        mockMvc.perform(patch("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(userEmail));
+
+        User saved = userRepository.findByEmail(userEmail).orElseThrow();
+        assertEquals(userEmail, saved.getEmail(), "Email should not change");
+    }
+
+    @Test
+    void shouldIgnoreUnknownFieldsInProfileUpdate() throws Exception {
+        setupUserAndLogin();
+
+        String requestJson = """
+                {"fullName":"Updated","unknownField":"ignored"}
+                """;
+
+        mockMvc.perform(patch("/api/v1/users/me")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Updated"));
+    }
+
+    @Test
+    void shouldRejectChangePasswordWithWrongCurrentPassword() throws Exception {
+        setupUserAndLogin();
+
+        String requestJson = objectMapper.writeValueAsString(
+                com.flowerconnect.security.dto.ChangePasswordRequest.builder()
+                        .currentPassword("wrongpassword")
+                        .newPassword("newPassword123")
+                        .build());
+
+        mockMvc.perform(post("/api/v1/users/me/password")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Current password is incorrect"));
+    }
+
+    @Test
+    void shouldChangePasswordSuccessfullyWithCorrectCurrentPassword() throws Exception {
+        setupUserAndLogin();
+        String originalPasswordHash = userRepository.findByEmail(userEmail).orElseThrow().getPasswordHash();
+
+        // Verify user has refresh tokens before change
+        Long userId = userRepository.findByEmail(userEmail).orElseThrow().getId();
+        List<Map<String, Object>> tokensBefore = jdbcTemplate.queryForList(
+                "SELECT id, revoked_at FROM refresh_tokens WHERE user_id = ?", userId);
+        assertFalse(tokensBefore.isEmpty(), "User should have refresh tokens before password change");
+
+        String requestJson = objectMapper.writeValueAsString(
+                com.flowerconnect.security.dto.ChangePasswordRequest.builder()
+                        .currentPassword("password123")
+                        .newPassword("newPassword123")
+                        .build());
+
+        mockMvc.perform(post("/api/v1/users/me/password")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password updated"));
+
+        // Verify password hash changed
+        String newPasswordHash = userRepository.findByEmail(userEmail).orElseThrow().getPasswordHash();
+        assertNotEquals(originalPasswordHash, newPasswordHash, "Password hash should change");
+        assertTrue(passwordEncoder.matches("newPassword123", newPasswordHash), "New password should be valid");
+
+        // Verify ALL refresh tokens revoked
+        List<Map<String, Object>> tokensAfter = jdbcTemplate.queryForList(
+                "SELECT id, revoked_at FROM refresh_tokens WHERE user_id = ?", userId);
+        long activeTokensAfter = tokensAfter.stream()
+                .filter(t -> t.get("revoked_at") == null)
+                .count();
+        assertEquals(0, activeTokensAfter, "All refresh tokens should be revoked after password change");
+
+        // Verify new password works for login
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                LoginRequest.builder().email(userEmail).password("newPassword123").build())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldRejectChangePasswordWithShortNewPassword() throws Exception {
+        setupUserAndLogin();
+
+        String requestJson = objectMapper.writeValueAsString(
+                com.flowerconnect.security.dto.ChangePasswordRequest.builder()
+                        .currentPassword("password123")
+                        .newPassword("short")
+                        .build());
+
+        mockMvc.perform(post("/api/v1/users/me/password")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
                 .andExpect(status().isBadRequest());
     }
 
