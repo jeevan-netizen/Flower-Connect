@@ -29,9 +29,9 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
   - Tailwind CSS with brand color palette and Inter font
   - Vitest smoke test in `src/test/setup.ts`
 - [x] Infrastructure
-  - `docker-compose.yml`: MySQL 8, Redis 7, backend, frontend
+  - `docker-compose.yml`: MySQL 8, Mailhog, backend, frontend (Redis removed per plan v2.2)
   - `.env.example` with all environment variable templates
-  - `.gitignore` for Maven, Node, env files, IDE artifacts
+  - `.gitignore` for Maven, Node, env files, IDE artifacts, uploads
 - [x] Project memory & agent configuration
   - `AGENTS.md` — primary agent instructions
   - `CLAUDE.md` — compatibility redirect
@@ -53,6 +53,10 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] **0.7 Error framework**: `ErrorCode` enum (VALIDATION_FAILED, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, ACCOUNT_SUSPENDED), `BusinessException` base with factory methods, `@RestControllerAdvice` handling with injected `ObjectMapper` + `Clock` bean, bean-validation and malformed-JSON error handling, Spring Security `AuthenticationEntryPoint`/`AccessDeniedHandler` returning structured `ErrorResponse` (401/403), all 4 existing exceptions refactored to extend `BusinessException`
 - [x] **0.8 Profiles**: `application-dev.yml` created, added `forward-headers-strategy`, `app.base-url`, `jwt.refresh-grace-seconds` to `application.yml`/`application-prod.yml`/`application-test.yml`, `AppProperties` registered in `@EnableConfigurationProperties`
 - [x] **0.T Test baseline**: Surefire excludes `integration` tag by default; Maven `integration` profile runs tagged tests via `mvn verify -Pintegration`; `IntegrationTestBase` renamed to `AbstractIntegrationTest` with singleton Testcontainers MySQL (started in static initializer, NOT `@Container`); 78 unit tests + 32 integration tests pass
+- [x] **0.10 Git ignore**: `.gitignore` covering `.env`, `node_modules`, `target`, `uploads`
+- [x] **Stage 6 - Redis removal**: Removed Redis service, config, env vars, and volume from docker-compose.yml, application.yml, application-prod.yml per plan v2.2 (no Redis in v1)
+- [x] **Stage 6 - Vite dev proxy**: Added `/api` proxy to backend in `vite.config.ts` for same-origin cookie flow
+- [x] **Stage 6 - MySQL healthcheck**: Verified mysqladmin ping healthcheck with `depends_on: service_healthy` in docker-compose.yml
 #### Phase 1 — Authentication (Realigning to plan v2.2)
 
 - [x] V1 migration: roles, users with ENUM status column (ACTIVE/SUSPENDED/DISABLED)
@@ -116,6 +120,7 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-09-27 | Stage 6: Redis removal, Vite dev proxy, MySQL healthcheck, .gitignore uploads, known-issues update | `.gitignore`, `docker-compose.yml`, `application.yml`, `application-prod.yml`, `vite.config.ts`, `docs/known-issues.md` |
 | 2026-09-14 | Initial Phase 0 scaffold established     | All files (initial commits)                          |
 | 2026-09-14 | Created persistent project memory (optimized for limited models) | `AGENTS.md`, `CLAUDE.md`, `docs/*`, `kilo.jsonc` |
 | 2026-09-14 | Fixed unit test failures across all test classes | `JwtService.java`, `AuthControllerTest.java`, `UserControllerTest.java`, `AuthServiceTest.java`, `RefreshTokenServiceTest.java` |
@@ -143,7 +148,8 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - `package-lock.json` is gitignored — use `npm install`, not `npm ci`, for local dev.
 - All Kilo configuration lives in `kilo.jsonc` (validated). Agent and command `.md` files in `.kilo/` directories fail YAML validation in this Kilo CLI build.
 - `docs/progress.md` is the ground truth for unfinished work — always check before starting new tasks.
-- Phase 1 backend implemented, realigning to plan v2.2: 99 unit tests and 68 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern) + Mailhog container.
-- Phase 1 frontend auth implemented, realigning to plan v2.2: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor; 41 frontend tests pass (including the smoke test).
+- Phase 1 backend implemented, realigning to plan v2.2: 99 unit tests and 73 integration tests pass, with a single Testcontainers MySQL 8 container (singleton pattern) + Mailhog container.
+- Phase 1 frontend auth implemented, realigning to plan v2.2: login/register UI, auth API client, Zustand store, route guards, token refresh/retry interceptor; 42 frontend tests pass (including the smoke test).
 - Stage 5a complete: forgot-password, reset-password, change-password, PATCH /users/me endpoints fully tested with unit and integration tests covering all acceptance criteria.
 - Stage 5b complete: admin bootstrap, token cleanup extended to password_reset_tokens, rate limiting with Bucket4j+Caffeine, springdoc added (disabled for tests).
+- Stage 6 complete: Redis removed, Vite dev proxy added, MySQL healthcheck verified, .gitignore updated for uploads, known-issues.md updated.

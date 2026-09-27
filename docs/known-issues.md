@@ -25,12 +25,13 @@
 
 | ID  | Area       | Description                                           | Impact |
 |-----|------------|-------------------------------------------------------|--------|
-| 001 | Backend    | Redis is provisioned in `docker-compose.yml` and configured in `application.yml` and `application-prod.yml`, but nothing in the backend uses it | Plan v2.2 says no Redis in v1. The container, config, and env vars are removed in stage 6 of the plan v2.2 realignment. |
+| 001 | Backend    | Redis was provisioned in `docker-compose.yml` and configured in `application.yml`/`application-prod.yml`, but nothing in the backend used it (rate limiting uses Caffeine) | Fixed/Removed | Redis service, config, env vars, and volume removed in Stage 6 per plan v2.2 (no Redis in v1) |
 | 002 | Frontend   | No error boundary component                           | Unhandled errors will crash the app. Should add in Phase 2. |
 | 003 | Frontend   | No loading states or suspense in routes                | All routes render immediately. Add skeleton loaders later. |
 | 004 | Docker     | No `.env` file required for `docker compose up`      | Compose uses defaults from `.env.example`. Production deployments need a real `.env`. |
 | 005 | Docker     | No health check for backend DB/Redis connectivity    | Backend may start before DB is ready if healthcheck fails silently. |
 | 006 | Docker     | Docker now available                                  | Full-stack Docker verified. All healthchecks pass. |
+| 007 | Frontend   | Vite dev proxy for `/api` exists in `vite.config.ts` but is currently unused — frontend axios `baseURL` points directly at `http://localhost:8080/api/v1`. If proxy is ever activated (relative `VITE_API_BASE_URL`), stage 4c's exact-Origin check in `AuthController.validateCookieAuthentication` would need revisiting, since same-origin proxied requests may not present the `Origin` header the same way cross-origin requests do. Verified via trace in Stage 6; not re-tested with proxy active. | Configuration mismatch; no runtime impact currently |
 
 ## Discovered Problems
 

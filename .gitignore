@@ -24,3 +24,6 @@ Thumbs.db
 
 # DBHub
 dbhub.toml
+
+# Uploads
+uploads/
