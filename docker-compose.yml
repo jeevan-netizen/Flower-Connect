@@ -25,12 +25,11 @@ services:
     image: mailhog/mailhog:v1.0.1
     container_name: flowerconnect-mailhog
     restart: unless-stopped
-    command: ["-host-interface=0.0.0.0", "-smtp-interface=0.0.0.0", "-api-interface=0.0.0.0"]
     ports:
       - "1025:1025"
       - "8025:8025"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8025/api/v2/messages"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8025/api/v2/messages"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -51,7 +50,7 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: ${DB_NAME:-flowerconnect}
-      DB_URL: "jdbc:mysql://mysql:3306/${DB_NAME:-flowerconnect}?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeServer=false&serverTimezone=UTC&allowPublicKeys=true&useSSL=false"
+      DB_URL: "jdbc:mysql://mysql:3306/${DB_NAME:-flowerconnect}?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeServer=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false"
       DB_USER: ${DB_USER:-flowerconnect}
       DB_PASS: ${DB_PASS:-flowerconnect}
       MAIL_HOST: mailhog
