@@ -4,9 +4,9 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 2a — Service Locations (Task 2.1)**
+**Phase 2b — Vendor Profiles, Delivery Settings & Opening Hours (Tasks 2.2–2.4)**
 
-Service-location database structure, Bengaluru demo region seed data, backend domain model, and a public unauthenticated `GET /api/v1/locations` endpoint. Consolidated `GET /api/v1/locations/search` into `GET /api/v1/locations`: no `pincode`/`area` → hierarchical `List<ServiceLocationResponse>`; `pincode` and/or `area` present → paginated `PageResponse<ServiceLocationResponse>` with AND semantics. Validation moved from DTO to `@Pattern`/`@Min`/`@Max` on `@RequestParam`. Backend implemented and tested (131 unit tests + 83 integration tests pass). Awaiting final approval before commit.
+Vendor-profile data model only: `vendor_profiles` and `vendor_hours` tables (V5 migration), `VendorProfile` and `VendorHours` entities, and their repositories. Coordinates are copied from the Phase 2a `service_locations` centroid (D-4 — no GPS). No API, service or controller is added in this phase: vendor registration, admin approval, audit log and admin user status belong to Phase 2c and later. Backend verified with 131 unit tests + 110 integration tests.
 
 ## Completed Work
 
@@ -101,8 +101,11 @@ Service-location database structure, Bengaluru demo region seed data, backend do
 - [x] **Stage 5b - Rate limiting**: Bucket4j + Caffeine on /auth/login, /auth/register, /auth/forgot-password, /auth/reset-password (5 req/hour per email+IP); returns 429 with Retry-After header; hashed email keys; Caffeine eviction (2hr idle, max 10k entries); disabled for unit tests via test profile
 - [x] **Stage 5b - springdoc/Swagger**: dependency added but NOT enabled due to WebMvcTest incompatibility; will be addressed in future phase
 
-#### Phase 2 — Catalog
-- [x] **2a — Service Locations (Task 2.1)**: `service_locations` table (V4 migration) with Bengaluru seed data (8 areas), `ServiceLocation` entity, `ServiceLocationRepository` with custom search queries, DTOs (`ServiceLocationResponse`, `LocationSearchRequest`, `PageResponse`), MapStruct mapper, `LocationService` with search/pagination, public `GET /api/v1/locations` (hierarchical) and `GET /api/v1/locations/search` (pincode/area AND filter, pagination), `/api/v1/locations/**` added to `permitAll()` in `SecurityConfig`. 32 new tests (15 unit + 10 controller + 7 seed integrity + 10 integration). No commit/push pending final approval.
+#### Phase 2 — Vendor Profiles, Delivery Settings & Admin Approval
+- [x] **2a — Service Locations (Task 2.1)**: `service_locations` table (V4 migration) with Bengaluru seed data (8 areas), `ServiceLocation` entity, `ServiceLocationRepository` with custom search queries, DTOs (`ServiceLocationResponse`, `LocationSearchRequest`, `PageResponse`), MapStruct mapper, `LocationService` with search/pagination, public `GET /api/v1/locations` (hierarchical by default, paginated `PageResponse` when `pincode`/`area` filters are supplied, AND semantics), `/api/v1/locations/**` added to `permitAll()` in `SecurityConfig`. 32 new tests (15 unit + 10 controller + 7 seed integrity + 10 integration). Committed as `852cec6`.
+- [x] **2b — Vendor profile data model (Tasks 2.2, 2.3, 2.4)**: `vendor_profiles` and `vendor_hours` tables (V5 migration) with business details, copied `service_location_id` FK plus lat/lng centroid copy, `delivery_radius_km`, `logo_url`, `status` ENUM (`PENDING_APPROVAL`/`APPROVED`/`REJECTED`/`SUSPENDED`), nullable `commission_rate` override, nullable `avg_rating` with `review_count` default 0, delivery settings (`min_order_amount`, `base_delivery_fee`, `per_km_fee`, `free_delivery_above`, `prep_time_minutes`, `slot_duration_minutes`, `max_orders_per_slot`, `accepting_orders`), and weekly `vendor_hours` (weekday, open, close, closed). Index `vendor_profiles(status, latitude, longitude)` per plan section 8. `VendorProfile` and `VendorHours` entities plus `VendorProfileRepository` and `VendorHoursRepository`. 27 new integration tests (10 profile repository + 7 hours repository + 10 schema/migration integrity). No endpoints added — registration, approval, audit log and admin user status are Phase 2c+.
+- [ ] **2c — Vendor registration API, admin vendor management, approval gating (Tasks 2.5, 2.6, 2.7)**
+- [ ] **2d — Admin user status API (Task 2.8)**
 - [ ] Florist entity and catalog CRUD
 - [ ] Product browsing UI
 - [ ] Search and filtering

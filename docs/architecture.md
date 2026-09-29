@@ -4,7 +4,7 @@
 
 FlowerConnect is a **hyperlocal flower marketplace**. It connects local florists with customers for same-day or scheduled flower delivery within a tight geographic radius. The platform handles browsing, ordering, payments, and delivery coordination.
 
-Current development phase: **Phase 0 (Scaffold)** — the project has an initialized repository with basic directory layout, database schema for users/roles, and a placeholder frontend. No business logic or REST API endpoints are implemented yet.
+Current development phase: **Phase 2b (Vendor Profiles)** — authentication (Phase 1) and service locations (Phase 2a) are implemented. Phase 2b adds the `vendor_profiles` and `vendor_hours` data model. Vendor registration, admin approval, and vendor-facing endpoints are not implemented yet.
 
 ## 2. High-Level Architecture
 
@@ -22,7 +22,9 @@ Current development phase: **Phase 0 (Scaffold)** — the project has an initial
 │  http://localhost:8080                                │
 ├──────────────────────────────────────────────────────┤
 │                    MySQL 8 (docker)                   │
-│  Roles + Users (Phase 0)                              │
+│  Roles + Users (Phase 0/1)                            │
+│  Service Locations (Phase 2a)                         │
+│  Vendor Profiles + Vendor Hours (Phase 2b)            │
 │  Future: Catalog, Orders, Payments, Delivery          │
 ├──────────────────────────────────────────────────────┤
 │                    Redis 7 (docker)                    │
@@ -34,8 +36,9 @@ Current development phase: **Phase 0 (Scaffold)** — the project has an initial
 
 | Service      | Responsibility                          | Phase    |
 |--------------|-----------------------------------------|----------|
-| Auth         | JWT issuance, user registration/login   | Phase 1+ |
-| Catalog      | Florist listings, product inventory     | Phase 2+ |
+| Auth         | JWT issuance, user registration/login   | Phase 1 (done) |
+| Geo          | Service locations, pincode/area search  | Phase 2a (done) |
+| Catalog      | Florist listings, product inventory     | Phase 2b+ |
 | Order        | Cart, checkout, order lifecycle         | Phase 3+ |
 | Payment      | Stripe integration                      | Phase 3+ |
 | Delivery     | Assignment, tracking, status updates    | Phase 3+ |
@@ -52,7 +55,7 @@ Current development phase: **Phase 0 (Scaffold)** — the project has an initial
 | Build          | Maven (via `mvnw` wrapper)          |
 | ORM            | Spring Data JPA + Hibernate 6       |
 | Database       | MySQL 8 (InnoDB, utf8mb4)           |
-| Migrations     | Flyway (baseline V1)                |
+| Migrations     | Flyway (baseline V1, additive V2–V5) |
 | Cache          | Redis 7 (password-protected)        |
 | Codegen        | Lombok 1.18.32, MapStruct 1.5.5     |
 | Security       | Spring Security 6 (planned)         |
@@ -104,11 +107,22 @@ FlowerConnect/
 │   └── src/
 │       └── main/
 │           ├── java/com/flowerconnect/
-│           │   └── FlowerConnectApplication.java
+│           │   ├── FlowerConnectApplication.java
+│           │   ├── domain/               # JPA entities
+│           │   ├── repository/           # Spring Data repositories
+│           │   ├── service/              # Business logic
+│           │   ├── controller/           # REST controllers
+│           │   ├── dto/                  # Request/response DTOs
+│           │   ├── config/               # Security, Jackson, Clock beans
+│           │   └── exception/            # Error framework
 │           └── resources/
 │               ├── application.yml
 │               └── db/migration/
-│                   └── V1__baseline.sql
+│                   ├── V1__baseline.sql         # roles, users
+│                   ├── V2__auth_tokens.sql
+│                   ├── V3__seed_roles.sql
+│                   ├── V4__service_locations.sql
+│                   └── V5__vendor_profiles.sql  # vendor_profiles, vendor_hours
 ├── frontend/
 │   ├── Dockerfile            # Multi-stage: deps → builder → runner
 │   ├── index.html
@@ -147,9 +161,9 @@ FlowerConnect/
             └── 00-init.sql   # Ensures DB exists for Flyway
 ```
 
-## 5. Database Schema (Phase 0)
+## 5. Database Schema (Phase 0–2b)
 
-Source of truth: `backend/src/main/resources/db/migration/V1__baseline.sql`
+Source of truth: `backend/src/main/resources/db/migration/`
 
 ### Tables
 
@@ -167,16 +181,98 @@ Source of truth: `backend/src/main/resources/db/migration/V1__baseline.sql`
 | email         | VARCHAR(255)| NOT NULL, UNIQUE                       |
 | password_hash | VARCHAR(255)| NOT NULL                               |
 | full_name     | VARCHAR(128)| NOT NULL                               |
-| phone         | VARCHAR(32) | NULL                                   |
-| is_active     | TINYINT(1)  | NOT NULL, DEFAULT 1                    |
+| phone         | VARCHAR(32) | NULL, UNIQUE                           |
+| status        | ENUM('ACTIVE', 'SUSPENDED', 'DISABLED') | NOT NULL, DEFAULT 'ACTIVE' |
 | created_at    | DATETIME(6)| NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) |
 | updated_at    | DATETIME(6)| NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE |
 
+#### `service_locations` (Phase 2a)
+| Column      | Type        | Constraints                            |
+|-------------|-------------|----------------------------------------|
+| id          | BIGINT      | PK, AUTO_INCREMENT                     |
+| city        | VARCHAR(128)| NOT NULL                               |
+| area        | VARCHAR(128)| NOT NULL                               |
+| pincode     | VARCHAR(10) | NOT NULL                               |
+| latitude    | DECIMAL(10,8)| NOT NULL                             |
+| longitude   | DECIMAL(11,8)| NOT NULL                             |
+| created_at  | DATETIME(6) | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) |
+
+- One row per service area, seeded for the Bengaluru demo region (8 areas).
+- Coordinates are area-level approximations; there is no GPS or live device location (D-4).
+- Unique on `(city, area)`.
+
+#### `vendor_profiles` (Phase 2b)
+| Column                   | Type          | Constraints                                  |
+|--------------------------|---------------|----------------------------------------------|
+| id                       | BIGINT        | PK, AUTO_INCREMENT                           |
+| user_id                  | BIGINT        | FK → users(id), NOT NULL, UNIQUE             |
+| business_name            | VARCHAR(160)  | NOT NULL                                     |
+| description              | VARCHAR(1000) | NULL                                         |
+| address_line1            | VARCHAR(255)  | NOT NULL                                     |
+| address_line2            | VARCHAR(255)  | NULL                                         |
+| service_location_id      | BIGINT        | FK → service_locations(id), NOT NULL         |
+| latitude                 | DECIMAL(10,8) | NOT NULL (copied from service_location)      |
+| longitude                | DECIMAL(11,8) | NOT NULL (copied from service_location)      |
+| delivery_radius_km       | DECIMAL(5,2)  | NOT NULL, DEFAULT 5.00                       |
+| logo_url                 | VARCHAR(512)  | NULL                                         |
+| status                   | ENUM('PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'SUSPENDED') | NOT NULL, DEFAULT 'PENDING_APPROVAL' |
+| commission_rate          | DECIMAL(5,4)  | NULL (platform default applies when NULL)    |
+| avg_rating               | DECIMAL(3,2)  | NULL                                         |
+| review_count             | INT           | NOT NULL, DEFAULT 0                          |
+| min_order_amount         | DECIMAL(10,2) | NOT NULL, DEFAULT 0.00                       |
+| base_delivery_fee        | DECIMAL(10,2) | NOT NULL, DEFAULT 0.00                       |
+| per_km_fee               | DECIMAL(10,2) | NOT NULL, DEFAULT 0.00                       |
+| free_delivery_above      | DECIMAL(10,2) | NULL                                         |
+| prep_time_minutes        | INT           | NOT NULL, DEFAULT 30                         |
+| slot_duration_minutes    | INT           | NOT NULL, DEFAULT 60                         |
+| max_orders_per_slot      | INT           | NOT NULL, DEFAULT 10                         |
+| accepting_orders         | BIT(1)        | NOT NULL, DEFAULT b'1'                       |
+| created_at               | DATETIME(6)   | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6)       |
+| updated_at               | DATETIME(6)   | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE |
+
+- One profile per user (`uq_vendor_profiles_user`).
+- `service_location_id` is the single source of the vendor's coordinates; `latitude`/`longitude`
+  are denormalized copies so geo queries can use a single index (D-4).
+- Delivery settings live on the profile: minimum order amount, base delivery fee, per-km fee,
+  free-delivery threshold, prep time, slot duration, orders per slot, and an accept-orders flag.
+- Money fields use `DECIMAL` so scale is preserved (no floating-point round-off).
+
+#### `vendor_hours` (Phase 2b)
+| Column            | Type     | Constraints                                |
+|-------------------|----------|--------------------------------------------|
+| id                | BIGINT   | PK, AUTO_INCREMENT                         |
+| vendor_profile_id | BIGINT   | FK → vendor_profiles(id), NOT NULL, ON DELETE CASCADE |
+| weekday           | ENUM('MONDAY'…'SUNDAY') | NOT NULL                 |
+| open_time         | TIME     | NULL                                       |
+| close_time        | TIME     | NULL                                       |
+| closed            | BIT(1)   | NOT NULL, DEFAULT b'0'                     |
+| created_at        | DATETIME(6) | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) |
+| updated_at        | DATETIME(6) | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE |
+
+- At most one row per profile per weekday (`uq_vendor_hours_profile_weekday`).
+- A closed day stores NULL `open_time` / `close_time`.
+- Deleting a vendor profile cascades to its hours.
+
+### Entity Relationships
+
+```
+roles  1 ──< users  1 ──1 vendor_profiles  1 ──< vendor_hours
+                              │
+                              └──< service_locations
+```
+
+- `VendorProfile.user` is a one-to-one with `User` (unique on `user_id`).
+- `VendorProfile.serviceLocation` is a many-to-one with `ServiceLocation`.
+- `VendorHours.vendorProfile` is a many-to-one with `VendorProfile` (cascade delete).
+
 ### Indexes
 - `idx_users_role` on `users(role_id)`
-- `idx_users_active` on `users(is_active)`
+- `idx_service_locations_city_area` on `service_locations(city, area)`
+- `idx_service_locations_pincode` on `service_locations(pincode)`
+- `idx_vendor_profiles_status_geo` on `vendor_profiles(status, latitude, longitude)` — supports
+  "approved vendors near a location" lookups
 
-### Role Hierarchy (Planned, Phase 0)
+### Role Hierarchy
 | Role       | Description                         |
 |------------|-------------------------------------|
 | CUSTOMER   | End-user browsing and ordering      |
@@ -194,16 +290,22 @@ Source of truth: `backend/src/main/resources/db/migration/V1__baseline.sql`
 - Access token (default 15 min TTL) + refresh token (default 7 days TTL)
 - Tokens stored in Zustand (persisted) and `localStorage` (`fc-access-token` key)
 
-### Endpoints (Phase 0 — none implemented yet)
-All routes are placeholders. Phase 1 will implement:
+### Implemented Endpoints
+Phase 1 (auth) and Phase 2a (service locations) endpoints are implemented. Phase 2b adds no
+endpoints — vendor registration and vendor-facing APIs arrive in Phase 2c and later.
 
 | Method | Path                | Description                        | Phase  |
 |--------|---------------------|------------------------------------|--------|
+| POST   | `/api/v1/auth/register`| Register new user                | Phase 1|
 | POST   | `/api/v1/auth/login`| Authenticate and issue JWT         | Phase 1|
-| POST   | `/api/v1/auth/refresh` | Issue new access token            | Phase 1|
-| POST   | `/api/v1/auth/register` | Register new user                | Phase 1|
+| POST   | `/api/v1/auth/refresh` | Issue new access token (rotation) | Phase 1|
 | POST   | `/api/v1/auth/logout` | Invalidate refresh token           | Phase 1|
+| POST   | `/api/v1/auth/forgot-password` | Request a password reset link | Phase 1|
+| POST   | `/api/v1/auth/reset-password` | Reset password with a valid token | Phase 1|
 | GET    | `/api/v1/users/me`   | Get current user profile            | Phase 1|
+| PATCH  | `/api/v1/users/me`   | Update current user profile         | Phase 1|
+| POST   | `/api/v1/users/me/password` | Change current password      | Phase 1|
+| GET    | `/api/v1/locations`  | List or search service locations    | Phase 2a|
 | GET    | `/actuator/health`   | Health check (no auth)              | Phase 0|
 
 ## 7. Configuration
