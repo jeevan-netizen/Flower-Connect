@@ -4,9 +4,9 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 1 — Authentication** (Realigning to plan v2.2)
+**Phase 2a — Service Locations (Task 2.1)**
 
-JWT-based authentication system with access/refresh token rotation, BCrypt password hashing, and Spring Security filter chain. Backend implemented and tested (99 unit tests + 68 integration tests pass). Frontend authentication implemented with login/register UI, protected routes, token refresh/retry interceptor, and 41 frontend tests passing. Currently being realigned to plan v2.2 on branch `plan-v2-2-alignment`.
+Service-location database structure, Bengaluru demo region seed data, backend domain model, and a public unauthenticated `GET /api/v1/locations` endpoint. Consolidated `GET /api/v1/locations/search` into `GET /api/v1/locations`: no `pincode`/`area` → hierarchical `List<ServiceLocationResponse>`; `pincode` and/or `area` present → paginated `PageResponse<ServiceLocationResponse>` with AND semantics. Validation moved from DTO to `@Pattern`/`@Min`/`@Max` on `@RequestParam`. Backend implemented and tested (131 unit tests + 83 integration tests pass). Awaiting final approval before commit.
 
 ## Completed Work
 
@@ -101,7 +101,8 @@ JWT-based authentication system with access/refresh token rotation, BCrypt passw
 - [x] **Stage 5b - Rate limiting**: Bucket4j + Caffeine on /auth/login, /auth/register, /auth/forgot-password, /auth/reset-password (5 req/hour per email+IP); returns 429 with Retry-After header; hashed email keys; Caffeine eviction (2hr idle, max 10k entries); disabled for unit tests via test profile
 - [x] **Stage 5b - springdoc/Swagger**: dependency added but NOT enabled due to WebMvcTest incompatibility; will be addressed in future phase
 
-#### Phase 2 — Catalog (Not Started)
+#### Phase 2 — Catalog
+- [x] **2a — Service Locations (Task 2.1)**: `service_locations` table (V4 migration) with Bengaluru seed data (8 areas), `ServiceLocation` entity, `ServiceLocationRepository` with custom search queries, DTOs (`ServiceLocationResponse`, `LocationSearchRequest`, `PageResponse`), MapStruct mapper, `LocationService` with search/pagination, public `GET /api/v1/locations` (hierarchical) and `GET /api/v1/locations/search` (pincode/area AND filter, pagination), `/api/v1/locations/**` added to `permitAll()` in `SecurityConfig`. 32 new tests (15 unit + 10 controller + 7 seed integrity + 10 integration). No commit/push pending final approval.
 - [ ] Florist entity and catalog CRUD
 - [ ] Product browsing UI
 - [ ] Search and filtering
