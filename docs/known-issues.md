@@ -21,6 +21,7 @@
 | 016 | Test      | `TestProbeController` route conflict with `UserController` on `GET /api/v1/users/me` in `@SpringBootTest` contexts | Fixed | Added `@Profile("test-probe")` to `TestProbeController` and `@ActiveProfiles("test-probe")` to `RoleBoundaryTest`. |
 | 017 | Test      | (a) Testcontainers 1.20.2 could not connect to Docker Desktop 29.8.0 without `~/.docker-java.properties` (`api.version=1.44`) — both `EnvironmentAndSystemPropertyClientProviderStrategy` and `NpipeSocketClientProviderStrategy` failed with `BadRequestException (Status 400)`; (b) `@Container` on `IntegrationTestBase.MYSQL` caused Testcontainers to create and destroy a new MySQL container per test class (per-class lifecycle), with four containers started (one per test class); `AuthApiIntegrationTest` and `RefreshTokenRepositoryIT` passed, `RoleRepositoryIT` and `UserRepositoryIT` got Connection refused | Fixed | (a) Upgraded Testcontainers to 1.21.4, which resolves Docker Desktop 29.x compatibility — `~/.docker-java.properties` is no longer required. (b) Removed `@Container` annotation; container now starts once via `static { MYSQL.start(); }` in `IntegrationTestBase` and is shared across all IT classes. One MySQL container per JVM run. |
 | 018 | Test      | `./mvnw verify -Pintegration` fails every integration test with `Could not find a valid Docker environment` when the Docker Desktop daemon is not running, even though the Docker CLI is on `PATH` | Environment | Testcontainers needs the running daemon, not just the client. Start Docker Desktop before the failsafe run; Testcontainers fails fast with an `ExceptionInInitializerError` per test class rather than skipping. |
+| 019 | Backend / Frontend | `SecurityConfig.corsConfigurationSource()` sets `allowedMethods` to `GET, POST, PUT, DELETE, OPTIONS` — **`PATCH` is missing**. Any cross-origin browser request to a `PATCH` endpoint fails the CORS preflight, so `PATCH /api/v1/admin/users/{id}/status` (admin user status, task 2.10) and `PATCH /api/v1/users/me` (profile update, Phase 1) cannot be called from the SPA on the dev setup (`:5173` → `:8080`) | Open — latent until task 2.10 | Pre-existing since Phase 1 and invisible until now because no frontend feature exercised `PATCH`. The frontend is correct; the allow-list is not. Fix is one line — add `"PATCH"` to `List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")` in `SecurityConfig.corsConfigurationSource()` — but it is a backend change and was deliberately **not** made under task 2.10. Until then, use the Vite `/api` dev proxy (same-origin, no preflight) or curl to exercise user-status changes. |
 
 ## Known Limitations
 
@@ -53,7 +54,34 @@
 
 _None currently blocked._
 
-## Testing Gotchas (Phase 2d frontend)
+## Testing Gotchas (Phase 2d frontend, admin area)
+
+- **A sibling `describe` does not inherit another suite's `beforeEach`.** In `router.test.tsx` the
+  new `describe("admin route protection")` sits *next to* `describe("application router")`, not
+  inside it, so the outer suite's state reset never runs. The symptom is misleading rather than
+  obvious: tests render the **unauthenticated** layout (Login/Register in the header, the login form
+  in `<main>`) because a previous test in the new suite left `mockState.isAuthenticated = false`,
+  and only the tests that do *not* set their own `mockState` fail. Give a sibling suite its own
+  `beforeEach` that sets every field it relies on.
+- **A `vi.hoisted` factory must return via a callback.** `vi.hoisted<{user: X}>({ user: null })`
+  throws `TypeError: "vi.hoisted" factory value must be function, received "object"` and the whole
+  file reports `no tests` rather than a named failure. Use
+  `vi.hoisted(() => ({ user: null as X | null }))`.
+- **`selector({ user: mockCurrentUser })` instead of `mockCurrentUser.user` fails silently.** Passing
+  the hoisted *wrapper* where the store's `user` is expected makes `state.user?.id` `undefined`,
+  so `currentUserId` becomes `null` and every self-comparison is false. The page then renders
+  normally — just without the self-row treatment — so the symptom is "the (you) marker never
+  appears", not an error. Assert on a rendered value, not just the absence of a throw.
+- **`vi.clearAllMocks()` inside a nested `beforeEach` is redundant** and re-clears the shared
+  `vi.fn()`s the outer suite already configured; put the shared reset in the sibling suite once.
+- **`getAllByRole("row")` includes the header row.** For a table with a `<thead>`, index 0 is the
+  header; `slice(1)` before asserting per-row buttons, or a "did this row show the wrong action"
+  assertion will read the header's cells.
+- **An empty `<option>` label collides with a table cell's text.** A role filter option labelled
+  "Customer" and a table cell also reading "Customer" makes `getByText("Customer")` throw
+  "Found multiple elements". Scope cell assertions with `within(row)`.
+
+## Testing Gotchas (Phase 2d frontend, vendor area)
 
 - **zod v3 `.refine()` silently discards the message a check returns.** `z.string().refine(fn)`
   where `fn` returns a string renders zod's default `Invalid input`, not the returned string; only a

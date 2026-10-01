@@ -1,4 +1,10 @@
 import type { VendorHours, VendorProfile, VendorStatus } from "@/features/vendor/types";
+import type {
+  AdminRole,
+  AdminUser,
+  PageResponse,
+  UserStatus,
+} from "@/features/admin/types";
 
 /**
  * A profile fixture shaped exactly like `VendorProfileResponse`, so tests exercise
@@ -47,6 +53,50 @@ export function makeVendorHours(overrides: Partial<VendorHours> = {}): VendorHou
     openTime: "09:00:00",
     closeTime: "18:00:00",
     closed: false,
+    ...overrides,
+  };
+}
+
+/**
+ * A user fixture shaped exactly like `AdminUserResponse`: id, email, fullName,
+ * phone, role, status, createdAt — and deliberately no credential material,
+ * because the backend sends none.
+ */
+export function makeAdminUser(overrides: Partial<AdminUser> = {}): AdminUser {
+  return {
+    id: 42,
+    email: "buyer@example.com",
+    fullName: "Bea Buyer",
+    phone: "+919876543210",
+    role: "CUSTOMER" as AdminRole,
+    status: "ACTIVE" as UserStatus,
+    createdAt: "2026-09-02T09:15:00",
+    ...overrides,
+  };
+}
+
+/**
+ * A page fixture shaped exactly like `VendorProfilePageResponse` /
+ * `AdminUserPageResponse`, which are the same shape. Defaults are derived from
+ * `content` so `first`/`last`/`totalPages` stay consistent unless a test
+ * deliberately overrides them.
+ */
+export function makePage<T>(
+  content: T[],
+  overrides: Partial<PageResponse<T>> = {},
+): PageResponse<T> {
+  const totalElements = overrides.totalElements ?? content.length;
+  const totalPages = overrides.totalPages ?? (totalElements === 0 ? 0 : 1);
+
+  return {
+    content,
+    page: 0,
+    size: 20,
+    totalElements,
+    totalPages,
+    first: true,
+    last: true,
+    empty: content.length === 0,
     ...overrides,
   };
 }

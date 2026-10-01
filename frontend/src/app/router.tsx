@@ -11,6 +11,11 @@ import { VendorDashboardPage } from "@/features/vendor/pages/VendorDashboardPage
 import { VendorProfilePage } from "@/features/vendor/pages/VendorProfilePage";
 import { VendorSettingsPage } from "@/features/vendor/pages/VendorSettingsPage";
 import { VendorHoursPage } from "@/features/vendor/pages/VendorHoursPage";
+import { AdminLayout } from "@/features/admin/components/AdminLayout";
+import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
+import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
+import { AdminUsersPage } from "@/features/admin/pages/AdminUsersPage";
+import { clearAdminCache } from "@/features/admin/queries";
 
 /**
  * Application role for a vendor. The plan calls this role "VENDOR"; the seeded
@@ -18,15 +23,20 @@ import { VendorHoursPage } from "@/features/vendor/pages/VendorHoursPage";
  */
 const VENDOR_ROLE = "FLORIST";
 
+/** Seeded role name for administrators (`roles` row 3, V3__seed_roles.sql). */
+const ADMIN_ROLE = "ADMIN";
+
 function Layout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAuthenticated, user, logout } = useAuthStore();
 
   const handleLogout = () => {
-    // Vendor data is cached under its own query key; drop it so the next
-    // account to sign in on this tab never sees the previous vendor's profile.
+    // Vendor and admin data are each cached under their own query key; drop both
+    // so the next account to sign in on this tab never sees the previous user's
+    // profile, user list or vendor list.
     clearVendorCache(queryClient);
+    clearAdminCache(queryClient);
     logout();
     navigate("/", { replace: true });
   };
@@ -45,6 +55,7 @@ function Layout() {
                 <Link to="/cart">Cart</Link>
                 <Link to="/orders">Orders</Link>
                 {user?.role === VENDOR_ROLE && <Link to="/vendor">Vendor</Link>}
+                {user?.role === ADMIN_ROLE && <Link to="/admin">Admin</Link>}
                 <button onClick={handleLogout} className="hover:underline">
                   Log out
                 </button>
@@ -133,6 +144,23 @@ export const router = createBrowserRouter([
           { path: "profile", element: <VendorProfilePage /> },
           { path: "settings", element: <VendorSettingsPage /> },
           { path: "hours", element: <VendorHoursPage /> },
+        ],
+      },
+      {
+        // Phase 2 admin dashboard shell. Same reasoning as the vendor namespace:
+        // the guard is routing UX only, and `SecurityConfig` matches
+        // `/api/v1/admin/**` with `hasRole("ADMIN")` on every request, so the
+        // backend stays the authorization authority.
+        path: "admin",
+        element: (
+          <ProtectedRoute roles={[ADMIN_ROLE]}>
+            <AdminLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <AdminDashboardPage /> },
+          { path: "vendors", element: <AdminVendorsPage /> },
+          { path: "users", element: <AdminUsersPage /> },
         ],
       },
     ],

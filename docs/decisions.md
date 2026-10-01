@@ -360,6 +360,7 @@ of a constraint name.
 | D-13 | Approval gating is per-handler, not per-namespace | Decision | Accepted | Phase 2c |
 | D-14 | Admin user status changes are self-targeting-protected and always revoke tokens | Decision | Accepted | Phase 2d |
 | D-15 | The vendor area is one profile resource, edited through full-replacement PUTs | Decision | Accepted | Phase 2d |
+| D-16 | The admin UI derives backend rules instead of inventing transitions | Decision | Accepted | Phase 2d |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -534,3 +535,59 @@ without ids, so the profile page can display the stored area but cannot offer a 
 - Because the profile is fetched once and reused as the base for every PUT, a concurrent edit from
   another tab is overwritten rather than merged. Acceptable in v1; it needs a revision/etag to fix
   properly.
+
+---
+
+## D-16: The admin UI derives backend rules instead of inventing transitions
+
+**Status:** Accepted
+**Date:** Phase 2d (Task 2.10)
+
+### Context
+
+Task 2.10 builds the admin screens on top of two backend capabilities that were written to
+different rules, and the plan does not say which rule the frontend should encode.
+
+`VendorAdminService` (task 2.6) enforces a strict transition table through `requireStatus`:
+`PENDING_APPROVAL -> APPROVED | REJECTED`, `APPROVED -> SUSPENDED`, `SUSPENDED -> APPROVED`.
+Anything else is a 409. `UserStatusService` (task 2.8) enforces **no** transition matrix at all —
+`ACTIVE`, `SUSPENDED` and `DISABLED` are mutually reachable in both directions, and the only rule
+is that an admin may not change their own account (403, D-14). So neither "one generic status
+picker" nor "one shared transition table" is correct for both screens.
+
+The listings are also paginated and filtered, which means a status change can move a record *out*
+of the filter that is on screen or onto a different page.
+
+### Decision
+
+- **Vendor actions are derived, not offered generically.** `vendorActionsFor(status)` in
+  `src/features/admin/types.ts` is a direct transcription of the backend's `requireStatus` table,
+  and the row renders exactly those buttons. A `REJECTED` profile shows "No further action
+  available" because the backend has no route back from `REJECTED`.
+- **User status offers every status except the one held.** That is the honest encoding of "the
+  backend enforces no matrix"; the only exclusion is the current value, so a button cannot offer a
+  no-op.
+- **`approve` and `reinstate` collect no reason.** Their routes take no request body at all
+  (`AdminVendorController`), and rendering a reason box would imply the backend records one. The
+  same shared `ReasonDialog` serves both shapes via a `requiresReason` flag.
+- **Every mutation invalidates the whole listing** under `["admin","vendors"]` / `["admin","users"]`
+  instead of writing the updated row into the current page's cache. A transition can leave the
+  active filter or the current page, so patching one row would leave the screen lying about both.
+- **Listings are keyed by their filters** (`["admin","vendors","list",status,page]`) so a filter
+  change is a cache miss rather than a stale render, and the broad invalidation still reaches every
+  page/filter combination.
+- **Self-targeting status change is disabled on the signed-in admin's own row for usability only.**
+  The backend check in `UserStatusService` is unaffected, and the UI still renders a 403 correctly
+  if a call is attempted regardless.
+
+### Consequences
+
+- The client now holds a second copy of `VendorAdminService`'s transition table. If the backend
+  changes a rule, `vendorActionsFor` must change with it or the UI will offer a 409. The table is
+  small, lives in one place, and `api.test.ts` asserts it row-by-row.
+- Any future endpoint that *does* enforce a user-status matrix will need a matching client table.
+  That is a deliberate follow-on, not an incidental fix.
+- Invalidating the whole listing costs one extra request per mutation per distinct filter/page key
+  in flight. That is cheaper than the alternative being wrong.
+- `AdminErrorState` treats 409 as an expected race between administrators ("refresh and try again")
+  rather than a fault, because with two admins acting on one profile that is what it usually means.

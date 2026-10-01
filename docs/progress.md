@@ -4,21 +4,31 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 2d — Vendor Frontend (Task 2.9)**
+**Phase 2d — Admin Frontend (Task 2.10)**
 
-The florist-facing screens are implemented on top of the two endpoints the vendor API exposes
-(`GET`/`PUT /api/v1/vendors/profile`). `/vendor` is a dashboard, `/vendor/profile` edits business
-details, `/vendor/settings` edits delivery fees and slot capacity, and `/vendor/hours` edits the
-weekly operating hours; all four are guarded by `ProtectedRoute roles={["FLORIST"]}` and share one
-`["vendor","profile"]` cache key that is cleared on logout.
+The administrator-facing screens are implemented on top of the admin APIs Phase 2 already exposes.
+`/admin` is a dashboard (queue counts and previews plus navigation), `/admin/vendors` lists vendor
+profiles filtered by approval status and drives the four transitions, and `/admin/users` lists
+accounts filtered by role and status and changes an account's status. All three sit behind
+`ProtectedRoute roles={["ADMIN"]}`; `SecurityConfig`'s `hasRole("ADMIN")` on `/api/v1/admin/**`
+remains the authorization authority and the guard is routing UX only.
 
-Because `PUT` replaces the profile's editable scalars rather than patching them, every save resends
-the full profile (`buildProfileUpdateRequest`), so no screen can blank the fields it does not show
-(`docs/decisions.md`, D-15). No backend code changed in this task.
+The vendor action buttons are derived from `VendorAdminService`'s own `requireStatus` table rather
+than a generic status picker, and the user status control offers every status except the one held —
+because `UserStatusService` enforces no transition matrix at all (D-16). No backend code changed in
+this task.
 
-Verified with 164 frontend tests (19 files), `npm run typecheck`, `npm run lint`, and `npm run
-build`. Backend is unchanged since `8f648a7`, which was verified with 264 unit + 214 integration
-tests.
+Verified with 249 frontend tests (25 files), `npm run typecheck`, `npm run lint`, and `npm run
+build`. Backend is unchanged since `8f648a7`; its unit suite was re-run and reports 264 tests,
+0 failures, matching the recorded baseline.
+
+**Open contract issue found while implementing:** `SecurityConfig.corsConfigurationSource()`
+allows only `GET, POST, PUT, DELETE, OPTIONS`, so `PATCH` is rejected by CORS preflight.
+`PATCH /api/v1/admin/users/{id}/status` — and the pre-existing `PATCH /api/v1/users/me` — will
+therefore fail from a browser on the cross-origin dev setup (frontend `:5173` → backend `:8080`).
+This is pre-existing and latent (no frontend feature exercised `PATCH` before task 2.10) and needs a
+one-line backend fix that was **not** made, as it is outside this task's scope. See
+`docs/known-issues.md` (issue 019).
 
 ## Completed Work
 
@@ -120,6 +130,7 @@ tests.
 - [x] **2d — Approval gating (Task 2.7)**: `VendorApprovalGuard` (single owner of the approval rule), `@RequiresApprovedVendor` (composed `@PreAuthorize`), `VendorNotApprovedException` + `ErrorCode.VENDOR_NOT_APPROVED` (403), and `VendorProfileSpecifications.approved()` for discovery; `VendorProfileRepository` now extends `JpaSpecificationExecutor<VendorProfile>` and gained `findByUserEmail`; `@EnableMethodSecurity` added to `SecurityConfig`. No new production endpoint and no migration — the annotation guards no route until Phase 3 adds one. Gating is per-handler so the vendor's own `GET|PUT /api/v1/vendors/profile` stays reachable while a profile is not approved (D-13). 29 new tests (9 unit, 16 gating integration, 4 discovery integration). Verified with 222 unit + 177 integration tests.
 - [x] **2d — Admin user management (Task 2.8)**: `GET /api/v1/admin/users` (optional `role`/`status` filters, page size clamped to `1..100`, sorting pinned to `createdAt` then `id`) and `PATCH /api/v1/admin/users/{id}/status` (status + required reason, revokes all active refresh tokens for the target, writes one `audit_log` row in the same transaction). Self-targeting is refused with 403; every transition including reactivation revokes tokens (D-14). New `UserStatusService` is the sole owner of status mutation, revocation and audit writing; `AdminUserService` owns listing only; `UserSpecifications` backs the listing over a now-`JpaSpecificationExecutor<User>` `UserRepository`; `AdminUserMapper` + `AdminUserResponse` keep credential material out of the payload. No migration — reuses `users.status` and `audit_log`. 79 new tests (10 `UserStatusServiceTest`, 8 `AdminUserServiceTest`, 24 `AdminUserControllerTest`, 37 `AdminUserStatusIntegrationTest`). Verified with 264 unit + 214 integration tests.
 - [x] **2d — Vendor frontend (Task 2.9)**: the florist area of the SPA — `/vendor` (dashboard), `/vendor/profile`, `/vendor/settings`, `/vendor/hours` — built on the existing `GET|PUT /api/v1/vendors/profile`, guarded by a new reusable `ProtectedRoute roles={["FLORIST"]}`. `com.flowerconnect.vendor` is mirrored by `src/features/vendor/` (types with the full-replacement PUT builder, API client, TanStack Query hooks, formatters, Zod schemas mirroring the DTO bounds) plus shared `ProtectedRoute` and `api-error` helpers that normalise the backend `ErrorResponse` envelope. `VENDOR_NOT_APPROVED` (403) renders the approval banner as a state rather than an error, the service area is read-only because `GET /api/v1/locations` exposes no ids, and the whole area is one cache key cleared on logout (D-15). Added the `typecheck` npm script. 164 frontend tests across 19 files; no backend change and no migration.
+- [x] **2d — Admin frontend (Task 2.10)**: the admin area of the SPA — `/admin` (dashboard), `/admin/vendors`, `/admin/users` — built on the existing `GET /api/v1/admin/vendors`, the four vendor transition routes, `GET /api/v1/admin/users`, and `PATCH /api/v1/admin/users/{id}/status`, guarded by the existing `ProtectedRoute roles={["ADMIN"]}`. New `src/features/admin/` slice: types (with `vendorActionsFor` deriving the offered transitions from the backend's `requireStatus` rules), API client, filter-and-page-keyed TanStack Query hooks that invalidate the whole listing after a mutation, formatters, a shared `ReasonDialog` used by both reject/suspend and the user status change, `Pagination`, `AdminLayout`, and `AdminErrorState` telling 403/404/409/other apart. Reuses the vendor slice's `Card`, `PageHeading`, `StatCard`, `TextField`, `SubmitButton`, `SuccessMessage`, `VENDOR_STATUS_LABELS` and `api-error` normalisation rather than duplicating them. Self-targeting user status is disabled on the signed-in admin's row for usability, with the backend 403 still handled (D-14). 85 new frontend tests across 5 files; no backend change and no migration (D-16).
 - [ ] Florist entity and catalog CRUD
 - [ ] Product browsing UI
 - [ ] Search and filtering
@@ -138,6 +149,7 @@ tests.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-01 | Task 2.10 admin frontend: dashboard, vendor management with reason dialog, user management with pagination and filters | `src/app/router.tsx`, `src/app/router.test.tsx`, `src/features/admin/**` (types, api, queries, format, form-schema, components, pages, 5 test files), `src/test/factories.ts`, `docs/*` |
 | 2026-10-01 | Task 2.9 vendor frontend: dashboard, profile, settings and hours screens behind a reusable `ProtectedRoute` | `src/app/router.tsx`, `src/features/vendor/**` (types, api, queries, format, form-schema, components, pages), `src/shared/components/ProtectedRoute.tsx`, `src/shared/lib/api-error.ts`, `src/features/auth/types.ts`, `src/test/**`, `package.json`, `vite.config.ts`, `docs/*` |
 | 2026-10-01 | Task 2.8 admin user management: listing with filters, status change with revocation + audit, self-targeting refused | `AdminUserController.java`, `AdminUserService.java`, `UserStatusService.java`, `AdminUserMapper.java`, `UserSpecifications.java`, 3 DTOs, `UserRepository.java`, 4 test classes, `docs/*` |
 | 2026-10-01 | Task 2.7 approval gating: guard, composed `@PreAuthorize`, approved-only specification | `VendorApprovalGuard.java`, `RequiresApprovedVendor.java`, `VendorNotApprovedException.java`, `VendorProfileSpecifications.java`, `VendorProfileRepository.java`, `SecurityConfig.java`, `GlobalExceptionHandler.java`, `ErrorCode.java`, `BusinessException.java`, 3 test classes, `docs/*` |

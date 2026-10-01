@@ -1,0 +1,56 @@
+import { displayPageNumber } from "@/features/admin/format";
+import type { PageResponse } from "@/features/admin/types";
+
+interface PaginationProps<T> {
+  /** The page response as the backend returned it. */
+  page: PageResponse<T>;
+  onPageChange: (page: number) => void;
+  /** Disabled while a mutation invalidates the list, to avoid a paging race. */
+  disabled?: boolean;
+}
+
+/**
+ * Pagination control shared by both admin listings, because
+ * `VendorProfilePageResponse` and `AdminUserPageResponse` are the same shape.
+ *
+ * The buttons are driven by the backend's own `first` / `last` / `totalPages`
+ * rather than recomputed from `content.length`, so the control agrees with the
+ * server about the boundaries instead of guessing at them. `page` is zero-based
+ * on the wire and shown one-based to the operator.
+ */
+export function Pagination<T>({ page, onPageChange, disabled = false }: PaginationProps<T>) {
+  return (
+    <nav
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4"
+      aria-label="Pagination"
+    >
+      <p className="text-sm text-slate-600">
+        {page.totalElements === 0
+          ? "No results"
+          : `Page ${displayPageNumber(page.page)} of ${Math.max(page.totalPages, 1)}`}
+        <span className="ml-2 text-slate-500">
+          {page.totalElements} total{page.totalElements === 1 ? "" : "s"}
+        </span>
+      </p>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(page.page - 1)}
+          disabled={disabled || page.first || page.page === 0}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(page.page + 1)}
+          disabled={disabled || page.last}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+    </nav>
+  );
+}

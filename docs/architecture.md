@@ -4,7 +4,7 @@
 
 FlowerConnect is a **hyperlocal flower marketplace**. It connects local florists with customers for same-day or scheduled flower delivery within a tight geographic radius. The platform handles browsing, ordering, payments, and delivery coordination.
 
-Current development phase: **Phase 2d (Admin User Management)** — authentication (Phase 1), service
+Current development phase: **Phase 2d (Admin Frontend)** — authentication (Phase 1), service
 locations (Phase 2a), and vendor registration/approval with the `audit_log` trail (Phase 2b/2c) are
 implemented. Phase 2d adds the admin user listing and status-management APIs, backed by the same
 `audit_log` table and the existing `users.status` column.
@@ -161,14 +161,22 @@ FlowerConnect/
 │       │   │   ├── api.ts
 │       │   │   ├── stores/auth-store.ts
 │       │   │   └── types.ts
-│       │   └── vendor/
-│       │       ├── api.ts          # GET/PUT /api/v1/vendors/profile
-│       │       ├── queries.ts      # TanStack Query hooks + cache lifecycle
-│       │       ├── types.ts        # DTOs, Weekday, PUT payload builder
-│       │       ├── format.ts       # INR, LocalTime, status/label helpers
-│       │       ├── form-schema.ts  # Zod string-form schemas mirroring the DTO bounds
-│       │       ├── components/     # Layout, status banner, error state, form fields
-│       │       └── pages/          # dashboard, profile, settings, hours
+│       │   ├── vendor/
+│       │   │   ├── api.ts          # GET/PUT /api/v1/vendors/profile
+│       │   │   ├── queries.ts      # TanStack Query hooks + cache lifecycle
+│       │   │   ├── types.ts        # DTOs, Weekday, PUT payload builder
+│       │   │   ├── format.ts       # INR, LocalTime, status/label helpers
+│       │   │   ├── form-schema.ts  # Zod string-form schemas mirroring the DTO bounds
+│       │   │   ├── components/     # Layout, status banner, error state, form fields
+│       │   │   └── pages/          # dashboard, profile, settings, hours
+│       │   └── admin/
+│       │       ├── api.ts          # /api/v1/admin/vendors + /api/v1/admin/users
+│       │       ├── queries.ts      # filter+page keyed queries, whole-listing invalidation
+│       │       ├── types.ts        # DTOs, PageResponse, vendorActionsFor
+│       │       ├── format.ts       # role/status labels, action labels, dates
+│       │       ├── form-schema.ts  # Zod reason schema mirroring @NotBlank + @Size(500)
+│       │       ├── components/     # Layout, reason dialog, pagination, error state, badges
+│       │       └── pages/          # dashboard, vendors, users
 │       ├── shared/
 │       │   ├── components/
 │       │   │   └── ProtectedRoute.tsx
@@ -177,7 +185,7 @@ FlowerConnect/
 │       │       └── api-error.ts    # ErrorResponse -> ApiErrorInfo
 │       └── test/
 │           ├── setup.ts
-│           ├── factories.ts        # vendor profile / hours fixtures
+│           ├── factories.ts        # vendor profile / hours / admin user / page fixtures
 │           ├── api-errors.ts       # AxiosError shaped like ErrorResponse
 │           └── render.tsx          # renderWithProviders
 └── docker/
@@ -353,6 +361,27 @@ application while it is pending.
 
 The whole vendor area is one TanStack Query cache key (`["vendor","profile"]`), cleared on logout so
 a different florist cannot see the previous one's data.
+
+The Phase 2d admin area is the second real screen set:
+
+| Path                | Page                          | Guard                          |
+|---------------------|-------------------------------|--------------------------------|
+| `/admin`            | Admin dashboard (queues + navigation) | `ProtectedRoute roles={ADMIN}` |
+| `/admin/vendors`    | Vendor listing, approval transitions | `ProtectedRoute roles={ADMIN}` |
+| `/admin/users`      | User listing, status changes   | `ProtectedRoute roles={ADMIN}` |
+
+`ProtectedRoute` renders an access-denied panel for a signed-in non-admin, and
+`SecurityConfig`'s `hasRole("ADMIN")` matcher on `/api/v1/admin/**` is the actual authorization
+authority on every request. `/admin` previews the two queues an administrator's own work produces
+(`PENDING_APPROVAL` vendors, `SUSPENDED` users) rather than inventing analytics, because Phase 2
+exposes no dashboard endpoint.
+
+Both admin listings are **filter-and-page-keyed** queries (`["admin","vendors","list",status,page]`
+and `["admin","users","list",role,status,page]`), and every mutation invalidates the whole listing
+under `["admin","vendors"]` / `["admin","users"]` rather than patching one row into one page's
+cache — a transition can move a record out of the active filter or off the current page. The admin
+cache is cleared on logout alongside the vendor cache, so the next account to sign in on the same tab
+sees neither list. See `docs/decisions.md` (D-16).
 
 ### Implemented Endpoints
 Phase 1 (auth), Phase 2a (service locations), and Phase 2c (vendor registration, admin

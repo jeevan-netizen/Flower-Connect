@@ -3,16 +3,19 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createTestQueryClient } from "@/test/render";
-import { makeVendorProfile } from "@/test/factories";
+import { makePage, makeVendorProfile } from "@/test/factories";
 // `vi.mock` is hoisted above these, so the router, guard and pages all bind to
 // the mocked store and the mocked vendor API client.
 import { router as appRouter } from "@/app/router";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
+import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import type { UserResponse } from "@/features/auth/types";
 
 const mockFetch = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
+const mockFetchAdminVendors = vi.hoisted(() => vi.fn());
+const mockFetchAdminUsers = vi.hoisted(() => vi.fn());
 const mockState = vi.hoisted(() => ({
   isAuthenticated: true,
   hasLoadedInitial: true,
@@ -23,6 +26,16 @@ const mockState = vi.hoisted(() => ({
 vi.mock("@/features/vendor/api", () => ({
   fetchOwnProfile: mockFetch,
   updateOwnProfile: mockUpdate,
+}));
+
+vi.mock("@/features/admin/api", () => ({
+  fetchAdminVendors: mockFetchAdminVendors,
+  fetchAdminUsers: mockFetchAdminUsers,
+  approveVendor: vi.fn(),
+  rejectVendor: vi.fn(),
+  suspendVendor: vi.fn(),
+  reinstateVendor: vi.fn(),
+  updateUserStatus: vi.fn(),
 }));
 
 vi.mock("@/features/auth/stores/auth-store", () => ({
@@ -38,9 +51,14 @@ vi.mock("@/features/auth/stores/auth-store", () => ({
 }));
 
 const VENDOR_ROLE = "FLORIST";
+const ADMIN_ROLE = "ADMIN";
 
 function florist(): UserResponse {
   return { id: 1, email: "petal@example.com", fullName: "Petal Owner", phone: null, role: "FLORIST", createdAt: "2026-09-01" };
+}
+
+function administrator(): UserResponse {
+  return { id: 9, email: "admin@example.com", fullName: "Ada Admin", phone: null, role: "ADMIN", createdAt: "2026-01-01" };
 }
 
 function renderAt(path: string) {
@@ -63,6 +81,8 @@ describe("application router", () => {
     mockState.hasLoadedInitial = true;
     mockState.user = florist();
     mockFetch.mockResolvedValue(makeVendorProfile());
+    mockFetchAdminVendors.mockResolvedValue(makePage([]));
+    mockFetchAdminUsers.mockResolvedValue(makePage([]));
   });
 
   it("keeps every pre-existing customer route", () => {
@@ -176,6 +196,146 @@ describe("application router", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Browse" })).toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * Admin access (plan task 2.10). `ProtectedRoute` is the same component the vendor
+ * namespace uses; the three outcomes asserted here — anonymous, wrong role,
+ * ADMIN — are the ones an admin screen has to keep distinct.
+ */
+describe("admin route protection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // This suite is a sibling of "application router", so it sets up the shared
+    // auth state itself rather than inheriting that suite's `beforeEach`.
+    mockState.isAuthenticated = true;
+    mockState.hasLoadedInitial = true;
+    mockState.user = administrator();
+    mockFetch.mockResolvedValue(makeVendorProfile());
+    mockFetchAdminVendors.mockResolvedValue(makePage([]));
+    mockFetchAdminUsers.mockResolvedValue(makePage([]));
+  });
+
+  it("adds the three admin paths under a guarded /admin namespace", () => {
+    const adminRoute = appRouter.routes
+      .flatMap((route) => route.children ?? [])
+      .find((child) => child.path === "admin") as RouteObject | undefined;
+
+    expect(adminRoute).toBeDefined();
+    expect(adminRoute?.element).toEqual(
+      <ProtectedRoute roles={[ADMIN_ROLE]}>
+        <AdminLayout />
+      </ProtectedRoute>,
+    );
+    expect(adminRoute?.children?.map((child) => child.path)).toEqual([
+      undefined,
+      "vendors",
+      "users",
+    ]);
+  });
+
+  it("renders the admin dashboard for an ADMIN", async () => {
+    mockState.user = administrator();
+
+    renderAt("/admin");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Admin dashboard" })).toBeInTheDocument();
+    });
+    expect(screen.getByRole("link", { name: /manage vendors/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /manage users/i })).toBeInTheDocument();
+  });
+
+  it("renders vendor management for an ADMIN", async () => {
+    mockState.user = administrator();
+
+    renderAt("/admin/vendors");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Vendors" })).toBeInTheDocument();
+    });
+    expect(mockFetchAdminVendors).toHaveBeenCalledWith({ status: null, page: 0 });
+  });
+
+  it("renders user management for an ADMIN", async () => {
+    mockState.user = administrator();
+
+    renderAt("/admin/users");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Users" })).toBeInTheDocument();
+    });
+    expect(mockFetchAdminUsers).toHaveBeenCalledWith({ role: null, status: null, page: 0 });
+  });
+
+  it("keeps a non-admin out of every admin route without calling the admin API", async () => {
+    mockState.user = florist();
+
+    renderAt("/admin/vendors");
+
+    await waitFor(() => {
+      expect(screen.getByText(/does not have access to this area/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("heading", { name: "Vendors" })).not.toBeInTheDocument();
+    expect(mockFetchAdminVendors).not.toHaveBeenCalled();
+    expect(mockFetchAdminUsers).not.toHaveBeenCalled();
+  });
+
+  it("keeps a CUSTOMER out of the admin area too", async () => {
+    mockState.user = { ...florist(), role: "CUSTOMER" };
+
+    renderAt("/admin/users");
+
+    await waitFor(() => {
+      expect(screen.getByText(/does not have access to this area/i)).toBeInTheDocument();
+    });
+    expect(mockFetchAdminUsers).not.toHaveBeenCalled();
+  });
+
+  it("keeps an anonymous visitor out of the admin area and shows the login page", async () => {
+    mockState.isAuthenticated = false;
+    mockState.user = null;
+
+    renderAt("/admin");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
+    });
+    expect(mockFetchAdminVendors).not.toHaveBeenCalled();
+    expect(mockFetchAdminUsers).not.toHaveBeenCalled();
+  });
+
+  it("shows the admin entry point in the header only for an ADMIN", async () => {
+    mockState.user = administrator();
+
+    renderAt("/");
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Admin" })).toBeInTheDocument();
+    });
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/admin");
+  });
+
+  it("hides the admin entry point from a florist", async () => {
+    mockState.user = florist();
+
+    renderAt("/");
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "Vendor" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
+  });
+
+  it("leaves the vendor routes working for a florist after the admin routes were added", async () => {
+    mockState.user = florist();
+
+    renderAt("/vendor/profile");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
     });
   });
 });
