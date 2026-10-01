@@ -127,6 +127,8 @@ class VendorHoursRepositoryIT extends AbstractIntegrationTest {
         VendorHours orphan = VendorHours.builder()
                 .vendorProfile(entityManager.getReference(VendorProfile.class, 9_999_999L))
                 .weekday(DayOfWeek.MONDAY)
+                .openTime(LocalTime.of(9, 0))
+                .closeTime(LocalTime.of(21, 0))
                 .closed(false)
                 .build();
 

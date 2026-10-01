@@ -4,7 +4,11 @@
 
 FlowerConnect is a **hyperlocal flower marketplace**. It connects local florists with customers for same-day or scheduled flower delivery within a tight geographic radius. The platform handles browsing, ordering, payments, and delivery coordination.
 
-Current development phase: **Phase 2b (Vendor Profiles)** — authentication (Phase 1) and service locations (Phase 2a) are implemented. Phase 2b adds the `vendor_profiles` and `vendor_hours` data model. Vendor registration, admin approval, and vendor-facing endpoints are not implemented yet.
+Current development phase: **Phase 2c (Vendor Profiles)** — authentication (Phase 1) and
+service locations (Phase 2a) are implemented. Phase 2b added the `vendor_profiles` and
+`vendor_hours` data model; Phase 2c adds the vendor registration/profile APIs and the admin
+approval workflow backed by a new `audit_log` table. Customer-facing approval gating
+(Task 2.7) is not implemented yet.
 
 ## 2. High-Level Architecture
 
@@ -113,6 +117,8 @@ FlowerConnect/
 │           │   ├── service/              # Business logic
 │           │   ├── controller/           # REST controllers
 │           │   ├── dto/                  # Request/response DTOs
+│           │   ├── geo/                  # Service locations feature slice
+│           │   ├── vendor/               # Vendor profile + admin feature slice
 │           │   ├── config/               # Security, Jackson, Clock beans
 │           │   └── exception/            # Error framework
 │           └── resources/
@@ -123,6 +129,7 @@ FlowerConnect/
 │                   ├── V3__seed_roles.sql
 │                   ├── V4__service_locations.sql
 │                   └── V5__vendor_profiles.sql  # vendor_profiles, vendor_hours
+│                   └── V6__audit_log_and_vendor_checks.sql  # audit_log, vendor CHECKs
 ├── frontend/
 │   ├── Dockerfile            # Multi-stage: deps → builder → runner
 │   ├── index.html
@@ -252,6 +259,22 @@ Source of truth: `backend/src/main/resources/db/migration/`
 - At most one row per profile per weekday (`uq_vendor_hours_profile_weekday`).
 - A closed day stores NULL `open_time` / `close_time`.
 - Deleting a vendor profile cascades to its hours.
+- `ck_vendor_hours_times` (V6) enforces: a closed day has both times NULL, and an open day
+  has both present with `close_time > open_time`.
+
+#### `audit_log` (Phase 2c)
+| Column        | Type        | Constraints                          |
+|---------------|-------------|--------------------------------------|
+| id            | BIGINT      | PK, AUTO_INCREMENT                   |
+| actor_user_id | BIGINT      | FK → users(id), NOT NULL             |
+| action_type   | VARCHAR(64) | NOT NULL                             |
+| entity_type   | VARCHAR(64) | NOT NULL                             |
+| entity_id     | BIGINT      | NOT NULL                             |
+| reason        | VARCHAR(500)| NULL (required for reject/suspend)   |
+| created_at    | DATETIME(6) | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6)|
+
+- Append-only: every admin vendor transition writes one row; no update or delete path exists.
+- Indexed on `(entity_type, entity_id)` and `(actor_user_id, created_at)`.
 
 ### Entity Relationships
 
@@ -291,8 +314,8 @@ roles  1 ──< users  1 ──1 vendor_profiles  1 ──< vendor_hours
 - Tokens stored in Zustand (persisted) and `localStorage` (`fc-access-token` key)
 
 ### Implemented Endpoints
-Phase 1 (auth) and Phase 2a (service locations) endpoints are implemented. Phase 2b adds no
-endpoints — vendor registration and vendor-facing APIs arrive in Phase 2c and later.
+Phase 1 (auth), Phase 2a (service locations), and Phase 2c (vendor registration and admin
+approval) endpoints are implemented. Approval gating of customer-facing endpoints is Task 2.7.
 
 | Method | Path                | Description                        | Phase  |
 |--------|---------------------|------------------------------------|--------|
@@ -306,6 +329,14 @@ endpoints — vendor registration and vendor-facing APIs arrive in Phase 2c and 
 | PATCH  | `/api/v1/users/me`   | Update current user profile         | Phase 1|
 | POST   | `/api/v1/users/me/password` | Change current password      | Phase 1|
 | GET    | `/api/v1/locations`  | List or search service locations    | Phase 2a|
+| POST   | `/api/v1/vendors/register` | Register a vendor account + `PENDING_APPROVAL` profile (public) | Phase 2c|
+| GET    | `/api/v1/vendors/profile` | Get the caller's own vendor profile (FLORIST) | Phase 2c|
+| PUT    | `/api/v1/vendors/profile` | Update the caller's own vendor profile (FLORIST) | Phase 2c|
+| GET    | `/api/v1/admin/vendors` | List/filter vendor profiles by status (ADMIN) | Phase 2c|
+| POST   | `/api/v1/admin/vendors/{id}/approve`  | Approve a pending vendor (ADMIN) | Phase 2c|
+| POST   | `/api/v1/admin/vendors/{id}/reject`   | Reject a pending vendor; `reason` required (ADMIN) | Phase 2c|
+| POST   | `/api/v1/admin/vendors/{id}/suspend`   | Suspend an approved vendor; `reason` required (ADMIN) | Phase 2c|
+| POST   | `/api/v1/admin/vendors/{id}/reinstate` | Reinstate a suspended vendor (ADMIN) | Phase 2c|
 | GET    | `/actuator/health`   | Health check (no auth)              | Phase 0|
 
 ## 7. Configuration

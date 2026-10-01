@@ -52,6 +52,27 @@
 
 _None currently blocked._
 
+## Testing Gotchas (Phase 2c)
+
+These cost real debugging time and will recur if forgotten:
+
+- **`UUID.randomUUID()` is not a valid phone-number source.** Its hex output contains
+  letters, so `"+91" + uuid.replace("-","").substring(0,10)` fails the
+  `^\+?[0-9]{7,15}$` DTO pattern roughly 40% of the time. The symptom is a *flaky*
+  subset of tests returning 400 instead of the expected status, and it masks the
+  service-level messages (you see the generic `VALIDATION_FAILED` envelope, not the
+  specific hours error). Use random decimal digits instead — see `uniquePhone()` in
+  `VendorApiIntegrationTest`.
+- **MySQL CHECK violations are not `DataIntegrityViolationException`.** SQL error 3819
+  surfaces as `JpaSystemException`/`GenericJDBCException`, so asserting the Spring
+  translation fails even though the constraint worked. Assert on the constraint name in
+  the failure chain (see D-12).
+- **A row that deliberately violates a CHECK must otherwise be valid.** When V6 added
+  `ck_vendor_hours_times`, the pre-existing `VendorHoursRepositoryIT.shouldRejectHoursForUnknownProfile`
+  broke: its orphan row was `closed=false` with no times, so the new check fired before
+  the foreign key the test meant to exercise. Supplying valid times restored the
+  original intent.
+
 ## Deprecation Notices
 
 _None._

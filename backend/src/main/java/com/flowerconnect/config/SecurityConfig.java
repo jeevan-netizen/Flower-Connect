@@ -80,6 +80,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/locations/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs").permitAll()
+                // Vendor self-service. Registration is the public entry point that
+                // creates the FLORIST account; everything else is vendor-only.
+                .requestMatchers(HttpMethod.POST, "/api/v1/vendors/register").permitAll()
+                .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

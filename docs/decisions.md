@@ -267,6 +267,81 @@ Migrations are rewritten before the first deployment. The additive-only migratio
 
 ---
 
+## D-11: Vendor role stays `FLORIST` (no `VENDOR` rename)
+
+**Status:** Accepted
+**Date:** Phase 2c
+
+### Context
+
+Plan v2.2 section 1.1 seeds the roles table as `CUSTOMER`, `VENDOR`, `ADMIN`, but the same
+plan explicitly allows the existing name: "If the codebase names the vendor role differently
+(e.g. `FLORIST`), use the code's name consistently everywhere." The `roles` table was seeded
+as `FLORIST` in V3 and `FLORIST` is already referenced by Phase 1 auth code, the Phase 2b
+vendor-profile tests, and the seeded role data.
+
+Renaming the role would require a data migration over `users.role_id`, plus coordinated
+changes to the security config, every role-boundary test, and the role assertions in the
+frontend auth store — all to reach the same behaviour under a different string.
+
+### Decision
+
+Keep `FLORIST` as the application role name for vendors and use it consistently. The API
+surface uses the vendor vocabulary (`/api/v1/vendors/**`, `vendor_profiles`), so only the
+role *constant* differs from the plan's wording. No rename migration is written.
+
+### Consequences
+
+- `FLORIST` is the role name to use in `SecurityConfig` matchers, tests, and any future
+  frontend route guards.
+- Plan text and code will differ on this one identifier; `docs/rules.md` records the
+  convention so it is not read as drift.
+- If a `VENDOR` rename is ever wanted, it must be an additive migration updating the seeded
+  `roles` row and every referencing `users.role_id`, not an edit to the applied V3 migration
+  (ADR-002, D-9).
+
+---
+
+## D-12: Vendor invariants enforced in both the service and the database
+
+**Status:** Accepted
+**Date:** Phase 2c
+
+### Context
+
+Phase 2b created `vendor_profiles` and `vendor_hours` without range constraints, deferring
+the invariant rules to Phase 2c. Those invariants (positive prep time, non-negative money,
+chronological opening hours) must hold for any writer, not just HTTP callers going through
+`VendorService` — scheduled jobs, admin tooling, and direct data fixes all write to these
+tables.
+
+### Decision
+
+Validate in two places, deliberately:
+
+- **DTO (`@Valid` + Bean Validation)** shapes and bounds of one request payload.
+- **Service** cross-field rules that need the database or span rows: duplicate weekdays,
+  `close_time > open_time`, service-location resolution, status-transition legality.
+- **MySQL CHECK constraints (V6)** backstop so the invariant holds for non-HTTP writers.
+
+The CHECK constraints are the authority for storage integrity; the service returns 400 with a
+specific message before the database is ever reached, so clients get a useful error instead
+of a constraint name.
+
+### Consequences
+
+- Adding a new invariant means touching the DTO, the service, and (where it is a storage
+  rule) a new additive migration. V6 is additive; applied migrations are never edited.
+- MySQL reports a CHECK violation as SQL error 3819, which Hibernate surfaces as
+  `JpaSystemException`, **not** `DataIntegrityViolationException`. Tests that assert on these
+  constraints must assert the constraint name from the failure chain rather than assuming the
+  Spring translation — `VendorApiIntegrationTest.assertCheckViolation` is the reference
+  helper.
+- Because constraints fire at the database, tests that deliberately violate one must supply
+  otherwise-valid row data, or the constraint under test may not be the one that fires first.
+
+---
+
 | ADR | Title                       | Type   | Status   | Date |
 |-----|-----------------------------|--------|----------|------|
 | 001 | Maven wrapper + thin Dockerfile | Decision | Accepted | Phase 0 |
@@ -280,3 +355,5 @@ Migrations are rewritten before the first deployment. The additive-only migratio
 | D-8 | Registration duplicate-email behaviour | Decision | Accepted | Phase 1 |
 | D-9 | Migrations rewritten before first deployment | Decision | Accepted | Phase 1 |
 | D-10 | Injectable Clock for testable time | Decision | Accepted | Phase 0 (Finalize) |
+| D-11 | Vendor role stays `FLORIST` (no `VENDOR` rename) | Decision | Accepted | Phase 2c |
+| D-12 | Vendor invariants enforced in service and database | Decision | Accepted | Phase 2c |

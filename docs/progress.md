@@ -4,9 +4,17 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 2b — Vendor Profiles, Delivery Settings & Opening Hours (Tasks 2.2–2.4)**
+**Phase 2c — Vendor Registration & Admin Approval (Tasks 2.5, 2.6)**
 
-Vendor-profile data model only: `vendor_profiles` and `vendor_hours` tables (V5 migration), `VendorProfile` and `VendorHours` entities, and their repositories. Coordinates are copied from the Phase 2a `service_locations` centroid (D-4 — no GPS). No API, service or controller is added in this phase: vendor registration, admin approval, audit log and admin user status belong to Phase 2c and later. Backend verified with 131 unit tests + 110 integration tests.
+Vendor onboarding and approval are implemented end to end. `POST /api/v1/vendors/register` is
+public and creates the FLORIST account and a `PENDING_APPROVAL` profile atomically;
+`GET|PUT /api/v1/vendors/profile` operate on the caller's own profile only, derived from the
+JWT subject. Admins manage approval via `GET /api/v1/admin/vendors` and the
+`approve`/`reject`/`suspend`/`reinstate` transitions, each of which appends a row to the
+new `audit_log` table (reject and suspend require a reason; illegal transitions return 409).
+Approval gating of customer-facing endpoints is Task 2.7, not yet started.
+
+Verified with 213 unit + 157 integration tests.
 
 ## Completed Work
 
@@ -104,7 +112,8 @@ Vendor-profile data model only: `vendor_profiles` and `vendor_hours` tables (V5 
 #### Phase 2 — Vendor Profiles, Delivery Settings & Admin Approval
 - [x] **2a — Service Locations (Task 2.1)**: `service_locations` table (V4 migration) with Bengaluru seed data (8 areas), `ServiceLocation` entity, `ServiceLocationRepository` with custom search queries, DTOs (`ServiceLocationResponse`, `LocationSearchRequest`, `PageResponse`), MapStruct mapper, `LocationService` with search/pagination, public `GET /api/v1/locations` (hierarchical by default, paginated `PageResponse` when `pincode`/`area` filters are supplied, AND semantics), `/api/v1/locations/**` added to `permitAll()` in `SecurityConfig`. 32 new tests (15 unit + 10 controller + 7 seed integrity + 10 integration). Committed as `852cec6`.
 - [x] **2b — Vendor profile data model (Tasks 2.2, 2.3, 2.4)**: `vendor_profiles` and `vendor_hours` tables (V5 migration) with business details, copied `service_location_id` FK plus lat/lng centroid copy, `delivery_radius_km`, `logo_url`, `status` ENUM (`PENDING_APPROVAL`/`APPROVED`/`REJECTED`/`SUSPENDED`), nullable `commission_rate` override, nullable `avg_rating` with `review_count` default 0, delivery settings (`min_order_amount`, `base_delivery_fee`, `per_km_fee`, `free_delivery_above`, `prep_time_minutes`, `slot_duration_minutes`, `max_orders_per_slot`, `accepting_orders`), and weekly `vendor_hours` (weekday, open, close, closed). Index `vendor_profiles(status, latitude, longitude)` per plan section 8. `VendorProfile` and `VendorHours` entities plus `VendorProfileRepository` and `VendorHoursRepository`. 27 new integration tests (10 profile repository + 7 hours repository + 10 schema/migration integrity). No endpoints added — registration, approval, audit log and admin user status are Phase 2c+.
-- [ ] **2c — Vendor registration API, admin vendor management, approval gating (Tasks 2.5, 2.6, 2.7)**
+- [x] **2c — Vendor registration API and admin vendor management (Tasks 2.5, 2.6)**: `audit_log` table plus vendor CHECK constraints (`V6__audit_log_and_vendor_checks.sql`), `AuditLog` entity and repository, `com.flowerconnect.vendor` feature slice (7 DTOs, `VendorMapper`, `VendorService`, `VendorAdminService`, `VendorController`, `AdminVendorController`). Endpoints: `POST /api/v1/vendors/register` (public, creates the FLORIST account and a `PENDING_APPROVAL` profile atomically), `GET|PUT /api/v1/vendors/profile` (own profile only, derived from the JWT subject), and `GET /api/v1/admin/vendors` plus `approve`/`reject`/`suspend`/`reinstate` under `/api/v1/admin/**`. Every admin transition writes an append-only `audit_log` row; reject and suspend require a reason; illegal transitions return 409. 122 new tests (37 service, 45 controller, 40 integration). Verified with 213 unit + 157 integration tests.
+- [ ] **2d — Approval gating on customer-facing endpoints (Task 2.7)**
 - [ ] **2d — Admin user status API (Task 2.8)**
 - [ ] Florist entity and catalog CRUD
 - [ ] Product browsing UI

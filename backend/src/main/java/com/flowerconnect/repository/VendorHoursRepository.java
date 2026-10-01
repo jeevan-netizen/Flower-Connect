@@ -13,5 +13,11 @@ public interface VendorHoursRepository extends JpaRepository<VendorHours, Long> 
 
     List<VendorHours> findByVendorProfileIdOrderByWeekdayAsc(Long vendorProfileId);
 
+    /**
+     * Loads the opening hours of several profiles in a single query, so the
+     * admin vendor listing does not issue one query per row.
+     */
+    List<VendorHours> findByVendorProfileIdInOrderByWeekdayAsc(List<Long> vendorProfileIds);
+
     Optional<VendorHours> findByVendorProfileIdAndWeekday(Long vendorProfileId, DayOfWeek weekday);
 }
