@@ -53,6 +53,27 @@
 
 _None currently blocked._
 
+## Testing Gotchas (Phase 2d frontend)
+
+- **zod v3 `.refine()` silently discards the message a check returns.** `z.string().refine(fn)`
+  where `fn` returns a string renders zod's default `Invalid input`, not the returned string; only a
+  message passed as the second argument is used. So a field that "validates" but reports the wrong
+  text produces a test failure that looks like the validator never ran. Use `.superRefine` +
+  `ctx.addIssue({ message })` when the message depends on which bound failed — see
+  `requiredDecimalField` / `optionalDecimalField` in `src/features/vendor/form-schema.ts`.
+- **react-hook-form `reset()` does not refresh a `register`ed checkbox.** RHF keeps checkbox state
+  in the DOM, so after the profile loads (or a save re-seeds the form) the stored week renders with
+  the stale week still ticked while the time inputs show the new values. Bind `checked` to a
+  `useWatch`ed value and write through `setValue` instead of `register` — see the open/closed
+  checkbox in `VendorHoursPage`.
+- **`z.record(z.enum([...]), schema)` infers optional values.** Indexing it by a member of the enum
+  gives `T | undefined` under `noUncheckedIndexedAccess`, so every access needs a guard. Build a
+  fixed seven-key shape (`DAY_SHAPE` in `VendorHoursPage`) when every key is guaranteed present.
+- **Rendering assertions on the shared `renderWithProviders` result drop the DOM queries.** Spreading
+  the result (`{ queryClient, ...render(...) }`) widened to a union and lost the Testing Library
+  queries under `tsc -b`. Use `Object.assign(render(...), { queryClient })`, which keeps the
+  intersection.
+
 ## Testing Gotchas (Phase 2d)
 
 - **Integration tests share one accumulating database.** The singleton MySQL container in

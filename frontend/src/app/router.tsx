@@ -1,12 +1,35 @@
-import { createBrowserRouter, Outlet, Link, RouterProvider, useNavigate } from "react-router-dom";
+import { createBrowserRouter, Link, Outlet, RouterProvider, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useInitAuth, RequireAuth, RequireUnauth } from "@/features/auth/hooks/useAuth";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
+import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
+import { clearVendorCache } from "@/features/vendor/queries";
+import { VendorLayout } from "@/features/vendor/components/VendorLayout";
+import { VendorDashboardPage } from "@/features/vendor/pages/VendorDashboardPage";
+import { VendorProfilePage } from "@/features/vendor/pages/VendorProfilePage";
+import { VendorSettingsPage } from "@/features/vendor/pages/VendorSettingsPage";
+import { VendorHoursPage } from "@/features/vendor/pages/VendorHoursPage";
+
+/**
+ * Application role for a vendor. The plan calls this role "VENDOR"; the seeded
+ * role is FLORIST and is not renamed (docs/decisions.md, D-11).
+ */
+const VENDOR_ROLE = "FLORIST";
 
 function Layout() {
   const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuthStore();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    // Vendor data is cached under its own query key; drop it so the next
+    // account to sign in on this tab never sees the previous vendor's profile.
+    clearVendorCache(queryClient);
+    logout();
+    navigate("/", { replace: true });
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -21,13 +44,8 @@ function Layout() {
                 <Link to="/browse">Browse</Link>
                 <Link to="/cart">Cart</Link>
                 <Link to="/orders">Orders</Link>
-                <button
-                  onClick={() => {
-                    logout();
-                    navigate("/", { replace: true });
-                  }}
-                  className="hover:underline"
-                >
+                {user?.role === VENDOR_ROLE && <Link to="/vendor">Vendor</Link>}
+                <button onClick={handleLogout} className="hover:underline">
                   Log out
                 </button>
               </>
@@ -100,6 +118,23 @@ export const router = createBrowserRouter([
       },
       { path: "login", element: <RequireUnauth><LoginPage /></RequireUnauth> },
       { path: "register", element: <RequireUnauth><RegisterPage /></RequireUnauth> },
+      {
+        // Phase 2 vendor dashboard shell. The guard is UX gating only — the
+        // backend re-checks ROLE_FLORIST (and, for approved-only vendor
+        // features, the approval state) on every request.
+        path: "vendor",
+        element: (
+          <ProtectedRoute roles={[VENDOR_ROLE]}>
+            <VendorLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <VendorDashboardPage /> },
+          { path: "profile", element: <VendorProfilePage /> },
+          { path: "settings", element: <VendorSettingsPage /> },
+          { path: "hours", element: <VendorHoursPage /> },
+        ],
+      },
     ],
   },
 ]);

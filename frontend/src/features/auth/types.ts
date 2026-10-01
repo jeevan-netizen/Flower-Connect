@@ -30,12 +30,23 @@ export interface UserResponse {
   createdAt: string;
 }
 
+/**
+ * The single API error envelope produced by the backend `GlobalExceptionHandler`.
+ *
+ * `code` carries the `ErrorCode` enum value (VALIDATION_FAILED, UNAUTHORIZED,
+ * FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, ACCOUNT_SUSPENDED,
+ * VENDOR_NOT_APPROVED) and `validation` carries the per-field map that only a
+ * 400 bean-validation failure populates. Both are optional because Spring
+ * Security's entry point and access-denied handler omit them.
+ */
 export interface ErrorResponse {
-  timestamp: string;
+  timestamp?: string;
   status: number;
-  error: string;
+  error?: string;
+  code?: string | null;
   message: string;
-  path: string;
+  path?: string;
+  validation?: Record<string, string> | null;
 }
 
 export interface AuthState {

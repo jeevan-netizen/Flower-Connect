@@ -359,6 +359,7 @@ of a constraint name.
 | D-12 | Vendor invariants enforced in service and database | Decision | Accepted | Phase 2c |
 | D-13 | Approval gating is per-handler, not per-namespace | Decision | Accepted | Phase 2c |
 | D-14 | Admin user status changes are self-targeting-protected and always revoke tokens | Decision | Accepted | Phase 2d |
+| D-15 | The vendor area is one profile resource, edited through full-replacement PUTs | Decision | Accepted | Phase 2d |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -478,3 +479,58 @@ The plan requires revocation for `SUSPENDED` and `DISABLED` and is silent on rea
 - Integration tests must not assume page 0 contains their own rows: the shared singleton MySQL
   container accumulates users across every IT class in the run. `AdminUserStatusIntegrationTest`
   reads the last page for creation-order assertions and walks all pages for filter assertions.
+
+---
+
+## D-15: The vendor area is one profile resource, edited through full-replacement PUTs
+
+**Status:** Accepted
+**Date:** Phase 2d (Task 2.9)
+
+### Context
+
+Task 2.9 builds the florist-facing screens on the Phase 2c/2d API, which exposes exactly two
+endpoints: `GET /api/v1/vendors/profile` and `PUT /api/v1/vendors/profile`. The plan asks for a
+dashboard, a profile editor, delivery settings, and operating hours. Several things about that API
+shape are not obvious from the endpoint list alone, and each one forces a frontend choice.
+
+`PUT` is a full replacement of the profile's editable scalars, not a patch. Sending only the fields
+on the visible screen would silently reset every other field to its default. The `hours` field is a
+sub-resource with different semantics from the scalars: omitting it means "keep the stored week",
+while sending it replaces all seven rows. And `GET /api/v1/locations` returns the service-area list
+without ids, so the profile page can display the stored area but cannot offer a picker for it.
+
+### Decision
+
+- **One resource, four views.** The dashboard, profile, settings, and hours screens all read the
+  same `["vendor","profile"]` query and all write through the same mutation. There is no separate
+  settings or hours endpoint to keep in step, and no screen can show state another screen has
+  already invalidated.
+- **Every PUT resends the full editable profile.** `buildProfileUpdateRequest(profile, overrides,
+  hours)` starts from the fetched profile and layers the edited fields on top, so a partial screen
+  cannot blank the parts it does not show. `hours` is passed only by the hours screen.
+- **Form state is kept as strings and converted when the payload is built.** This keeps `""`
+  distinguishable from `0`, so clearing an optional fee sends `null` rather than `0`, and it avoids
+  `NaN` from `valueAsNumber` on an empty number input. Zod bounds mirror the DTO annotations
+  (`@Digits`, `@DecimalMin`, `@DecimalMax`, `@Min`, `@Max`) so the client rejects an out-of-range
+  value before the network; the backend stays authoritative.
+- **The service area is read-only in the UI.** The stored area is shown as resolved text. Adding a
+  picker would require a location id the API does not expose, and guessing one would be a data-integrity
+  bug.
+- **The whole vendor area is a single cache key**, cleared on logout, so a second florist signing in
+  on the same browser cannot see the previous one's profile.
+- **`VENDOR_NOT_APPROVED` (403) is a state, not an error.** The vendor's own profile stays reachable
+  while a profile is pending, so the pages render the approval banner and still allow editing the
+  application — the same reasoning as D-13, applied to the client.
+
+### Consequences
+
+- A future `PATCH` endpoint or a dedicated `/vendors/hours` resource would replace
+  `buildProfileUpdateRequest` and the resend-everything rule. That is a change to this decision, not
+  an incidental refactor.
+- Validation is duplicated between the DTO annotations and `form-schema.ts`. If a bound changes in
+  one place it must change in the other, or the client will either reject valid input or send invalid
+  input.
+- Because the profile is fetched once and reused as the base for every PUT, a concurrent edit from
+  another tab is overwritten rather than merged. Acceptable in v1; it needs a revision/etag to fix
+  properly.

@@ -157,14 +157,29 @@ FlowerConnect/
 │       │   └── styles/
 │       │       └── index.css
 │       ├── features/
-│       │   └── auth/
-│       │       └── stores/
-│       │           └── auth-store.ts
+│       │   ├── auth/
+│       │   │   ├── api.ts
+│       │   │   ├── stores/auth-store.ts
+│       │   │   └── types.ts
+│       │   └── vendor/
+│       │       ├── api.ts          # GET/PUT /api/v1/vendors/profile
+│       │       ├── queries.ts      # TanStack Query hooks + cache lifecycle
+│       │       ├── types.ts        # DTOs, Weekday, PUT payload builder
+│       │       ├── format.ts       # INR, LocalTime, status/label helpers
+│       │       ├── form-schema.ts  # Zod string-form schemas mirroring the DTO bounds
+│       │       ├── components/     # Layout, status banner, error state, form fields
+│       │       └── pages/          # dashboard, profile, settings, hours
 │       ├── shared/
+│       │   ├── components/
+│       │   │   └── ProtectedRoute.tsx
 │       │   └── lib/
-│       │       └── api.ts
+│       │       ├── api.ts
+│       │       └── api-error.ts    # ErrorResponse -> ApiErrorInfo
 │       └── test/
-│           └── setup.ts
+│           ├── setup.ts
+│           ├── factories.ts        # vendor profile / hours fixtures
+│           ├── api-errors.ts       # AxiosError shaped like ErrorResponse
+│           └── render.tsx          # renderWithProviders
 └── docker/
     └── mysql/
         ├── Dockerfile        # Custom MySQL image with init script
@@ -318,6 +333,26 @@ roles  1 ──< users  1 ──1 vendor_profiles  1 ──< vendor_hours
 - JWT Bearer tokens in the `Authorization` header
 - Access token (default 15 min TTL) + refresh token (default 7 days TTL)
 - Tokens stored in Zustand (persisted) and `localStorage` (`fc-access-token` key)
+
+### Implemented Frontend Routes
+Customer routes (`/`, `/browse`, `/cart`, `/orders`, `/login`, `/register`) are placeholders. The
+Phase 2d vendor area is the first real screen set:
+
+| Path                | Page                          | Guard                          |
+|---------------------|-------------------------------|--------------------------------|
+| `/vendor`           | Vendor dashboard              | `ProtectedRoute roles={FLORIST}` |
+| `/vendor/profile`   | Business/profile editing      | `ProtectedRoute roles={FLORIST}` |
+| `/vendor/settings`  | Delivery settings and capacity | `ProtectedRoute roles={FLORIST}` |
+| `/vendor/hours`     | Weekly operating hours        | `ProtectedRoute roles={FLORIST}` |
+
+`ProtectedRoute` sends an unauthenticated visitor to `/login` (preserving `from`) and renders an
+access-denied panel for a signed-in non-florist. The three `/vendor/*` pages read the caller's own
+profile from `GET /api/v1/vendors/profile`; a `VENDOR_NOT_APPROVED` (403) response renders the
+approval banner rather than an error, because the vendor must still be able to see and edit their
+application while it is pending.
+
+The whole vendor area is one TanStack Query cache key (`["vendor","profile"]`), cleared on logout so
+a different florist cannot see the previous one's data.
 
 ### Implemented Endpoints
 Phase 1 (auth), Phase 2a (service locations), and Phase 2c (vendor registration, admin
