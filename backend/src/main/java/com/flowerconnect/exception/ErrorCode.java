@@ -7,5 +7,6 @@ public enum ErrorCode {
     NOT_FOUND,
     CONFLICT,
     RATE_LIMITED,
-    ACCOUNT_SUSPENDED
+    ACCOUNT_SUSPENDED,
+    VENDOR_NOT_APPROVED
 }

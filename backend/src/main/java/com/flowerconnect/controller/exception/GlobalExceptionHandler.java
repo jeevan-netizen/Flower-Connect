@@ -3,6 +3,7 @@ package com.flowerconnect.controller.exception;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.exception.ErrorCode;
 import com.flowerconnect.security.dto.ErrorResponse;
+import com.flowerconnect.vendor.security.VendorNotApprovedException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex) {
         HttpStatus status = statusForErrorCode(ex.getErrorCode());
         return buildErrorResponse(status, status.getReasonPhrase(), ex.getMessage(), ex.getErrorCode(), null);
+    }
+
+    /**
+     * Vendor approval gating (plan task 2.7). The exception is raised while a
+     * method-security rule is being evaluated, so it reaches this advice through
+     * the normal MVC exception path rather than through Spring Security's
+     * {@code AccessDeniedHandler}. Rendering it here keeps the response shape and
+     * the {@code code} field identical to every other business error.
+     */
+    @ExceptionHandler(VendorNotApprovedException.class)
+    public ResponseEntity<ErrorResponse> handleVendorNotApproved(VendorNotApprovedException ex) {
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(),
+                ErrorCode.VENDOR_NOT_APPROVED, null);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -109,6 +123,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case CONFLICT -> HttpStatus.CONFLICT;
             case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
             case ACCOUNT_SUSPENDED -> HttpStatus.FORBIDDEN;
+            case VENDOR_NOT_APPROVED -> HttpStatus.FORBIDDEN;
         };
     }
 

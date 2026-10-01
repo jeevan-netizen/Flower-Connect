@@ -357,3 +357,69 @@ of a constraint name.
 | D-10 | Injectable Clock for testable time | Decision | Accepted | Phase 0 (Finalize) |
 | D-11 | Vendor role stays `FLORIST` (no `VENDOR` rename) | Decision | Accepted | Phase 2c |
 | D-12 | Vendor invariants enforced in service and database | Decision | Accepted | Phase 2c |
+| D-13 | Approval gating is per-handler, not per-namespace | Decision | Accepted | Phase 2c |
+
+## D-13: Approval gating is per-handler, not per-namespace
+
+**Status:** Accepted
+**Date:** Phase 2c (Task 2.7)
+
+### Context
+
+Plan task 2.7 requires that only `APPROVED` vendors may use catalog/order endpoints and appear in
+discovery, and that a suspended vendor is hidden immediately while in-flight orders continue (D-6).
+
+Two constraints pull in opposite directions. Role-based authorization is already configured at the
+URL namespace level: `SecurityConfig` maps `/api/v1/vendors/**` to `hasRole("FLORIST")`. A
+`PENDING_APPROVAL` vendor holds that role — the role is granted at registration, before approval —
+so the namespace rule cannot express "approved". Widening it instead (e.g. a rule that covers only
+some vendor sub-paths) would also lock a pending vendor out of `GET|PUT /api/v1/vendors/profile`,
+which they must be able to use to see why they are not approved and to fix their application.
+
+No catalog, inventory or order endpoint exists yet, so there is also nothing in the codebase to
+attach a rule to, and Task 2.7 explicitly must not invent those APIs.
+
+### Decision
+
+Gating is expressed per handler, and every rule lives in one class.
+
+- `VendorApprovalGuard` is the single owner of the "is this vendor approved?" rule. It reads
+  `vendor_profiles.status` from the database on every call, resolves the profile from the JWT
+  subject only, and raises `VendorNotApprovedException` (a `VENDOR_NOT_APPROVED` / 403 error) on any
+  refusal.
+- `@RequiresApprovedVendor` is a composed annotation carrying
+  `@PreAuthorize("@vendorApprovalGuard.isApproved(authentication)")`, applied to the handler method or
+  the controller class. It is enabled by `@EnableMethodSecurity` on `SecurityConfig`.
+- The existing `hasRole("FLORIST")` namespace rule is left exactly as it is. It answers "is this a
+  vendor account?"; the annotation answers "may this vendor transact?" Both run, in that order.
+- Discovery is gated by `VendorProfileSpecifications.approved()`, a Criteria API predicate that
+  every discovery query must compose. `VendorProfileRepository` now extends
+  `JpaSpecificationExecutor<VendorProfile>`.
+
+Approval state is deliberately **not** copied into the JWT. A status column read per request means an
+admin approval takes effect on the vendor's very next request and a suspension takes effect on the
+next request too, with no token re-issue and no cache invalidation to get wrong. The cost is one
+indexed `SELECT` per guarded request.
+
+The guard raises a typed exception rather than returning `false`, because a `false` result produces
+Spring Security's opaque "Access Denied" body while the thrown exception reaches
+`GlobalExceptionHandler` and produces the standard error envelope with an approval-specific `code`.
+That keeps a client able to distinguish "not approved yet" from a plain permission failure.
+
+### Consequences
+
+- `SecurityConfig`'s vendor namespace rule still runs first, so a `CUSTOMER` or `ADMIN` is stopped
+  with `FORBIDDEN` and never reaches the approval guard. Only a `FLORIST` can be refused with
+  `VENDOR_NOT_APPROVED`.
+- Every Phase 3+ catalog, inventory and order route must carry `@RequiresApprovedVendor`. Forgetting
+  it fails open for that route; this is the main review checklist item when adding vendor features.
+- `@RequiresApprovedVendor` is **inert in `@WebMvcTest` slices**, because those slices supply their
+  own `SecurityFilterChain` and never load the production `SecurityConfig` that enables method
+  security. Gating must therefore be covered by a `@SpringBootTest` (see
+  `VendorApprovalGatingIntegrationTest`), not by a slice test. This is a deliberate trade: a global
+  `WebMvcConfigurer`/`HandlerInterceptor` would have been pulled into every slice and required
+  mocking the guard in six test classes for no extra safety.
+- D-6 is honoured by scoping the rule to vendor-feature access and discovery only. Suspension stops
+  new catalog, inventory and order access and removes the vendor from discovery; it deliberately does
+  **not** block order reads, delivery tracking, or the vendor's own profile route, so in-flight
+  orders continue to completion.

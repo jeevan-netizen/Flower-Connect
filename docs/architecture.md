@@ -6,9 +6,9 @@ FlowerConnect is a **hyperlocal flower marketplace**. It connects local florists
 
 Current development phase: **Phase 2c (Vendor Profiles)** — authentication (Phase 1) and
 service locations (Phase 2a) are implemented. Phase 2b added the `vendor_profiles` and
-`vendor_hours` data model; Phase 2c adds the vendor registration/profile APIs and the admin
-approval workflow backed by a new `audit_log` table. Customer-facing approval gating
-(Task 2.7) is not implemented yet.
+`vendor_hours` data model; Phase 2c adds the vendor registration/profile APIs, the admin
+approval workflow backed by a new `audit_log` table, and the approval gating that keeps
+non-approved vendors out of vendor-feature endpoints and discovery.
 
 ## 2. High-Level Architecture
 
@@ -117,10 +117,16 @@ FlowerConnect/
 │           │   ├── service/              # Business logic
 │           │   ├── controller/           # REST controllers
 │           │   ├── dto/                  # Request/response DTOs
-│           │   ├── geo/                  # Service locations feature slice
-│           │   ├── vendor/               # Vendor profile + admin feature slice
-│           │   ├── config/               # Security, Jackson, Clock beans
-│           │   └── exception/            # Error framework
+│               │   ├── geo/                  # Service locations feature slice
+│               │   ├── vendor/               # Vendor profile + admin feature slice
+│               │   │   ├── controller/
+│               │   │   ├── dto/
+│               │   │   ├── mapper/
+│               │   │   ├── security/         # Approval guard + @RequiresApprovedVendor
+│               │   │   ├── service/
+│               │   │   └── specification/    # Reusable query fragments (approved-only)
+│               │   ├── config/               # Security, Jackson, Clock beans
+│               │   └── exception/            # Error framework
 │           └── resources/
 │               ├── application.yml
 │               └── db/migration/
@@ -293,7 +299,8 @@ roles  1 ──< users  1 ──1 vendor_profiles  1 ──< vendor_hours
 - `idx_service_locations_city_area` on `service_locations(city, area)`
 - `idx_service_locations_pincode` on `service_locations(pincode)`
 - `idx_vendor_profiles_status_geo` on `vendor_profiles(status, latitude, longitude)` — supports
-  "approved vendors near a location" lookups
+  "approved vendors near a location" lookups. `VendorProfileSpecifications.approved()` predicates on
+  the leading `status` column, so discovery queries stay index-served.
 
 ### Role Hierarchy
 | Role       | Description                         |
@@ -314,8 +321,10 @@ roles  1 ──< users  1 ──1 vendor_profiles  1 ──< vendor_hours
 - Tokens stored in Zustand (persisted) and `localStorage` (`fc-access-token` key)
 
 ### Implemented Endpoints
-Phase 1 (auth), Phase 2a (service locations), and Phase 2c (vendor registration and admin
-approval) endpoints are implemented. Approval gating of customer-facing endpoints is Task 2.7.
+Phase 1 (auth), Phase 2a (service locations), and Phase 2c (vendor registration, admin
+approval, and approval gating) endpoints are implemented. No catalog or order endpoint exists
+yet, so `@RequiresApprovedVendor` currently guards no production route — see
+`docs/decisions.md` (D-13).
 
 | Method | Path                | Description                        | Phase  |
 |--------|---------------------|------------------------------------|--------|
@@ -459,3 +468,18 @@ See `docs/decisions.md` for the full ADR log. Key decisions made so far:
 - **Secrets**: Never committed; all via `.env` (gitignored)
 - **API**: All endpoints except `/actuator/health` will require JWT once auth is implemented
 - **Input validation**: Backend validates all requests (frontend validation is convenience only)
+
+### Authorization layering
+
+Authorization is two independent layers that both run, in order:
+
+| Layer                          | Rule                                                        | Failure response              |
+|--------------------------------|-------------------------------------------------------------|-------------------------------|
+| URL namespace (`SecurityConfig`) | `/api/v1/vendors/**` → `hasRole("FLORIST")`                 | 403 `FORBIDDEN`               |
+| Handler (`@RequiresApprovedVendor`) | `vendor_profiles.status = APPROVED`, read from the DB per request | 403 `VENDOR_NOT_APPROVED` |
+
+The first answers "is this a vendor account?"; the second answers "may this vendor transact?".
+A `PENDING_APPROVAL`, `REJECTED` or `SUSPENDED` vendor passes the first and fails the second, which
+is why the vendor's own `GET|PUT /api/v1/vendors/profile` stays reachable while the profile is not
+approved. Approval state is never cached in the JWT, so an admin approval or suspension takes effect
+on the vendor's very next request. See `docs/decisions.md` (D-13).

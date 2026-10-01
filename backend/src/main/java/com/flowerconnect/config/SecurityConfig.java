@@ -15,6 +15,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -32,6 +33,7 @@ import java.util.List;
 @Slf4j
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtService jwtService;
@@ -82,6 +84,11 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs").permitAll()
                 // Vendor self-service. Registration is the public entry point that
                 // creates the FLORIST account; everything else is vendor-only.
+                // This is the *role* boundary only. The stricter *approval* boundary
+                // (PENDING_APPROVAL / REJECTED / SUSPENDED vendors are refused) is
+                // enforced per handler by @RequiresApprovedVendor, so that the vendor's
+                // own profile routes stay reachable while their profile is not approved.
+                // See docs/decisions.md (D-13).
                 .requestMatchers(HttpMethod.POST, "/api/v1/vendors/register").permitAll()
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

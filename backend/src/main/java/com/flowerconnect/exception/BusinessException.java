@@ -45,4 +45,8 @@ public class BusinessException extends RuntimeException {
     public static BusinessException accountSuspended(String message) {
         return new BusinessException(ErrorCode.ACCOUNT_SUSPENDED, message);
     }
+
+    public static BusinessException vendorNotApproved(String message) {
+        return new BusinessException(ErrorCode.VENDOR_NOT_APPROVED, message);
+    }
 }

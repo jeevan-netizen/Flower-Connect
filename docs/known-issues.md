@@ -20,6 +20,7 @@
 | 015 | DB / Auth  | `User.role` was `FetchType.LAZY` but `UserRepository.findByEmail` and `findById` lacked `JOIN FETCH`, causing `LazyInitializationException` during login and token refresh | Fixed | Added `@Query` with `JOIN FETCH u.role` to `UserRepository.findByEmail` and a new `findByIdWithRole` method. Added `@Query` with `JOIN FETCH rt.user u JOIN FETCH u.role` to `RefreshTokenRepository.findByTokenHash`. Updated `AuthService.login` to use `findByIdWithRole`. Updated `AuthServiceTest` mocks accordingly. |
 | 016 | Test      | `TestProbeController` route conflict with `UserController` on `GET /api/v1/users/me` in `@SpringBootTest` contexts | Fixed | Added `@Profile("test-probe")` to `TestProbeController` and `@ActiveProfiles("test-probe")` to `RoleBoundaryTest`. |
 | 017 | Test      | (a) Testcontainers 1.20.2 could not connect to Docker Desktop 29.8.0 without `~/.docker-java.properties` (`api.version=1.44`) — both `EnvironmentAndSystemPropertyClientProviderStrategy` and `NpipeSocketClientProviderStrategy` failed with `BadRequestException (Status 400)`; (b) `@Container` on `IntegrationTestBase.MYSQL` caused Testcontainers to create and destroy a new MySQL container per test class (per-class lifecycle), with four containers started (one per test class); `AuthApiIntegrationTest` and `RefreshTokenRepositoryIT` passed, `RoleRepositoryIT` and `UserRepositoryIT` got Connection refused | Fixed | (a) Upgraded Testcontainers to 1.21.4, which resolves Docker Desktop 29.x compatibility — `~/.docker-java.properties` is no longer required. (b) Removed `@Container` annotation; container now starts once via `static { MYSQL.start(); }` in `IntegrationTestBase` and is shared across all IT classes. One MySQL container per JVM run. |
+| 018 | Test      | `./mvnw verify -Pintegration` fails every integration test with `Could not find a valid Docker environment` when the Docker Desktop daemon is not running, even though the Docker CLI is on `PATH` | Environment | Testcontainers needs the running daemon, not just the client. Start Docker Desktop before the failsafe run; Testcontainers fails fast with an `ExceptionInInitializerError` per test class rather than skipping. |
 
 ## Known Limitations
 
@@ -56,13 +57,24 @@ _None currently blocked._
 
 These cost real debugging time and will recur if forgotten:
 
+- **`@RequiresApprovedVendor` is inert in `@WebMvcTest` slices.** The annotation is a composed
+  `@PreAuthorize`, enabled by `@EnableMethodSecurity` on the production `SecurityConfig`. A slice test
+  supplies its own `SecurityFilterChain` and never loads that class, so a gated route returns 200
+  instead of 403 and the slice test passes while the gate is untested. Gating must be covered by a
+  `@SpringBootTest` (see `VendorApprovalGatingIntegrationTest`). This is why method security was
+  chosen over a global `WebMvcConfigurer`/`HandlerInterceptor` — see `docs/decisions.md` (D-13).
+- **A gating probe route must sit under the real namespace.** With the probe mapped to a path outside
+  `/api/v1/vendors/**`, the `hasRole("FLORIST")` matcher never runs, so a CUSTOMER passes RBAC and is
+  refused by the guard with `VENDOR_NOT_APPROVED` instead of `FORBIDDEN`. The observable status is
+  still 403, so the bug is easy to miss; the error code is what exposes it. `TestVendorFeatureController`
+  is mapped to `/api/v1/vendors/test-features` so the layer ordering matches production.
 - **`UUID.randomUUID()` is not a valid phone-number source.** Its hex output contains
   letters, so `"+91" + uuid.replace("-","").substring(0,10)` fails the
   `^\+?[0-9]{7,15}$` DTO pattern roughly 40% of the time. The symptom is a *flaky*
   subset of tests returning 400 instead of the expected status, and it masks the
   service-level messages (you see the generic `VALIDATION_FAILED` envelope, not the
   specific hours error). Use random decimal digits instead — see `uniquePhone()` in
-  `VendorApiIntegrationTest`.
+  `VendorApiIntegrationTest` and `VendorApprovalGatingIntegrationTest`.
 - **MySQL CHECK violations are not `DataIntegrityViolationException`.** SQL error 3819
   surfaces as `JpaSystemException`/`GenericJDBCException`, so asserting the Spring
   translation fails even though the constraint worked. Assert on the constraint name in
