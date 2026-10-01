@@ -172,4 +172,43 @@ describe("LoginPage", () => {
     expect(screen.getByText(/create an account/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /create an account/i })).toHaveAttribute("href", "/register");
   });
+
+  it("should link to the vendor registration entry point", () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("link", { name: /register it on flowerconnect/i })).toHaveAttribute(
+      "href",
+      "/vendor/register",
+    );
+  });
+
+  it("should prefill the email and explain the handoff after vendor registration", () => {
+    render(
+      <MemoryRouter
+        initialEntries={[{ pathname: "/login", state: { registeredEmail: "petal@example.com", from: "/vendor" } }]}
+      >
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByLabelText(/email address/i)).toHaveValue("petal@example.com");
+    expect(screen.getByText(/florist application is in/i)).toBeInTheDocument();
+    // The password is never carried across, even though the email is.
+    expect(screen.getByLabelText(/password/i)).toHaveValue("");
+  });
+
+  it("should not prefill anything on an ordinary login visit", () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByLabelText(/email address/i)).toHaveValue("");
+    expect(screen.queryByText(/florist application is in/i)).not.toBeInTheDocument();
+  });
 });

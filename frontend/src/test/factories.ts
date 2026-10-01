@@ -1,4 +1,5 @@
 import type { VendorHours, VendorProfile, VendorStatus } from "@/features/vendor/types";
+import type { ServiceLocationGroup } from "@/features/vendor-registration/types";
 import type {
   AdminRole,
   AdminUser,
@@ -81,6 +82,38 @@ export function makeAdminUser(overrides: Partial<AdminUser> = {}): AdminUser {
  * `content` so `first`/`last`/`totalPages` stay consistent unless a test
  * deliberately overrides them.
  */
+/**
+ * The city-grouped payload of `GET /api/v1/locations`, exactly as the backend sends
+ * it — including `id`, which is what `POST /api/v1/vendors/register` requires as
+ * `serviceLocationId`.
+ */
+export function makeServiceLocations(
+  overrides: Partial<ServiceLocationGroup> = {},
+): ServiceLocationGroup[] {
+  return [
+    {
+      city: "Bengaluru",
+      areas: [
+        {
+          id: 3,
+          area: "Indiranagar",
+          pincode: "560038",
+          latitude: 12.971199,
+          longitude: 77.640586,
+        },
+        {
+          id: 4,
+          area: "Koramangala",
+          pincode: "560034",
+          latitude: 12.9352,
+          longitude: 77.6245,
+        },
+      ],
+      ...overrides,
+    },
+  ];
+}
+
 export function makePage<T>(
   content: T[],
   overrides: Partial<PageResponse<T>> = {},

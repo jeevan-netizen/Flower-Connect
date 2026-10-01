@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createTestQueryClient } from "@/test/render";
-import { makePage, makeVendorProfile } from "@/test/factories";
+import { makePage, makeServiceLocations, makeVendorProfile } from "@/test/factories";
 // `vi.mock` is hoisted above these, so the router, guard and pages all bind to
 // the mocked store and the mocked vendor API client.
 import { router as appRouter } from "@/app/router";
@@ -16,6 +17,8 @@ const mockFetch = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockFetchAdminVendors = vi.hoisted(() => vi.fn());
 const mockFetchAdminUsers = vi.hoisted(() => vi.fn());
+const mockFetchServiceLocations = vi.hoisted(() => vi.fn());
+const mockRegisterVendor = vi.hoisted(() => vi.fn());
 const mockState = vi.hoisted(() => ({
   isAuthenticated: true,
   hasLoadedInitial: true,
@@ -26,6 +29,11 @@ const mockState = vi.hoisted(() => ({
 vi.mock("@/features/vendor/api", () => ({
   fetchOwnProfile: mockFetch,
   updateOwnProfile: mockUpdate,
+}));
+
+vi.mock("@/features/vendor-registration/api", () => ({
+  fetchServiceLocations: mockFetchServiceLocations,
+  registerVendor: mockRegisterVendor,
 }));
 
 vi.mock("@/features/admin/api", () => ({
@@ -336,6 +344,87 @@ describe("admin route protection", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * The vendor entry point (plan task 1.7). Reachable while signed out from two
+ * places — the login page and the header's florist link — and closed to a signed-in
+ * account, because `POST /api/v1/vendors/register` creates a *new* account.
+ */
+describe("vendor entry point", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Sibling suite: set up every piece of shared state this one relies on.
+    mockState.isAuthenticated = false;
+    mockState.hasLoadedInitial = true;
+    mockState.user = null;
+    mockFetchServiceLocations.mockResolvedValue(makeServiceLocations());
+  });
+
+  it("serves the registration page to an anonymous visitor", async () => {
+    renderAt("/vendor/register");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /register your flower shop/i })).toBeInTheDocument();
+    });
+    expect(await screen.findByLabelText(/service area/i)).toBeInTheDocument();
+    // The vendor namespace stays closed to the same visitor.
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("is reachable from the login page", async () => {
+    renderAt("/login");
+
+    const entryLink = await screen.findByRole("link", { name: /register it on flowerconnect/i });
+    expect(entryLink).toHaveAttribute("href", "/vendor/register");
+
+    await userEvent.click(entryLink);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /register your flower shop/i })).toBeInTheDocument();
+    });
+  });
+
+  it("is reachable from the Phase 1 florist entry point in the header", async () => {
+    renderAt("/");
+
+    const entryLink = await screen.findByRole("link", { name: /for florists/i });
+    expect(entryLink).toHaveAttribute("href", "/vendor/register");
+  });
+
+  it("sends a signed-in account away, because registering would create a second one", async () => {
+    mockState.isAuthenticated = true;
+    mockState.user = florist();
+
+    renderAt("/vendor/register");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "FlowerConnect" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("heading", { name: /register your flower shop/i })).not.toBeInTheDocument();
+    expect(mockRegisterVendor).not.toHaveBeenCalled();
+  });
+
+  it("exposes no admin entry point from the registration flow", async () => {
+    renderAt("/vendor/register");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /register your flower shop/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the existing vendor dashboard reachable for a florist", async () => {
+    mockState.isAuthenticated = true;
+    mockState.user = florist();
+    mockFetch.mockResolvedValue(makeVendorProfile());
+
+    renderAt("/vendor");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Petal & Stem" })).toBeInTheDocument();
     });
   });
 });

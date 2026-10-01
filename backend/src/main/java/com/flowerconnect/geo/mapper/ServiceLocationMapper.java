@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
                     .map(entry -> {
                         ServiceLocation first = entry.getValue().get(0);
                         return ServiceLocationResponse.AreaResponse.builder()
+                                .id(first.getId())
                                 .area(entry.getKey())
                                 .pincode(first.getPincode())
                                 .latitude(first.getLatitude())
@@ -57,6 +58,7 @@ import java.util.stream.Collectors;
                                 .map(areaEntry -> {
                                     ServiceLocation first = areaEntry.getValue().get(0);
                                     return ServiceLocationResponse.AreaResponse.builder()
+                                            .id(first.getId())
                                             .area(areaEntry.getKey())
                                             .pincode(first.getPincode())
                                             .latitude(first.getLatitude())

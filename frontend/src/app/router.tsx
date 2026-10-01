@@ -4,6 +4,7 @@ import { useInitAuth, RequireAuth, RequireUnauth } from "@/features/auth/hooks/u
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
+import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { clearVendorCache } from "@/features/vendor/queries";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
@@ -64,6 +65,11 @@ function Layout() {
               <>
                 <Link to="/login">Login</Link>
                 <Link to="/register">Register</Link>
+                {/* Phase 1's vendor onboarding entry point: it was a forward link to a
+                    Phase 2 that did not exist yet, and now resolves to the registration
+                    page. Kept in the signed-out branch because registering creates a new
+                    account — a signed-in visitor must not end up with two. */}
+                <Link to="/vendor/register">For florists</Link>
               </>
             )}
           </div>
@@ -129,6 +135,18 @@ export const router = createBrowserRouter([
       },
       { path: "login", element: <RequireUnauth><LoginPage /></RequireUnauth> },
       { path: "register", element: <RequireUnauth><RegisterPage /></RequireUnauth> },
+      {
+        // The vendor entry point (plan task 1.7). Public, because
+        // `POST /api/v1/vendors/register` creates the account itself, and
+        // `RequireUnauth` because it must not be reachable with an existing session:
+        // submitting while signed in would create a second, orphaned account.
+        path: "vendor/register",
+        element: (
+          <RequireUnauth>
+            <VendorRegisterPage />
+          </RequireUnauth>
+        ),
+      },
       {
         // Phase 2 vendor dashboard shell. The guard is UX gating only — the
         // backend re-checks ROLE_FLORIST (and, for approved-only vendor
