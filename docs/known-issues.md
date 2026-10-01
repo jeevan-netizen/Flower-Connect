@@ -53,6 +53,21 @@
 
 _None currently blocked._
 
+## Testing Gotchas (Phase 2d)
+
+- **Integration tests share one accumulating database.** The singleton MySQL container in
+  `AbstractIntegrationTest` persists users across every IT class in the run, so a listing test
+  cannot assume the row it just created is on page 0. `AdminUserStatusIntegrationTest` reads the
+  *last* page (`createdAt` ascending puts the newest row last) and walks every page for filter
+  assertions via `listedIds(...)`. Anything asserting on paginated results must do the same.
+- **Skip the unit phase when iterating on an IT class.** `-Dtest='!*'` is rejected by Surefire 3.x;
+  use `-Dsurefire.failIfNoSpecifiedTests=false` with a pattern that matches nothing, or run the
+  whole `verify -Pintegration` (264 unit + 214 integration tests, roughly 12 minutes with the
+  MySQL and Mailhog containers).
+- **`-Dit.test=...` must be quoted in PowerShell.** Unquoted, `-Dit.test=Foo` is parsed as
+  `-D` plus a separate argument and Maven reports
+  `Unknown lifecycle phase ".test=AdminUserStatusIntegrationTest"`.
+
 ## Testing Gotchas (Phase 2c)
 
 These cost real debugging time and will recur if forgotten:

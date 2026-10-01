@@ -4,20 +4,17 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 2c — Vendor Registration, Admin Approval & Approval Gating (Tasks 2.5, 2.6, 2.7)**
+**Phase 2d — Admin User Management (Task 2.8)**
 
-Vendor onboarding, approval and gating are implemented end to end. `POST /api/v1/vendors/register` is
-public and creates the FLORIST account and a `PENDING_APPROVAL` profile atomically;
-`GET|PUT /api/v1/vendors/profile` operate on the caller's own profile only, derived from the
-JWT subject. Admins manage approval via `GET /api/v1/admin/vendors` and the
-`approve`/`reject`/`suspend`/`reinstate` transitions, each of which appends a row to the
-new `audit_log` table (reject and suspend require a reason; illegal transitions return 409).
-Vendor-feature access and discovery are gated on `vendor_profiles.status` by
-`@RequiresApprovedVendor` + `VendorApprovalGuard` (403 `VENDOR_NOT_APPROVED`) and by
-`VendorProfileSpecifications.approved()` respectively. No catalog or order route exists yet, so
-the annotation currently guards no production endpoint.
+Admin user management is implemented on top of the Phase 2c `audit_log` table and the existing
+`users.status` column. `GET /api/v1/admin/users` lists users with optional `role`/`status`
+filters, page size clamped to `1..100`, and sorting pinned to `createdAt` then `id`.
+`PATCH /api/v1/admin/users/{id}/status` moves a user between `ACTIVE`, `SUSPENDED` and
+`DISABLED`, requires a reason on every change, revokes the target's active refresh tokens, and
+writes one `audit_log` row in the same transaction. Self-targeting is refused with 403
+(`docs/decisions.md`, D-14).
 
-Verified with 222 unit + 177 integration tests.
+Verified with 264 unit + 214 integration tests.
 
 ## Completed Work
 
@@ -117,7 +114,7 @@ Verified with 222 unit + 177 integration tests.
 - [x] **2b — Vendor profile data model (Tasks 2.2, 2.3, 2.4)**: `vendor_profiles` and `vendor_hours` tables (V5 migration) with business details, copied `service_location_id` FK plus lat/lng centroid copy, `delivery_radius_km`, `logo_url`, `status` ENUM (`PENDING_APPROVAL`/`APPROVED`/`REJECTED`/`SUSPENDED`), nullable `commission_rate` override, nullable `avg_rating` with `review_count` default 0, delivery settings (`min_order_amount`, `base_delivery_fee`, `per_km_fee`, `free_delivery_above`, `prep_time_minutes`, `slot_duration_minutes`, `max_orders_per_slot`, `accepting_orders`), and weekly `vendor_hours` (weekday, open, close, closed). Index `vendor_profiles(status, latitude, longitude)` per plan section 8. `VendorProfile` and `VendorHours` entities plus `VendorProfileRepository` and `VendorHoursRepository`. 27 new integration tests (10 profile repository + 7 hours repository + 10 schema/migration integrity). No endpoints added — registration, approval, audit log and admin user status are Phase 2c+.
 - [x] **2c — Vendor registration API and admin vendor management (Tasks 2.5, 2.6)**: `audit_log` table plus vendor CHECK constraints (`V6__audit_log_and_vendor_checks.sql`), `AuditLog` entity and repository, `com.flowerconnect.vendor` feature slice (7 DTOs, `VendorMapper`, `VendorService`, `VendorAdminService`, `VendorController`, `AdminVendorController`). Endpoints: `POST /api/v1/vendors/register` (public, creates the FLORIST account and a `PENDING_APPROVAL` profile atomically), `GET|PUT /api/v1/vendors/profile` (own profile only, derived from the JWT subject), and `GET /api/v1/admin/vendors` plus `approve`/`reject`/`suspend`/`reinstate` under `/api/v1/admin/**`. Every admin transition writes an append-only `audit_log` row; reject and suspend require a reason; illegal transitions return 409. 122 new tests (37 service, 45 controller, 40 integration). Verified with 213 unit + 157 integration tests.
 - [x] **2d — Approval gating (Task 2.7)**: `VendorApprovalGuard` (single owner of the approval rule), `@RequiresApprovedVendor` (composed `@PreAuthorize`), `VendorNotApprovedException` + `ErrorCode.VENDOR_NOT_APPROVED` (403), and `VendorProfileSpecifications.approved()` for discovery; `VendorProfileRepository` now extends `JpaSpecificationExecutor<VendorProfile>` and gained `findByUserEmail`; `@EnableMethodSecurity` added to `SecurityConfig`. No new production endpoint and no migration — the annotation guards no route until Phase 3 adds one. Gating is per-handler so the vendor's own `GET|PUT /api/v1/vendors/profile` stays reachable while a profile is not approved (D-13). 29 new tests (9 unit, 16 gating integration, 4 discovery integration). Verified with 222 unit + 177 integration tests.
-- [ ] **2d — Admin user status API (Task 2.8)**
+- [x] **2d — Admin user management (Task 2.8)**: `GET /api/v1/admin/users` (optional `role`/`status` filters, page size clamped to `1..100`, sorting pinned to `createdAt` then `id`) and `PATCH /api/v1/admin/users/{id}/status` (status + required reason, revokes all active refresh tokens for the target, writes one `audit_log` row in the same transaction). Self-targeting is refused with 403; every transition including reactivation revokes tokens (D-14). New `UserStatusService` is the sole owner of status mutation, revocation and audit writing; `AdminUserService` owns listing only; `UserSpecifications` backs the listing over a now-`JpaSpecificationExecutor<User>` `UserRepository`; `AdminUserMapper` + `AdminUserResponse` keep credential material out of the payload. No migration — reuses `users.status` and `audit_log`. 79 new tests (10 `UserStatusServiceTest`, 8 `AdminUserServiceTest`, 24 `AdminUserControllerTest`, 37 `AdminUserStatusIntegrationTest`). Verified with 264 unit + 214 integration tests.
 - [ ] Florist entity and catalog CRUD
 - [ ] Product browsing UI
 - [ ] Search and filtering
@@ -136,6 +133,7 @@ Verified with 222 unit + 177 integration tests.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-01 | Task 2.8 admin user management: listing with filters, status change with revocation + audit, self-targeting refused | `AdminUserController.java`, `AdminUserService.java`, `UserStatusService.java`, `AdminUserMapper.java`, `UserSpecifications.java`, 3 DTOs, `UserRepository.java`, 4 test classes, `docs/*` |
 | 2026-10-01 | Task 2.7 approval gating: guard, composed `@PreAuthorize`, approved-only specification | `VendorApprovalGuard.java`, `RequiresApprovedVendor.java`, `VendorNotApprovedException.java`, `VendorProfileSpecifications.java`, `VendorProfileRepository.java`, `SecurityConfig.java`, `GlobalExceptionHandler.java`, `ErrorCode.java`, `BusinessException.java`, 3 test classes, `docs/*` |
 | 2026-09-27 | Stage 6: Redis removal, Vite dev proxy, MySQL healthcheck, .gitignore uploads, known-issues update | `.gitignore`, `docker-compose.yml`, `application.yml`, `application-prod.yml`, `vite.config.ts`, `docs/known-issues.md` |
 | 2026-09-14 | Initial Phase 0 scaffold established     | All files (initial commits)                          |

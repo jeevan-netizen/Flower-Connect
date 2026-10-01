@@ -4,11 +4,10 @@
 
 FlowerConnect is a **hyperlocal flower marketplace**. It connects local florists with customers for same-day or scheduled flower delivery within a tight geographic radius. The platform handles browsing, ordering, payments, and delivery coordination.
 
-Current development phase: **Phase 2c (Vendor Profiles)** — authentication (Phase 1) and
-service locations (Phase 2a) are implemented. Phase 2b added the `vendor_profiles` and
-`vendor_hours` data model; Phase 2c adds the vendor registration/profile APIs, the admin
-approval workflow backed by a new `audit_log` table, and the approval gating that keeps
-non-approved vendors out of vendor-feature endpoints and discovery.
+Current development phase: **Phase 2d (Admin User Management)** — authentication (Phase 1), service
+locations (Phase 2a), and vendor registration/approval with the `audit_log` trail (Phase 2b/2c) are
+implemented. Phase 2d adds the admin user listing and status-management APIs, backed by the same
+`audit_log` table and the existing `users.status` column.
 
 ## 2. High-Level Architecture
 
@@ -346,6 +345,8 @@ yet, so `@RequiresApprovedVendor` currently guards no production route — see
 | POST   | `/api/v1/admin/vendors/{id}/reject`   | Reject a pending vendor; `reason` required (ADMIN) | Phase 2c|
 | POST   | `/api/v1/admin/vendors/{id}/suspend`   | Suspend an approved vendor; `reason` required (ADMIN) | Phase 2c|
 | POST   | `/api/v1/admin/vendors/{id}/reinstate` | Reinstate a suspended vendor (ADMIN) | Phase 2c|
+| GET    | `/api/v1/admin/users`   | List/filter users by role and status (ADMIN) | Phase 2d|
+| PATCH  | `/api/v1/admin/users/{id}/status` | Change a user's status; reason required, tokens revoked (ADMIN) | Phase 2d|
 | GET    | `/actuator/health`   | Health check (no auth)              | Phase 0|
 
 ## 7. Configuration

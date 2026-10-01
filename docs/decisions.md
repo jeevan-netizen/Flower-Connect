@@ -358,6 +358,7 @@ of a constraint name.
 | D-11 | Vendor role stays `FLORIST` (no `VENDOR` rename) | Decision | Accepted | Phase 2c |
 | D-12 | Vendor invariants enforced in service and database | Decision | Accepted | Phase 2c |
 | D-13 | Approval gating is per-handler, not per-namespace | Decision | Accepted | Phase 2c |
+| D-14 | Admin user status changes are self-targeting-protected and always revoke tokens | Decision | Accepted | Phase 2d |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -423,3 +424,57 @@ That keeps a client able to distinguish "not approved yet" from a plain permissi
   new catalog, inventory and order access and removes the vendor from discovery; it deliberately does
   **not** block order reads, delivery tracking, or the vendor's own profile route, so in-flight
   orders continue to completion.
+
+---
+
+## D-14: Admin user status changes are self-targeting-protected and always revoke tokens
+
+**Status:** Accepted
+**Date:** Phase 2d (Task 2.8)
+
+### Context
+
+Task 2.8 adds `PATCH /api/v1/admin/users/{id}/status`, letting an admin move a user between
+`ACTIVE`, `SUSPENDED` and `DISABLED`. Two questions the plan does not answer have to be settled
+before the endpoint can be written.
+
+First: can an admin suspend or disable *itself*? The plan only says an admin may change another
+user's status. A self-targeting call is the one where a mistake is unrecoverable through the API,
+because the acting admin revokes the very credential it is authenticated with and then no admin
+route remains reachable for that account.
+
+Second: should reactivating a user (`SUSPENDED` → `ACTIVE`) revoke refresh tokens too? Revoking on
+every transition is uniform and simple; exempting reactivations keeps a legitimate user logged in.
+The plan requires revocation for `SUSPENDED` and `DISABLED` and is silent on reactivation.
+
+### Decision
+
+- **Self-targeting is refused** with `403 FORBIDDEN`. The target id is compared against the JWT
+  subject, so the rule holds for every admin, not just the seeded one. Targeting *another* admin is
+  allowed — with one admin account there is no recovery path, but locking that out would make the
+  platform unadministrable, and a second admin is created by `AdminBootstrap` or an existing
+  registration, not by self-modification.
+- **Every** status change revokes all active refresh tokens for the target, reactivation included.
+- No transition matrix is enforced. `ACTIVE`, `SUSPENDED` and `DISABLED` are mutually reachable in
+  both directions; no same-status or terminal-state rule was invented, because the plan defines
+  none and an over-strict rule would block legitimate corrections.
+- A nonblank `reason` is required on every change, not only on the punitive ones, so the
+  `audit_log` row is always interpretable.
+- `UserStatusService` is the single owner of status mutation, token revocation and audit writing.
+  `AdminUserService` owns listing only. Neither may be reached from anywhere else.
+- The audit row shares the status-change transaction: `saveAndFlush` on the user is followed by
+  revocation and the audit insert, so a rolled-back status change leaves no orphaned audit entry
+  claiming a transition that did not happen.
+
+### Consequences
+
+- Reactivating a user forces a re-login. This is intentional: a status change is treated as a
+  trust boundary crossing, and a token issued before it should not survive it.
+- Any future "unsuspend without re-login" requirement is a behaviour change to this decision, not
+  an incidental bug fix.
+- Listing is a specification query (`UserSpecifications.role(...)` / `.status(...)`) over
+  `UserRepository`, now a `JpaSpecificationExecutor<User>`. Page size is clamped to `1..100` and
+  sorting is pinned to `createdAt` then `id` so pagination is stable for equal timestamps.
+- Integration tests must not assume page 0 contains their own rows: the shared singleton MySQL
+  container accumulates users across every IT class in the run. `AdminUserStatusIntegrationTest`
+  reads the last page for creation-order assertions and walks all pages for filter assertions.
