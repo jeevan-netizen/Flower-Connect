@@ -57,6 +57,10 @@ services:
       MAIL_PORT: 1025
       JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_JWT_SECRET_256_BITS}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+      # Consumed by AdminBootstrap to create the initial ADMIN user on first start.
+      # Empty by default so the bootstrap stays a no-op unless explicitly supplied.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     ports:
       - "8080:8080"
     healthcheck:
