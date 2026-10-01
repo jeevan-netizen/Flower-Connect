@@ -1,5 +1,6 @@
 package com.flowerconnect.vendor;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.ServiceLocation;
@@ -31,11 +32,14 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -82,6 +86,7 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
     private TransactionTemplate transactionTemplate;
 
     private String adminToken;
+    private Long adminUserId;
     private String customerToken;
     private Long koramangalaId;
 
@@ -89,7 +94,9 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         koramangalaId = serviceLocationRepository.findByPincode(KORAMANGALA_PINCODE)
                 .orElseThrow().getId();
-        adminToken = tokenFor(createUser(uniqueEmail(), "ADMIN"));
+        User admin = createUser(uniqueEmail(), "ADMIN");
+        adminUserId = admin.getId();
+        adminToken = tokenFor(admin);
         customerToken = tokenFor(createUser(uniqueEmail(), "CUSTOMER"));
     }
 
@@ -235,6 +242,8 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
     void registrationLeavesNoOrphanAccountWhenProfileCreationFails() throws Exception {
         VendorRegisterRequest request = registerRequest(uniqueEmail());
         request.setServiceLocationId(9_999_999L);
+        String businessName = "Rollback Probe " + UUID.randomUUID();
+        request.setBusinessName(businessName);
 
         mockMvc.perform(post("/api/v1/vendors/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -243,6 +252,27 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
 
         assertFalse(userRepository.existsByEmail(request.getEmail()),
                 "the account insert must roll back with the failed profile insert");
+        assertEquals(0L, countProfilesNamed(businessName),
+                "no vendor_profiles row may survive the rolled-back registration");
+    }
+
+    @Test
+    void registrationLeavesNoOrphanProfileWhenTheWeekIsRejected() throws Exception {
+        VendorRegisterRequest request = registerRequest(uniqueEmail());
+        String businessName = "Hours Rollback Probe " + UUID.randomUUID();
+        request.setBusinessName(businessName);
+        // validateHours runs before the user insert, so nothing is written at all
+        // here; this is the second distinct failure mode of the same invariant.
+        request.setHours(List.of(openDay(DayOfWeek.MONDAY,
+                LocalTime.of(9, 0), LocalTime.of(9, 0))));
+
+        mockMvc.perform(post("/api/v1/vendors/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        assertFalse(userRepository.existsByEmail(request.getEmail()));
+        assertEquals(0L, countProfilesNamed(businessName));
     }
 
     // ================================================================ task 2.5: hours
@@ -505,6 +535,27 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
+    @Test
+    void updatingWithoutAProfileGetsNotFound() throws Exception {
+        User florist = createUser(uniqueEmail(), "FLORIST");
+        String token = tokenFor(florist);
+
+        VendorProfileUpdateRequest update = new VendorProfileUpdateRequest();
+        update.setBusinessName("Ghost Blossoms");
+        update.setAddressLine1("1 Nowhere");
+        update.setServiceLocationId(koramangalaId);
+
+        mockMvc.perform(put("/api/v1/vendors/profile")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(update)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        assertEquals(0L, countProfilesNamed("Ghost Blossoms"),
+                "a refused update must not create a profile");
+    }
+
     // ================================================================ authorization
 
     @Test
@@ -545,9 +596,21 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/admin/vendors")
                         .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/v1/admin/vendors/" + vendor.profileId() + "/approve")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
-                .andExpect(status().isForbidden());
+        for (String action : List.of("approve", "reinstate")) {
+            mockMvc.perform(post("/api/v1/admin/vendors/" + vendor.profileId() + "/" + action)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                    .andExpect(status().isForbidden());
+        }
+        for (String action : List.of("reject", "suspend")) {
+            mockMvc.perform(post("/api/v1/admin/vendors/" + vendor.profileId() + "/" + action)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(reason("not an admin")))
+                    .andExpect(status().isForbidden());
+        }
+        assertEquals(VendorProfile.Status.PENDING_APPROVAL,
+                vendorProfileRepository.findById(vendor.profileId()).orElseThrow().getStatus(),
+                "a refused call must leave the profile untouched");
     }
 
     @Test
@@ -635,36 +698,53 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
         VendorFixture first = registerWithVendor();
         VendorFixture second = registerWithVendor();
 
-        mockMvc.perform(get("/api/v1/admin/vendors")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isArray())
-                .andExpect(jsonPath("$.content[*].id", hasItem(first.profileId().intValue())))
-                .andExpect(jsonPath("$.content[*].id", hasItem(second.profileId().intValue())));
+        List<Long> all = listedIds(null);
+        assertTrue(all.contains(first.profileId()));
+        assertTrue(all.contains(second.profileId()));
 
-        mockMvc.perform(get("/api/v1/admin/vendors")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
-                        .param("status", "PENDING_APPROVAL"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[*].id", hasItem(first.profileId().intValue())))
-                .andExpect(jsonPath("$.content[*].id", hasItem(second.profileId().intValue())));
+        List<Long> pending = listedIds("PENDING_APPROVAL");
+        assertTrue(pending.contains(first.profileId()));
+        assertTrue(pending.contains(second.profileId()));
 
         approve(first.profileId());
 
-        mockMvc.perform(get("/api/v1/admin/vendors")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
-                        .param("status", "APPROVED"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[*].id", hasItem(first.profileId().intValue())))
-                .andExpect(jsonPath("$.content[*].id",
-                        not(hasItem(second.profileId().intValue()))));
+        assertTrue(listedIds("APPROVED").contains(first.profileId()));
+        assertFalse(listedIds("APPROVED").contains(second.profileId()),
+                "an unapproved profile must not appear under the APPROVED filter");
+        assertFalse(listedIds("PENDING_APPROVAL").contains(first.profileId()),
+                "approving a profile must remove it from the PENDING_APPROVAL filter");
+    }
 
-        mockMvc.perform(get("/api/v1/admin/vendors")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
-                        .param("status", "PENDING_APPROVAL"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[*].id",
-                        not(hasItem(first.profileId().intValue()))));
+    /**
+     * Reads every page of the admin vendor listing for one status filter. The
+     * shared singleton MySQL container accumulates profiles across the whole
+     * integration run, so a single page is never guaranteed to hold the rows this
+     * test just created (see {@code docs/known-issues.md}).
+     */
+    private List<Long> listedIds(String status) throws Exception {
+        List<Long> ids = new ArrayList<>();
+        int page = 0;
+        int totalPages;
+        do {
+            MockHttpServletRequestBuilder request = get("/api/v1/admin/vendors")
+                    .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                    .param("page", String.valueOf(page))
+                    .param("size", "100");
+            if (status != null) {
+                request.param("status", status);
+            }
+            MvcResult result = mockMvc.perform(request)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content").isArray())
+                    .andReturn();
+            JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+            for (JsonNode item : body.path("content")) {
+                ids.add(item.path("id").asLong());
+            }
+            totalPages = body.path("totalPages").asInt(0);
+            page++;
+        } while (page < totalPages);
+        return ids;
     }
 
     @Test
@@ -686,6 +766,8 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
         assertEquals(VendorAdminService.ACTION_APPROVED, entries.get(0).getActionType());
         assertEquals("VENDOR_PROFILE", entries.get(0).getEntityType());
         assertNull(entries.get(0).getReason());
+        assertEquals(adminUserId, entries.get(0).getActor().getId(),
+                "the audit row must record the acting admin, not the vendor owner");
     }
 
     @Test
@@ -714,6 +796,7 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
         assertEquals(1, entries.size());
         assertEquals(VendorAdminService.ACTION_REJECTED, entries.get(0).getActionType());
         assertEquals("Business licence could not be verified", entries.get(0).getReason());
+        assertEquals(adminUserId, entries.get(0).getActor().getId());
     }
 
     @Test
@@ -744,6 +827,86 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
         assertEquals(VendorAdminService.ACTION_SUSPENDED, entries.get(1).getActionType());
         assertEquals("Repeated late deliveries", entries.get(1).getReason());
         assertEquals(VendorAdminService.ACTION_REINSTATED, entries.get(2).getActionType());
+        assertTrue(entries.stream().allMatch(entry -> adminUserId.equals(entry.getActor().getId())),
+                "every administrative transition must be attributed to the acting admin");
+    }
+
+    /**
+     * The full legal/illegal transition matrix at the HTTP boundary. Each action
+     * route accepts exactly one source status; every other combination must be a
+     * 409 that names both the action and the status it refused, leaves the stored
+     * status untouched, and writes no audit row.
+     */
+    @Test
+    void everyIllegalTransitionIsRefusedWithAConflictThatChangesNothing() throws Exception {
+        record Refused(VendorProfile.Status from, String action) {
+        }
+
+        List<Refused> illegal = List.of(
+                new Refused(VendorProfile.Status.PENDING_APPROVAL, "suspend"),
+                new Refused(VendorProfile.Status.PENDING_APPROVAL, "reinstate"),
+                new Refused(VendorProfile.Status.APPROVED, "approve"),
+                new Refused(VendorProfile.Status.APPROVED, "reject"),
+                new Refused(VendorProfile.Status.APPROVED, "reinstate"),
+                new Refused(VendorProfile.Status.REJECTED, "approve"),
+                new Refused(VendorProfile.Status.REJECTED, "reject"),
+                new Refused(VendorProfile.Status.REJECTED, "suspend"),
+                new Refused(VendorProfile.Status.REJECTED, "reinstate"),
+                new Refused(VendorProfile.Status.SUSPENDED, "approve"),
+                new Refused(VendorProfile.Status.SUSPENDED, "reject"),
+                new Refused(VendorProfile.Status.SUSPENDED, "suspend"));
+
+        for (Refused refused : illegal) {
+            VendorFixture vendor = registerInStatus(refused.from());
+            long auditsBefore = auditLogRepository.countByEntityTypeAndEntityId(
+                    VendorAdminService.ENTITY_TYPE, vendor.profileId());
+
+            performAdminAction(vendor.profileId(), refused.action())
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("CONFLICT"))
+                    .andExpect(jsonPath("$.message").value("Cannot " + refused.action()
+                            + " a vendor profile in status " + refused.from()));
+
+            assertEquals(refused.from(),
+                    vendorProfileRepository.findById(vendor.profileId()).orElseThrow().getStatus(),
+                    () -> refused.action() + " must not change a " + refused.from() + " profile");
+            assertEquals(auditsBefore,
+                    auditLogRepository.countByEntityTypeAndEntityId(
+                            VendorAdminService.ENTITY_TYPE, vendor.profileId()),
+                    () -> refused.action() + " must not audit a refused transition");
+        }
+    }
+
+    /**
+     * The four legal transitions, each from its one permitted source status.
+     */
+    @Test
+    void everyLegalTransitionIsAcceptedFromExactlyOneStatus() throws Exception {
+        record Allowed(VendorProfile.Status from, String action, VendorProfile.Status to) {
+        }
+
+        List<Allowed> legal = List.of(
+                new Allowed(VendorProfile.Status.PENDING_APPROVAL, "approve", VendorProfile.Status.APPROVED),
+                new Allowed(VendorProfile.Status.PENDING_APPROVAL, "reject", VendorProfile.Status.REJECTED),
+                new Allowed(VendorProfile.Status.APPROVED, "suspend", VendorProfile.Status.SUSPENDED),
+                new Allowed(VendorProfile.Status.SUSPENDED, "reinstate", VendorProfile.Status.APPROVED));
+
+        for (Allowed allowed : legal) {
+            VendorFixture vendor = registerInStatus(allowed.from());
+            long auditsBefore = auditLogRepository.countByEntityTypeAndEntityId(
+                    VendorAdminService.ENTITY_TYPE, vendor.profileId());
+
+            performAdminAction(vendor.profileId(), allowed.action())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value(allowed.to().name()));
+
+            assertEquals(allowed.to(),
+                    vendorProfileRepository.findById(vendor.profileId()).orElseThrow().getStatus());
+            assertEquals(auditsBefore + 1,
+                    auditLogRepository.countByEntityTypeAndEntityId(
+                            VendorAdminService.ENTITY_TYPE, vendor.profileId()),
+                    () -> allowed.action() + " must write exactly one audit row");
+        }
     }
 
     @Test
@@ -765,10 +928,32 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void anUnknownProfileIsNotFound() throws Exception {
-        mockMvc.perform(post("/api/v1/admin/vendors/99999999/approve")
+        for (String action : List.of("approve", "reinstate")) {
+            mockMvc.perform(post("/api/v1/admin/vendors/99999999/" + action)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+        }
+        for (String action : List.of("reject", "suspend")) {
+            mockMvc.perform(post("/api/v1/admin/vendors/99999999/" + action)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(reason("missing profile")))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+        }
+    }
+
+    @Test
+    void aNonPositiveProfileIdIsRejected() throws Exception {
+        // @Positive on the path variable raises a ConstraintViolationException, which the
+        // handler reports as VALIDATION_FAILED without a per-field validation map.
+        mockMvc.perform(post("/api/v1/admin/vendors/0/approve")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message",
+                        org.hamcrest.Matchers.containsString("must be positive")));
     }
 
     @Test
@@ -926,6 +1111,53 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/admin/vendors/" + profileId + "/approve")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
                 .andExpect(status().isOk());
+    }
+
+    /**
+     * Invokes one administrative vendor action. {@code reject} and {@code suspend}
+     * require a reason body; {@code approve} and {@code reinstate} take none, and
+     * an unused body is ignored by their handlers, so one call serves all four.
+     */
+    private ResultActions performAdminAction(Long profileId, String action) throws Exception {
+        return mockMvc.perform(post("/api/v1/admin/vendors/" + profileId + "/" + action)
+                .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(reason("transition matrix probe")));
+    }
+
+    /** Registers a vendor and drives it to the requested approval status by legal transitions only. */
+    private VendorFixture registerInStatus(VendorProfile.Status target) throws Exception {
+        VendorFixture vendor = registerWithVendor();
+        switch (target) {
+            case PENDING_APPROVAL -> {
+                // freshly registered
+            }
+            case APPROVED -> approve(vendor.profileId());
+            case REJECTED -> performAdminAction(vendor.profileId(), "reject")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("REJECTED"));
+            case SUSPENDED -> {
+                approve(vendor.profileId());
+                performAdminAction(vendor.profileId(), "suspend")
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.status").value("SUSPENDED"));
+            }
+            default -> throw new IllegalArgumentException("unhandled status " + target);
+        }
+        assertEquals(target,
+                vendorProfileRepository.findById(vendor.profileId()).orElseThrow().getStatus());
+        return vendor;
+    }
+
+    private long countProfilesNamed(String businessName) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM vendor_profiles WHERE business_name = ?",
+                Long.class, businessName);
+    }
+
+    private static String reason(String text) throws Exception {
+        return new ObjectMapper().writeValueAsString(
+                VendorAdminReasonRequest.builder().reason(text).build());
     }
 
     private ServiceLocation location() {

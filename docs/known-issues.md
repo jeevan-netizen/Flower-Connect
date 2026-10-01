@@ -21,14 +21,14 @@
 | 016 | Test      | `TestProbeController` route conflict with `UserController` on `GET /api/v1/users/me` in `@SpringBootTest` contexts | Fixed | Added `@Profile("test-probe")` to `TestProbeController` and `@ActiveProfiles("test-probe")` to `RoleBoundaryTest`. |
 | 017 | Test      | (a) Testcontainers 1.20.2 could not connect to Docker Desktop 29.8.0 without `~/.docker-java.properties` (`api.version=1.44`) — both `EnvironmentAndSystemPropertyClientProviderStrategy` and `NpipeSocketClientProviderStrategy` failed with `BadRequestException (Status 400)`; (b) `@Container` on `IntegrationTestBase.MYSQL` caused Testcontainers to create and destroy a new MySQL container per test class (per-class lifecycle), with four containers started (one per test class); `AuthApiIntegrationTest` and `RefreshTokenRepositoryIT` passed, `RoleRepositoryIT` and `UserRepositoryIT` got Connection refused | Fixed | (a) Upgraded Testcontainers to 1.21.4, which resolves Docker Desktop 29.x compatibility — `~/.docker-java.properties` is no longer required. (b) Removed `@Container` annotation; container now starts once via `static { MYSQL.start(); }` in `IntegrationTestBase` and is shared across all IT classes. One MySQL container per JVM run. |
 | 018 | Test      | `./mvnw verify -Pintegration` fails every integration test with `Could not find a valid Docker environment` when the Docker Desktop daemon is not running, even though the Docker CLI is on `PATH` | Environment | Testcontainers needs the running daemon, not just the client. Start Docker Desktop before the failsafe run; Testcontainers fails fast with an `ExceptionInInitializerError` per test class rather than skipping. |
-| 019 | Backend / Frontend | `SecurityConfig.corsConfigurationSource()` sets `allowedMethods` to `GET, POST, PUT, DELETE, OPTIONS` — **`PATCH` is missing**. Any cross-origin browser request to a `PATCH` endpoint fails the CORS preflight, so `PATCH /api/v1/admin/users/{id}/status` (admin user status, task 2.10) and `PATCH /api/v1/users/me` (profile update, Phase 1) cannot be called from the SPA on the dev setup (`:5173` → `:8080`) | Open — latent until task 2.10 | Pre-existing since Phase 1 and invisible until now because no frontend feature exercised `PATCH`. The frontend is correct; the allow-list is not. Fix is one line — add `"PATCH"` to `List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")` in `SecurityConfig.corsConfigurationSource()` — but it is a backend change and was deliberately **not** made under task 2.10. Until then, use the Vite `/api` dev proxy (same-origin, no preflight) or curl to exercise user-status changes. |
+| 019 | Backend / Frontend | `SecurityConfig.corsConfigurationSource()` set `allowedMethods` to `GET, POST, PUT, DELETE, OPTIONS` — **`PATCH` was missing**, so any cross-origin browser request to a `PATCH` endpoint failed the CORS preflight. This blocked `PATCH /api/v1/admin/users/{id}/status` (task 2.10) and `PATCH /api/v1/users/me` (Phase 1) from the SPA on the dev setup (`:5173` → `:8080`) | Fixed | `"PATCH"` added to the allow-list in `SecurityConfig.corsConfigurationSource()` (commit `c27ef19`). Verified end-to-end from the browser during the Phase 2 close-out: the admin user status change succeeds cross-origin. |
 
 ## Known Limitations
 
 | ID  | Area       | Description                                           | Impact |
 |-----|------------|-------------------------------------------------------|--------|
 | 001 | Backend    | Redis was provisioned in `docker-compose.yml` and configured in `application.yml`/`application-prod.yml`, but nothing in the backend used it (rate limiting uses Caffeine) | Fixed/Removed | Redis service, config, env vars, and volume removed in Stage 6 per plan v2.2 (no Redis in v1) |
-| 002 | Frontend   | No error boundary component                           | Unhandled errors will crash the app. Should add in Phase 2. |
+| 002 | Frontend   | No error boundary component                           | Unhandled errors will crash the app. Not introduced by Phase 2; the vendor and admin areas handle expected failures through per-query error states (`AdminErrorState`, `VendorErrorState`) rather than a route-level boundary. |
 | 003 | Frontend   | No loading states or suspense in routes                | All routes render immediately. Add skeleton loaders later. |
 | 004 | Docker     | No `.env` file required for `docker compose up`      | Compose uses defaults from `.env.example`. Production deployments need a real `.env`. |
 | 005 | Docker     | No health check for backend DB/Redis connectivity    | Backend may start before DB is ready if healthcheck fails silently. |
@@ -111,11 +111,27 @@ _None currently blocked._
   assertions via `listedIds(...)`. Anything asserting on paginated results must do the same.
 - **Skip the unit phase when iterating on an IT class.** `-Dtest='!*'` is rejected by Surefire 3.x;
   use `-Dsurefire.failIfNoSpecifiedTests=false` with a pattern that matches nothing, or run the
-  whole `verify -Pintegration` (264 unit + 214 integration tests, roughly 12 minutes with the
+  whole `verify -Pintegration` (264 unit + 222 integration tests, roughly 12 minutes with the
   MySQL and Mailhog containers).
 - **`-Dit.test=...` must be quoted in PowerShell.** Unquoted, `-Dit.test=Foo` is parsed as
   `-D` plus a separate argument and Maven reports
-  `Unknown lifecycle phase ".test=AdminUserStatusIntegrationTest"`.
+  `Unknown lifecycle phase ".test=AdminUserStatusIntegrationTest"`. The same applies to
+  `-Dsurefire.failIfNoSpecifiedTests=false`, which PowerShell otherwise splits into
+  `-D` + `surefire.failIfNoSpecifiedTests=false` and Maven rejects as a lifecycle phase.
+- **Growing the vendor IT suite can break a test that assumed an exclusive dataset.** The accumulated
+  `vendor_profiles` count crossed the default page size of 20 during the Phase 2 close-out, and two
+  tests failed on assumptions that only hold when this class runs alone:
+  `VendorApiIntegrationTest.anAdminCanListVendorsAndFilterByStatus` on
+  `hasItem(first.profileId())`, and `VendorProfileRepositoryIT.shouldFindAllProfilesByStatus` on
+  `assertEquals(1, approved.size())`. Both now assert membership of the rows the test created
+  (`listedIds(status)` walking every page with `size=100`; `idsOf(...)` containment checks) instead
+  of counting or paging. Any new IT that registers vendors makes the problem more likely, not less,
+  so scope to the rows you created rather than to the table.
+- **A `@Positive`/`@PathVariable` violation has no `validation` map.** Bean validation on a path
+  variable raises `ConstraintViolationException`, which `GlobalExceptionHandler` renders as
+  `{"code":"VALIDATION_FAILED","message":"Validation failed: ..."}` with no per-field `validation`
+  object. Asserting `$.validation.id` fails with `No value at JSON path "$.validation.id"`. Only
+  `@Valid @RequestBody` violations populate that map.
 
 ## Testing Gotchas (Phase 2c)
 

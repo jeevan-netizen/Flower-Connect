@@ -128,17 +128,31 @@ class VendorProfileRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldFindAllProfilesByStatus() {
-        createProfile(createVendorUser(), VendorProfile.Status.APPROVED);
-        createProfile(createVendorUser(), VendorProfile.Status.SUSPENDED);
-        createProfile(createVendorUser(), VendorProfile.Status.PENDING_APPROVAL);
+        VendorProfile approvedProfile = createProfile(createVendorUser(), VendorProfile.Status.APPROVED);
+        VendorProfile suspendedProfile = createProfile(createVendorUser(), VendorProfile.Status.SUSPENDED);
+        VendorProfile pendingProfile = createProfile(createVendorUser(), VendorProfile.Status.PENDING_APPROVAL);
 
-        List<VendorProfile> approved = vendorProfileRepository.findAllByStatus(VendorProfile.Status.APPROVED);
-        List<VendorProfile> pending = vendorProfileRepository.findAllByStatus(VendorProfile.Status.PENDING_APPROVAL);
+        // The shared singleton MySQL container accumulates profiles across the whole
+        // integration run, so membership is asserted on the rows this test created
+        // rather than by counting every row of a given status.
+        List<Long> approvedIds = idsOf(vendorProfileRepository.findAllByStatus(VendorProfile.Status.APPROVED));
+        List<Long> pendingIds = idsOf(vendorProfileRepository.findAllByStatus(VendorProfile.Status.PENDING_APPROVAL));
+        List<Long> rejectedIds = idsOf(vendorProfileRepository.findAllByStatus(VendorProfile.Status.REJECTED));
 
-        assertEquals(1, approved.size());
-        assertEquals(VendorProfile.Status.APPROVED, approved.get(0).getStatus());
-        assertEquals(1, pending.size());
-        assertTrue(vendorProfileRepository.findAllByStatus(VendorProfile.Status.REJECTED).isEmpty());
+        assertTrue(approvedIds.contains(approvedProfile.getId()));
+        assertFalse(approvedIds.contains(suspendedProfile.getId()));
+        assertFalse(approvedIds.contains(pendingProfile.getId()));
+
+        assertTrue(pendingIds.contains(pendingProfile.getId()));
+        assertFalse(pendingIds.contains(approvedProfile.getId()));
+
+        assertFalse(rejectedIds.contains(approvedProfile.getId()));
+        assertFalse(rejectedIds.contains(suspendedProfile.getId()));
+        assertFalse(rejectedIds.contains(pendingProfile.getId()));
+    }
+
+    private static List<Long> idsOf(List<VendorProfile> profiles) {
+        return profiles.stream().map(VendorProfile::getId).toList();
     }
 
     @Test

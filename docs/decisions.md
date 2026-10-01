@@ -354,6 +354,8 @@ of a constraint name.
 | 003 | Three-Layer Backend Architecture | Decision | Accepted | Phase 0 |
 | D-8 | Registration duplicate-email behaviour | Decision | Accepted | Phase 1 |
 | D-9 | Migrations rewritten before first deployment | Decision | Accepted | Phase 1 |
+| D-4 | No GPS — locations are chosen from a seeded area table | Decision | Accepted | Phase 2a |
+| D-6 | A suspended vendor is hidden from discovery immediately, but in-flight orders continue | Decision | Accepted | Phase 2c |
 | D-10 | Injectable Clock for testable time | Decision | Accepted | Phase 0 (Finalize) |
 | D-11 | Vendor role stays `FLORIST` (no `VENDOR` rename) | Decision | Accepted | Phase 2c |
 | D-12 | Vendor invariants enforced in service and database | Decision | Accepted | Phase 2c |
@@ -515,9 +517,11 @@ without ids, so the profile page can display the stored area but cannot offer a 
   `NaN` from `valueAsNumber` on an empty number input. Zod bounds mirror the DTO annotations
   (`@Digits`, `@DecimalMin`, `@DecimalMax`, `@Min`, `@Max`) so the client rejects an out-of-range
   value before the network; the backend stays authoritative.
-- **The service area is read-only in the UI.** The stored area is shown as resolved text. Adding a
-  picker would require a location id the API does not expose, and guessing one would be a data-integrity
-  bug.
+- **The service area is read-only in the UI.** The stored area is shown as resolved text.
+  `GET /api/v1/locations` does expose the row id, so this is a scope choice rather than a data
+  limit: the florist profile editor was specified as a business-details and settings screen, and
+  moving a shop to a different service area is a re-registration concern. The vendor-registration
+  wizard is where the area is chosen.
 - **The whole vendor area is a single cache key**, cleared on logout, so a second florist signing in
   on the same browser cannot see the previous one's profile.
 - **`VENDOR_NOT_APPROVED` (403) is a state, not an error.** The vendor's own profile stays reachable
@@ -591,3 +595,116 @@ of the filter that is on screen or onto a different page.
   in flight. That is cheaper than the alternative being wrong.
 - `AdminErrorState` treats 409 as an expected race between administrators ("refresh and try again")
   rather than a fault, because with two admins acting on one profile that is what it usually means.
+
+---
+
+## D-4: No GPS — locations are chosen from a seeded area table
+
+**Status:** Accepted
+**Date:** Phase 2a (Task 2.1)
+
+### Context
+
+Customers and vendors both need a location: for delivery address, for delivery radius, and for
+geo discovery. The plan's recommended default is **no browser Geolocation API and no GPS** —
+a caller picks city / area / pincode from a seeded `service_locations` table for the demo region,
+and the coordinates are that area's centroid. This had to be settled before task 2.1, because
+vendor registration, vendor addresses and discovery all read coordinates from the same place.
+
+Three options were on the table: browser geolocation (an accurate device fix), free-text address
+with a geocoder, or a fixed area list. The first two both need a third-party dependency or a
+permission prompt and produce coordinates no two users ever agree on, which makes "is this vendor
+within my delivery radius" ambiguous at the boundary.
+
+### Decision
+
+- `service_locations` is the **only** source of coordinates in the system. It is seeded by the
+  `V4__service_locations.sql` Flyway migration (Bengaluru demo region, 8 areas) and is read-only
+  from the application's point of view — there is no admin CRUD over it in v1.
+- No `Geolocation` API call and no geocoding anywhere in the frontend or backend. The browser
+  never learns a device position.
+- One row per area, unique on `(city, area)`, with a single centroid for `latitude`/`longitude`.
+  Coordinates are therefore an **area-level approximation**, not an address or a doorstep position.
+- `GET /api/v1/locations` is public (`permitAll`) and returns city ? areas ? pincodes, so the
+  picker needs no token; it is also searchable by `pincode` or `area`.
+- `vendor_profiles.service_location_id` is the authoritative reference; `latitude`/`longitude` on
+  the profile are a **denormalized copy** taken from the centroid at write time so a geo query can
+  hit one composite index (`idx_vendor_profiles_status_geo`) instead of joining.
+- Customer addresses (Phase 4) will follow the same rule and copy the centroid of the chosen
+  `service_location_id`.
+
+### Consequences
+
+- Distance and radius checks are area-level. A vendor can be "2.1 km away" from a customer in the
+  same pincode. The alternative is a false precision the data does not support.
+- A copy can drift from its source. The rule is that any code changing a profile's
+  `service_location_id` re-copies the centroid in the same statement;
+  `VendorApiIntegrationTest.anUpdateRecopiesTheCoordinatesWhenTheServiceLocationChanges` asserts it.
+- `GET /api/v1/locations` returns the row id on every area, in both the hierarchical and the
+  paginated search shape, so a client can address a location directly. The vendor profile editor
+  still renders the stored area read-only (D-15); ids being available is not what would change that.
+- Growing beyond the seeded demo region means seeding more areas, not adding a geocoder. That is a
+  deliberate v1 boundary, revisited if the market leaves the demo region.
+
+---
+
+## D-6: A suspended vendor is hidden from discovery immediately, but in-flight orders continue
+
+**Status:** Accepted
+**Date:** Phase 2c (Tasks 2.6, 2.7)
+
+### Context
+
+Plan task 2.7 requires that only `APPROVED` vendors can use catalog/order endpoints and appear in
+discovery, and that "a suspended vendor is hidden immediately; in-flight orders continue to
+completion" (D-6). Those two halves pull in opposite directions: the first is a hard stop, the
+second is an explicit promise *not* to hard-stop anything already in progress.
+
+"Suspension" covers two different situations. A vendor suspended for a conduct problem (fraud,
+abuse) should arguably lose access to everything at once. A vendor suspended for an operational
+reason — stock exhausted, a seasonal pause, a pending verification — would strand paying customers
+whose flowers are already arranged if the suspension also killed their order reads and delivery
+tracking. Phase 2 has no way to tell those apart, and the plan does not define a suspension reason
+taxonomy, so a single rule has to cover both.
+
+### Decision
+
+Suspension is enforced **on new work and on discovery only**. The rule is expressed as a positive
+list of what a non-approved vendor loses, so an unlisted route is not accidentally closed:
+
+| Surface | Suspended vendor | Rationale |
+|---|---|---|
+| Discovery / geo search | Hidden immediately | The plan's explicit requirement; a suspended vendor must not receive new orders |
+| Catalog and inventory writes | Refused (`VENDOR_NOT_APPROVED`) | New work must stop now |
+| Order creation | Refused | New work must stop now |
+| Existing order **reads** for that vendor | Allowed | D-6: in-flight orders continue to completion |
+| Delivery tracking / order status updates | Allowed | D-6: an order cannot complete if the vendor cannot see or advance it |
+| The vendor's own `GET\|PUT /api/v1/vendors/profile` | Allowed | See D-13 — the vendor must still be able to read and fix their application |
+
+In code this is `VendorApprovalGuard` behind `@RequiresApprovedVendor` (D-13), which is a
+per-handler annotation rather than a URL-namespace rule. No Phase 2 route carries it yet, because
+no catalog or order endpoint exists; `VendorApprovalGatingIntegrationTest` proves the behaviour
+against a test-probe controller under the real `/api/v1/vendors/**` namespace so that the rule is
+already verified for the Phase 3+ routes that will attach it.
+
+Discovery filtering is `VendorProfileSpecifications.approved()`, a Criteria predicate every
+discovery query must compose — it is not enforced by the guard, because discovery is a read over
+many vendors rather than a request from one.
+
+### Consequences
+
+- **Every Phase 3+ catalog, inventory and order-creation route must carry
+  `@RequiresApprovedVendor`.** Omitting it fails open for that route. This is the single main
+  review checklist item when adding vendor features, and it is the reason the guard is a named
+  annotation rather than an interceptor that might be unregistered.
+- **Reads of in-flight orders must deliberately omit the annotation.** This is the half of D-6 that
+  is easy to lose: a Phase 3 reviewer who annotates an order-read route "for consistency" has
+  silently broken the guarantee that a suspended vendor can finish delivering.
+- Status is read from `vendor_profiles` per request and never cached in the JWT, so suspension takes
+  effect on the vendor's very next request with no token re-issue (D-13). There is no separate
+  "suspended_at" timestamp and no cache to invalidate.
+- D-6 is honoured by scoping, not by a permanent state: `reinstate` returns the profile to
+  `APPROVED`, and `VendorApprovalGatingIntegrationTest.reinstatementRestoresAccess` asserts access
+  is restored immediately.
+- A future need to distinguish conduct suspensions from operational ones requires a suspension
+  reason taxonomy. That would be a change to this decision, not an incidental refinement.
