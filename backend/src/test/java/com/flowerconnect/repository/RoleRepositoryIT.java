@@ -1,7 +1,7 @@
 package com.flowerconnect.repository;
 
 import com.flowerconnect.domain.Role;
-import com.flowerconnect.test.IntegrationTestBase;
+import com.flowerconnect.test.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class RoleRepositoryIT extends IntegrationTestBase {
+class RoleRepositoryIT extends AbstractIntegrationTest {
 
     @Autowired
     private RoleRepository roleRepository;

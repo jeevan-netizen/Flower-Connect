@@ -4,7 +4,10 @@
 
 FlowerConnect is a **hyperlocal flower marketplace**. It connects local florists with customers for same-day or scheduled flower delivery within a tight geographic radius. The platform handles browsing, ordering, payments, and delivery coordination.
 
-Current development phase: **Phase 0 (Scaffold)** — the project has an initialized repository with basic directory layout, database schema for users/roles, and a placeholder frontend. No business logic or REST API endpoints are implemented yet.
+Current development phase: **Phase 2d (Admin Frontend)** — authentication (Phase 1), service
+locations (Phase 2a), and vendor registration/approval with the `audit_log` trail (Phase 2b/2c) are
+implemented. Phase 2d adds the admin user listing and status-management APIs, backed by the same
+`audit_log` table and the existing `users.status` column.
 
 ## 2. High-Level Architecture
 
@@ -22,7 +25,9 @@ Current development phase: **Phase 0 (Scaffold)** — the project has an initial
 │  http://localhost:8080                                │
 ├──────────────────────────────────────────────────────┤
 │                    MySQL 8 (docker)                   │
-│  Roles + Users (Phase 0)                              │
+│  Roles + Users (Phase 0/1)                            │
+│  Service Locations (Phase 2a)                         │
+│  Vendor Profiles + Vendor Hours (Phase 2b)            │
 │  Future: Catalog, Orders, Payments, Delivery          │
 ├──────────────────────────────────────────────────────┤
 │                    Redis 7 (docker)                    │
@@ -34,8 +39,9 @@ Current development phase: **Phase 0 (Scaffold)** — the project has an initial
 
 | Service      | Responsibility                          | Phase    |
 |--------------|-----------------------------------------|----------|
-| Auth         | JWT issuance, user registration/login   | Phase 1+ |
-| Catalog      | Florist listings, product inventory     | Phase 2+ |
+| Auth         | JWT issuance, user registration/login   | Phase 1 (done) |
+| Geo          | Service locations, pincode/area search  | Phase 2a (done) |
+| Catalog      | Florist listings, product inventory     | Phase 2b+ |
 | Order        | Cart, checkout, order lifecycle         | Phase 3+ |
 | Payment      | Stripe integration                      | Phase 3+ |
 | Delivery     | Assignment, tracking, status updates    | Phase 3+ |
@@ -52,7 +58,7 @@ Current development phase: **Phase 0 (Scaffold)** — the project has an initial
 | Build          | Maven (via `mvnw` wrapper)          |
 | ORM            | Spring Data JPA + Hibernate 6       |
 | Database       | MySQL 8 (InnoDB, utf8mb4)           |
-| Migrations     | Flyway (baseline V1)                |
+| Migrations     | Flyway (baseline V1, additive V2–V5) |
 | Cache          | Redis 7 (password-protected)        |
 | Codegen        | Lombok 1.18.32, MapStruct 1.5.5     |
 | Security       | Spring Security 6 (planned)         |
@@ -104,11 +110,31 @@ FlowerConnect/
 │   └── src/
 │       └── main/
 │           ├── java/com/flowerconnect/
-│           │   └── FlowerConnectApplication.java
+│           │   ├── FlowerConnectApplication.java
+│           │   ├── domain/               # JPA entities
+│           │   ├── repository/           # Spring Data repositories
+│           │   ├── service/              # Business logic
+│           │   ├── controller/           # REST controllers
+│           │   ├── dto/                  # Request/response DTOs
+│               │   ├── geo/                  # Service locations feature slice
+│               │   ├── vendor/               # Vendor profile + admin feature slice
+│               │   │   ├── controller/
+│               │   │   ├── dto/
+│               │   │   ├── mapper/
+│               │   │   ├── security/         # Approval guard + @RequiresApprovedVendor
+│               │   │   ├── service/
+│               │   │   └── specification/    # Reusable query fragments (approved-only)
+│               │   ├── config/               # Security, Jackson, Clock beans
+│               │   └── exception/            # Error framework
 │           └── resources/
 │               ├── application.yml
 │               └── db/migration/
-│                   └── V1__baseline.sql
+│                   ├── V1__baseline.sql         # roles, users
+│                   ├── V2__auth_tokens.sql
+│                   ├── V3__seed_roles.sql
+│                   ├── V4__service_locations.sql
+│                   └── V5__vendor_profiles.sql  # vendor_profiles, vendor_hours
+│                   └── V6__audit_log_and_vendor_checks.sql  # audit_log, vendor CHECKs
 ├── frontend/
 │   ├── Dockerfile            # Multi-stage: deps → builder → runner
 │   ├── index.html
@@ -131,14 +157,37 @@ FlowerConnect/
 │       │   └── styles/
 │       │       └── index.css
 │       ├── features/
-│       │   └── auth/
-│       │       └── stores/
-│       │           └── auth-store.ts
+│       │   ├── auth/
+│       │   │   ├── api.ts
+│       │   │   ├── stores/auth-store.ts
+│       │   │   └── types.ts
+│       │   ├── vendor/
+│       │   │   ├── api.ts          # GET/PUT /api/v1/vendors/profile
+│       │   │   ├── queries.ts      # TanStack Query hooks + cache lifecycle
+│       │   │   ├── types.ts        # DTOs, Weekday, PUT payload builder
+│       │   │   ├── format.ts       # INR, LocalTime, status/label helpers
+│       │   │   ├── form-schema.ts  # Zod string-form schemas mirroring the DTO bounds
+│       │   │   ├── components/     # Layout, status banner, error state, form fields
+│       │   │   └── pages/          # dashboard, profile, settings, hours
+│       │   └── admin/
+│       │       ├── api.ts          # /api/v1/admin/vendors + /api/v1/admin/users
+│       │       ├── queries.ts      # filter+page keyed queries, whole-listing invalidation
+│       │       ├── types.ts        # DTOs, PageResponse, vendorActionsFor
+│       │       ├── format.ts       # role/status labels, action labels, dates
+│       │       ├── form-schema.ts  # Zod reason schema mirroring @NotBlank + @Size(500)
+│       │       ├── components/     # Layout, reason dialog, pagination, error state, badges
+│       │       └── pages/          # dashboard, vendors, users
 │       ├── shared/
+│       │   ├── components/
+│       │   │   └── ProtectedRoute.tsx
 │       │   └── lib/
-│       │       └── api.ts
+│       │       ├── api.ts
+│       │       └── api-error.ts    # ErrorResponse -> ApiErrorInfo
 │       └── test/
-│           └── setup.ts
+│           ├── setup.ts
+│           ├── factories.ts        # vendor profile / hours / admin user / page fixtures
+│           ├── api-errors.ts       # AxiosError shaped like ErrorResponse
+│           └── render.tsx          # renderWithProviders
 └── docker/
     └── mysql/
         ├── Dockerfile        # Custom MySQL image with init script
@@ -147,9 +196,9 @@ FlowerConnect/
             └── 00-init.sql   # Ensures DB exists for Flyway
 ```
 
-## 5. Database Schema (Phase 0)
+## 5. Database Schema (Phase 0–2b)
 
-Source of truth: `backend/src/main/resources/db/migration/V1__baseline.sql`
+Source of truth: `backend/src/main/resources/db/migration/`
 
 ### Tables
 
@@ -167,16 +216,115 @@ Source of truth: `backend/src/main/resources/db/migration/V1__baseline.sql`
 | email         | VARCHAR(255)| NOT NULL, UNIQUE                       |
 | password_hash | VARCHAR(255)| NOT NULL                               |
 | full_name     | VARCHAR(128)| NOT NULL                               |
-| phone         | VARCHAR(32) | NULL                                   |
-| is_active     | TINYINT(1)  | NOT NULL, DEFAULT 1                    |
+| phone         | VARCHAR(32) | NULL, UNIQUE                           |
+| status        | ENUM('ACTIVE', 'SUSPENDED', 'DISABLED') | NOT NULL, DEFAULT 'ACTIVE' |
 | created_at    | DATETIME(6)| NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) |
 | updated_at    | DATETIME(6)| NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE |
 
+#### `service_locations` (Phase 2a)
+| Column      | Type        | Constraints                            |
+|-------------|-------------|----------------------------------------|
+| id          | BIGINT      | PK, AUTO_INCREMENT                     |
+| city        | VARCHAR(128)| NOT NULL                               |
+| area        | VARCHAR(128)| NOT NULL                               |
+| pincode     | VARCHAR(10) | NOT NULL                               |
+| latitude    | DECIMAL(10,8)| NOT NULL                             |
+| longitude   | DECIMAL(11,8)| NOT NULL                             |
+| created_at  | DATETIME(6) | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) |
+
+- One row per service area, seeded for the Bengaluru demo region (8 areas).
+- Coordinates are area-level approximations; there is no GPS or live device location (D-4).
+- Unique on `(city, area)`.
+
+#### `vendor_profiles` (Phase 2b)
+| Column                   | Type          | Constraints                                  |
+|--------------------------|---------------|----------------------------------------------|
+| id                       | BIGINT        | PK, AUTO_INCREMENT                           |
+| user_id                  | BIGINT        | FK → users(id), NOT NULL, UNIQUE             |
+| business_name            | VARCHAR(160)  | NOT NULL                                     |
+| description              | VARCHAR(1000) | NULL                                         |
+| address_line1            | VARCHAR(255)  | NOT NULL                                     |
+| address_line2            | VARCHAR(255)  | NULL                                         |
+| service_location_id      | BIGINT        | FK → service_locations(id), NOT NULL         |
+| latitude                 | DECIMAL(10,8) | NOT NULL (copied from service_location)      |
+| longitude                | DECIMAL(11,8) | NOT NULL (copied from service_location)      |
+| delivery_radius_km       | DECIMAL(5,2)  | NOT NULL, DEFAULT 5.00                       |
+| logo_url                 | VARCHAR(512)  | NULL                                         |
+| status                   | ENUM('PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'SUSPENDED') | NOT NULL, DEFAULT 'PENDING_APPROVAL' |
+| commission_rate          | DECIMAL(5,4)  | NULL (platform default applies when NULL)    |
+| avg_rating               | DECIMAL(3,2)  | NULL                                         |
+| review_count             | INT           | NOT NULL, DEFAULT 0                          |
+| min_order_amount         | DECIMAL(10,2) | NOT NULL, DEFAULT 0.00                       |
+| base_delivery_fee        | DECIMAL(10,2) | NOT NULL, DEFAULT 0.00                       |
+| per_km_fee               | DECIMAL(10,2) | NOT NULL, DEFAULT 0.00                       |
+| free_delivery_above      | DECIMAL(10,2) | NULL                                         |
+| prep_time_minutes        | INT           | NOT NULL, DEFAULT 30                         |
+| slot_duration_minutes    | INT           | NOT NULL, DEFAULT 60                         |
+| max_orders_per_slot      | INT           | NOT NULL, DEFAULT 10                         |
+| accepting_orders         | BIT(1)        | NOT NULL, DEFAULT b'1'                       |
+| created_at               | DATETIME(6)   | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6)       |
+| updated_at               | DATETIME(6)   | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE |
+
+- One profile per user (`uq_vendor_profiles_user`).
+- `service_location_id` is the single source of the vendor's coordinates; `latitude`/`longitude`
+  are denormalized copies so geo queries can use a single index (D-4).
+- Delivery settings live on the profile: minimum order amount, base delivery fee, per-km fee,
+  free-delivery threshold, prep time, slot duration, orders per slot, and an accept-orders flag.
+- Money fields use `DECIMAL` so scale is preserved (no floating-point round-off).
+
+#### `vendor_hours` (Phase 2b)
+| Column            | Type     | Constraints                                |
+|-------------------|----------|--------------------------------------------|
+| id                | BIGINT   | PK, AUTO_INCREMENT                         |
+| vendor_profile_id | BIGINT   | FK → vendor_profiles(id), NOT NULL, ON DELETE CASCADE |
+| weekday           | ENUM('MONDAY'…'SUNDAY') | NOT NULL                 |
+| open_time         | TIME     | NULL                                       |
+| close_time        | TIME     | NULL                                       |
+| closed            | BIT(1)   | NOT NULL, DEFAULT b'0'                     |
+| created_at        | DATETIME(6) | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) |
+| updated_at        | DATETIME(6) | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE |
+
+- At most one row per profile per weekday (`uq_vendor_hours_profile_weekday`).
+- A closed day stores NULL `open_time` / `close_time`.
+- Deleting a vendor profile cascades to its hours.
+- `ck_vendor_hours_times` (V6) enforces: a closed day has both times NULL, and an open day
+  has both present with `close_time > open_time`.
+
+#### `audit_log` (Phase 2c)
+| Column        | Type        | Constraints                          |
+|---------------|-------------|--------------------------------------|
+| id            | BIGINT      | PK, AUTO_INCREMENT                   |
+| actor_user_id | BIGINT      | FK → users(id), NOT NULL             |
+| action_type   | VARCHAR(64) | NOT NULL                             |
+| entity_type   | VARCHAR(64) | NOT NULL                             |
+| entity_id     | BIGINT      | NOT NULL                             |
+| reason        | VARCHAR(500)| NULL (required for reject/suspend)   |
+| created_at    | DATETIME(6) | NOT NULL, DEFAULT CURRENT_TIMESTAMP(6)|
+
+- Append-only: every admin vendor transition writes one row; no update or delete path exists.
+- Indexed on `(entity_type, entity_id)` and `(actor_user_id, created_at)`.
+
+### Entity Relationships
+
+```
+roles  1 ──< users  1 ──1 vendor_profiles  1 ──< vendor_hours
+                              │
+                              └──< service_locations
+```
+
+- `VendorProfile.user` is a one-to-one with `User` (unique on `user_id`).
+- `VendorProfile.serviceLocation` is a many-to-one with `ServiceLocation`.
+- `VendorHours.vendorProfile` is a many-to-one with `VendorProfile` (cascade delete).
+
 ### Indexes
 - `idx_users_role` on `users(role_id)`
-- `idx_users_active` on `users(is_active)`
+- `idx_service_locations_city_area` on `service_locations(city, area)`
+- `idx_service_locations_pincode` on `service_locations(pincode)`
+- `idx_vendor_profiles_status_geo` on `vendor_profiles(status, latitude, longitude)` — supports
+  "approved vendors near a location" lookups. `VendorProfileSpecifications.approved()` predicates on
+  the leading `status` column, so discovery queries stay index-served.
 
-### Role Hierarchy (Planned, Phase 0)
+### Role Hierarchy
 | Role       | Description                         |
 |------------|-------------------------------------|
 | CUSTOMER   | End-user browsing and ordering      |
@@ -194,16 +342,75 @@ Source of truth: `backend/src/main/resources/db/migration/V1__baseline.sql`
 - Access token (default 15 min TTL) + refresh token (default 7 days TTL)
 - Tokens stored in Zustand (persisted) and `localStorage` (`fc-access-token` key)
 
-### Endpoints (Phase 0 — none implemented yet)
-All routes are placeholders. Phase 1 will implement:
+### Implemented Frontend Routes
+Customer routes (`/`, `/browse`, `/cart`, `/orders`, `/login`, `/register`) are placeholders. The
+Phase 2d vendor area is the first real screen set:
+
+| Path                | Page                          | Guard                          |
+|---------------------|-------------------------------|--------------------------------|
+| `/vendor`           | Vendor dashboard              | `ProtectedRoute roles={FLORIST}` |
+| `/vendor/profile`   | Business/profile editing      | `ProtectedRoute roles={FLORIST}` |
+| `/vendor/settings`  | Delivery settings and capacity | `ProtectedRoute roles={FLORIST}` |
+| `/vendor/hours`     | Weekly operating hours        | `ProtectedRoute roles={FLORIST}` |
+
+`ProtectedRoute` sends an unauthenticated visitor to `/login` (preserving `from`) and renders an
+access-denied panel for a signed-in non-florist. The three `/vendor/*` pages read the caller's own
+profile from `GET /api/v1/vendors/profile`; a `VENDOR_NOT_APPROVED` (403) response renders the
+approval banner rather than an error, because the vendor must still be able to see and edit their
+application while it is pending.
+
+The whole vendor area is one TanStack Query cache key (`["vendor","profile"]`), cleared on logout so
+a different florist cannot see the previous one's data.
+
+The Phase 2d admin area is the second real screen set:
+
+| Path                | Page                          | Guard                          |
+|---------------------|-------------------------------|--------------------------------|
+| `/admin`            | Admin dashboard (queues + navigation) | `ProtectedRoute roles={ADMIN}` |
+| `/admin/vendors`    | Vendor listing, approval transitions | `ProtectedRoute roles={ADMIN}` |
+| `/admin/users`      | User listing, status changes   | `ProtectedRoute roles={ADMIN}` |
+
+`ProtectedRoute` renders an access-denied panel for a signed-in non-admin, and
+`SecurityConfig`'s `hasRole("ADMIN")` matcher on `/api/v1/admin/**` is the actual authorization
+authority on every request. `/admin` previews the two queues an administrator's own work produces
+(`PENDING_APPROVAL` vendors, `SUSPENDED` users) rather than inventing analytics, because Phase 2
+exposes no dashboard endpoint.
+
+Both admin listings are **filter-and-page-keyed** queries (`["admin","vendors","list",status,page]`
+and `["admin","users","list",role,status,page]`), and every mutation invalidates the whole listing
+under `["admin","vendors"]` / `["admin","users"]` rather than patching one row into one page's
+cache — a transition can move a record out of the active filter or off the current page. The admin
+cache is cleared on logout alongside the vendor cache, so the next account to sign in on the same tab
+sees neither list. See `docs/decisions.md` (D-16).
+
+### Implemented Endpoints
+Phase 1 (auth), Phase 2a (service locations), and Phase 2c (vendor registration, admin
+approval, and approval gating) endpoints are implemented. No catalog or order endpoint exists
+yet, so `@RequiresApprovedVendor` currently guards no production route — see
+`docs/decisions.md` (D-13).
 
 | Method | Path                | Description                        | Phase  |
 |--------|---------------------|------------------------------------|--------|
+| POST   | `/api/v1/auth/register`| Register new user                | Phase 1|
 | POST   | `/api/v1/auth/login`| Authenticate and issue JWT         | Phase 1|
-| POST   | `/api/v1/auth/refresh` | Issue new access token            | Phase 1|
-| POST   | `/api/v1/auth/register` | Register new user                | Phase 1|
+| POST   | `/api/v1/auth/refresh` | Issue new access token (rotation) | Phase 1|
 | POST   | `/api/v1/auth/logout` | Invalidate refresh token           | Phase 1|
+| POST   | `/api/v1/auth/forgot-password` | Request a password reset link | Phase 1|
+| POST   | `/api/v1/auth/reset-password` | Reset password with a valid token | Phase 1|
 | GET    | `/api/v1/users/me`   | Get current user profile            | Phase 1|
+| PATCH  | `/api/v1/users/me`   | Update current user profile         | Phase 1|
+| POST   | `/api/v1/users/me/password` | Change current password      | Phase 1|
+| GET    | `/api/v1/locations`  | List or search service locations    | Phase 2a|
+| POST   | `/api/v1/vendors/register` | Register a vendor account + `PENDING_APPROVAL` profile (public) | Phase 2c|
+| GET    | `/api/v1/vendors/profile` | Get the caller's own vendor profile (FLORIST) | Phase 2c|
+| PUT    | `/api/v1/vendors/profile` | Update the caller's own vendor profile (FLORIST) | Phase 2c|
+| GET    | `/api/v1/admin/vendors` | List/filter vendor profiles by status (ADMIN) | Phase 2c|
+| POST   | `/api/v1/admin/vendors/{id}/approve`  | Approve a pending vendor (ADMIN) | Phase 2c|
+| POST   | `/api/v1/admin/vendors/{id}/reject`   | Reject a pending vendor; `reason` required (ADMIN) | Phase 2c|
+| POST   | `/api/v1/admin/vendors/{id}/suspend`   | Suspend an approved vendor; `reason` required (ADMIN) | Phase 2c|
+| POST   | `/api/v1/admin/vendors/{id}/reinstate` | Reinstate a suspended vendor (ADMIN) | Phase 2c|
+| GET    | `/api/v1/admin/users`   | List/filter users by role and status (ADMIN) | Phase 2d|
+| PATCH  | `/api/v1/admin/users/{id}/status` | Change a user's status; reason required, tokens revoked (ADMIN) | Phase 2d|
 | GET    | `/actuator/health`   | Health check (no auth)              | Phase 0|
 
 ## 7. Configuration
@@ -326,3 +533,18 @@ See `docs/decisions.md` for the full ADR log. Key decisions made so far:
 - **Secrets**: Never committed; all via `.env` (gitignored)
 - **API**: All endpoints except `/actuator/health` will require JWT once auth is implemented
 - **Input validation**: Backend validates all requests (frontend validation is convenience only)
+
+### Authorization layering
+
+Authorization is two independent layers that both run, in order:
+
+| Layer                          | Rule                                                        | Failure response              |
+|--------------------------------|-------------------------------------------------------------|-------------------------------|
+| URL namespace (`SecurityConfig`) | `/api/v1/vendors/**` → `hasRole("FLORIST")`                 | 403 `FORBIDDEN`               |
+| Handler (`@RequiresApprovedVendor`) | `vendor_profiles.status = APPROVED`, read from the DB per request | 403 `VENDOR_NOT_APPROVED` |
+
+The first answers "is this a vendor account?"; the second answers "may this vendor transact?".
+A `PENDING_APPROVAL`, `REJECTED` or `SUSPENDED` vendor passes the first and fails the second, which
+is why the vendor's own `GET|PUT /api/v1/vendors/profile` stays reachable while the profile is not
+approved. Approval state is never cached in the JWT, so an admin approval or suspension takes effect
+on the vendor's very next request. See `docs/decisions.md` (D-13).

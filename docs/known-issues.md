@@ -20,17 +20,20 @@
 | 015 | DB / Auth  | `User.role` was `FetchType.LAZY` but `UserRepository.findByEmail` and `findById` lacked `JOIN FETCH`, causing `LazyInitializationException` during login and token refresh | Fixed | Added `@Query` with `JOIN FETCH u.role` to `UserRepository.findByEmail` and a new `findByIdWithRole` method. Added `@Query` with `JOIN FETCH rt.user u JOIN FETCH u.role` to `RefreshTokenRepository.findByTokenHash`. Updated `AuthService.login` to use `findByIdWithRole`. Updated `AuthServiceTest` mocks accordingly. |
 | 016 | Test      | `TestProbeController` route conflict with `UserController` on `GET /api/v1/users/me` in `@SpringBootTest` contexts | Fixed | Added `@Profile("test-probe")` to `TestProbeController` and `@ActiveProfiles("test-probe")` to `RoleBoundaryTest`. |
 | 017 | Test      | (a) Testcontainers 1.20.2 could not connect to Docker Desktop 29.8.0 without `~/.docker-java.properties` (`api.version=1.44`) — both `EnvironmentAndSystemPropertyClientProviderStrategy` and `NpipeSocketClientProviderStrategy` failed with `BadRequestException (Status 400)`; (b) `@Container` on `IntegrationTestBase.MYSQL` caused Testcontainers to create and destroy a new MySQL container per test class (per-class lifecycle), with four containers started (one per test class); `AuthApiIntegrationTest` and `RefreshTokenRepositoryIT` passed, `RoleRepositoryIT` and `UserRepositoryIT` got Connection refused | Fixed | (a) Upgraded Testcontainers to 1.21.4, which resolves Docker Desktop 29.x compatibility — `~/.docker-java.properties` is no longer required. (b) Removed `@Container` annotation; container now starts once via `static { MYSQL.start(); }` in `IntegrationTestBase` and is shared across all IT classes. One MySQL container per JVM run. |
+| 018 | Test      | `./mvnw verify -Pintegration` fails every integration test with `Could not find a valid Docker environment` when the Docker Desktop daemon is not running, even though the Docker CLI is on `PATH` | Environment | Testcontainers needs the running daemon, not just the client. Start Docker Desktop before the failsafe run; Testcontainers fails fast with an `ExceptionInInitializerError` per test class rather than skipping. |
+| 019 | Backend / Frontend | `SecurityConfig.corsConfigurationSource()` set `allowedMethods` to `GET, POST, PUT, DELETE, OPTIONS` — **`PATCH` was missing**, so any cross-origin browser request to a `PATCH` endpoint failed the CORS preflight. This blocked `PATCH /api/v1/admin/users/{id}/status` (task 2.10) and `PATCH /api/v1/users/me` (Phase 1) from the SPA on the dev setup (`:5173` → `:8080`) | Fixed | `"PATCH"` added to the allow-list in `SecurityConfig.corsConfigurationSource()` (commit `c27ef19`). Verified end-to-end from the browser during the Phase 2 close-out: the admin user status change succeeds cross-origin. |
 
 ## Known Limitations
 
 | ID  | Area       | Description                                           | Impact |
 |-----|------------|-------------------------------------------------------|--------|
-| 001 | Backend    | No Redis configuration in `application.yml`            | Redis runs in Docker but backend doesn't connect to it yet. |
-| 002 | Frontend   | No error boundary component                           | Unhandled errors will crash the app. Should add in Phase 2. |
+| 001 | Backend    | Redis was provisioned in `docker-compose.yml` and configured in `application.yml`/`application-prod.yml`, but nothing in the backend used it (rate limiting uses Caffeine) | Fixed/Removed | Redis service, config, env vars, and volume removed in Stage 6 per plan v2.2 (no Redis in v1) |
+| 002 | Frontend   | No error boundary component                           | Unhandled errors will crash the app. Not introduced by Phase 2; the vendor and admin areas handle expected failures through per-query error states (`AdminErrorState`, `VendorErrorState`) rather than a route-level boundary. |
 | 003 | Frontend   | No loading states or suspense in routes                | All routes render immediately. Add skeleton loaders later. |
 | 004 | Docker     | No `.env` file required for `docker compose up`      | Compose uses defaults from `.env.example`. Production deployments need a real `.env`. |
 | 005 | Docker     | No health check for backend DB/Redis connectivity    | Backend may start before DB is ready if healthcheck fails silently. |
 | 006 | Docker     | Docker now available                                  | Full-stack Docker verified. All healthchecks pass. |
+| 007 | Frontend   | Vite dev proxy for `/api` exists in `vite.config.ts` but is currently unused — frontend axios `baseURL` points directly at `http://localhost:8080/api/v1`. If proxy is ever activated (relative `VITE_API_BASE_URL`), stage 4c's exact-Origin check in `AuthController.validateCookieAuthentication` would need revisiting, since same-origin proxied requests may not present the `Origin` header the same way cross-origin requests do. Verified via trace in Stage 6; not re-tested with proxy active. | Configuration mismatch; no runtime impact currently |
 
 ## Discovered Problems
 
@@ -41,7 +44,7 @@
 - Local MySQL instance lacked the `flowerconnect` user with privileges; backend failed to start until the user was created manually. Docker Compose creates this user automatically.
 - Docker was unavailable in prior sessions; `docker compose up --build` could not be validated directly and local services were used as a substitute. Docker is now available and full-stack has been verified.
 - `docker-compose.yml` DB_URL line used `${DB_HOST:-mysql}:${DB_PORT:-3306}` template substitution, which resolved to `localhost:3307` (from root `.env` file intended for host-side tooling) instead of the internal Docker hostname `mysql:3306`. Fixed by hardcoding `mysql:3306` in the DB_URL env var.
-- V1__baseline.sql `roles` table omitted the `created_at` column that the `Role` entity maps via `@CreationTimestamp`. Hibernate `ddl-auto: validate` rejected the schema at startup. Fixed with V4 migration (`ALTER TABLE roles ADD COLUMN created_at ...`) rather than editing the applied V1 baseline.
+- The original V1 baseline `roles` table omitted the `created_at` column that the `Role` entity maps via `@CreationTimestamp`, and Hibernate `ddl-auto: validate` rejected the schema at startup. This was first fixed with a V4 migration. It is now fixed by including `created_at` in the rewritten V1 baseline (D-9: migrations were rewritten before first deployment, and V4 and V5 no longer exist).
 - `User.role` (FetchType.LAZY) was not eagerly fetched by `UserRepository.findByEmail` and `findById`, causing `LazyInitializationException` when `UserDetailsImpl.fromUser()` or `AuthService.createAuthResponse()` accessed `role.getName()` outside the Hibernate session. Fixed by adding `@Query` with `JOIN FETCH` to `findByEmail`, adding `findByIdWithRole`, and eager-fetching Role in `RefreshTokenRepository.findByTokenHash`.
 - `TestProbeController` (in `src/test/java`) mapped `GET /api/v1/users/me` and `GET /actuator/metrics`, conflicting with `UserController` when loaded in `@SpringBootTest` contexts (e.g., `AuthApiIntegrationTest`). Fixed by adding `@Profile("test-probe")` to `TestProbeController` and `@ActiveProfiles("test-probe")` to `RoleBoundaryTest` (which uses `@WebMvcTest(controllers = TestProbeController.class)`).
 - (a) Upgrading Testcontainers to 1.21.4 resolved Docker Desktop 29.x compatibility — `~/.docker-java.properties` with `api.version=1.44` is no longer required; verified via `mvn verify -Pintegration` without the file.
@@ -50,6 +53,117 @@
 ## Blocked Work
 
 _None currently blocked._
+
+## Testing Gotchas (Phase 2d frontend, admin area)
+
+- **A sibling `describe` does not inherit another suite's `beforeEach`.** In `router.test.tsx` the
+  new `describe("admin route protection")` sits *next to* `describe("application router")`, not
+  inside it, so the outer suite's state reset never runs. The symptom is misleading rather than
+  obvious: tests render the **unauthenticated** layout (Login/Register in the header, the login form
+  in `<main>`) because a previous test in the new suite left `mockState.isAuthenticated = false`,
+  and only the tests that do *not* set their own `mockState` fail. Give a sibling suite its own
+  `beforeEach` that sets every field it relies on.
+- **A `vi.hoisted` factory must return via a callback.** `vi.hoisted<{user: X}>({ user: null })`
+  throws `TypeError: "vi.hoisted" factory value must be function, received "object"` and the whole
+  file reports `no tests` rather than a named failure. Use
+  `vi.hoisted(() => ({ user: null as X | null }))`.
+- **`selector({ user: mockCurrentUser })` instead of `mockCurrentUser.user` fails silently.** Passing
+  the hoisted *wrapper* where the store's `user` is expected makes `state.user?.id` `undefined`,
+  so `currentUserId` becomes `null` and every self-comparison is false. The page then renders
+  normally — just without the self-row treatment — so the symptom is "the (you) marker never
+  appears", not an error. Assert on a rendered value, not just the absence of a throw.
+- **`vi.clearAllMocks()` inside a nested `beforeEach` is redundant** and re-clears the shared
+  `vi.fn()`s the outer suite already configured; put the shared reset in the sibling suite once.
+- **`getAllByRole("row")` includes the header row.** For a table with a `<thead>`, index 0 is the
+  header; `slice(1)` before asserting per-row buttons, or a "did this row show the wrong action"
+  assertion will read the header's cells.
+- **An empty `<option>` label collides with a table cell's text.** A role filter option labelled
+  "Customer" and a table cell also reading "Customer" makes `getByText("Customer")` throw
+  "Found multiple elements". Scope cell assertions with `within(row)`.
+
+## Testing Gotchas (Phase 2d frontend, vendor area)
+
+- **zod v3 `.refine()` silently discards the message a check returns.** `z.string().refine(fn)`
+  where `fn` returns a string renders zod's default `Invalid input`, not the returned string; only a
+  message passed as the second argument is used. So a field that "validates" but reports the wrong
+  text produces a test failure that looks like the validator never ran. Use `.superRefine` +
+  `ctx.addIssue({ message })` when the message depends on which bound failed — see
+  `requiredDecimalField` / `optionalDecimalField` in `src/features/vendor/form-schema.ts`.
+- **react-hook-form `reset()` does not refresh a `register`ed checkbox.** RHF keeps checkbox state
+  in the DOM, so after the profile loads (or a save re-seeds the form) the stored week renders with
+  the stale week still ticked while the time inputs show the new values. Bind `checked` to a
+  `useWatch`ed value and write through `setValue` instead of `register` — see the open/closed
+  checkbox in `VendorHoursPage`.
+- **`z.record(z.enum([...]), schema)` infers optional values.** Indexing it by a member of the enum
+  gives `T | undefined` under `noUncheckedIndexedAccess`, so every access needs a guard. Build a
+  fixed seven-key shape (`DAY_SHAPE` in `VendorHoursPage`) when every key is guaranteed present.
+- **Rendering assertions on the shared `renderWithProviders` result drop the DOM queries.** Spreading
+  the result (`{ queryClient, ...render(...) }`) widened to a union and lost the Testing Library
+  queries under `tsc -b`. Use `Object.assign(render(...), { queryClient })`, which keeps the
+  intersection.
+
+## Testing Gotchas (Phase 2d)
+
+- **Integration tests share one accumulating database.** The singleton MySQL container in
+  `AbstractIntegrationTest` persists users across every IT class in the run, so a listing test
+  cannot assume the row it just created is on page 0. `AdminUserStatusIntegrationTest` reads the
+  *last* page (`createdAt` ascending puts the newest row last) and walks every page for filter
+  assertions via `listedIds(...)`. Anything asserting on paginated results must do the same.
+- **Skip the unit phase when iterating on an IT class.** `-Dtest='!*'` is rejected by Surefire 3.x;
+  use `-Dsurefire.failIfNoSpecifiedTests=false` with a pattern that matches nothing, or run the
+  whole `verify -Pintegration` (264 unit + 222 integration tests, roughly 12 minutes with the
+  MySQL and Mailhog containers).
+- **`-Dit.test=...` must be quoted in PowerShell.** Unquoted, `-Dit.test=Foo` is parsed as
+  `-D` plus a separate argument and Maven reports
+  `Unknown lifecycle phase ".test=AdminUserStatusIntegrationTest"`. The same applies to
+  `-Dsurefire.failIfNoSpecifiedTests=false`, which PowerShell otherwise splits into
+  `-D` + `surefire.failIfNoSpecifiedTests=false` and Maven rejects as a lifecycle phase.
+- **Growing the vendor IT suite can break a test that assumed an exclusive dataset.** The accumulated
+  `vendor_profiles` count crossed the default page size of 20 during the Phase 2 close-out, and two
+  tests failed on assumptions that only hold when this class runs alone:
+  `VendorApiIntegrationTest.anAdminCanListVendorsAndFilterByStatus` on
+  `hasItem(first.profileId())`, and `VendorProfileRepositoryIT.shouldFindAllProfilesByStatus` on
+  `assertEquals(1, approved.size())`. Both now assert membership of the rows the test created
+  (`listedIds(status)` walking every page with `size=100`; `idsOf(...)` containment checks) instead
+  of counting or paging. Any new IT that registers vendors makes the problem more likely, not less,
+  so scope to the rows you created rather than to the table.
+- **A `@Positive`/`@PathVariable` violation has no `validation` map.** Bean validation on a path
+  variable raises `ConstraintViolationException`, which `GlobalExceptionHandler` renders as
+  `{"code":"VALIDATION_FAILED","message":"Validation failed: ..."}` with no per-field `validation`
+  object. Asserting `$.validation.id` fails with `No value at JSON path "$.validation.id"`. Only
+  `@Valid @RequestBody` violations populate that map.
+
+## Testing Gotchas (Phase 2c)
+
+These cost real debugging time and will recur if forgotten:
+
+- **`@RequiresApprovedVendor` is inert in `@WebMvcTest` slices.** The annotation is a composed
+  `@PreAuthorize`, enabled by `@EnableMethodSecurity` on the production `SecurityConfig`. A slice test
+  supplies its own `SecurityFilterChain` and never loads that class, so a gated route returns 200
+  instead of 403 and the slice test passes while the gate is untested. Gating must be covered by a
+  `@SpringBootTest` (see `VendorApprovalGatingIntegrationTest`). This is why method security was
+  chosen over a global `WebMvcConfigurer`/`HandlerInterceptor` — see `docs/decisions.md` (D-13).
+- **A gating probe route must sit under the real namespace.** With the probe mapped to a path outside
+  `/api/v1/vendors/**`, the `hasRole("FLORIST")` matcher never runs, so a CUSTOMER passes RBAC and is
+  refused by the guard with `VENDOR_NOT_APPROVED` instead of `FORBIDDEN`. The observable status is
+  still 403, so the bug is easy to miss; the error code is what exposes it. `TestVendorFeatureController`
+  is mapped to `/api/v1/vendors/test-features` so the layer ordering matches production.
+- **`UUID.randomUUID()` is not a valid phone-number source.** Its hex output contains
+  letters, so `"+91" + uuid.replace("-","").substring(0,10)` fails the
+  `^\+?[0-9]{7,15}$` DTO pattern roughly 40% of the time. The symptom is a *flaky*
+  subset of tests returning 400 instead of the expected status, and it masks the
+  service-level messages (you see the generic `VALIDATION_FAILED` envelope, not the
+  specific hours error). Use random decimal digits instead — see `uniquePhone()` in
+  `VendorApiIntegrationTest` and `VendorApprovalGatingIntegrationTest`.
+- **MySQL CHECK violations are not `DataIntegrityViolationException`.** SQL error 3819
+  surfaces as `JpaSystemException`/`GenericJDBCException`, so asserting the Spring
+  translation fails even though the constraint worked. Assert on the constraint name in
+  the failure chain (see D-12).
+- **A row that deliberately violates a CHECK must otherwise be valid.** When V6 added
+  `ck_vendor_hours_times`, the pre-existing `VendorHoursRepositoryIT.shouldRejectHoursForUnknownProfile`
+  broke: its orphan row was `closed=false` with no times, so the new check fired before
+  the foreign key the test meant to exercise. Supplying valid times restored the
+  original intent.
 
 ## Deprecation Notices
 

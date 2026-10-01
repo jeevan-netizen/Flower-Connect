@@ -3,19 +3,24 @@ package com.flowerconnect.security.jwt;
 import com.flowerconnect.config.JwtProperties;
 import com.flowerconnect.domain.RefreshToken;
 import com.flowerconnect.domain.User;
+import com.flowerconnect.exception.AccountSuspendedException;
+import com.flowerconnect.exception.RefreshTokenReuseException;
 import com.flowerconnect.exception.TokenRefreshException;
 import com.flowerconnect.repository.RefreshTokenRepository;
 import com.flowerconnect.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -25,70 +30,134 @@ public class RefreshTokenService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
+    private final Clock clock;
 
     public RefreshTokenService(
             RefreshTokenRepository refreshTokenRepository,
             UserRepository userRepository,
             JwtService jwtService,
-            JwtProperties jwtProperties) {
+            JwtProperties jwtProperties,
+            Clock clock) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
+        this.clock = clock;
     }
 
     public String createRefreshToken(Long userId) {
+        return doCreateRefreshToken(userId, UUID.randomUUID().toString()).rawToken;
+    }
+
+    private TokenCreationResult doCreateRefreshToken(Long userId, String familyId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new TokenRefreshException("User not found"));
         String rawToken = jwtService.generateRefreshToken();
         String tokenHash = hashToken(rawToken);
-        LocalDateTime expiresAt = LocalDateTime.now().plus(Duration.ofMillis(jwtProperties.getRefreshTtlMs()));
+        LocalDateTime expiresAt = LocalDateTime.now(clock).plus(Duration.ofMillis(jwtProperties.getRefreshTtlMs()));
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
                 .tokenHash(tokenHash)
                 .expiresAt(expiresAt)
-                .revoked(false)
+                .familyId(familyId)
                 .build();
-        refreshTokenRepository.save(refreshToken);
-        log.debug("Created refresh token for user id={}", userId);
-        return rawToken;
+        RefreshToken saved = refreshTokenRepository.save(refreshToken);
+        return new TokenCreationResult(rawToken, saved);
     }
 
+    private static class TokenCreationResult {
+        final String rawToken;
+        final RefreshToken entity;
+
+        TokenCreationResult(String rawToken, RefreshToken entity) {
+            this.rawToken = rawToken;
+            this.entity = entity;
+        }
+    }
+
+    @Transactional(noRollbackFor = RefreshTokenReuseException.class)
     public String rotateRefreshToken(String rawToken) {
         String tokenHash = hashToken(rawToken);
         RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new TokenRefreshException("Invalid refresh token"));
 
         if (storedToken.isRevoked()) {
-            throw new TokenRefreshException("Refresh token has been revoked");
+            if (storedToken.getReplacedById() == null) {
+                throw new TokenRefreshException("Refresh token has been revoked");
+            }
+            LocalDateTime now = LocalDateTime.now(clock);
+            if (!now.isAfter(storedToken.getRevokedAt().plusSeconds(jwtProperties.getRefreshGraceSeconds()))) {
+                RefreshToken liveToken = findCurrentLiveTokenInChain(storedToken.getReplacedById());
+                return rotateLiveToken(liveToken);
+            }
+            refreshTokenRepository.revokeAllTokensInFamily(storedToken.getFamilyId());
+            throw new RefreshTokenReuseException("Refresh token reuse detected outside grace window");
         }
 
-        if (storedToken.isExpired()) {
+        return rotateLiveToken(storedToken);
+    }
+
+    private RefreshToken findCurrentLiveTokenInChain(Long startingTokenId) {
+        RefreshToken current = refreshTokenRepository.findByIdWithUser(startingTokenId)
+                .orElseThrow(() -> new TokenRefreshException("Invalid refresh token"));
+        while (current.isRevoked()) {
+            if (current.getReplacedById() == null) {
+                throw new TokenRefreshException("Refresh token has been revoked");
+            }
+            current = refreshTokenRepository.findByIdWithUser(current.getReplacedById())
+                    .orElseThrow(() -> new TokenRefreshException("Invalid refresh token"));
+        }
+        return current;
+    }
+
+    private String rotateLiveToken(RefreshToken storedToken) {
+        if (storedToken.isExpired(LocalDateTime.now(clock))) {
             refreshTokenRepository.delete(storedToken);
             throw new TokenRefreshException("Refresh token has expired");
         }
 
-        storedToken.setRevoked(true);
+        User user = storedToken.getUser();
+        if (user.getStatus() == User.Status.SUSPENDED) {
+            throw new AccountSuspendedException("Account suspended");
+        }
+        if (user.getStatus() == User.Status.DISABLED) {
+            throw new TokenRefreshException("Invalid refresh token");
+        }
+
+        TokenCreationResult result = doCreateRefreshToken(user.getId(), storedToken.getFamilyId());
+
+        storedToken.setRevokedAt(LocalDateTime.now(clock));
+        storedToken.setReplacedById(result.entity.getId());
         refreshTokenRepository.save(storedToken);
 
-        return createRefreshToken(storedToken.getUser().getId());
+        log.debug("Rotated refresh token for user id={}", user.getId());
+        return result.rawToken;
     }
 
+    @Transactional
     public User validateAndReturnUser(String rawToken) {
         String tokenHash = hashToken(rawToken);
         RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new TokenRefreshException("Invalid refresh token"));
 
-        if (storedToken.isRevoked()) {
+        if (storedToken.isRevoked() && storedToken.getReplacedById() == null) {
             throw new TokenRefreshException("Refresh token has been revoked");
         }
 
-        if (storedToken.isExpired()) {
+        if (storedToken.isExpired(LocalDateTime.now(clock))) {
             refreshTokenRepository.delete(storedToken);
             throw new TokenRefreshException("Refresh token has expired");
         }
 
-        return storedToken.getUser();
+        User user = storedToken.getUser();
+        if (user.getStatus() == User.Status.SUSPENDED) {
+            throw new AccountSuspendedException("Account suspended");
+        }
+        if (user.getStatus() == User.Status.DISABLED) {
+            throw new TokenRefreshException("Invalid refresh token");
+        }
+
+        return user;
     }
 
     public void revokeRefreshToken(String rawToken) {
@@ -96,7 +165,7 @@ public class RefreshTokenService {
         Optional<RefreshToken> opt = refreshTokenRepository.findByTokenHash(tokenHash);
         if (opt.isPresent()) {
             RefreshToken token = opt.get();
-            token.setRevoked(true);
+            token.setRevokedAt(LocalDateTime.now(clock));
             refreshTokenRepository.save(token);
             log.debug("Revoked refresh token for user id={}", token.getUser().getId());
         }
@@ -119,7 +188,7 @@ public class RefreshTokenService {
     }
 
     public void cleanupExpiredTokens() {
-        int deleted = refreshTokenRepository.deleteExpiredAndRevokedBefore(LocalDateTime.now());
+        int deleted = refreshTokenRepository.deleteExpiredAndRevokedBefore(LocalDateTime.now(clock));
         if (deleted > 0) {
             log.info("Cleaned up {} expired/revoked refresh tokens", deleted);
         }

@@ -3,7 +3,6 @@ import { type AxiosError, type AxiosAdapter, type InternalAxiosRequestConfig } f
 
 interface MockAuthState {
   accessToken: string | null;
-  refreshToken: string | null;
   user: unknown;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -31,7 +30,6 @@ vi.mock("@/features/auth/stores/auth-store", () => ({
 function defaultState(): MockAuthState {
   return {
     accessToken: "test-access-token",
-    refreshToken: "test-refresh-token",
     user: null,
     isAuthenticated: true,
     isLoading: false,
@@ -133,6 +131,26 @@ describe("Axios API Interceptor", () => {
 
     const config = adapter.mock.calls[0][0] as InternalAxiosRequestConfig;
     expect(config.headers.Authorization).toBeUndefined();
+  });
+
+  it("should attach client header to cookie-authenticated endpoints", async () => {
+    const adapter = vi.fn().mockResolvedValue({
+      data: {},
+      status: 200,
+      statusText: "OK",
+      headers: {},
+      config: {} as InternalAxiosRequestConfig,
+    });
+
+    api.defaults.adapter = adapter as AxiosAdapter;
+
+    await api.post("/auth/refresh");
+    await api.post("/auth/logout");
+
+    const refreshConfig = adapter.mock.calls[0][0] as InternalAxiosRequestConfig;
+    const logoutConfig = adapter.mock.calls[1][0] as InternalAxiosRequestConfig;
+    expect(refreshConfig.headers["X-FlowerConnect-Client"]).toBe("1");
+    expect(logoutConfig.headers["X-FlowerConnect-Client"]).toBe("1");
   });
 
   it("should trigger token refresh on 401 and retry request", async () => {

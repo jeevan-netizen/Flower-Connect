@@ -17,15 +17,26 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Query("SELECT rt FROM RefreshToken rt JOIN FETCH rt.user u JOIN FETCH u.role WHERE rt.tokenHash = :tokenHash")
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
-    List<RefreshToken> findByUserIdAndRevokedFalseOrderByCreatedAtDesc(Long userId);
+    List<RefreshToken> findByUserIdAndRevokedAtIsNullOrderByCreatedAtDesc(Long userId);
+
+    @Query("SELECT rt FROM RefreshToken rt JOIN FETCH rt.user u JOIN FETCH u.role WHERE rt.tokenHash = :tokenHash AND rt.revokedAt IS NOT NULL")
+    Optional<RefreshToken> findRevokedByTokenHash(String tokenHash);
+
+    @Query("SELECT rt FROM RefreshToken rt JOIN FETCH rt.user u JOIN FETCH u.role WHERE rt.id = :id")
+    Optional<RefreshToken> findByIdWithUser(Long id);
 
     @Transactional
     @Modifying
-    @Query("UPDATE RefreshToken rt SET rt.revoked = true WHERE rt.user = :user AND rt.revoked = false")
+    @Query("UPDATE RefreshToken rt SET rt.revokedAt = CURRENT_TIMESTAMP WHERE rt.user = :user AND rt.revokedAt IS NULL")
     void revokeAllActiveTokensForUser(User user);
 
     @Transactional
     @Modifying
-    @Query("DELETE FROM RefreshToken rt WHERE rt.expiresAt < :now OR (rt.revoked = true AND rt.expiresAt < :now)")
+    @Query("UPDATE RefreshToken rt SET rt.revokedAt = CURRENT_TIMESTAMP WHERE rt.familyId = :familyId AND rt.revokedAt IS NULL")
+    int revokeAllTokensInFamily(String familyId);
+
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM RefreshToken rt WHERE rt.expiresAt < :now OR (rt.revokedAt IS NOT NULL AND rt.expiresAt < :now)")
     int deleteExpiredAndRevokedBefore(LocalDateTime now);
 }

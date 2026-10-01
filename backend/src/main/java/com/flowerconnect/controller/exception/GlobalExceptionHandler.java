@@ -1,8 +1,10 @@
 package com.flowerconnect.controller.exception;
 
-import com.flowerconnect.exception.ResourceConflictException;
-import com.flowerconnect.exception.TokenRefreshException;
+import com.flowerconnect.exception.BusinessException;
+import com.flowerconnect.exception.ErrorCode;
 import com.flowerconnect.security.dto.ErrorResponse;
+import com.flowerconnect.vendor.security.VendorNotApprovedException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,39 +29,56 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final String GENERIC_AUTH_MESSAGE = "Invalid email or password";
 
+    private final ObjectMapper objectMapper;
+    private final Clock clock;
+
+    public GlobalExceptionHandler(ObjectMapper objectMapper, Clock clock) {
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
         log.debug("Authentication failed: {}", ex.getMessage());
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "Unauthorized", GENERIC_AUTH_MESSAGE);
     }
 
-    @ExceptionHandler(TokenRefreshException.class)
-    public ResponseEntity<ErrorResponse> handleTokenRefresh(TokenRefreshException ex) {
-        return buildErrorResponse(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex) {
+        HttpStatus status = statusForErrorCode(ex.getErrorCode());
+        return buildErrorResponse(status, status.getReasonPhrase(), ex.getMessage(), ex.getErrorCode(), null);
     }
 
-    @ExceptionHandler(ResourceConflictException.class)
-    public ResponseEntity<ErrorResponse> handleConflict(ResourceConflictException ex) {
-        return buildErrorResponse(HttpStatus.CONFLICT, "Conflict", ex.getMessage());
+    /**
+     * Vendor approval gating (plan task 2.7). The exception is raised while a
+     * method-security rule is being evaluated, so it reaches this advice through
+     * the normal MVC exception path rather than through Spring Security's
+     * {@code AccessDeniedHandler}. Rendering it here keeps the response shape and
+     * the {@code code} field identical to every other business error.
+     */
+    @ExceptionHandler(VendorNotApprovedException.class)
+    public ResponseEntity<ErrorResponse> handleVendorNotApproved(VendorNotApprovedException ex) {
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage(),
+                ErrorCode.VENDOR_NOT_APPROVED, null);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request",
-                "Validation failed: " + ex.getMessage());
+                "Validation failed: " + ex.getMessage(), ErrorCode.VALIDATION_FAILED, null);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex) {
         return buildErrorResponse(HttpStatus.CONFLICT, "Conflict",
-                "A resource with this identifier already exists");
+                "A resource with this identifier already exists", ErrorCode.CONFLICT, null);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex, WebRequest request) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);
         return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
-                "An unexpected error occurred");
+                "An unexpected error occurred", null, null);
     }
 
     @Override
@@ -69,28 +89,57 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             errors.put(error.getField(), error.getDefaultMessage());
         }
-        return ResponseEntity.badRequest().body(errors);
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(clock))
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
+                .errorCode(ErrorCode.VALIDATION_FAILED)
+                .message("Validation failed")
+                .validation(errors)
+                .build();
+        return ResponseEntity.badRequest().body(response);
     }
 
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException ex, HttpHeaders headers,
             HttpStatusCode status, WebRequest request) {
-        return ResponseEntity.badRequest().body(
-                ErrorResponse.builder()
-                        .timestamp(LocalDateTime.now())
-                        .status(HttpStatus.BAD_REQUEST.value())
-                        .error("Bad Request")
-                        .message("Request body is required or malformed")
-                        .build());
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(clock))
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
+                .errorCode(ErrorCode.VALIDATION_FAILED)
+                .message("Request body is required or malformed")
+                .build();
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    private static HttpStatus statusForErrorCode(ErrorCode errorCode) {
+        return switch (errorCode) {
+            case VALIDATION_FAILED -> HttpStatus.BAD_REQUEST;
+            case UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case CONFLICT -> HttpStatus.CONFLICT;
+            case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
+            case ACCOUNT_SUSPENDED -> HttpStatus.FORBIDDEN;
+            case VENDOR_NOT_APPROVED -> HttpStatus.FORBIDDEN;
+        };
     }
 
     private ResponseEntity<ErrorResponse> buildErrorResponse(HttpStatus status, String error, String message) {
+        return buildErrorResponse(status, error, message, null, null);
+    }
+
+    private ResponseEntity<ErrorResponse> buildErrorResponse(HttpStatus status, String error, String message,
+                                                             ErrorCode errorCode, Map<String, String> validation) {
         ErrorResponse response = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
+                .timestamp(LocalDateTime.now(clock))
                 .status(status.value())
                 .error(error)
+                .errorCode(errorCode)
                 .message(message)
+                .validation(validation)
                 .build();
         return new ResponseEntity<>(response, status);
     }

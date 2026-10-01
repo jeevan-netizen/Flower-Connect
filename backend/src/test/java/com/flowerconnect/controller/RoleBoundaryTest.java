@@ -1,5 +1,6 @@
 package com.flowerconnect.controller;
 
+import com.flowerconnect.config.TestClockConfig;
 import com.flowerconnect.test.RoleBoundaryTester;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 @ActiveProfiles("test-probe")
 
 /**
@@ -30,7 +35,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * that mirror the production rules. Does not modify any existing test.
  */
 @WebMvcTest(controllers = TestProbeController.class)
-@Import(RoleBoundaryTest.TestSecurityConfig.class)
+@Import({RoleBoundaryTest.TestSecurityConfig.class, TestClockConfig.class})
 class RoleBoundaryTest {
 
     @TestConfiguration

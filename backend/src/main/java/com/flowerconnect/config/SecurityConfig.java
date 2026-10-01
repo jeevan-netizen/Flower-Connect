@@ -1,10 +1,13 @@
 package com.flowerconnect.config;
 
 import com.flowerconnect.config.CorsProperties;
+import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.security.jwt.JwtAuthenticationFilter;
 import com.flowerconnect.security.jwt.JwtService;
 import com.flowerconnect.security.jwt.UserDetailsServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -12,6 +15,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -22,12 +26,14 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtService jwtService;
@@ -36,6 +42,10 @@ public class SecurityConfig {
     private final CorsProperties corsProperties;
     private final CustomAuthenticationEntryPoint entryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;
+    private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
+    private final Clock clock;
+    private final RateLimitFilter rateLimitFilter;
 
     public SecurityConfig(
             JwtService jwtService,
@@ -43,13 +53,21 @@ public class SecurityConfig {
             PasswordEncoder passwordEncoder,
             CorsProperties corsProperties,
             CustomAuthenticationEntryPoint entryPoint,
-            CustomAccessDeniedHandler accessDeniedHandler) {
+            CustomAccessDeniedHandler accessDeniedHandler,
+            UserRepository userRepository,
+            ObjectMapper objectMapper,
+            Clock clock,
+            @Autowired(required = false) RateLimitFilter rateLimitFilter) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.corsProperties = corsProperties;
         this.entryPoint = entryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.userRepository = userRepository;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+        this.rateLimitFilter = rateLimitFilter;
     }
 
     @Bean
@@ -61,15 +79,30 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers("/api/v1/locations/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs").permitAll()
+                // Vendor self-service. Registration is the public entry point that
+                // creates the FLORIST account; everything else is vendor-only.
+                // This is the *role* boundary only. The stricter *approval* boundary
+                // (PENDING_APPROVAL / REJECTED / SUSPENDED vendors are refused) is
+                // enforced per handler by @RequiresApprovedVendor, so that the vendor's
+                // own profile routes stay reachable while their profile is not approved.
+                // See docs/decisions.md (D-13).
+                .requestMatchers(HttpMethod.POST, "/api/v1/vendors/register").permitAll()
+                .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler)
-            )
-            .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
+            );
+        if (rateLimitFilter != null) {
+            http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+        }
+        http.addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -95,7 +128,7 @@ public class SecurityConfig {
                 .filter(s -> !s.isEmpty())
                 .toList();
         config.setAllowedOrigins(origins);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);

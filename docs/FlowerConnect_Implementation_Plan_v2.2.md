@@ -146,6 +146,7 @@ Each has a recommended default so work can proceed. Record the final choice in `
 | D-6 | Suspended vendor with in-flight orders | Hidden from discovery immediately; **existing orders continue to completion** | Phase 2 |
 | D-7 | AI demand prediction in scope? | **Stretch only** (Phase 15); first thing cut | Phase 14 |
 | D-8 | Registration duplicate-email behaviour | **409 Conflict with a specific message** when the email (or phone) is already registered during registration. Accepted UX trade-off — registration can reveal account existence; login and forgot-password must not (see section 14). Rate limiting (task 1.11) mitigates bulk probing. | Phase 1 |
+| D-9 | Migrations rewritten before first deployment | **Migrations rewritten before first deployment.** The additive-only migration rule (ADR-002) applies from the first deployment onward. Before deployment, V1 through current version can be replaced entirely; after deployment, only additive migrations allowed. | Phase 1 |
 
 ---
 

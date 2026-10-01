@@ -1,11 +1,12 @@
 package com.flowerconnect.exception;
 
-public class JwtAuthenticationException extends RuntimeException {
+public class JwtAuthenticationException extends BusinessException {
+
     public JwtAuthenticationException(String message) {
-        super(message);
+        super(ErrorCode.UNAUTHORIZED, message);
     }
 
     public JwtAuthenticationException(String message, Throwable cause) {
-        super(message, cause);
+        super(ErrorCode.UNAUTHORIZED, message, cause);
     }
 }

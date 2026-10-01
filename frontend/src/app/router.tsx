@@ -1,12 +1,46 @@
-import { createBrowserRouter, Outlet, Link, RouterProvider, useNavigate } from "react-router-dom";
+import { createBrowserRouter, Link, Outlet, RouterProvider, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useInitAuth, RequireAuth, RequireUnauth } from "@/features/auth/hooks/useAuth";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
+import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
+import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
+import { clearVendorCache } from "@/features/vendor/queries";
+import { VendorLayout } from "@/features/vendor/components/VendorLayout";
+import { VendorDashboardPage } from "@/features/vendor/pages/VendorDashboardPage";
+import { VendorProfilePage } from "@/features/vendor/pages/VendorProfilePage";
+import { VendorSettingsPage } from "@/features/vendor/pages/VendorSettingsPage";
+import { VendorHoursPage } from "@/features/vendor/pages/VendorHoursPage";
+import { AdminLayout } from "@/features/admin/components/AdminLayout";
+import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
+import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
+import { AdminUsersPage } from "@/features/admin/pages/AdminUsersPage";
+import { clearAdminCache } from "@/features/admin/queries";
+
+/**
+ * Application role for a vendor. The plan calls this role "VENDOR"; the seeded
+ * role is FLORIST and is not renamed (docs/decisions.md, D-11).
+ */
+const VENDOR_ROLE = "FLORIST";
+
+/** Seeded role name for administrators (`roles` row 3, V3__seed_roles.sql). */
+const ADMIN_ROLE = "ADMIN";
 
 function Layout() {
   const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuthStore();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    // Vendor and admin data are each cached under their own query key; drop both
+    // so the next account to sign in on this tab never sees the previous user's
+    // profile, user list or vendor list.
+    clearVendorCache(queryClient);
+    clearAdminCache(queryClient);
+    logout();
+    navigate("/", { replace: true });
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -21,13 +55,9 @@ function Layout() {
                 <Link to="/browse">Browse</Link>
                 <Link to="/cart">Cart</Link>
                 <Link to="/orders">Orders</Link>
-                <button
-                  onClick={() => {
-                    logout();
-                    navigate("/", { replace: true });
-                  }}
-                  className="hover:underline"
-                >
+                {user?.role === VENDOR_ROLE && <Link to="/vendor">Vendor</Link>}
+                {user?.role === ADMIN_ROLE && <Link to="/admin">Admin</Link>}
+                <button onClick={handleLogout} className="hover:underline">
                   Log out
                 </button>
               </>
@@ -35,6 +65,11 @@ function Layout() {
               <>
                 <Link to="/login">Login</Link>
                 <Link to="/register">Register</Link>
+                {/* Phase 1's vendor onboarding entry point: it was a forward link to a
+                    Phase 2 that did not exist yet, and now resolves to the registration
+                    page. Kept in the signed-out branch because registering creates a new
+                    account — a signed-in visitor must not end up with two. */}
+                <Link to="/vendor/register">For florists</Link>
               </>
             )}
           </div>
@@ -100,6 +135,52 @@ export const router = createBrowserRouter([
       },
       { path: "login", element: <RequireUnauth><LoginPage /></RequireUnauth> },
       { path: "register", element: <RequireUnauth><RegisterPage /></RequireUnauth> },
+      {
+        // The vendor entry point (plan task 1.7). Public, because
+        // `POST /api/v1/vendors/register` creates the account itself, and
+        // `RequireUnauth` because it must not be reachable with an existing session:
+        // submitting while signed in would create a second, orphaned account.
+        path: "vendor/register",
+        element: (
+          <RequireUnauth>
+            <VendorRegisterPage />
+          </RequireUnauth>
+        ),
+      },
+      {
+        // Phase 2 vendor dashboard shell. The guard is UX gating only — the
+        // backend re-checks ROLE_FLORIST (and, for approved-only vendor
+        // features, the approval state) on every request.
+        path: "vendor",
+        element: (
+          <ProtectedRoute roles={[VENDOR_ROLE]}>
+            <VendorLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <VendorDashboardPage /> },
+          { path: "profile", element: <VendorProfilePage /> },
+          { path: "settings", element: <VendorSettingsPage /> },
+          { path: "hours", element: <VendorHoursPage /> },
+        ],
+      },
+      {
+        // Phase 2 admin dashboard shell. Same reasoning as the vendor namespace:
+        // the guard is routing UX only, and `SecurityConfig` matches
+        // `/api/v1/admin/**` with `hasRole("ADMIN")` on every request, so the
+        // backend stays the authorization authority.
+        path: "admin",
+        element: (
+          <ProtectedRoute roles={[ADMIN_ROLE]}>
+            <AdminLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <AdminDashboardPage /> },
+          { path: "vendors", element: <AdminVendorsPage /> },
+          { path: "users", element: <AdminUsersPage /> },
+        ],
+      },
     ],
   },
 ]);

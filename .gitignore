@@ -1,6 +1,6 @@
 # Maven
 target/
-mvnw.cmd
+**/bin/
 
 # Node / Vite
 node_modules/
@@ -21,3 +21,9 @@ tsconfig.tsbuildinfo
 # OS
 .DS_Store
 Thumbs.db
+
+# DBHub
+dbhub.toml
+
+# Uploads
+uploads/

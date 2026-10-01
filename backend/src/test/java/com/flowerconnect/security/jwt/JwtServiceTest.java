@@ -6,6 +6,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,7 +23,8 @@ class JwtServiceTest {
         props.setSecret("test-jwt-secret-key-for-testing-phase-1-only-a-very-secure-key!");
         props.setAccessTtlMs(900000L);
         props.setRefreshTtlMs(604800000L);
-        jwtService = new JwtService(props);
+        Clock clock = Clock.systemUTC();
+        jwtService = new JwtService(props, clock);
         jwtService.init();
     }
 
@@ -95,7 +99,8 @@ class JwtServiceTest {
     void shouldThrowWhenSecretTooShort() {
         JwtProperties shortProps = new JwtProperties();
         shortProps.setSecret("short");
-        JwtService service = new JwtService(shortProps);
+        Clock clock = Clock.systemUTC();
+        JwtService service = new JwtService(shortProps, clock);
         assertThrows(IllegalStateException.class, service::init);
     }
 }

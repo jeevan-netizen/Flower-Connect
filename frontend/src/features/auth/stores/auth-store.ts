@@ -11,7 +11,6 @@ import {
 
 interface AuthState {
   accessToken: string | null;
-  refreshToken: string | null;
   user: UserResponse | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -33,7 +32,6 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       accessToken: null,
-      refreshToken: null,
       user: null,
       isAuthenticated: false,
       isLoading: false,
@@ -43,7 +41,6 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (auth: AuthResponse) => {
         set({
           accessToken: auth.accessToken,
-          refreshToken: auth.refreshToken,
           isAuthenticated: true,
           error: null,
         });
@@ -53,13 +50,9 @@ export const useAuthStore = create<AuthState>()(
       setHasLoadedInitial: (value: boolean) => set({ hasLoadedInitial: value }),
 
       logout: () => {
-        const { refreshToken } = get();
-        if (refreshToken) {
-          void logoutApi({ refreshToken }).catch(() => {});
-        }
+        void logoutApi().catch(() => {});
         set({
           accessToken: null,
-          refreshToken: null,
           user: null,
           isAuthenticated: false,
           error: null,
@@ -74,7 +67,7 @@ export const useAuthStore = create<AuthState>()(
           await get().loadCurrentUser();
         } catch (e) {
           const message = extractErrorMessage(e);
-          set({ error: message, isAuthenticated: false, accessToken: null, refreshToken: null, user: null });
+          set({ error: message, isAuthenticated: false, accessToken: null, user: null });
         } finally {
           set({ isLoading: false });
         }
@@ -88,27 +81,26 @@ export const useAuthStore = create<AuthState>()(
           await get().loadCurrentUser();
         } catch (e) {
           const message = extractErrorMessage(e);
-          set({ error: message, isAuthenticated: false, accessToken: null, refreshToken: null, user: null });
+          set({ error: message, isAuthenticated: false, accessToken: null, user: null });
         } finally {
           set({ isLoading: false });
         }
       },
 
       refresh: async () => {
-        const { refreshToken } = get();
-        if (!refreshToken) {
-          set({ accessToken: null, user: null, isAuthenticated: false });
+        const { accessToken } = get();
+        if (!accessToken) {
+          set({ user: null, isAuthenticated: false });
           return false;
         }
         try {
-          const auth = await refreshApi({ refreshToken });
+          const auth = await refreshApi();
           get().setAuth(auth);
           await get().loadCurrentUser();
           return true;
         } catch (e) {
           set({
             accessToken: null,
-            refreshToken: null,
             user: null,
             isAuthenticated: false,
             error: "Session expired. Please log in again.",
@@ -135,7 +127,6 @@ export const useAuthStore = create<AuthState>()(
       name: "fc-auth",
       partialize: (state) => ({
         accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),

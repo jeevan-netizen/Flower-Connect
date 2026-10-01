@@ -15,7 +15,12 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isLoading, error } = useAuthStore();
-  const from = (location.state as { from?: string })?.from || "/";
+  // `registeredEmail` is set by the vendor registration page on success, so a florist
+  // who just applied only types their password. `from` is already used by
+  // `ProtectedRoute` to remember where an unauthenticated visitor was heading.
+  const locationState = location.state as { from?: string; registeredEmail?: string } | null;
+  const from = locationState?.from || "/";
+  const registeredEmail = locationState?.registeredEmail ?? "";
 
   const {
     register,
@@ -23,6 +28,7 @@ export function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: { email: registeredEmail, password: "" },
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -43,6 +49,13 @@ export function LoginPage() {
 
         {error && (
           <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        )}
+
+        {registeredEmail && (
+          <div className="rounded-md bg-brand-50 p-4 text-sm text-brand-900" role="status">
+            Your florist application is in. Sign in with the email you registered and we will
+            take you to your vendor dashboard.
+          </div>
         )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
@@ -98,6 +111,16 @@ export function LoginPage() {
             className="font-medium text-brand-600 hover:text-brand-700"
           >
             Create an account
+          </Link>
+        </p>
+
+        <p className="text-center text-sm text-slate-600">
+          Own a flower shop?{" "}
+          <Link
+            to="/vendor/register"
+            className="font-medium text-brand-600 hover:text-brand-700"
+          >
+            Register it on FlowerConnect
           </Link>
         </p>
       </div>

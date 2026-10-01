@@ -11,12 +11,16 @@ declare module "axios" {
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1",
   timeout: 15000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
 const PUBLIC_ENDPOINTS = ["/auth/register", "/auth/login", "/auth/refresh", "/auth/logout"];
+const COOKIE_AUTH_ENDPOINTS = ["/auth/refresh", "/auth/logout"];
+const COOKIE_AUTH_HEADER = "X-FlowerConnect-Client";
+const COOKIE_AUTH_HEADER_VALUE = "1";
 
 let isRefreshing = false;
 let refreshPromise: Promise<AuthResponse | null> | null = null;
@@ -24,15 +28,18 @@ let refreshPromise: Promise<AuthResponse | null> | null = null;
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const { accessToken } = useAuthStore.getState();
   const isPublic = PUBLIC_ENDPOINTS.some((endpoint) => config.url?.startsWith(endpoint));
+  const isCookieAuth = COOKIE_AUTH_ENDPOINTS.some((endpoint) => config.url?.startsWith(endpoint));
   if (accessToken && !isPublic) {
     config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  if (isCookieAuth) {
+    config.headers[COOKIE_AUTH_HEADER] = COOKIE_AUTH_HEADER_VALUE;
   }
   return config;
 });
 
 async function attemptRefresh(): Promise<string | null> {
-  const { refreshToken, setAuth } = useAuthStore.getState();
-  if (!refreshToken) return null;
+  const { setAuth } = useAuthStore.getState();
 
   if (isRefreshing && refreshPromise) {
     return refreshPromise.then((auth) => auth?.accessToken ?? null);
@@ -40,7 +47,7 @@ async function attemptRefresh(): Promise<string | null> {
 
   isRefreshing = true;
   refreshPromise = api
-    .post<AuthResponse>("/auth/refresh", { refreshToken })
+    .post<AuthResponse>("/auth/refresh")
     .then((response) => {
       const auth = response.data;
       setAuth(auth);

@@ -1,0 +1,72 @@
+server:
+  port: 8080
+  shutdown: graceful
+  forward-headers-strategy: framework
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/flowerconnect}
+    username: ${DB_USER:flowerconnect}
+    password: ${DB_PASS:flowerconnect}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: false
+        use_new_id_mappings: false
+    open-in-view: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  mail:
+    host: ${MAIL_HOST:mailhog}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+          connect-timeout: 5000
+          timeout: 5000
+  doc:
+    api-docs:
+      enabled: true
+    swagger-ui:
+      enabled: true
+      path: /swagger-ui.html
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-ttl-ms: ${JWT_ACCESS_TTL_MS:900000}
+  refresh-ttl-ms: ${JWT_REFRESH_TTL_MS:604800000}
+  refresh-grace-seconds: ${JWT_REFRESH_GRACE_SECONDS:10}
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:5173}
+  cors:
+    origins: ${APP_CORS_ORIGINS:http://localhost:5173}
+  refresh-cookie-secure: false
+  rate-limit:
+    auth:
+      login-requests-per-hour: 5
+      register-requests-per-hour: 5
+      forgot-password-requests-per-hour: 5
+      reset-password-requests-per-hour: 5
+
+logging:
+  level:
+    com.flowerconnect: DEBUG
+    org.flywaydb: INFO
+    org.springframework.security: DEBUG

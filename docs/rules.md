@@ -149,4 +149,5 @@ Additional testing rules:
 - Do not build GPS, Redis, delivery polygons or a delivery-partner role.
 - Do not skip tests, the RBAC checklist or the security items to save time.
 - Do not mark a phase complete without real verification output.
+- Verification output means the verbatim command output (test summaries, BUILD result, `git status`), pasted into the report. A prose summary of results does not count. Never commit, amend, or push unless the prompt says to.
 - Do not commit secrets.

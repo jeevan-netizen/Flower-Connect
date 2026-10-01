@@ -15,7 +15,6 @@ describe("Auth Store", () => {
     vi.resetAllMocks();
     useAuthStore.setState({
       accessToken: null,
-      refreshToken: null,
       user: null,
       isAuthenticated: false,
       isLoading: false,
@@ -27,7 +26,6 @@ describe("Auth Store", () => {
   it("should start with unauthenticated state", () => {
     const state = useAuthStore.getState();
     expect(state.accessToken).toBeNull();
-    expect(state.refreshToken).toBeNull();
     expect(state.user).toBeNull();
     expect(state.isAuthenticated).toBe(false);
     expect(state.hasLoadedInitial).toBe(false);
@@ -42,7 +40,6 @@ describe("Auth Store", () => {
     });
     const state = useAuthStore.getState();
     expect(state.accessToken).toBe("access-token");
-    expect(state.refreshToken).toBe("refresh-token");
     expect(state.isAuthenticated).toBe(true);
     expect(state.error).toBeNull();
   });
@@ -50,7 +47,6 @@ describe("Auth Store", () => {
   it("should clear auth on logout and call backend logout", async () => {
     useAuthStore.setState({
       accessToken: "access-token",
-      refreshToken: "refresh-token",
       user: { id: 1, email: "test@test.com", fullName: "Test", phone: null, role: "CUSTOMER", createdAt: "2024-01-01" },
       isAuthenticated: true,
       isLoading: false,
@@ -63,10 +59,9 @@ describe("Auth Store", () => {
 
     const state = useAuthStore.getState();
     expect(state.accessToken).toBeNull();
-    expect(state.refreshToken).toBeNull();
     expect(state.user).toBeNull();
     expect(state.isAuthenticated).toBe(false);
-    expect(logout).toHaveBeenCalledWith({ refreshToken: "refresh-token" });
+    expect(logout).toHaveBeenCalledWith();
   });
 
   it("should login and set tokens on success", async () => {
@@ -89,7 +84,6 @@ describe("Auth Store", () => {
 
     const state = useAuthStore.getState();
     expect(state.accessToken).toBe("new-access-token");
-    expect(state.refreshToken).toBe("new-refresh-token");
     expect(state.isAuthenticated).toBe(true);
     expect(state.user).not.toBeNull();
     expect(state.user?.email).toBe("user@test.com");
@@ -137,7 +131,6 @@ describe("Auth Store", () => {
   it("should refresh tokens on success", async () => {
     useAuthStore.setState({
       accessToken: "old-access-token",
-      refreshToken: "old-refresh-token",
       user: null,
       isAuthenticated: true,
       isLoading: false,
@@ -162,15 +155,14 @@ describe("Auth Store", () => {
     const result = await useAuthStore.getState().refresh();
 
     expect(result).toBe(true);
+    expect(refresh).toHaveBeenCalledWith();
     const state = useAuthStore.getState();
     expect(state.accessToken).toBe("new-access-token");
-    expect(state.refreshToken).toBe("new-refresh-token");
   });
 
   it("should return false and clear auth on refresh failure", async () => {
     useAuthStore.setState({
       accessToken: "old-access-token",
-      refreshToken: "invalid-refresh-token",
       user: null,
       isAuthenticated: true,
       isLoading: false,
@@ -185,13 +177,11 @@ describe("Auth Store", () => {
     const state = useAuthStore.getState();
     expect(state.isAuthenticated).toBe(false);
     expect(state.accessToken).toBeNull();
-    expect(state.refreshToken).toBeNull();
   });
 
   it("should load current user and set hasLoadedInitial", async () => {
     useAuthStore.setState({
       accessToken: "access-token",
-      refreshToken: null,
       user: null,
       isAuthenticated: false,
       isLoading: false,
@@ -226,7 +216,6 @@ describe("Auth Store", () => {
   it("should set hasLoadedInitial even when /users/me fails", async () => {
     useAuthStore.setState({
       accessToken: "access-token",
-      refreshToken: null,
       user: null,
       isAuthenticated: false,
       isLoading: false,

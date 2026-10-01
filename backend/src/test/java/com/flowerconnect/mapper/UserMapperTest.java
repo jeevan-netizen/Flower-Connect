@@ -24,7 +24,7 @@ class UserMapperTest {
                 .fullName("Florist Name")
                 .phone("+1234567890")
                 .role(role)
-                .active(true)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .createdAt(LocalDateTime.of(2024, 1, 15, 10, 30))
                 .build();
 
@@ -46,7 +46,7 @@ class UserMapperTest {
                 .passwordHash("$2a$10$hash")
                 .fullName("Test User")
                 .role(null)
-                .active(true)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .build();
 
         UserResponse response = mapper.toResponse(user);
@@ -64,7 +64,7 @@ class UserMapperTest {
                 .fullName("Test User")
                 .phone(null)
                 .role(Role.builder().id(1L).name("CUSTOMER").build())
-                .active(true)
+                .status(com.flowerconnect.domain.User.Status.ACTIVE)
                 .build();
 
         UserResponse response = mapper.toResponse(user);
