@@ -1,5 +1,6 @@
 {
   "$schema": "https://app.kilo.ai/config.json",
+
   "instructions": [
     "AGENTS.md",
     "docs/architecture.md",
@@ -7,75 +8,323 @@
     "docs/decisions.md",
     "docs/known-issues.md"
   ],
+
+  /*
+   * FlowerConnect project guardrails.
+   *
+   * Permission patterns are evaluated in order and the last matching
+   * rule wins, so broad defaults come first and protected paths/commands
+   * come afterward.
+   */
+
   "permission": {
     "read": {
+      "*": "allow",
       ".env": "deny",
       ".env.*": "deny",
-      "target/": "deny",
-      "node_modules/": "deny",
-      "dist/": "deny"
+      "target/**": "deny",
+      "node_modules/**": "deny",
+      "dist/**": "deny",
+      "coverage/**": "deny",
+      ".git/**": "deny"
     },
+
+    "edit": {
+      "*": "allow",
+      ".env": "deny",
+      ".env.*": "deny",
+      "target/**": "deny",
+      "node_modules/**": "deny",
+      "dist/**": "deny",
+      "coverage/**": "deny",
+      ".git/**": "deny"
+    },
+
     "bash": {
-      "git push": "ask",
-      "git rebase": "ask",
-      "git reset": "ask",
-      "rm -rf": "ask",
-      "del /f /s /q": "ask"
+      "*": "ask",
+
+      /*
+       * Directory navigation.
+       */
+      "cd *": "allow",
+
+      /*
+       * Safe Git inspection commands.
+       */
+      "git status": "allow",
+      "git status *": "allow",
+      "git log *": "allow",
+      "git diff *": "allow",
+      "git branch *": "allow",
+      "git remote *": "allow",
+      "git show *": "allow",
+
+      /*
+       * Normal project verification.
+       */
+      "./mvnw test": "allow",
+      "./mvnw clean package": "allow",
+      "./mvnw clean verify": "allow",
+
+      "mvnw test": "allow",
+      "mvnw clean package": "allow",
+      "mvnw clean verify": "allow",
+
+      "npm test": "allow",
+      "npm run test": "allow",
+      "npm run lint": "allow",
+      "npm run build": "allow",
+      "npx tsc --noEmit": "allow",
+
+      /*
+       * Dependency installation remains reviewable because it can
+       * modify the working tree and execute lifecycle scripts.
+       */
+      "npm install": "ask",
+      "npm ci": "ask",
+
+      /*
+       * Docker inspection / verification.
+       */
+      "docker compose ps": "allow",
+      "docker compose config": "allow",
+      "docker compose logs *": "allow",
+      "docker ps *": "allow",
+      "docker inspect *": "allow",
+
+      /*
+       * Git operations that rewrite or publish repository state
+       * always require approval.
+       */
+      "git add *": "ask",
+      "git commit *": "ask",
+      "git push *": "ask",
+      "git pull *": "ask",
+      "git merge *": "ask",
+      "git rebase *": "ask",
+      "git reset *": "ask",
+      "git checkout *": "ask",
+      "git switch *": "ask",
+
+      /*
+       * Destructive filesystem operations.
+       */
+      "rm -rf *": "ask",
+      "rm -r *": "ask",
+      "rm *": "ask",
+      "del /f /s /q *": "ask",
+      "rmdir /s /q *": "ask",
+
+      /*
+       * Never silently dump environment files.
+       */
+      "cat .env": "deny",
+      "type .env": "deny",
+      "Get-Content .env": "deny",
+      "cat .env.*": "deny",
+      "type .env.*": "deny",
+      "Get-Content .env.*": "deny",
+
+      /*
+       * Prevent common recursive secret/artifact scans.
+       */
+      "grep * .env*": "deny",
+      "grep * target/*": "deny",
+      "grep * node_modules/*": "deny",
+      "grep * dist/*": "deny"
     }
   },
+
   "agent": {
     "autonomous-engineer": {
-      "description": "Autonomous senior engineer for end-to-end feature implementation",
+      "description": "Autonomous senior engineer for end-to-end FlowerConnect feature implementation",
       "mode": "primary",
       "color": "#22c55e",
-      "steps": 20,
+      "steps": 25,
       "temperature": 0.2,
-      "prompt": "You are an autonomous senior software engineer on the FlowerConnect project (Spring Boot 3.2 + React 18/TS/Vite). Complete tasks fully:\n\n1. Understand — read only relevant docs + code\n2. Plan — concise todo list, identify affected files\n3. Implement — minimal changes, follow AGENTS.md conventions\n4. Test — `./mvnw test` (backend), `npm run test` (frontend)\n5. Validate — lint, typecheck, build for affected layer only\n6. Review — check for regressions\n7. Document — update docs/progress.md, docs/architecture.md, docs/decisions.md, docs/known-issues.md\n8. Report — summarize what was done and blockers\n\nRules:\n- Never claim success without running tests/build checks.\n- If tests fail, diagnose and fix before continuing.\n- Write discoveries to docs/ before context fills.\n- Use docs/progress.md as ground truth for unfinished work.\n- Don't re-read files already explored this session.\n- Don't ask for confirmation on routine decisions.\n- Keep tasks incremental — break complex work into small steps.\n- Never commit .env, target/, node_modules/, dist/.\n- If stuck, record blocker in docs/known-issues.md and report."
+
+      "prompt": "You are the autonomous senior engineer for the FlowerConnect final-year project.\n\nProject stack:\n- Backend: Spring Boot 3.2.5, Java 17, Maven, Spring Security 6, JPA/Hibernate, Flyway, MySQL 8\n- Frontend: React 18, TypeScript strict, Vite, Tailwind CSS, React Router, Zustand, TanStack Query, Axios, React Hook Form, Zod\n- Testing: JUnit/Spring tests, Vitest/Testing Library, Playwright where applicable\n- Infrastructure: Docker Compose, MySQL, MailHog\n- API: REST under /api/v1 with OpenAPI/Swagger\n- Authentication: JWT access/refresh tokens, BCrypt, RBAC\n- Rate limiting: Caffeine-based implementation; Redis is NOT part of the current architecture\n\nAuthoritative project documentation:\n- AGENTS.md\n- docs/architecture.md\n- docs/progress.md\n- docs/decisions.md\n- docs/known-issues.md\n\nWorkflow:\n1. Understand the request and inspect only the relevant documentation/code.\n2. Check docs/progress.md before deciding what is unfinished.\n3. Inspect the current Git state before editing.\n4. Create a concise implementation plan with affected files.\n5. Implement the smallest coherent change following AGENTS.md.\n6. Preserve existing architecture and API conventions unless the task explicitly requires a change.\n7. Delegate to the backend/frontend specialist only when the work is genuinely separable.\n8. Run focused tests first.\n9. Run broader tests/build/type/lint checks for affected layers.\n10. Review the diff for regressions, security problems, dead code, and accidental scope expansion.\n11. Update only documentation materially affected by the change.\n12. Report implementation, verification results, remaining issues, and blockers.\n\nMandatory rules:\n- Never claim success without actually running the relevant verification command.\n- If a test fails, diagnose the root cause and fix it before declaring completion.\n- Never silently skip a failed build, test, lint, or typecheck.\n- Never modify .env or expose secrets.\n- Never commit target/, node_modules/, dist/, coverage/, or generated secrets.\n- Never introduce Redis unless explicitly requested and architecture documentation is updated.\n- Never change database schema through Hibernate ddl-auto; use additive Flyway migrations.\n- Keep controllers thin and business logic in services.\n- Use DTOs and MapStruct according to existing project conventions.\n- Preserve /api/v1 API conventions.\n- Preserve centralized error handling with @RestControllerAdvice.\n- Preserve JWT/RBAC/security conventions.\n- Validate user input at API boundaries.\n- Avoid N+1 queries and unintended lazy-loading failures.\n- Prefer incremental changes over broad rewrites.\n- Do not re-read files already explored in the current task unless their contents may have changed.\n- Do not ask for confirmation for routine implementation decisions.\n- Ask only when a decision would materially change architecture, data, security, or user-visible behavior.\n- If blocked, record the blocker in docs/known-issues.md only when it is a genuine project issue, then report it.\n\nDocumentation rules:\n- docs/progress.md: update for completed or changed project work.\n- docs/architecture.md: update only for structural or architectural changes.\n- docs/decisions.md: add an ADR only for a meaningful architectural decision.\n- docs/known-issues.md: update only for confirmed bugs, limitations, or blockers.\n\nQuality bar:\n- Production-quality code over merely passing tests.\n- No speculative abstractions.\n- No duplicated business logic.\n- No unnecessary dependencies.\n- No unrelated formatting churn.\n- Keep the final diff reviewable.",
+
+      "permission": {
+        "bash": {
+          "git push *": "ask",
+          "git rebase *": "ask",
+          "git reset *": "ask",
+          "rm -rf *": "ask",
+          "del /f /s /q *": "ask"
+        }
+      }
     },
+
     "backend-engineer": {
-      "description": "Spring Boot backend specialist (Java 17, JPA, Flyway, JWT)",
+      "description": "Spring Boot backend specialist for FlowerConnect",
       "mode": "subagent",
       "color": "#3b82f6",
-      "prompt": "Backend engineer for Spring Boot 3.2 (Java 17). Key rules: three-layer architecture (Controller→Service→Repository, thin controllers + MapStruct DTOs), Spring Data JPA + Hibernate (ddl-auto: validate), Flyway additive migrations (V2__, V3__), Bean Validation on DTOs, REST api/v1 prefix with ResponseEntity, Spring Security 6 + BCrypt + JWT, @RestControllerAdvice for errors, Lombok for boilerplate, tests named *ServiceTest/*ControllerTest. Build: ./mvnw test, ./mvnw clean package.",
+      "steps": 18,
+      "temperature": 0.15,
+
+      "prompt": "You are the backend specialist for FlowerConnect.\n\nStack: Spring Boot 3.2.5, Java 17, Maven, Spring Security 6, Spring Data JPA, Hibernate 6, Flyway, MySQL 8, JWT, BCrypt, MapStruct, Bean Validation, springdoc OpenAPI.\n\nArchitecture:\nController -> Service -> Repository.\nControllers are thin. Business rules belong in services. Persistence belongs in repositories. DTOs are used at API boundaries.\n\nRules:\n- Use Java 17 features compatible with the project.\n- Follow existing package structure and naming conventions.\n- Use DTOs and MapStruct where established by the project.\n- Validate request DTOs with Bean Validation.\n- Keep REST endpoints under /api/v1.\n- Use ResponseEntity consistently with existing controllers.\n- Use @RestControllerAdvice for error handling.\n- Use Flyway additive migrations for schema changes.\n- Never rely on ddl-auto to mutate production schema.\n- Preserve existing JWT access/refresh-token behavior.\n- Preserve RBAC and security configuration.\n- Preserve BCrypt password handling.\n- Avoid N+1 queries and LazyInitializationException.\n- Prefer explicit fetch strategies/query methods over Open Session in View workarounds.\n- Preserve rate limiting and security protections.\n- Do not introduce Redis; current rate limiting uses Caffeine.\n- Add/update tests for changed services and controllers.\n- Follow existing test naming conventions such as *ServiceTest and *ControllerTest.\n\nVerification:\n1. ./mvnw test\n2. ./mvnw clean package when appropriate\n3. Inspect the final git diff\n\nDo not modify frontend files. Do not modify .env or generated build artifacts.",
+
       "permission": {
         "edit": {
+          "*": "deny",
           "*.java": "allow",
           "*.sql": "allow",
           "pom.xml": "allow",
           "application.yml": "allow",
-          "*.md": "allow",
-          "*": "deny"
+          "application-*.yml": "allow",
+          "*.md": "allow"
         },
         "bash": {
-          "./mvnw": "allow",
-          "java": "allow",
-          "git *": "ask"
+          "*": "ask",
+          "./mvnw test": "allow",
+          "./mvnw clean package": "allow",
+          "./mvnw clean verify": "allow",
+          "git status *": "allow",
+          "git diff *": "allow",
+          "git log *": "allow"
         }
       }
     },
+
     "frontend-engineer": {
-      "description": "React 18 + TypeScript + Vite frontend specialist",
+      "description": "React 18 + TypeScript + Vite specialist for FlowerConnect",
       "mode": "subagent",
       "color": "#a855f7",
-      "prompt": "Frontend engineer for React 18 + TypeScript (strict) + Vite. Key rules: all files .ts/.tsx, React 18 function components, Tailwind utility classes (brand green palette), Zustand for auth state, TanStack Query for server data, react-hook-form + zod for forms, API calls via src/shared/lib/api.ts, routing in src/app/router.tsx, feature-sliced layout (src/features/<feature>/). Use 2-space indent, ESLint + Prettier. Run npm run lint and npm run build before completion.",
+      "steps": 18,
+      "temperature": 0.15,
+
+      "prompt": "You are the frontend specialist for FlowerConnect.\n\nStack: React 18, TypeScript strict, Vite, Tailwind CSS, React Router, Zustand, TanStack Query, Axios, React Hook Form, Zod, Vitest, Testing Library.\n\nArchitecture:\n- Feature-sliced structure under src/features/<feature>/.\n- Routing belongs in src/app/router.tsx.\n- Shared API client belongs in src/shared/lib/api.ts.\n- Zustand is used for client/auth state.\n- TanStack Query is used for server state.\n- Forms use React Hook Form + Zod where appropriate.\n\nCurrent UI considerations:\n- Preserve the existing home-page motion/3D architecture.\n- The 3D bouquet hero is resilient and must retain WebGL fallback/error-boundary/reduced-motion/pointer-capability behavior.\n- Do not replace a working fallback with WebGL-only behavior.\n- Keep expensive animation/render loops paused when not visible where the existing implementation supports it.\n\nRules:\n- TypeScript strict; avoid any unless justified.\n- Use React function components.\n- Follow existing Tailwind conventions and design tokens.\n- Keep components focused and reusable.\n- Avoid unnecessary state and effects.\n- Use semantic HTML and accessible interactions.\n- Preserve responsive behavior.\n- Preserve reduced-motion accessibility.\n- Keep API calls through the shared API layer.\n- Do not directly duplicate Axios configuration.\n- Add/update Vitest tests for meaningful behavior changes.\n- Run lint, typecheck, tests, and production build for affected work.\n- Do not modify backend files.\n- Do not modify .env or generated build artifacts.",
+
       "permission": {
         "edit": {
-          "*.{ts,tsx,js,jsx,css,html,md}": "allow",
-          "*": "deny"
+          "*": "deny",
+          "frontend/**/*.{ts,tsx,js,jsx,css,html,md}": "allow",
+          "frontend/package.json": "allow",
+          "frontend/package-lock.json": "allow",
+          "frontend/vite.config.*": "allow",
+          "frontend/tailwind.config.*": "allow",
+          "frontend/postcss.config.*": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "npm run lint": "allow",
+          "npm run test": "allow",
+          "npm run build": "allow",
+          "npx tsc --noEmit": "allow",
+          "git status *": "allow",
+          "git diff *": "allow",
+          "git log *": "allow"
+        }
+      }
+    },
+
+    "security-reviewer": {
+      "description": "Security reviewer for FlowerConnect backend, frontend, API and authentication",
+      "mode": "subagent",
+      "color": "#ef4444",
+      "steps": 12,
+      "temperature": 0.1,
+
+      "prompt": "Perform a read-only security review of the requested FlowerConnect change.\n\nFocus on:\n- Spring Security configuration\n- JWT access and refresh tokens\n- refresh-token rotation/reuse detection\n- BCrypt/password handling\n- RBAC and authorization boundaries\n- CORS/CSRF configuration\n- Bean Validation\n- API input/output exposure\n- IDOR/BOLA risks\n- rate limiting\n- sensitive logging\n- secret handling\n- SQL/JPA injection risks\n- dependency/configuration risks\n- frontend token handling and auth state\n- unsafe browser APIs\n- XSS/HTML injection\n- WebGL/3D resource abuse where relevant\n\nDo not modify files. Report concrete findings with severity, affected files, evidence, and remediation guidance. Do not speculate when evidence is unavailable.",
+
+      "permission": {
+        "edit": "deny",
+        "bash": {
+          "*": "deny",
+          "git status *": "allow",
+          "git diff *": "allow",
+          "git log *": "allow"
+        }
+      }
+    },
+
+    "test-engineer": {
+      "description": "Testing and regression specialist for FlowerConnect",
+      "mode": "subagent",
+      "color": "#f59e0b",
+      "steps": 15,
+      "temperature": 0.1,
+
+      "prompt": "You are the testing specialist for FlowerConnect.\n\nDetermine the smallest meaningful verification matrix for the requested change.\n\nBackend:\n- ./mvnw test\n- targeted service/controller tests\n- ./mvnw clean package when the change affects packaging/configuration\n\nFrontend:\n- npm run lint\n- npx tsc --noEmit\n- npm run test\n- npm run build\n\nIntegration:\n- Use Docker Compose health checks and integration tests when the change crosses service boundaries.\n- Do not assume a test passes; inspect its result.\n\nLook for:\n- regressions\n- missing edge cases\n- auth/authorization regressions\n- validation failures\n- API contract mismatches\n- frontend/backend type mismatches\n- accessibility regressions\n- responsive UI regressions\n- reduced-motion regressions\n\nYou may add or improve tests when necessary. Do not make unrelated production changes.",
+
+      "permission": {
+        "bash": {
+          "*": "ask",
+          "./mvnw test": "allow",
+          "./mvnw clean package": "allow",
+          "npm run lint": "allow",
+          "npm run test": "allow",
+          "npm run build": "allow",
+          "npx tsc --noEmit": "allow",
+          "docker compose ps": "allow",
+          "docker compose config": "allow",
+          "git status *": "allow",
+          "git diff *": "allow"
+        }
+      }
+    },
+
+    "documentation-engineer": {
+      "description": "Maintains FlowerConnect project documentation without unnecessary documentation churn",
+      "mode": "subagent",
+      "color": "#06b6d4",
+      "steps": 10,
+      "temperature": 0.15,
+
+      "prompt": "Maintain FlowerConnect documentation based on verified implementation facts.\n\nRead:\n- AGENTS.md\n- docs/architecture.md\n- docs/progress.md\n- docs/decisions.md\n- docs/known-issues.md\n- relevant changed source files\n\nRules:\n- Do not invent features or status.\n- docs/progress.md records actual completed work.\n- docs/architecture.md records actual structural architecture.\n- docs/decisions.md records meaningful architectural decisions as ADR-style entries.\n- docs/known-issues.md records confirmed bugs, limitations and blockers.\n- Do not create an ADR for a routine implementation detail.\n- Do not rewrite unchanged sections.\n- Keep documentation concise and consistent with the existing style.\n- Never modify application source code.",
+
+      "permission": {
+        "edit": {
+          "*": "deny",
+          "AGENTS.md": "allow",
+          "docs/*.md": "allow"
+        },
+        "bash": {
+          "*": "deny",
+          "git status *": "allow",
+          "git diff *": "allow",
+          "git log *": "allow"
         }
       }
     }
   },
+
   "command": {
     "build-check": {
-      "description": "Run full build and test verification for the project",
-      "template": "Run all build, test, and lint checks to verify the project state.\n\n## Backend\n1. `cd backend && ./mvnw test` (unit tests, excludes @Tag(\"integration\"))\n2. `./mvnw clean package` (full build)\n\n## Frontend\n1. `cd frontend && npm install` (if needed)\n2. `npm run lint`\n3. `npx tsc --noEmit` (type checking)\n4. `npm run test` (Vitest)\n5. `npm run build` (production build)\n\n## Report\nSummarize: what passed/failed, errors, and deployability.",
+      "description": "Run the complete FlowerConnect verification suite without modifying dependencies unnecessarily",
+      "template": "Run the full verification suite for the current FlowerConnect state.\n\n## 1. Repository state\n- `git status`\n- `git diff --check`\n- `git log --oneline -10`\n\n## 2. Backend\n- `cd backend && ./mvnw test`\n- If the backend change affects packaging/configuration: `cd backend && ./mvnw clean package`\n\n## 3. Frontend\n- Do NOT run `npm install` automatically.\n- Run `cd frontend && npm run lint`\n- Run `cd frontend && npx tsc --noEmit`\n- Run `cd frontend && npm run test`\n- Run `cd frontend && npm run build`\n\n## 4. Docker/integration when relevant\n- `docker compose config`\n- `docker compose ps`\n- Run integration verification only when the changed feature requires it.\n\n## 5. Report\nReport every check as PASS, FAIL, or NOT RUN.\nFor failures include the actual error, likely root cause, and whether it was fixed.\nNever report the project as verified when a required check failed.",
       "agent": "autonomous-engineer"
     },
+
+    "backend-check": {
+      "description": "Verify FlowerConnect backend",
+      "template": "Verify the backend only.\n\n1. `git diff --check`\n2. `cd backend && ./mvnw test`\n3. If packaging/configuration changed: `cd backend && ./mvnw clean package`\n4. Inspect the final diff.\n5. Report PASS/FAIL for each check and list unresolved issues.",
+      "agent": "backend-engineer"
+    },
+
+    "frontend-check": {
+      "description": "Verify FlowerConnect frontend",
+      "template": "Verify the frontend only.\n\n1. `git diff --check`\n2. `cd frontend && npm run lint`\n3. `cd frontend && npx tsc --noEmit`\n4. `cd frontend && npm run test`\n5. `cd frontend && npm run build`\n6. Inspect the final diff.\n7. Report PASS/FAIL for each check and list unresolved issues.",
+      "agent": "frontend-engineer"
+    },
+
+    "security-audit": {
+      "description": "Perform a read-only FlowerConnect security audit",
+      "template": "Perform a read-only security audit of the current FlowerConnect implementation.\n\nInspect authentication, authorization, JWT handling, refresh-token security, password handling, CORS/CSRF, rate limiting, API validation, sensitive data exposure, frontend auth state, dependency/configuration risks, and relevant changed code.\n\nDo not modify files.\n\nReport:\n- Finding\n- Severity\n- Evidence\n- Affected file\n- Recommended remediation\n\nDo not speculate beyond available evidence.",
+      "agent": "security-reviewer"
+    },
+
+    "test-check": {
+      "description": "Run targeted regression verification for FlowerConnect",
+      "template": "Determine and run the smallest meaningful regression suite for the current changes.\n\nBackend: Maven tests as required.\nFrontend: lint, typecheck, Vitest, build as required.\nDocker/integration: only when the changed functionality crosses service boundaries.\n\nReport PASS/FAIL/NOT RUN for every check and explain failures.",
+      "agent": "test-engineer"
+    },
+
     "self-maintain": {
-      "description": "Verify and update project documentation",
-      "template": "Audit project documentation for currency.\n\n1. Read AGENTS.md + all docs/*.md + kilo.jsonc.\n2. Run `git status` and `git log --oneline -10`.\n3. Compare against actual code.\n4. Update: docs/progress.md (status), docs/architecture.md (structural changes), docs/decisions.md (new ADRs), docs/known-issues.md (bugs/limitations).\n5. Report what was updated vs. already current.",
-      "agent": "autonomous-engineer"
+      "description": "Synchronize FlowerConnect documentation with the verified codebase",
+      "template": "Audit FlowerConnect documentation against the actual repository.\n\n1. Read AGENTS.md.\n2. Read docs/architecture.md, docs/progress.md, docs/decisions.md, docs/known-issues.md.\n3. Inspect relevant source/configuration files.\n4. Run `git status` and `git log --oneline -10`.\n5. Identify only factual documentation drift.\n6. Update only the documents that are actually affected.\n7. Do not invent status or create unnecessary ADRs.\n8. Report exactly what changed and what was already current.",
+      "agent": "documentation-engineer"
     }
   }
 }
