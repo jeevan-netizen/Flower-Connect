@@ -1,17 +1,15 @@
 import { useId } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
 import { FlowerSuccess } from "@/motion/FlowerSuccess";
+import { PRESSABLE } from "@/motion/pressable";
 
 /*
- * Interaction feedback classes shared by every control in the app. Durations and
- * easings come from the motion tokens via `tailwind.config.ts`
+ * Durations and easings come from the motion tokens via `tailwind.config.ts`
  * (`duration-micro ease-standard`), never from a literal millisecond value.
- * The focus ring is untouched: press feedback must not cost a keyboard user the
- * visible indicator.
+ * `PRESSABLE` is the app-wide press feedback and lives in `@/motion/pressable` so
+ * every feature composes one definition; the focus ring stays out of it, because
+ * press feedback must not cost a keyboard user the visible indicator.
  */
-const PRESSABLE =
-  "transition-[background-color,border-color,color,box-shadow,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100";
-
 const CONTROL_CLASS =
   "mt-1 block w-full rounded-md border-slate-300 shadow-sm transition-[border-color,box-shadow] duration-micro ease-standard focus:border-brand-500 focus:ring-brand-500 sm:text-sm";
 const ERROR_BORDER = "border-red-500";

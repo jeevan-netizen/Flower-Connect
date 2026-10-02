@@ -7,6 +7,7 @@ import { adminReasonSchema, type AdminReasonValues } from "@/features/admin/form
 import { ADMIN_REASON_MAX_LENGTH } from "@/features/admin/types";
 import { backdropVariants, dialogVariants } from "@/motion/tokens";
 import { usePrefersReducedMotion } from "@/motion/use-reduced-motion";
+import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 import type { ApiErrorInfo } from "@/shared/lib/api-error";
 
 interface ReasonDialogProps {
@@ -131,7 +132,7 @@ export function ReasonDialog({
               type="button"
               onClick={onCancel}
               disabled={isSubmitting}
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 transition-[background-color,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              className={`rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
             >
               Cancel
             </button>

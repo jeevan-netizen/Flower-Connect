@@ -12,6 +12,7 @@ import { AnimatedPage } from "@/motion/AnimatedPage";
 import { FadeIn } from "@/motion/FadeIn";
 import { useInitAuth, RequireAuth, RequireUnauth } from "@/features/auth/hooks/useAuth";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { HomePage } from "@/features/home/pages/HomePage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
@@ -143,15 +144,6 @@ function Layout() {
         &copy; 2026 FlowerConnect
       </footer>
     </div>
-  );
-}
-
-function HomePage() {
-  return (
-    <FadeIn className="max-w-7xl mx-auto px-4 py-12 text-center">
-      <h1 className="text-4xl font-bold text-brand-700">FlowerConnect</h1>
-      <p className="mt-3 text-slate-600">Hyperlocal flower marketplace</p>
-    </FadeIn>
   );
 }
 

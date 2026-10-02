@@ -6,6 +6,7 @@ import { VendorErrorState } from "@/features/vendor/components/VendorErrorState"
 import { VendorStatusBanner } from "@/features/vendor/components/VendorStatusBanner";
 import { countOpenDays } from "@/features/vendor/format";
 import { FlowerLoader } from "@/motion/FlowerLoader";
+import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
 interface VendorNavItem {
   to: string;
@@ -30,7 +31,7 @@ function navClass({ isActive }: { isActive: boolean }): string {
     // Duration/easing come from the motion tokens via `tailwind.config.ts`;
     // `focus-visible` keeps a visible ring on the keyboard path.
     "block rounded-md px-3 py-2 text-sm font-medium transition-colors duration-micro ease-standard",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2",
+    FOCUS_RING,
     isActive
       ? "bg-brand-600 text-white"
       : "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
@@ -84,7 +85,7 @@ export function VendorLayout() {
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-4 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-[background-color,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            className={`mt-4 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
           >
             Log out
           </button>
