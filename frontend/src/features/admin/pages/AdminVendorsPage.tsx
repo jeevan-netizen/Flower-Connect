@@ -23,6 +23,7 @@ import { AdminErrorState } from "@/features/admin/components/AdminErrorState";
 import { AdminVendorStatusBadge } from "@/features/admin/components/AdminStatusBadge";
 import { Pagination } from "@/features/admin/components/Pagination";
 import { ReasonDialog } from "@/features/admin/components/ReasonDialog";
+import { AnimatePresence } from "framer-motion";
 import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
 
 const STATUS_FILTER_OPTIONS: { value: VendorStatus | null; label: string }[] = [
@@ -246,19 +247,26 @@ export function AdminVendorsPage() {
         </div>
       )}
 
-      {pending && (
-        <ReasonDialog
-          key={`${pending.vendor.id}-${pending.action}`}
-          heading={VENDOR_ACTION_HEADINGS[pending.action]}
-          description={`${pending.vendor.businessName} (${pending.vendor.ownerEmail}) is currently ${pending.vendor.status.replace(/_/g, " ").toLowerCase()}.`}
-          confirmLabel={VENDOR_ACTION_LABELS[pending.action]}
-          requiresReason={vendorActionRequiresReason(pending.action)}
-          isSubmitting={runAction.isPending}
-          error={actionError}
-          onConfirm={(reason) => void confirmAction(reason)}
-          onCancel={closeDialog}
-        />
-      )}
+      {/*
+        `AnimatePresence` gives the dialog its exit animation when it closes.
+        `mode="wait"` keeps one dialog on screen at a time, so switching the
+        pending target cannot show two overlapping modals.
+      */}
+      <AnimatePresence mode="wait">
+        {pending && (
+          <ReasonDialog
+            key={`${pending.vendor.id}-${pending.action}`}
+            heading={VENDOR_ACTION_HEADINGS[pending.action]}
+            description={`${pending.vendor.businessName} (${pending.vendor.ownerEmail}) is currently ${pending.vendor.status.replace(/_/g, " ").toLowerCase()}.`}
+            confirmLabel={VENDOR_ACTION_LABELS[pending.action]}
+            requiresReason={vendorActionRequiresReason(pending.action)}
+            isSubmitting={runAction.isPending}
+            error={actionError}
+            onConfirm={(reason) => void confirmAction(reason)}
+            onCancel={closeDialog}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

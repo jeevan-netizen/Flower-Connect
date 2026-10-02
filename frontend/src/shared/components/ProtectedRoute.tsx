@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { FlowerLoader } from "@/motion/FlowerLoader";
 
 interface ProtectedRouteProps {
   /**
@@ -15,10 +16,10 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-function FullPageSpinner() {
+function FullPageLoader() {
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
+    <div className="flex min-h-screen items-center justify-center">
+      <FlowerLoader label="Checking your session" />
     </div>
   );
 }
@@ -29,7 +30,7 @@ function FullPageSpinner() {
  * keeps its own copy of the session.
  *
  * Three outcomes:
- *   - session not restored yet → spinner (the "initial load finished" flag is
+ *   - session not restored yet → loader (the "initial load finished" flag is
  *     set on success *and* failure, so this cannot hang);
  *   - not authenticated → redirect to `/login`, remembering where the user was;
  *   - authenticated but wrong role → redirect home, because the user signed in
@@ -47,7 +48,7 @@ export function ProtectedRoute({ roles, children }: ProtectedRouteProps) {
   }, [hasLoadedInitial, isAuthenticated, location.pathname, navigate]);
 
   if (!hasLoadedInitial || !isAuthenticated) {
-    return <FullPageSpinner />;
+    return <FullPageLoader />;
   }
 
   if (roles && roles.length > 0 && (!user || !roles.includes(user.role))) {

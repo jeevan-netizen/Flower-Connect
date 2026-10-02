@@ -1,5 +1,15 @@
-import { createBrowserRouter, Link, Outlet, RouterProvider, useNavigate } from "react-router-dom";
+import {
+  createBrowserRouter,
+  Link,
+  Outlet,
+  RouterProvider,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence } from "framer-motion";
+import { AnimatedPage } from "@/motion/AnimatedPage";
+import { FadeIn } from "@/motion/FadeIn";
 import { useInitAuth, RequireAuth, RequireUnauth } from "@/features/auth/hooks/useAuth";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
@@ -27,9 +37,18 @@ const VENDOR_ROLE = "FLORIST";
 /** Seeded role name for administrators (`roles` row 3, V3__seed_roles.sql). */
 const ADMIN_ROLE = "ADMIN";
 
+/**
+ * Header link/button treatment. Durations come from the motion tokens via
+ * `tailwind.config.ts`; the `focus-visible` ring is explicit because the header
+ * background is dark and the default ring does not read against it.
+ */
+const NAV_LINK =
+  "rounded transition-colors duration-micro ease-standard hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-600";
+
 function Layout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { isAuthenticated, user, logout } = useAuthStore();
 
   const handleLogout = () => {
@@ -46,37 +65,79 @@ function Layout() {
     <div className="min-h-screen flex flex-col">
       <header className="bg-brand-600 text-white">
         <nav className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="text-xl font-bold">
+          <Link
+            to="/"
+            className="rounded text-xl font-bold transition-opacity duration-micro ease-standard hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-600"
+          >
             FlowerConnect
           </Link>
           <div className="flex gap-4 text-sm">
             {isAuthenticated ? (
               <>
-                <Link to="/browse">Browse</Link>
-                <Link to="/cart">Cart</Link>
-                <Link to="/orders">Orders</Link>
-                {user?.role === VENDOR_ROLE && <Link to="/vendor">Vendor</Link>}
-                {user?.role === ADMIN_ROLE && <Link to="/admin">Admin</Link>}
-                <button onClick={handleLogout} className="hover:underline">
+                <Link className={NAV_LINK} to="/browse">
+                  Browse
+                </Link>
+                <Link className={NAV_LINK} to="/cart">
+                  Cart
+                </Link>
+                <Link className={NAV_LINK} to="/orders">
+                  Orders
+                </Link>
+                {user?.role === VENDOR_ROLE && (
+                  <Link className={NAV_LINK} to="/vendor">
+                    Vendor
+                  </Link>
+                )}
+                {user?.role === ADMIN_ROLE && (
+                  <Link className={NAV_LINK} to="/admin">
+                    Admin
+                  </Link>
+                )}
+                <button onClick={handleLogout} className={`${NAV_LINK} hover:underline`}>
                   Log out
                 </button>
               </>
             ) : (
               <>
-                <Link to="/login">Login</Link>
-                <Link to="/register">Register</Link>
+                <Link className={NAV_LINK} to="/login">
+                  Login
+                </Link>
+                <Link className={NAV_LINK} to="/register">
+                  Register
+                </Link>
                 {/* Phase 1's vendor onboarding entry point: it was a forward link to a
                     Phase 2 that did not exist yet, and now resolves to the registration
                     page. Kept in the signed-out branch because registering creates a new
                     account — a signed-in visitor must not end up with two. */}
-                <Link to="/vendor/register">For florists</Link>
+                <Link className={NAV_LINK} to="/vendor/register">
+                  For florists
+                </Link>
               </>
             )}
           </div>
         </nav>
       </header>
       <main className="flex-1">
-        <Outlet />
+        {/*
+          Route transition. `AnimatedPage` is keyed by pathname, so a navigation
+          plays its exit on the outgoing page and its entry on the incoming one.
+
+          Three deliberate choices:
+          - `mode="wait"` so the two pages are never painted at the same time
+            (no overlap flash, no double render of the routed page);
+          - `initial={false}` so the first page of a session appears immediately
+            instead of animating in behind a blank frame;
+          - the wrapper sits *inside* the shell, below the route guards. A guard
+            redirect therefore swaps the whole branch above it, and can never
+            leave a half-exited page underneath the redirect target.
+          Nothing here blocks navigation: the exit is `durations.ui` (240ms) and
+          `AnimatedPage` skips both states entirely when reduced motion is set.
+        */}
+        <AnimatePresence mode="wait" initial={false}>
+          <AnimatedPage key={location.pathname}>
+            <Outlet />
+          </AnimatedPage>
+        </AnimatePresence>
       </main>
       <footer className="bg-slate-100 text-center text-sm py-4">
         &copy; 2026 FlowerConnect
@@ -87,19 +148,19 @@ function Layout() {
 
 function HomePage() {
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12 text-center">
+    <FadeIn className="max-w-7xl mx-auto px-4 py-12 text-center">
       <h1 className="text-4xl font-bold text-brand-700">FlowerConnect</h1>
       <p className="mt-3 text-slate-600">Hyperlocal flower marketplace</p>
-    </div>
+    </FadeIn>
   );
 }
 
 function Placeholder({ title }: { title: string }) {
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12">
+    <FadeIn className="max-w-7xl mx-auto px-4 py-12">
       <h2 className="text-2xl font-semibold">{title}</h2>
       <p className="mt-2 text-slate-600">Phase 0 placeholder page.</p>
-    </div>
+    </FadeIn>
   );
 }
 

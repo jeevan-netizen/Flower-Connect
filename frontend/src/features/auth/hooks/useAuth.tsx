@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { FlowerLoader } from "@/motion/FlowerLoader";
 
 export function useAuth() {
   return useAuthStore();
@@ -41,8 +42,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (!hasLoadedInitial || !isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
+      <div className="flex min-h-screen items-center justify-center">
+        <FlowerLoader label="Checking your session" />
       </div>
     );
   }
@@ -62,8 +63,8 @@ export function RequireUnauth({ children }: { children: React.ReactNode }) {
 
   if (!hasLoadedInitial || isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
+      <div className="flex min-h-screen items-center justify-center">
+        <FlowerLoader label="Checking your session" />
       </div>
     );
   }

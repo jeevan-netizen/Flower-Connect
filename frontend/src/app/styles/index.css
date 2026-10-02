@@ -1,3 +1,161 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Motion tokens, mirrored from `src/motion/tokens.ts`.
+ * Framer Motion reads the TypeScript object; CSS animations and Tailwind's
+ * `duration-*` / `ease-*` utilities read these variables. Change one, change
+ * both — nothing outside this pair may name a duration.
+ */
+@layer base {
+  :root {
+    --fc-motion-duration-micro: 150ms;
+    --fc-motion-duration-ui: 240ms;
+    --fc-motion-duration-page: 320ms;
+    --fc-motion-duration-ambient: 6000ms;
+
+    --fc-motion-ease-standard: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --fc-motion-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+    --fc-motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+    --fc-motion-stagger: 50ms;
+    --fc-motion-distance-enter: 12px;
+    --fc-motion-distance-exit: -8px;
+    --fc-motion-distance-lift: -2px;
+  }
+}
+
+/* Keyframes for the CSS-only half of the motion layer. */
+@keyframes fc-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fc-slide-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--fc-motion-distance-enter));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fc-bloom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-12deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes fc-check-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fc-flower-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Enter utilities. Applied to a className, not to an element type, so they can
+   be handed straight to any shared component without changing its API. */
+.fc-fade-in {
+  animation: fc-fade-in var(--fc-motion-duration-ui) var(--fc-motion-ease-standard) both;
+}
+
+.fc-slide-up-in {
+  animation: fc-slide-up-in var(--fc-motion-duration-page) var(--fc-motion-ease-enter) both;
+}
+
+.fc-bloom-in {
+  animation: fc-bloom-in var(--fc-motion-duration-page) var(--fc-motion-ease-enter) both;
+}
+
+.fc-check-draw {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 0;
+  animation: fc-check-draw var(--fc-motion-duration-page) var(--fc-motion-ease-enter) both;
+}
+
+/* FlowerLoader: five petals and a core, turned slowly by one CSS transform. */
+.fc-flower-spinner {
+  display: inline-block;
+  width: 1.75rem;
+  height: 1.75rem;
+  position: relative;
+  animation: fc-flower-spin var(--fc-motion-duration-ambient) linear infinite;
+}
+
+.fc-flower-spinner > span {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-left: -0.35rem;
+  border-radius: 9999px;
+  background-color: theme("colors.brand.500");
+  opacity: 0.55;
+  transform-origin: 50% 0.875rem;
+}
+
+.fc-flower-spinner > span:nth-child(2) {
+  transform: rotate(72deg);
+}
+.fc-flower-spinner > span:nth-child(3) {
+  transform: rotate(144deg);
+}
+.fc-flower-spinner > span:nth-child(4) {
+  transform: rotate(216deg);
+}
+.fc-flower-spinner > span:nth-child(5) {
+  transform: rotate(288deg);
+}
+
+.fc-flower-spinner > span:last-child {
+  top: 50%;
+  left: 50%;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin: -0.3rem 0 0 -0.3rem;
+  background-color: theme("colors.brand.700");
+  opacity: 1;
+  transform-origin: center;
+}
+
+/*
+ * `prefers-reduced-motion: reduce` — Framer Motion is already handled by
+ * `<MotionConfig reducedMotion="user">` in `src/main.tsx`. This covers the
+ * CSS-only effects and every Tailwind `transition-*` utility in the app:
+ * animations collapse to their end state and transitions become instant rather
+ * than being removed, so nothing keeps a `transform` or `opacity` mid-flight.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -18,6 +18,7 @@ import { AdminErrorState } from "@/features/admin/components/AdminErrorState";
 import { AdminUserStatusBadge } from "@/features/admin/components/AdminStatusBadge";
 import { Pagination } from "@/features/admin/components/Pagination";
 import { ReasonDialog } from "@/features/admin/components/ReasonDialog";
+import { AnimatePresence } from "framer-motion";
 import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
 
 const ROLE_OPTIONS: { value: AdminRole | null; label: string }[] = [
@@ -265,19 +266,23 @@ export function AdminUsersPage() {
         </div>
       )}
 
-      {pending && (
-        <ReasonDialog
-          key={`${pending.user.id}-${pending.status}`}
-          heading={`Set ${pending.user.email} to ${formatUserStatus(pending.status).toLowerCase()}?`}
-          description={`${pending.user.fullName} is currently ${pending.user.status.toLowerCase()}. Changing status also signs this account out everywhere.`}
-          confirmLabel={`Set to ${formatUserStatus(pending.status)}`}
-          requiresReason
-          isSubmitting={updateStatus.isPending}
-          error={actionError}
-          onConfirm={(reason) => void confirmChange(reason)}
-          onCancel={closeDialog}
-        />
-      )}
+      {/* `AnimatePresence` gives the dialog its exit animation; `mode="wait"`
+          keeps one dialog on screen at a time when the target changes. */}
+      <AnimatePresence mode="wait">
+        {pending && (
+          <ReasonDialog
+            key={`${pending.user.id}-${pending.status}`}
+            heading={`Set ${pending.user.email} to ${formatUserStatus(pending.status).toLowerCase()}?`}
+            description={`${pending.user.fullName} is currently ${pending.user.status.toLowerCase()}. Changing status also signs this account out everywhere.`}
+            confirmLabel={`Set to ${formatUserStatus(pending.status)}`}
+            requiresReason
+            isSubmitting={updateStatus.isPending}
+            error={actionError}
+            onConfirm={(reason) => void confirmChange(reason)}
+            onCancel={closeDialog}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

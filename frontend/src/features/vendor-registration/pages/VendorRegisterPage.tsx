@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { SlideUp } from "@/motion/SlideUp";
 import { useRegisterVendor, useServiceLocations } from "@/features/vendor-registration/queries";
 import {
   isVendorRegisterField,
@@ -100,7 +101,7 @@ export function VendorRegisterPage() {
 
   if (registered) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
+      <SlideUp className="mx-auto max-w-2xl space-y-6">
         <PageHeading
           title="Application received"
           description="FlowerConnect reviews every new florist before it can list products."
@@ -120,7 +121,7 @@ export function VendorRegisterPage() {
             <Link
               to="/login"
               state={{ registeredEmail, from: "/vendor" }}
-              className="rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              className="rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-[background-color,box-shadow,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100"
             >
               Sign in to your vendor dashboard
             </Link>
@@ -130,18 +131,18 @@ export function VendorRegisterPage() {
                 setRegistered(null);
                 setRegisteredEmail(null);
               }}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-[background-color,box-shadow,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100"
             >
               Register another shop
             </button>
           </div>
         </Card>
-      </div>
+      </SlideUp>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <SlideUp className="mx-auto max-w-2xl space-y-6">
       <PageHeading
         title="Register your flower shop"
         description="Create a florist account and tell us where you deliver. An administrator approves every new shop before it can list products."
@@ -301,6 +302,6 @@ export function VendorRegisterPage() {
         </Link>
         .
       </p>
-    </div>
+    </SlideUp>
   );
 }

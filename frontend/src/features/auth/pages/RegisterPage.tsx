@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { SlideUp } from "@/motion/SlideUp";
 
 const registerSchema = z
   .object({
@@ -50,7 +51,7 @@ export function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
+      <SlideUp className="w-full max-w-md space-y-8">
         <div>
           <h2 className="mt-6 text-3xl font-bold text-brand-700">Create your account</h2>
           <p className="mt-2 text-sm text-slate-600">Join FlowerConnect today</p>
@@ -151,7 +152,7 @@ export function RegisterPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full rounded-md border border-transparent bg-brand-600 py-2.5 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-md border border-transparent bg-brand-600 py-2.5 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 transition-[background-color,box-shadow,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100"
           >
             {isLoading ? "Creating account..." : "Create account"}
           </button>
@@ -166,7 +167,7 @@ export function RegisterPage() {
             Sign in
           </Link>
         </p>
-      </div>
+      </SlideUp>
     </div>
   );
 }

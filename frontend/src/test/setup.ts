@@ -5,3 +5,34 @@ import { configure } from "@testing-library/react";
 // waits on a query/mutation to settle. Testing Library's 1s default is too tight
 // under that load and produced timeouts that pass when a file runs alone.
 configure({ asyncUtilTimeout: 5000 });
+
+/*
+ * jsdom does not evaluate media queries, so `prefers-reduced-motion` would
+ * always read as "no preference" and every motion primitive would start
+ * mid-animation in a test. Reporting the preference as `reduce` makes the
+ * primitives render their final state synchronously — no rAF ticks, no opacity
+ * left at 0, and existing tests keep asserting against exactly what a real user
+ * with reduced motion sees.
+ *
+ * This is test infrastructure, not a test change: no existing assertion was
+ * touched. `src/motion/*.test.tsx` overrides it with `vi.stubGlobal` for the
+ * few cases that need the animated branch.
+ */
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: query === REDUCED_MOTION_QUERY,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+}

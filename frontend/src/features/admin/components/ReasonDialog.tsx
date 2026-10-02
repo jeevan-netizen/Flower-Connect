@@ -1,9 +1,12 @@
 import { useId } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { motion } from "framer-motion";
 import { TextField, FormErrorSummary, SubmitButton } from "@/features/vendor/components/FormFields";
 import { adminReasonSchema, type AdminReasonValues } from "@/features/admin/form-schema";
 import { ADMIN_REASON_MAX_LENGTH } from "@/features/admin/types";
+import { backdropVariants, dialogVariants } from "@/motion/tokens";
+import { usePrefersReducedMotion } from "@/motion/use-reduced-motion";
 import type { ApiErrorInfo } from "@/shared/lib/api-error";
 
 interface ReasonDialogProps {
@@ -41,7 +44,8 @@ interface ReasonDialogProps {
  *
  * Callers render this only while an action is pending, and should give it a `key`
  * derived from the target id so switching targets remounts the form rather than
- * carrying a stale reason across.
+ * carrying a stale reason across. That same key is what lets
+ * `AnimatePresence` play the dialog's exit before the next one arrives.
  */
 export function ReasonDialog({
   heading,
@@ -55,6 +59,11 @@ export function ReasonDialog({
 }: ReasonDialogProps) {
   const headingId = useId();
   const descriptionId = useId();
+  // Reduced motion drops both the entry and the exit state, so the dialog appears
+  // and disappears in the same tick as the surrounding `AnimatePresence` sees it.
+  const reduceMotion = usePrefersReducedMotion();
+  const enterState = reduceMotion ? false : "hidden";
+  const exitState = reduceMotion ? undefined : "exit";
 
   const {
     register,
@@ -70,13 +79,23 @@ export function ReasonDialog({
     : () => onConfirm(undefined);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      variants={backdropVariants}
+      initial={enterState}
+      animate="visible"
+      exit={exitState}
+    >
+      <motion.div
         role="dialog"
         aria-modal="true"
         aria-labelledby={headingId}
         aria-describedby={descriptionId}
         className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
+        variants={dialogVariants}
+        initial={enterState}
+        animate="visible"
+        exit={exitState}
       >
         <h2 id={headingId} className="text-base font-semibold text-slate-900">
           {heading}
@@ -112,7 +131,7 @@ export function ReasonDialog({
               type="button"
               onClick={onCancel}
               disabled={isSubmitting}
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 transition-[background-color,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
             >
               Cancel
             </button>
@@ -123,7 +142,7 @@ export function ReasonDialog({
             />
           </div>
         </form>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

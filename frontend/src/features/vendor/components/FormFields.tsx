@@ -1,8 +1,19 @@
 import { useId } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
+import { FlowerSuccess } from "@/motion/FlowerSuccess";
+
+/*
+ * Interaction feedback classes shared by every control in the app. Durations and
+ * easings come from the motion tokens via `tailwind.config.ts`
+ * (`duration-micro ease-standard`), never from a literal millisecond value.
+ * The focus ring is untouched: press feedback must not cost a keyboard user the
+ * visible indicator.
+ */
+const PRESSABLE =
+  "transition-[background-color,border-color,color,box-shadow,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100";
 
 const CONTROL_CLASS =
-  "mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm";
+  "mt-1 block w-full rounded-md border-slate-300 shadow-sm transition-[border-color,box-shadow] duration-micro ease-standard focus:border-brand-500 focus:ring-brand-500 sm:text-sm";
 const ERROR_BORDER = "border-red-500";
 
 interface TextFieldProps {
@@ -152,7 +163,7 @@ export function SubmitButton({ isSubmitting, idleLabel, busyLabel }: SubmitButto
     <button
       type="submit"
       disabled={isSubmitting}
-      className="rounded-md border border-transparent bg-brand-600 py-2 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+      className={`rounded-md border border-transparent bg-brand-600 py-2 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
     >
       {isSubmitting ? busyLabel : idleLabel}
     </button>
@@ -170,13 +181,18 @@ export function FormErrorSummary({ message }: { message: string | null }) {
   );
 }
 
+/**
+ * Success feedback after a save. The message itself is unchanged — only the
+ * presentation is: a blooming flower mark plus the CSS enter animation, with
+ * the live-region semantics (`role="status"`) the screen reader already relied on.
+ */
 export function SuccessMessage({ message }: { message: string | null }) {
   if (!message) {
     return null;
   }
   return (
-    <div className="rounded-md bg-brand-50 p-3 text-sm text-brand-900" role="status">
-      {message}
+    <div className="fc-fade-in rounded-md bg-brand-50 p-3 text-sm text-brand-900">
+      <FlowerSuccess message={message} />
     </div>
   );
 }
