@@ -29,3 +29,16 @@ export const FOCUS_RING =
  */
 export const FOCUS_RING_DARK =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bolder-rose focus-visible:ring-offset-2 focus-visible:ring-offset-bolder-bg";
+
+/**
+ * The transition a text control, textarea or select wears so its border colour
+ * and focus shadow slide rather than snap.
+ *
+ * Applied next to `focus:border-brand-500 focus:ring-brand-500`: without it the
+ * focus ring appears instantly, which reads as a border colour change rather
+ * than as focus arriving. Only colour and shadow are transitioned, never the
+ * control's box, and the `prefers-reduced-motion` block in `index.css` collapses
+ * the duration to nothing for anyone who has asked for that.
+ */
+export const FIELD_TRANSITION =
+  "transition-[border-color,box-shadow] duration-micro ease-standard";

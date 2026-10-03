@@ -1,8 +1,9 @@
 import { useId } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
+import { FieldMessage } from "@/motion/FieldMessage";
+import { FIELD_TRANSITION } from "@/motion/pressable";
 
-const CONTROL_CLASS =
-  "mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm";
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
 const ERROR_BORDER = "border-red-500";
 
 type InputType = "text" | "email" | "tel" | "password";
@@ -41,7 +42,7 @@ export function TextInput({
   registration,
 }: TextInputProps) {
   const id = useId();
-  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
+  const describedBy = error || hint ? id : undefined;
   const props = registration;
 
   return (
@@ -69,16 +70,7 @@ export function TextInput({
           {...props}
         />
       )}
-      {hint && !error && (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-slate-500">
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p id={`${id}-error`} className="mt-1 text-sm text-red-600">
-          {error}
-        </p>
-      )}
+      <FieldMessage id={id} hint={hint} message={error} reserve />
     </div>
   );
 }

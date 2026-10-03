@@ -46,6 +46,12 @@ export const distances = {
   lift: -2,
   /** Press feedback applied to pressable motion elements. */
   press: 0.98,
+  /**
+   * Travel for an inline message appearing under a field. Deliberately much
+   * smaller than `enter`: the text should read as arriving at the field, not as
+   * the form moving.
+   */
+  reveal: 4,
 } as const;
 
 /** Ambient spin period for `FlowerLoader`, in seconds (mirrors `--fc-motion-duration-ambient`). */
@@ -96,6 +102,29 @@ export const cardVariants: Variants = {
 export const dialogVariants: Variants = {
   hidden: { opacity: 0, scale: distances.press },
   visible: { opacity: 1, scale: 1, transition: standard },
+  exit: { opacity: 0, scale: distances.press, transition: leaving },
+};
+
+/**
+ * Inline field message — a validation error or a hint — appearing under a
+ * control. Travels the `reveal` distance rather than the full `enter` one, so
+ * the surrounding form does not look like it shifted; `ui` timing because the
+ * tokens define that duration as the one for inline reveals.
+ */
+export const fieldErrorVariants: Variants = {
+  hidden: { opacity: 0, y: distances.reveal },
+  visible: { opacity: 1, y: 0, transition: entering },
+  exit: { opacity: 0, transition: leaving },
+};
+
+/**
+ * A status pill's label changing from one status to another. The scale is the
+ * same 2% as press feedback: the cross-fade carries the transition, and the
+ * scale only keeps the swap from reading as a flat text replacement.
+ */
+export const statusChangeVariants: Variants = {
+  hidden: { opacity: 0, scale: distances.press },
+  visible: { opacity: 1, scale: 1, transition: entering },
   exit: { opacity: 0, scale: distances.press, transition: leaving },
 };
 

@@ -24,6 +24,8 @@ import { AdminVendorStatusBadge } from "@/features/admin/components/AdminStatusB
 import { Pagination } from "@/features/admin/components/Pagination";
 import { ReasonDialog } from "@/features/admin/components/ReasonDialog";
 import { AnimatePresence } from "framer-motion";
+import { FadeIn } from "@/motion/FadeIn";
+import { FIELD_TRANSITION, FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
 
 const STATUS_FILTER_OPTIONS: { value: VendorStatus | null; label: string }[] = [
@@ -81,6 +83,17 @@ export function AdminVendorsPage() {
 
   const { data, isPending, error, refetch } = useAdminVendors(filters);
   const runAction = useVendorAdminAction();
+
+  /**
+   * When the table replays its entry animation: the filter, the page, and the rows
+   * themselves. A refetch that comes back with the same rows produces the same
+   * key, so a background refetch, a window focus or an invalidation that changed
+   * nothing never replays it — only a genuinely different result set does. Row
+   * order is part of the key for the same reason.
+   */
+  const listingKey = data
+    ? `${filters.status ?? "all"}:${data.page}:${data.content.map((vendor) => vendor.id).join(",")}`
+    : "";
 
   const openDialog = (action: VendorAdminAction, vendor: VendorProfile) => {
     setActionError(null);
@@ -144,7 +157,7 @@ export function AdminVendorsPage() {
                 page: 0,
               });
             }}
-            className="mt-1 block rounded-md border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500`}
           >
             {STATUS_FILTER_OPTIONS.map((option) => (
               <option key={option.label} value={option.value ?? ""}>
@@ -176,7 +189,10 @@ export function AdminVendorsPage() {
       )}
 
       {!isPending && !error && data && !data.empty && (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <FadeIn
+          key={listingKey}
+          className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+        >
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Vendor profiles and available admin actions</caption>
             <thead className="text-xs uppercase tracking-wide text-slate-500">
@@ -223,7 +239,7 @@ export function AdminVendorsPage() {
                               // in flight, so one submission cannot race another and
                               // a double click cannot fire the same transition twice.
                               disabled={runAction.isPending}
-                              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              className={`rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
                             >
                               {VENDOR_ACTION_LABELS[action]}
                             </button>
@@ -244,7 +260,7 @@ export function AdminVendorsPage() {
               onPageChange={(page) => setFilters((current) => ({ ...current, page }))}
             />
           </div>
-        </div>
+        </FadeIn>
       )}
 
       {/*

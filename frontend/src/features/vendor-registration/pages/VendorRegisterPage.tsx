@@ -24,6 +24,8 @@ import {
   SuccessMessage,
 } from "@/features/vendor/components/FormFields";
 import { Card, PageHeading } from "@/features/vendor/components/StatCard";
+import { FadeIn } from "@/motion/FadeIn";
+import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
 
 /**
@@ -121,7 +123,7 @@ export function VendorRegisterPage() {
             <Link
               to="/login"
               state={{ registeredEmail, from: "/vendor" }}
-              className="rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-[background-color,box-shadow,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100"
+              className={`rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE}`}
             >
               Sign in to your vendor dashboard
             </Link>
@@ -131,7 +133,7 @@ export function VendorRegisterPage() {
                 setRegistered(null);
                 setRegisteredEmail(null);
               }}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-[background-color,box-shadow,transform] duration-micro ease-standard active:scale-press motion-reduce:active:scale-100"
+              className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 ${PRESSABLE} ${FOCUS_RING}`}
             >
               Register another shop
             </button>
@@ -234,23 +236,29 @@ export function VendorRegisterPage() {
             {locationsPending && <p className="text-sm text-slate-600">Loading service areas...</p>}
 
             {locationsError && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+              <FadeIn
+                role="alert"
+                className="rounded-md bg-red-50 p-3 text-sm text-red-700"
+              >
                 <p>Could not load the service areas.</p>
                 <button
                   type="button"
                   onClick={() => void refetchLocations()}
-                  className="mt-2 font-medium underline"
+                  className={`mt-2 inline-flex rounded-md font-medium underline underline-offset-2 ${PRESSABLE} ${FOCUS_RING}`}
                 >
                   Try again
                 </button>
-              </div>
+              </FadeIn>
             )}
 
             {noServiceAreas && (
-              <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800" role="alert">
+              <FadeIn
+                role="alert"
+                className="rounded-md bg-amber-50 p-3 text-sm text-amber-800"
+              >
                 No service areas are configured yet, so registration is unavailable. Please
                 contact FlowerConnect support.
-              </p>
+              </FadeIn>
             )}
 
             <Controller
@@ -293,11 +301,17 @@ export function VendorRegisterPage() {
 
       <p className="text-center text-sm text-slate-600">
         Already registered?{" "}
-        <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700">
+        <Link
+          to="/login"
+          className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+        >
           Sign in
         </Link>{" "}
         or{" "}
-        <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">
+        <Link
+          to="/register"
+          className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+        >
           create a customer account
         </Link>
         .

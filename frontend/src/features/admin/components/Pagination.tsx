@@ -1,5 +1,8 @@
 import { displayPageNumber } from "@/features/admin/format";
 import type { PageResponse } from "@/features/admin/types";
+import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
+
+const PAGE_BUTTON_CLASS = `rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
 
 interface PaginationProps<T> {
   /** The page response as the backend returned it. */
@@ -38,7 +41,7 @@ export function Pagination<T>({ page, onPageChange, disabled = false }: Paginati
           type="button"
           onClick={() => onPageChange(page.page - 1)}
           disabled={disabled || page.first || page.page === 0}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className={PAGE_BUTTON_CLASS}
         >
           Previous
         </button>
@@ -46,7 +49,7 @@ export function Pagination<T>({ page, onPageChange, disabled = false }: Paginati
           type="button"
           onClick={() => onPageChange(page.page + 1)}
           disabled={disabled || page.last}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className={PAGE_BUTTON_CLASS}
         >
           Next
         </button>
