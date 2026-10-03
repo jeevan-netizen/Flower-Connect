@@ -790,3 +790,119 @@ Categories need a unique, URL-friendly identifier (`slug`). The admin should not
 - The request DTO (`CategoryRequest`) has no `slug` field — the service owns it entirely
 - Slug collision handling is deterministic and testable
 - The slug is stable unless the admin changes the category name
+
+---
+
+## D-20: Enum-typed columns are native MySQL ENUM
+
+**Status:** Accepted
+**Date:** Phase 3b (Tasks 3.2–3.4)
+
+### Context
+
+Tasks 3.2–3.4 add two enum-typed fields: `products.status`
+(`DRAFT`/`ACTIVE`/`INACTIVE`/`ARCHIVED`) and
+`stock_movements.movement_type` (the nine movement types of
+plan section 6.2). Both are mapped in the entities with
+`@Enumerated(EnumType.STRING)`. The obvious migration column
+type is `VARCHAR(32)` with a `CHECK ... IN (...)` constraint —
+the pattern used for `movement_type` in the first draft of
+V11. That draft failed Hibernate schema validation at startup:
+
+```
+Schema-validation: wrong column type encountered in column
+[status] in table [products]; found [varchar (Types#VARCHAR)],
+but expecting [enum ('DRAFT','ACTIVE','INACTIVE','ARCHIVED')
+(Types#ENUM)]
+```
+
+Hibernate 6.4 with the MySQL dialect maps
+`@Enumerated(EnumType.STRING)` properties to the dialect's
+native ENUM type, so `ddl-auto: validate` expects an ENUM
+column, not a VARCHAR.
+
+### Decision
+
+Enum-typed entity fields are stored in native MySQL `ENUM`
+columns whose values mirror the Java enum constants exactly
+(uppercase, same order). This matches the existing convention
+already established by `V1__baseline.sql` (`users.status`)
+and `V5__vendor_profiles.sql` (`vendor_profiles.status`),
+which is why those pass validation. A separate `CHECK ... IN
+(...)` constraint on an ENUM column is redundant — the type
+system itself rejects unknown values — so none is written.
+
+### Consequences
+
+- An unknown enum value is rejected by the column type (MySQL
+  error 1265, "Data truncated for column ..."), not by a named
+  CHECK constraint; tests assert the column name in the failure
+  chain instead of a constraint name
+- ENUM comparison in MySQL is case-insensitive, so `'draft'`
+  and `'DRAFT'` are equivalent on write
+- Adding a new enum constant requires a new additive migration
+  (`ALTER TABLE ... MODIFY COLUMN ... ENUM(...)`) — ENUM value
+  lists are part of the column definition
+- The `stock_movements` vocabulary is enforced by the ENUM
+  column; the draft V11 CHECK constraint was dropped
+
+---
+
+## D-21: Exactly one primary image per product is a service-level invariant
+
+**Status:** Accepted
+**Date:** Phase 3b (Task 3.2)
+
+### Context
+
+Task 3.2 requires exactly one primary image per product, and
+the plan asks for a database-level guarantee "if
+MySQL-compatible, otherwise a documented service-level
+invariant". The natural MySQL encoding is a unique key on
+`(product_id, is_primary)` filtered to primary rows — but
+MySQL has no partial/filtered unique indexes. The usual
+workaround is a generated column
+(`is_primary_flag INT GENERATED ALWAYS AS (IF(is_primary, 1, NULL))`)
+with a unique key on `(product_id, is_primary_flag)`, since
+NULLs are ignored by unique keys.
+
+That workaround is incompatible with this schema: the
+generated column depends on `is_primary`, and the table also
+needs `FOREIGN KEY (product_id) REFERENCES products (id)`.
+MySQL rejects any foreign key on a column that a generated
+column depends on (error 1215 "Cannot add foreign key
+constraint" — the FK's referenced/dependent column set
+conflicts with the generated-column dependency), so the
+generated-column trick cannot coexist with the required
+`product_id` FK. This was verified against a live MySQL 8
+container before abandoning the approach.
+
+### Decision
+
+The one-primary-image rule is a **service-level invariant**,
+enforced transactionally when image upload lands (plan task
+3.8, out of scope for 3.2–3.4): within one transaction,
+setting an image primary clears the previous primary for the
+same product, and the write is refused if a primary already
+exists. The read side is already in place:
+`ProductImageRepository.countByProductIdAndPrimaryIsTrue`
+lets the service check the rule, and
+`findByProductIdOrderBySortOrderAscIdAsc` serves the ordered
+image list. The `product_images` table keeps `is_primary` as
+a plain `BIT(1)` column with no unique constraint.
+
+This follows the precedent of D-12 (invariants enforced in
+both service and database where the database can express
+them) — here the database cannot express the rule, so the
+service is the sole enforcement point, documented here.
+
+### Consequences
+
+- A second primary image for one product is rejected by the
+  service with a 409 when the image API is built; the
+  database alone does not prevent it
+- The rule is covered by the integration test exercising the
+  repository helper and the ordered image query
+- If MySQL ever gains filtered unique indexes (or the project
+  moves to a database that has them), this decision should be
+  revisited and the constraint promoted to the database

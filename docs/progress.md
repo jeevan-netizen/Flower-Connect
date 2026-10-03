@@ -4,15 +4,22 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 3a — Task 3.1 (Categories) completed**
+**Phase 3b — Tasks 3.2, 3.3, 3.4 (Products + Inventory Data Model) completed**
 
-Phase 3a task 3.1 is complete. The backend exposes the category hierarchy with admin-managed CRUD
-and a public read endpoint. The `categories` table (Flyway V7) is seeded with the four top-level
-categories (Roses, Bouquets, Arrangements, Occasions). The admin API at `/api/v1/admin/categories`
-supports create, update, delete (with child protection), and paginated listing; the public endpoint
-`GET /api/v1/categories` returns a flat list of active categories. All mutations write audit trail
-rows. Cycle prevention and slug auto-generation with collision-safe suffix are enforced in the
-service layer. 32 new unit tests and 9 integration tests pass. Decisions D-17, D-18, D-19 recorded.
+Phase 3b tasks 3.2–3.4 are complete. Four additive migrations (V8 `products`, V9
+`product_images`, V10 `inventory`, V11 `stock_movements`) add the product, image,
+inventory and stock-movement tables with their FKs, unique keys and CHECK constraints.
+The `catalog` slice gained the `Product`/`ProductImage` entities, repositories, DTOs
+and a MapStruct `ProductMapper`; the new `inventory` slice holds `Inventory` and
+`StockMovement`. `ProductService` owns the three stage invariants: product + inventory
+row at quantity 0 created in one transaction with no initial stock movement,
+collision-safe slug generation that treats the DB unique constraint as the authority and
+retries with numeric suffixes after a lost race, and vendor-scoped ownership (403
+foreign / 404 missing) with page-size clamping. Exactly one primary image per product is
+a documented service-level invariant (D-21) because MySQL rejects the generated-column
+unique-index trick alongside the required `product_id` FK (error 1215). Enum-typed
+columns are native MySQL ENUM (D-20). 9 new unit tests and 16 new integration tests
+pass. Verified at 305 unit + 247 integration tests.
 
 ## Completed Work
 
@@ -135,13 +142,13 @@ service layer. 32 new unit tests and 9 integration tests pass. Decisions D-17, D
 
 #### Phase 3a — Catalog and inventory management (Task 3.1 completed)
 - [x] **3.1 — Category entity**: `categories` table (V7 migration) with hierarchical structure (parent_id self-FK), `name`, `slug` (unique, auto-generated), `display_order`, `active` flag, `created_at`, `updated_at`. Four seed categories: Roses, Bouquets, Arrangements, Occasions. Admin CRUD at `/api/v1/admin/categories` (POST/PUT/DELETE/GET list with pagination), public read at `GET /api/v1/categories` (flat list of active categories, permitAll). Cycle prevention on parent assignment, delete protection (409 if has children), slug auto-generation with collision-safe suffix, audit trail on all mutations. 32 new unit tests + 9 integration tests. Verified with 296 unit + 231 integration tests.
-- [ ] **3.2 — Product entity**: vendor_id, name, slug (collision-safe suffix), description, category_id, base_price, status. Images live only in `product_images` (ordered, one primary); no images JSON column
-- [ ] **3.3 — Inventory entity**: One row per product: `quantity`, `reserved_quantity`, `low_stock_threshold`, optional `expiry_date`. Created automatically at quantity 0 when a product is created
-- [ ] **3.4 — Stock movement log**: `stock_movements` records every change (type, quantity delta, reason, reference id, actor)
+- [x] **3.2 — Product entity**: `products` table (V8) with vendor_id/category_id FKs, name, slug (unique, auto-generated with collision-safe suffix), description, base_price, status (native ENUM DRAFT/ACTIVE/INACTIVE/ARCHIVED). `product_images` (V9) holds ordered images with a single primary flag — the one-primary rule is a service-level invariant (D-21) because MySQL error 1215 rejects the generated-column unique-index trick next to the required product_id FK. `ProductService.create` generates the slug, treats the unique constraint as the authority, and retries with numeric suffixes after a lost race
+- [x] **3.3 — Inventory entity**: `inventory` table (V10), one row per product (unique on product_id) with `quantity`, `reserved_quantity`, `low_stock_threshold`, optional `expiry_date`. Created automatically at quantity 0 in the same transaction as the product; no stock movement is written for the initial zero. CHECKs: quantity >= 0, reserved_quantity >= 0, low_stock_threshold >= 0, reserved_quantity <= quantity. Availability = quantity − reserved (computed in the entity)
+- [x] **3.4 — Stock movement log**: `stock_movements` table (V11) records every change — movement_type (native ENUM of the nine plan section 6.2 types), signed quantity_delta, reason, reference id/type, nullable actor. Append-only (no updated_at). Product creation writes no movement; the log records changes only
 - [ ] **3.5 — Catalog API**: Vendor-scoped product CRUD; ownership: 403 foreign / 404 missing
 - [ ] **3.6 — Inventory API**: Stock in/out, adjustment with reason, write-off, low-stock list; availability = quantity − reserved; adjustments may not drop `quantity` below `reserved_quantity` (409)
 - [ ] **3.7 — Expiry scheduler**: `@Scheduled` job using the injected `Clock`: expired stock → `WASTE` movement and product delisted
-- [ ] **3.8 — Image handling**: `StorageService` interface: local disk (dev), S3 implementation pluggable by profile. Validation: type whitelist (JPEG/PNG/WebP) checked by content sniffing, max size, random filenames, no path traversal, resize/compress
+- [ ] **3.8 — Image handling**: `StorageService` interface: local disk (dev), S3 implementation pluggable by profile. Validation: type whitelist (JPEG/PNG/WebP) checked by content sniffing, max size, random filenames, no path traversal, resize/compress. Enforces the D-21 one-primary-image invariant transactionally
 - [ ] **3.9 — Vendor catalog UI**: Product list and form (Shopify-style), inventory table with stock adjustments, low-stock badges
 - [ ] **3.T — Tests**: Ownership checks; slug collision; expiry job with a fake clock; upload rejection cases; RBAC checklist
 
@@ -159,6 +166,7 @@ service layer. 32 new unit tests and 9 integration tests pass. Decisions D-17, D
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-03 | Phase 3b Tasks 3.2–3.4: product, image, inventory and stock-movement data model with ProductService foundation | `V8__products.sql`, `V9__product_images.sql`, `V10__inventory.sql`, `V11__stock_movements.sql`, `backend/src/main/java/com/flowerconnect/catalog/**` (Product, ProductImage, repositories, DTOs, ProductMapper, ProductService), `backend/src/main/java/com/flowerconnect/inventory/**` (Inventory, StockMovement, repositories), `backend/src/test/java/com/flowerconnect/catalog/**` (ProductServiceTest, ProductInventoryIntegrationTest), `docs/decisions.md` (D-20, D-21), `docs/progress.md` |
 | 2026-10-03 | Phase 3a Task 3.1: Category entity with hierarchical admin CRUD and public read | `V7__categories.sql`, `backend/src/main/java/com/flowerconnect/catalog/**` (domain, repository, service, controller, dto, mapper), `SecurityConfig.java`, `backend/src/test/java/com/flowerconnect/catalog/**` (CategoryServiceTest, AdminCategoryControllerTest, CategoryApiIntegrationTest, CategorySeedIntegrityTest), `docs/decisions.md` (D-17, D-18, D-19), `docs/progress.md` |
 | 2026-10-01 | Phase 2 close-out: 2.T checklist gaps closed, D-4/D-6 written up, issue 019 closed | `VendorApiIntegrationTest.java`, `docs/progress.md`, `docs/decisions.md`, `docs/known-issues.md` |
 | 2026-10-01 | Task 2.10 admin frontend: dashboard, vendor management with reason dialog, user management with pagination and filters | `src/app/router.tsx`, `src/app/router.test.tsx`, `src/features/admin/**` (types, api, queries, format, form-schema, components, pages, 5 test files), `src/test/factories.ts`, `docs/*` |

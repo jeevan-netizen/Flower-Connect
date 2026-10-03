@@ -133,6 +133,32 @@ _None currently blocked._
   object. Asserting `$.validation.id` fails with `No value at JSON path "$.validation.id"`. Only
   `@Valid @RequestBody` violations populate that map.
 
+## Testing Gotchas (Phase 3b)
+
+- **Enum-typed entity fields require native MySQL `ENUM` columns.** Hibernate 6.4 with the
+  MySQL dialect maps `@Enumerated(EnumType.STRING)` to the dialect's native ENUM type, so
+  `ddl-auto: validate` fails at startup if the migration declares the column `VARCHAR(32)`:
+  `Schema-validation: wrong column type encountered in column [status] ... found [varchar
+  (Types#VARCHAR)], but expecting [enum (...) (Types#ENUM)]`. Write the migration column as
+  `ENUM('A', 'B', ...)` with the Java constants' exact names (see D-20). A `CHECK ... IN
+  (...)` constraint on an ENUM column is redundant and was dropped from V11.
+- **An unknown ENUM value is rejected by the column type, not a named constraint.** Inserting
+  a value outside the ENUM list fails with MySQL error 1265 ("Data truncated for column
+  ..."), so a test cannot assert a CHECK-constraint name in the failure chain — assert the
+  column name instead (see `ProductInventoryIntegrationTest.stockMovementsRejectAnUnknownMovementType`).
+- **Concurrent creates with the same slug can deadlock (error 1213).** Several transactions
+  inserting the same unique-key value at once take gap locks on the unique index and can
+  deadlock; InnoDB rolls the victim's whole transaction back (the service's in-method
+  duplicate-key retry cannot recover from that — the transaction is already dead). MySQL's
+  own error message says "try restarting transaction", so the caller retries the whole
+  create in a fresh transaction; `ProductInventoryIntegrationTest.createWithDeadlockRetry`
+  is the reference helper. This is transient infrastructure behaviour, not a slug bug.
+- **A test's product name must be unique to that test.** The integration database accumulates
+  rows across every test in the run (non-transactional `@SpringBootTest`), so a slug test
+  that reuses a name another test already created (e.g. "Hybrid Tea") collides before its
+  first create and the whole expected suffix sequence shifts by one. Give each slug test its
+  own product name, or assert the suffix sequence relative to the first create's slug.
+
 ## Testing Gotchas (Phase 2c)
 
 These cost real debugging time and will recur if forgotten:
