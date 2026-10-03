@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 2,
+  "name": "flowerconnect-production",
+  "catalog": {
+    "package": "agentic-awesome-skills"
+  },
+  "targets": [
+    {
+      "host": "kilo",
+      "scope": "project"
+    }
+  ],
+  "profile": {
+    "goals": [
+      "build",
+      "test",
+      "security",
+      "code-quality",
+      "deployment"
+    ],
+    "projectType": "web application",
+    "languages": [
+      "java",
+      "typescript"
+    ],
+    "frameworks": [
+      "spring-boot",
+      "react",
+      "vite"
+    ],
+    "constraints": [
+      "production-oriented",
+      "modular-monolith",
+      "REST API",
+      "MySQL 8",
+      "Docker Compose",
+      "JWT authentication",
+      "RBAC",
+      "same-day and scheduled flower delivery"
+    ]
+  },
+  "skills": [
+    { "id": "springboot-patterns" },
+    { "id": "springboot-security" },
+    { "id": "springboot-tdd" },
+    { "id": "java-pro" },
+    { "id": "react-patterns" },
+    { "id": "react-best-practices" },
+    { "id": "typescript-expert" },
+    { "id": "zustand-store-ts" },
+    { "id": "database-design" },
+    { "id": "database-migrations-sql-migrations" },
+    { "id": "api-design-principles" },
+    { "id": "openapi-spec-generator" },
+    { "id": "api-security-best-practices" },
+    { "id": "security-audit" },
+    { "id": "playwright-skill" },
+    { "id": "e2e-testing-patterns" },
+    { "id": "code-review-excellence" },
+    { "id": "clean-code" },
+    { "id": "docker-compose" },
+    { "id": "github-actions" },
+    { "id": "architecture-decision-records" },
+    { "id": "motion-patterns" },
+    { "id": "stripe-integration" },
+    { "id": "payment-integration" }
+  ]
+}

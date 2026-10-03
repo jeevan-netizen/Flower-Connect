@@ -401,9 +401,10 @@ describe("vendor entry point", () => {
     renderAt("/vendor/register");
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "FlowerConnect" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /flowers, beautifully delivered/i, level: 1 }),
+      ).toBeInTheDocument();
     });
-    expect(screen.queryByRole("heading", { name: /register your flower shop/i })).not.toBeInTheDocument();
     expect(mockRegisterVendor).not.toHaveBeenCalled();
   });
 

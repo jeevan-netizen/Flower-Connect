@@ -1,8 +1,18 @@
 import { useId } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
+import { FadeIn } from "@/motion/FadeIn";
+import { FieldMessage } from "@/motion/FieldMessage";
+import { FlowerSuccess } from "@/motion/FlowerSuccess";
+import { FIELD_TRANSITION, PRESSABLE } from "@/motion/pressable";
 
-const CONTROL_CLASS =
-  "mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm";
+/*
+ * Durations and easings come from the motion tokens via `tailwind.config.ts`
+ * (`duration-micro ease-standard`), never from a literal millisecond value.
+ * `PRESSABLE` is the app-wide press feedback and lives in `@/motion/pressable` so
+ * every feature composes one definition; the focus ring stays out of it, because
+ * press feedback must not cost a keyboard user the visible indicator.
+ */
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
 const ERROR_BORDER = "border-red-500";
 
 interface TextFieldProps {
@@ -28,7 +38,7 @@ export function TextField({
   registration,
 }: TextFieldProps) {
   const id = useId();
-  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
+  const describedBy = error || hint ? id : undefined;
   const props = registration;
 
   return (
@@ -55,16 +65,7 @@ export function TextField({
           {...props}
         />
       )}
-      {hint && !error && (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-slate-500">
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p id={`${id}-error`} className="mt-1 text-sm text-red-600">
-          {error}
-        </p>
-      )}
+      <FieldMessage id={id} hint={hint} message={error} reserve />
     </div>
   );
 }
@@ -80,7 +81,7 @@ interface NumberFieldProps {
 
 export function NumberField({ label, error, hint, step = "0.01", min = "0", registration }: NumberFieldProps) {
   const id = useId();
-  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
+  const describedBy = error || hint ? id : undefined;
   const props = registration;
 
   return (
@@ -99,16 +100,7 @@ export function NumberField({ label, error, hint, step = "0.01", min = "0", regi
         className={`${CONTROL_CLASS} ${error ? ERROR_BORDER : ""}`}
         {...props}
       />
-      {hint && !error && (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-slate-500">
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p id={`${id}-error`} className="mt-1 text-sm text-red-600">
-          {error}
-        </p>
-      )}
+      <FieldMessage id={id} hint={hint} message={error} reserve />
     </div>
   );
 }
@@ -128,7 +120,7 @@ export function CheckboxField({ label, hint, registration }: CheckboxFieldProps)
       <input
         id={id}
         type="checkbox"
-        className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+        className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 transition-colors duration-micro ease-standard focus:ring-brand-500"
         {...props}
       />
       <div>
@@ -152,7 +144,7 @@ export function SubmitButton({ isSubmitting, idleLabel, busyLabel }: SubmitButto
     <button
       type="submit"
       disabled={isSubmitting}
-      className="rounded-md border border-transparent bg-brand-600 py-2 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+      className={`rounded-md border border-transparent bg-brand-600 py-2 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
     >
       {isSubmitting ? busyLabel : idleLabel}
     </button>
@@ -164,19 +156,24 @@ export function FormErrorSummary({ message }: { message: string | null }) {
     return null;
   }
   return (
-    <div className="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+    <FadeIn role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
       {message}
-    </div>
+    </FadeIn>
   );
 }
 
+/**
+ * Success feedback after a save. The message itself is unchanged — only the
+ * presentation is: a blooming flower mark plus the CSS enter animation, with
+ * the live-region semantics (`role="status"`) the screen reader already relied on.
+ */
 export function SuccessMessage({ message }: { message: string | null }) {
   if (!message) {
     return null;
   }
   return (
-    <div className="rounded-md bg-brand-50 p-3 text-sm text-brand-900" role="status">
-      {message}
+    <div className="fc-fade-in rounded-md bg-brand-50 p-3 text-sm text-brand-900">
+      <FlowerSuccess message={message} />
     </div>
   );
 }

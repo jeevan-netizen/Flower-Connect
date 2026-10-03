@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { clearAdminCache } from "@/features/admin/queries";
+import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
 interface AdminNavItem {
   to: string;
@@ -25,7 +26,10 @@ const NAV_ITEMS: AdminNavItem[] = [
 
 function navClass({ isActive }: { isActive: boolean }): string {
   return [
-    "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
+    // Duration/easing come from the motion tokens via `tailwind.config.ts`;
+    // `focus-visible` keeps a visible ring on the keyboard path.
+    "block rounded-md px-3 py-2 text-sm font-medium transition-colors duration-micro ease-standard",
+    FOCUS_RING,
     isActive
       ? "bg-brand-600 text-white"
       : "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
@@ -78,7 +82,7 @@ export function AdminLayout() {
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-4 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            className={`mt-4 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
           >
             Log out
           </button>

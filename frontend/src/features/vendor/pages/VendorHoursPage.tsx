@@ -18,8 +18,20 @@ import {
   SuccessMessage,
 } from "@/features/vendor/components/FormFields";
 import { VendorErrorState } from "@/features/vendor/components/VendorErrorState";
+import { FadeIn } from "@/motion/FadeIn";
+import { FieldMessage } from "@/motion/FieldMessage";
+import { FIELD_TRANSITION } from "@/motion/pressable";
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Time inputs keep the same control treatment as every other field. Unlike the
+ * standalone fields in `FormFields` these do **not** reserve a message line: a
+ * day row is two fixed-width columns, so reserving under both would add a line
+ * of empty space to all seven rows for a validation failure that can only happen
+ * after a submit.
+ */
+const TIME_CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 disabled:bg-slate-100 sm:text-sm`;
 
 const daySchema = z.object({
   closed: z.boolean(),
@@ -213,7 +225,8 @@ export function VendorHoursPage() {
           <FormErrorSummary message={submitError?.message ?? null} />
           <SuccessMessage message={success} />
 
-          <ul className="mt-4 divide-y divide-slate-100">
+          <FadeIn>
+            <ul className="mt-4 divide-y divide-slate-100">
             {WEEKDAYS.map((weekday) => {
               const day = watchedDays?.[weekday];
               const closed = day ? day.closed : true;
@@ -241,7 +254,7 @@ export function VendorHoursPage() {
                       <input
                         id={checkboxId}
                         type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        className="h-4 w-4 rounded border-slate-300 text-brand-600 transition-colors duration-micro ease-standard focus:ring-brand-500"
                         checked={!closed}
                         onChange={(event) =>
                           setValue(`days.${weekday}.closed`, !event.target.checked, {
@@ -267,10 +280,11 @@ export function VendorHoursPage() {
                         type="time"
                         disabled={closed}
                         aria-invalid={openError ? true : undefined}
-                        className={`mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 disabled:bg-slate-100 sm:text-sm ${openError ? "border-red-500" : ""}`}
+                        aria-describedby={openError ? openId : undefined}
+                        className={`${TIME_CONTROL_CLASS} ${openError ? "border-red-500" : ""}`}
                         {...register(`days.${weekday}.openTime`)}
                       />
-                      {openError && <p className="mt-1 text-sm text-red-600">{openError}</p>}
+                      <FieldMessage id={openId} message={openError} />
                     </div>
 
                     <div className="sm:w-40">
@@ -285,16 +299,18 @@ export function VendorHoursPage() {
                         type="time"
                         disabled={closed}
                         aria-invalid={closeError ? true : undefined}
-                        className={`mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 disabled:bg-slate-100 sm:text-sm ${closeError ? "border-red-500" : ""}`}
+                        aria-describedby={closeError ? closeId : undefined}
+                        className={`${TIME_CONTROL_CLASS} ${closeError ? "border-red-500" : ""}`}
                         {...register(`days.${weekday}.closeTime`)}
                       />
-                      {closeError && <p className="mt-1 text-sm text-red-600">{closeError}</p>}
+                      <FieldMessage id={closeId} message={closeError} />
                     </div>
                   </div>
                 </li>
               );
             })}
-          </ul>
+            </ul>
+          </FadeIn>
 
           <div className="mt-4">
             <SubmitButton

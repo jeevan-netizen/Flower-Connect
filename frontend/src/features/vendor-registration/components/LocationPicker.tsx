@@ -1,8 +1,9 @@
 import { useId } from "react";
 import type { ServiceLocationGroup, ServiceLocationOption } from "@/features/vendor-registration/types";
+import { FieldMessage } from "@/motion/FieldMessage";
+import { FIELD_TRANSITION } from "@/motion/pressable";
 
-const CONTROL_CLASS =
-  "mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm";
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
 const ERROR_BORDER = "border-red-500";
 
 interface LocationPickerProps {
@@ -45,7 +46,10 @@ export function LocationPicker({
   onChange,
 }: LocationPickerProps) {
   const id = useId();
-  const describedBy = error ? `${id}-error` : `${id}-hint`;
+  // The hint has a steady-state default, so this field always has something to
+  // describe: the error replaces the hint in the same element rather than in a
+  // second node the description would then have to point at instead.
+  const describedBy = id;
 
   return (
     <div>
@@ -78,16 +82,7 @@ export function LocationPicker({
           );
         })}
       </select>
-      {!error && (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-slate-500">
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p id={`${id}-error`} className="mt-1 text-sm text-red-600">
-          {error}
-        </p>
-      )}
+      <FieldMessage id={id} hint={hint} message={error} reserve />
     </div>
   );
 }

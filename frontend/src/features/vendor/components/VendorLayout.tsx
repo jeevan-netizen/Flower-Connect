@@ -5,6 +5,8 @@ import { clearVendorCache, useVendorProfile } from "@/features/vendor/queries";
 import { VendorErrorState } from "@/features/vendor/components/VendorErrorState";
 import { VendorStatusBanner } from "@/features/vendor/components/VendorStatusBanner";
 import { countOpenDays } from "@/features/vendor/format";
+import { FlowerLoader } from "@/motion/FlowerLoader";
+import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
 interface VendorNavItem {
   to: string;
@@ -26,7 +28,10 @@ const NAV_ITEMS: VendorNavItem[] = [
 
 function navClass({ isActive }: { isActive: boolean }): string {
   return [
-    "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
+    // Duration/easing come from the motion tokens via `tailwind.config.ts`;
+    // `focus-visible` keeps a visible ring on the keyboard path.
+    "block rounded-md px-3 py-2 text-sm font-medium transition-colors duration-micro ease-standard",
+    FOCUS_RING,
     isActive
       ? "bg-brand-600 text-white"
       : "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
@@ -80,7 +85,7 @@ export function VendorLayout() {
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-4 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            className={`mt-4 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
           >
             Log out
           </button>
@@ -88,10 +93,11 @@ export function VendorLayout() {
 
         <main className="min-w-0 flex-1 space-y-6">
           {isPending && (
-            <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
-              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-600" />
-              <span>Loading your vendor profile...</span>
-            </div>
+            <FlowerLoader
+              label="Loading your vendor profile..."
+              showLabel
+              className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600"
+            />
           )}
 
           {!isPending && error && <VendorErrorState error={error} onRetry={() => void refetch()} />}

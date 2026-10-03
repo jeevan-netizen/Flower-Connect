@@ -18,6 +18,9 @@ import { AdminErrorState } from "@/features/admin/components/AdminErrorState";
 import { AdminUserStatusBadge } from "@/features/admin/components/AdminStatusBadge";
 import { Pagination } from "@/features/admin/components/Pagination";
 import { ReasonDialog } from "@/features/admin/components/ReasonDialog";
+import { AnimatePresence } from "framer-motion";
+import { FadeIn } from "@/motion/FadeIn";
+import { FIELD_TRANSITION, FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
 
 const ROLE_OPTIONS: { value: AdminRole | null; label: string }[] = [
@@ -89,6 +92,17 @@ export function AdminUsersPage() {
   const { data, isPending, error, refetch } = useAdminUsers(filters);
   const updateStatus = useUpdateUserStatus();
 
+  /**
+   * When the table replays its entry animation: both filters, the page, and the
+   * rows themselves. Identical rows from a refetch produce an identical key, so
+   * invalidation or polling that changed nothing does not replay it.
+   */
+  const listingKey = data
+    ? `${filters.role ?? "all"}:${filters.status ?? "all"}:${data.page}:${data.content
+        .map((user) => user.id)
+        .join(",")}`
+    : "";
+
   const openDialog = (status: UserStatus, user: AdminUser) => {
     setActionError(null);
     setSuccess(null);
@@ -142,7 +156,7 @@ export function AdminUsersPage() {
             onChange={(event) =>
               applyFilter({ role: event.target.value === "" ? null : (event.target.value as AdminRole) })
             }
-            className="mt-1 block rounded-md border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500`}
           >
             {ROLE_OPTIONS.map((option) => (
               <option key={option.label} value={option.value ?? ""}>
@@ -164,7 +178,7 @@ export function AdminUsersPage() {
                 status: event.target.value === "" ? null : (event.target.value as UserStatus),
               })
             }
-            className="mt-1 block rounded-md border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500`}
           >
             {STATUS_OPTIONS.map((option) => (
               <option key={option.label} value={option.value ?? ""}>
@@ -194,7 +208,10 @@ export function AdminUsersPage() {
       )}
 
       {!isPending && !error && data && !data.empty && (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <FadeIn
+          key={listingKey}
+          className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+        >
           <table className="w-full text-left text-sm">
             <caption className="sr-only">User accounts and available status actions</caption>
             <thead className="text-xs uppercase tracking-wide text-slate-500">
@@ -241,7 +258,7 @@ export function AdminUsersPage() {
                               type="button"
                               onClick={() => openDialog(status, user)}
                               disabled={updateStatus.isPending}
-                              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              className={`rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
                             >
                               {formatUserStatus(status)}
                             </button>
@@ -262,22 +279,26 @@ export function AdminUsersPage() {
               onPageChange={(page) => setFilters((current) => ({ ...current, page }))}
             />
           </div>
-        </div>
+        </FadeIn>
       )}
 
-      {pending && (
-        <ReasonDialog
-          key={`${pending.user.id}-${pending.status}`}
-          heading={`Set ${pending.user.email} to ${formatUserStatus(pending.status).toLowerCase()}?`}
-          description={`${pending.user.fullName} is currently ${pending.user.status.toLowerCase()}. Changing status also signs this account out everywhere.`}
-          confirmLabel={`Set to ${formatUserStatus(pending.status)}`}
-          requiresReason
-          isSubmitting={updateStatus.isPending}
-          error={actionError}
-          onConfirm={(reason) => void confirmChange(reason)}
-          onCancel={closeDialog}
-        />
-      )}
+      {/* `AnimatePresence` gives the dialog its exit animation; `mode="wait"`
+          keeps one dialog on screen at a time when the target changes. */}
+      <AnimatePresence mode="wait">
+        {pending && (
+          <ReasonDialog
+            key={`${pending.user.id}-${pending.status}`}
+            heading={`Set ${pending.user.email} to ${formatUserStatus(pending.status).toLowerCase()}?`}
+            description={`${pending.user.fullName} is currently ${pending.user.status.toLowerCase()}. Changing status also signs this account out everywhere.`}
+            confirmLabel={`Set to ${formatUserStatus(pending.status)}`}
+            requiresReason
+            isSubmitting={updateStatus.isPending}
+            error={actionError}
+            onConfirm={(reason) => void confirmChange(reason)}
+            onCancel={closeDialog}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

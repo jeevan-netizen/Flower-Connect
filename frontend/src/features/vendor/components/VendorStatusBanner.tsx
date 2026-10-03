@@ -1,5 +1,7 @@
 import type { VendorStatus } from "@/features/vendor/types";
 import { formatStatus } from "@/features/vendor/format";
+import { FadeIn } from "@/motion/FadeIn";
+import { StatusPill } from "@/motion/StatusPill";
 
 interface VendorStatusBannerProps {
   status: VendorStatus;
@@ -52,18 +54,17 @@ export function VendorStatusBanner({ status }: VendorStatusBannerProps) {
   const content = STATUS_CONTENT[status];
 
   return (
-    <div className={`rounded-lg border p-4 ${content.tone}`} role="status">
+    <FadeIn role="status" className={`rounded-lg border p-4 ${content.tone}`}>
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold">{content.headline}</h2>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${content.badgeTone}`}
+        <StatusPill
+          tone={content.badgeTone}
+          label={formatStatus(status)}
           data-testid="vendor-status-badge"
-        >
-          {formatStatus(status)}
-        </span>
+        />
       </div>
       <p className="mt-1 text-sm">{content.detail}</p>
-    </div>
+    </FadeIn>
   );
 }
 
@@ -74,10 +75,6 @@ interface VendorStatusBadgeProps {
 /** Compact status pill for cards and summaries. */
 export function VendorStatusBadge({ status }: VendorStatusBadgeProps) {
   return (
-    <span
-      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CONTENT[status].badgeTone}`}
-    >
-      {formatStatus(status)}
-    </span>
+    <StatusPill tone={STATUS_CONTENT[status].badgeTone} label={formatStatus(status)} />
   );
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { SlideUp } from "@/motion/SlideUp";
 import { useRegisterVendor, useServiceLocations } from "@/features/vendor-registration/queries";
 import {
   isVendorRegisterField,
@@ -23,6 +24,8 @@ import {
   SuccessMessage,
 } from "@/features/vendor/components/FormFields";
 import { Card, PageHeading } from "@/features/vendor/components/StatCard";
+import { FadeIn } from "@/motion/FadeIn";
+import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
 
 /**
@@ -100,7 +103,7 @@ export function VendorRegisterPage() {
 
   if (registered) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
+      <SlideUp className="mx-auto max-w-2xl space-y-6">
         <PageHeading
           title="Application received"
           description="FlowerConnect reviews every new florist before it can list products."
@@ -120,7 +123,7 @@ export function VendorRegisterPage() {
             <Link
               to="/login"
               state={{ registeredEmail, from: "/vendor" }}
-              className="rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              className={`rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE}`}
             >
               Sign in to your vendor dashboard
             </Link>
@@ -130,18 +133,18 @@ export function VendorRegisterPage() {
                 setRegistered(null);
                 setRegisteredEmail(null);
               }}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 ${PRESSABLE} ${FOCUS_RING}`}
             >
               Register another shop
             </button>
           </div>
         </Card>
-      </div>
+      </SlideUp>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <SlideUp className="mx-auto max-w-2xl space-y-6">
       <PageHeading
         title="Register your flower shop"
         description="Create a florist account and tell us where you deliver. An administrator approves every new shop before it can list products."
@@ -233,23 +236,29 @@ export function VendorRegisterPage() {
             {locationsPending && <p className="text-sm text-slate-600">Loading service areas...</p>}
 
             {locationsError && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+              <FadeIn
+                role="alert"
+                className="rounded-md bg-red-50 p-3 text-sm text-red-700"
+              >
                 <p>Could not load the service areas.</p>
                 <button
                   type="button"
                   onClick={() => void refetchLocations()}
-                  className="mt-2 font-medium underline"
+                  className={`mt-2 inline-flex rounded-md font-medium underline underline-offset-2 ${PRESSABLE} ${FOCUS_RING}`}
                 >
                   Try again
                 </button>
-              </div>
+              </FadeIn>
             )}
 
             {noServiceAreas && (
-              <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800" role="alert">
+              <FadeIn
+                role="alert"
+                className="rounded-md bg-amber-50 p-3 text-sm text-amber-800"
+              >
                 No service areas are configured yet, so registration is unavailable. Please
                 contact FlowerConnect support.
-              </p>
+              </FadeIn>
             )}
 
             <Controller
@@ -292,15 +301,21 @@ export function VendorRegisterPage() {
 
       <p className="text-center text-sm text-slate-600">
         Already registered?{" "}
-        <Link to="/login" className="font-medium text-brand-600 hover:text-brand-700">
+        <Link
+          to="/login"
+          className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+        >
           Sign in
         </Link>{" "}
         or{" "}
-        <Link to="/register" className="font-medium text-brand-600 hover:text-brand-700">
+        <Link
+          to="/register"
+          className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+        >
           create a customer account
         </Link>
         .
       </p>
-    </div>
+    </SlideUp>
   );
 }

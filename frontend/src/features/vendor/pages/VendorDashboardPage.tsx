@@ -4,6 +4,8 @@ import { Card, PageHeading, StatCard } from "@/features/vendor/components/StatCa
 import { ReadOnlyRow } from "@/features/vendor/components/FormFields";
 import { VendorErrorState } from "@/features/vendor/components/VendorErrorState";
 import { VendorStatusBadge } from "@/features/vendor/components/VendorStatusBanner";
+import { AnimatedList } from "@/motion/AnimatedList";
+import { FadeIn } from "@/motion/FadeIn";
 import {
   countOpenDays,
   formatDecimal,
@@ -12,6 +14,10 @@ import {
   formatTime,
   weekdayLabel,
 } from "@/features/vendor/format";
+
+/** The four "edit" affordances under the dashboard cards read as one set. */
+const CARD_LINK_CLASS =
+  "mt-4 inline-block text-sm font-medium text-brand-700 transition-colors duration-micro ease-standard hover:text-brand-900";
 
 /**
  * Vendor dashboard (plan task 2.9: "sidebar navigation, stats cards").
@@ -45,7 +51,7 @@ export function VendorDashboardPage() {
         description={`${profile.city}, ${profile.area} — ${profile.pincode}`}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <AnimatedList className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Approval status"
           value={<VendorStatusBadge status={profile.status} />}
@@ -66,9 +72,9 @@ export function VendorDashboardPage() {
           value={`${profile.maxOrdersPerSlot} / slot`}
           hint={profile.acceptingOrders ? "Accepting orders" : "Not accepting orders"}
         />
-      </div>
+      </AnimatedList>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <AnimatedList className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Delivery settings">
           <dl>
             <ReadOnlyRow label="Minimum order amount" value={formatMoney(profile.minOrderAmount)} />
@@ -77,7 +83,7 @@ export function VendorDashboardPage() {
             <ReadOnlyRow label="Free delivery above" value={formatMoney(profile.freeDeliveryAbove)} />
             <ReadOnlyRow label="Delivery radius" value={formatDecimal(profile.deliveryRadiusKm, " km")} />
           </dl>
-          <Link to="/vendor/settings" className="mt-4 inline-block text-sm font-medium text-brand-700 hover:text-brand-900">
+          <Link to="/vendor/settings" className={CARD_LINK_CLASS}>
             Edit delivery settings
           </Link>
         </Card>
@@ -94,7 +100,7 @@ export function VendorDashboardPage() {
               }
             />
           </dl>
-          <Link to="/vendor/hours" className="mt-4 inline-block text-sm font-medium text-brand-700 hover:text-brand-900">
+          <Link to="/vendor/hours" className={CARD_LINK_CLASS}>
             Edit operating hours
           </Link>
         </Card>
@@ -106,7 +112,7 @@ export function VendorDashboardPage() {
             <ReadOnlyRow label="Service location" value={`${profile.area}, ${profile.city}`} />
             <ReadOnlyRow label="Rating" value={formatRating(profile.avgRating, profile.reviewCount)} />
           </dl>
-          <Link to="/vendor/profile" className="mt-4 inline-block text-sm font-medium text-brand-700 hover:text-brand-900">
+          <Link to="/vendor/profile" className={CARD_LINK_CLASS}>
             Edit profile
           </Link>
         </Card>
@@ -116,13 +122,15 @@ export function VendorDashboardPage() {
             Everything a customer sees about your shop is editable from the profile and settings
             pages. Commission rate, approval status and ratings are set by FlowerConnect.
           </p>
-          <ul className="mt-3 space-y-1 text-sm text-slate-600">
-            <li>✓ Business name and description</li>
-            <li>✓ Address and service location</li>
-            <li>✓ Delivery settings and operating hours</li>
-          </ul>
+          <FadeIn>
+            <ul className="mt-3 space-y-1 text-sm text-slate-600">
+              <li>✓ Business name and description</li>
+              <li>✓ Address and service location</li>
+              <li>✓ Delivery settings and operating hours</li>
+            </ul>
+          </FadeIn>
         </Card>
-      </div>
+      </AnimatedList>
     </div>
   );
 }

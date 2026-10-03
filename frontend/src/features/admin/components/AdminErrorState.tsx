@@ -1,4 +1,6 @@
 import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
+import { FadeIn } from "@/motion/FadeIn";
+import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
 interface AdminErrorStateProps {
   error: unknown;
@@ -27,28 +29,28 @@ export function AdminErrorState({ error, onRetry }: AdminErrorStateProps) {
 
   if (info.status === 403) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+      <FadeIn role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
         <p className="font-semibold">Not permitted</p>
         <p className="mt-1">
           Your account does not have administrator access. Sign in as an administrator to manage
           vendors and users.
         </p>
-      </div>
+      </FadeIn>
     );
   }
 
   if (info.status === 404) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+      <FadeIn role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p className="font-semibold">Not found</p>
         <p className="mt-1">{info.message}</p>
-      </div>
+      </FadeIn>
     );
   }
 
   if (info.status === 409) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+      <FadeIn role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p className="font-semibold">Not allowed from the current status</p>
         <p className="mt-1">{info.message}</p>
         <p className="mt-1 text-amber-800">
@@ -58,28 +60,28 @@ export function AdminErrorState({ error, onRetry }: AdminErrorStateProps) {
           <button
             type="button"
             onClick={onRetry}
-            className="mt-3 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+            className={`mt-3 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 ${PRESSABLE} ${FOCUS_RING}`}
           >
             Refresh the list
           </button>
         )}
-      </div>
+      </FadeIn>
     );
   }
 
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+    <FadeIn role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
       <p className="font-semibold">Something went wrong</p>
       <p className="mt-1">{info.message}</p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100"
+          className={`mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 ${PRESSABLE} ${FOCUS_RING}`}
         >
           Try again
         </button>
       )}
-    </div>
+    </FadeIn>
   );
 }

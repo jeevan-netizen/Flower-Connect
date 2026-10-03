@@ -1,9 +1,15 @@
 import { Link } from "react-router-dom";
-import { PageHeading, StatCard } from "@/features/vendor/components/StatCard";
+import { Card, PageHeading, StatCard } from "@/features/vendor/components/StatCard";
 import { AdminUserStatusBadge } from "@/features/admin/components/AdminStatusBadge";
 import { useAdminUsers, useAdminVendors } from "@/features/admin/queries";
 import { formatDateTime } from "@/features/admin/format";
 import { AdminErrorState } from "@/features/admin/components/AdminErrorState";
+import { AnimatedList } from "@/motion/AnimatedList";
+import { FadeIn } from "@/motion/FadeIn";
+
+/** The two "manage" affordances read as one set. */
+const CARD_LINK_CLASS =
+  "mt-4 inline-block text-sm font-medium text-brand-700 transition-colors duration-micro ease-standard hover:text-brand-900";
 
 /**
  * Admin dashboard (plan task 2.10: "admin dashboard shell").
@@ -25,6 +31,13 @@ export function AdminDashboardPage() {
   const vendorError = vendors.error;
   const userError = users.error;
 
+  /**
+   * Both preview tables replay their entry animation only when their rows change,
+   * not on every refetch — see the same key in the two listings.
+   */
+  const vendorRowsKey = vendors.data?.content.map((vendor) => vendor.id).join(",") ?? "";
+  const userRowsKey = users.data?.content.map((user) => user.id).join(",") ?? "";
+
   return (
     <div className="space-y-6">
       <PageHeading
@@ -32,7 +45,7 @@ export function AdminDashboardPage() {
         description="Review vendor applications and manage user account status."
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <AnimatedList className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard
           label="Vendors awaiting approval"
           value={vendors.isPending ? "…" : (vendors.data?.totalElements ?? 0)}
@@ -43,37 +56,29 @@ export function AdminDashboardPage() {
           value={users.isPending ? "…" : (users.data?.totalElements ?? 0)}
           hint="Accounts currently not able to sign in"
         />
-      </div>
+      </AnimatedList>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Vendor management</h2>
-          <p className="mt-1 text-sm text-slate-600">
+      <AnimatedList className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card title="Vendor management">
+          <p className="text-sm text-slate-600">
             List vendors by approval status, then approve, reject, suspend or reinstate. Rejections
             and suspensions record a reason on the audit log.
           </p>
-          <Link
-            to="/admin/vendors"
-            className="mt-4 inline-block text-sm font-medium text-brand-700 hover:text-brand-900"
-          >
+          <Link to="/admin/vendors" className={CARD_LINK_CLASS}>
             Manage vendors
           </Link>
-        </section>
+        </Card>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">User management</h2>
-          <p className="mt-1 text-sm text-slate-600">
+        <Card title="User management">
+          <p className="text-sm text-slate-600">
             List accounts by role and status, then suspend, disable or reactivate. Every change
             records a reason and signs the account out everywhere.
           </p>
-          <Link
-            to="/admin/users"
-            className="mt-4 inline-block text-sm font-medium text-brand-700 hover:text-brand-900"
-          >
+          <Link to="/admin/users" className={CARD_LINK_CLASS}>
             Manage users
           </Link>
-        </section>
-      </div>
+        </Card>
+      </AnimatedList>
 
       {vendorError && <AdminErrorState error={vendorError} onRetry={() => void vendors.refetch()} />}
 
@@ -88,7 +93,10 @@ export function AdminDashboardPage() {
             No vendor applications are awaiting approval.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <FadeIn
+            key={vendorRowsKey}
+            className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+          >
             <h2 className="text-base font-semibold text-slate-900">Awaiting approval</h2>
             <table className="mt-3 w-full text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-slate-500">
@@ -114,12 +122,15 @@ export function AdminDashboardPage() {
             </table>
             {vendors.data.totalElements > vendors.data.content.length && (
               <p className="mt-3 text-sm text-slate-600">
-                <Link to="/admin/vendors?status=PENDING_APPROVAL" className="font-medium text-brand-700 hover:text-brand-900">
+                <Link
+                  to="/admin/vendors?status=PENDING_APPROVAL"
+                  className="font-medium text-brand-700 transition-colors duration-micro ease-standard hover:text-brand-900"
+                >
                   View all {vendors.data.totalElements} pending applications
                 </Link>
               </p>
             )}
-          </div>
+          </FadeIn>
         ))
       )}
 
@@ -136,7 +147,10 @@ export function AdminDashboardPage() {
             No user accounts are suspended.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <FadeIn
+            key={userRowsKey}
+            className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+          >
             <h2 className="text-base font-semibold text-slate-900">Suspended users</h2>
             <table className="mt-3 w-full text-left text-sm">
               <thead className="text-xs uppercase tracking-wide text-slate-500">
@@ -162,12 +176,15 @@ export function AdminDashboardPage() {
             </table>
             {users.data.totalElements > users.data.content.length && (
               <p className="mt-3 text-sm text-slate-600">
-                <Link to="/admin/users?status=SUSPENDED" className="font-medium text-brand-700 hover:text-brand-900">
+                <Link
+                  to="/admin/users?status=SUSPENDED"
+                  className="font-medium text-brand-700 transition-colors duration-micro ease-standard hover:text-brand-900"
+                >
                   View all {users.data.totalElements} suspended accounts
                 </Link>
               </p>
             )}
-          </div>
+          </FadeIn>
         ))
       )}
     </div>
