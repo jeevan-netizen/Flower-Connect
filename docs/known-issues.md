@@ -133,6 +133,26 @@ _None currently blocked._
   object. Asserting `$.validation.id` fails with `No value at JSON path "$.validation.id"`. Only
   `@Valid @RequestBody` violations populate that map.
 
+## Testing Gotchas (Phase 3c)
+
+- **`Category.builder().active(true)` is required in a product-service fixture.** `active` is a
+  primitive `boolean`, so the builder defaults it to `false` — and task 3.5 refuses to assign a
+  product to a deactivated category. A fixture written before that rule fails with
+  `Category is not active` rather than anything mentioning `active`, so the symptom looks like the
+  service is rejecting a perfectly good category.
+- **`verify(repo, never()).delete(any())` becomes ambiguous once a repository extends
+  `JpaSpecificationExecutor`.** `JpaSpecificationExecutor` adds `delete(Specification<T>)`, which
+  matches a bare `any()` exactly as well as `CrudRepository.delete(T)` does. Use
+  `delete(any(Product.class))`.
+- **Do not try to unit-test a `Specification` by calling `toPredicate` with null Criteria
+  arguments.** It does not throw, it returns something meaningless, and any assertion written
+  against it silently passes or silently fails depending on the stub. Filter *behaviour* belongs in
+  an integration test against real SQL; a unit test can only assert that the right `Pageable` was
+  passed and that an absent filter contributed no predicate.
+- **`@RequiresApprovedVendor` cannot be covered by a `@WebMvcTest` slice** (D-13). The controller
+  slice test carries an explicit Javadoc note saying so, because the slice happily returns 200 for
+  every gated route and a reader would otherwise assume the gate is verified there.
+
 ## Testing Gotchas (Phase 3b)
 
 - **Enum-typed entity fields require native MySQL `ENUM` columns.** Hibernate 6.4 with the

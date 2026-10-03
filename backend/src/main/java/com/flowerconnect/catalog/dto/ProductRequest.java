@@ -38,7 +38,7 @@ public class ProductRequest {
     private String description;
 
     @NotNull(message = "Base price is required")
-    @DecimalMin(value = "0.00", message = "Base price must not be negative")
+    @DecimalMin(value = "0.00", inclusive = false, message = "Base price must be greater than zero")
     @Digits(integer = 8, fraction = 2, message = "Base price must have at most 8 integer and 2 fraction digits")
     private BigDecimal basePrice;
 

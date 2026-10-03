@@ -363,6 +363,8 @@ of a constraint name.
 | D-14 | Admin user status changes are self-targeting-protected and always revoke tokens | Decision | Accepted | Phase 2d |
 | D-15 | The vendor area is one profile resource, edited through full-replacement PUTs | Decision | Accepted | Phase 2d |
 | D-16 | The admin UI derives backend rules instead of inventing transitions | Decision | Accepted | Phase 2d |
+| D-22 | Vendor catalog lives in the vendor namespace; removal is soft | Decision | Accepted | Phase 3c |
+| D-23 | Optional listing filters are composed Specifications | Decision | Accepted | Phase 3c |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -906,3 +908,128 @@ service is the sole enforcement point, documented here.
 - If MySQL ever gains filtered unique indexes (or the project
   moves to a database that has them), this decision should be
   revisited and the constraint promoted to the database
+
+---
+
+## D-22: The vendor catalog lives inside the vendor namespace, and removal is soft
+
+**Status:** Accepted
+**Date:** Phase 3c (Task 3.5)
+
+### Context
+
+Task 3.5 exposes `products` to vendors. Three things were not settled by the plan and each one
+forces a choice that later tasks will inherit.
+
+**Where the routes live.** The plan's prose names `/api/v1/vendor/products`, singular. The existing
+vendor routes are `/api/v1/vendors/**` (plural), and `SecurityConfig` maps that whole namespace to
+`hasRole("FLORIST")`. A second, parallel namespace would need its own matcher, and two nearly
+identical prefixes is exactly the kind of near-miss that produces a rule attached to the wrong one.
+
+**How a product is removed.** Phase 3b made a product's images and inventory cascade on a hard
+delete, and `ProductService` had a `delete` that did exactly that. But `stock_movements` is an
+append-only log: deleting the product a movement refers to makes that movement unreadable and
+silently rewrites the meaning of the inventory history. Task 3.8 will add real image uploads and
+task 3.6 real stock movements, which is precisely when that history starts to matter.
+
+**Whether lifecycle transitions are policed.** `products.status` has four values
+(`DRAFT`/`ACTIVE`/`INACTIVE`/`ARCHIVED`). `VendorAdminService` enforces a strict transition table for
+*vendor* approval (task 2.6), but `UserStatusService` (task 2.8) enforces none for *user* status,
+and the two were written to different rules. Applying the wrong one of those precedents to products
+would either block a vendor correcting their own mistake or refuse to let them retire an item.
+
+### Decision
+
+- **Routes are `/api/v1/vendors/products`.** The singular form in the plan text is treated as a typo;
+  the plural namespace is what `SecurityConfig`, the vendor frontend and the docs already use. The
+  namespace rule then covers the catalog with no change to `SecurityConfig`, and D-13's layering
+  holds with the namespace answering "is this a vendor account?" and `@RequiresApprovedVendor`
+  answering "may this vendor transact?".
+- **Removal is soft.** `ProductService.deactivate` sets `INACTIVE` and leaves the row, its images
+  and its inventory in place. The database cascade remains available, but no product route uses it.
+  A vendor can bring a product back through `PUT`, which is what makes `INACTIVE` "hidden" rather
+  than "gone".
+- **No transition table.** Any of the four statuses may be set from any other, and omitting `status`
+  on an update leaves the stored value untouched. The plan defines no product-status matrix, and
+  inventing one would stop a vendor fixing a miscategorised listing. This follows the D-14 precedent
+  for user status rather than the task 2.6 admin-transition precedent.
+- **A product may only be assigned to an active category.** `requireActiveCategory` refuses a
+  deactivated category with a 400. Without it a vendor could keep filing products under a category
+  the storefront no longer lists. `categories.active` is already a soft flag (D-18); this is what
+  makes it enforceable.
+- **`base_price` must be greater than zero**, asserted both by `ProductRequest`'s
+  `@DecimalMin(inclusive = false)` (so the client gets a field-level 400) and by a service check
+  (so a non-HTTP writer cannot store a zero) — the two-layer rule of D-12.
+
+### Consequences
+
+- The catalog is reachable only by a vendor whose profile is `APPROVED`. A suspended vendor loses it
+  on their next request, with no token re-issue, because the guard reads the status per request (D-13).
+- Deactivating is idempotent and cheap: a single-column update, so the API needs no confirmation
+  state and no cascade bookkeeping.
+- `ProductService.delete` was renamed to `deactivate`. A hard delete now has no caller at all; if one
+  is ever needed it should be an admin-only operation with its own decision, because it invalidates
+  stock-movement history.
+- A future `ARCHIVED` distinction ("end of life" vs "temporarily hidden") has no API difference from
+  `INACTIVE` today. If storefront queries start to treat them differently, revisit whether the update
+  endpoint should restrict the values a vendor may choose.
+
+---
+
+## D-23: Optional listing filters are composed Specifications, not a nullable JPQL query
+
+**Status:** Accepted
+**Date:** Phase 3c (Task 3.5)
+
+### Context
+
+The vendor product listing takes three optional filters (`status`, `categoryId`, `name`) over a
+paged result. Spring Data offers three ways to express that, and the obvious one is a trap.
+
+A hand-written query has to guard each optional parameter:
+
+```
+WHERE p.vendor.id = :vendorId
+  AND (:status IS NULL OR p.status = :status)
+  AND (:categoryId IS NULL OR p.category.id = :categoryId)
+```
+
+When Hibernate compiles `:status IS NULL`, the parameter appears on **both** sides of the comparison
+— one side against an enum column, the other against a literal `null`. Type inference then has to
+come from somewhere, and with no attribute on the null side it resolves from the other one or fails
+outright. `status` is a native MySQL `ENUM` (D-20), which makes this worse, not better: the dialect
+expects an ENUM-typed parameter and a mis-inferred one surfaces as a Hibernate type error rather
+than a useful message.
+
+A derived query method cannot express "absent" at all — Spring Data binds a null argument to
+`IS NULL`, which for a filter means "match nothing", the opposite of what an omitted filter should
+do. And one derived method per combination would be 2^3 methods to keep in step.
+
+### Decision
+
+Filters are Criteria predicates in `com.flowerconnect.catalog.specification.ProductSpecifications`,
+composed onto one mandatory fragment, following the `VendorProfileSpecifications` and
+`UserSpecifications` precedent already in the codebase:
+
+- `forVendor(vendorId)` — mandatory, passed first, never optional.
+- `withStatus`, `inCategory`, `nameContains` — appended with `Specification#and` only when the caller
+  supplied that filter, so an absent filter contributes no predicate at all.
+- `nameContains` returns `builder.conjunction()` for a null or blank term, so the predicate is total
+  and callers may pass the raw query-string value through unchanged.
+
+`ProductRepository` gains `JpaSpecificationExecutor<Product>`. Sorting stays on the `Pageable`
+(`createdAt` then `id`, both descending) rather than in an `ORDER BY` inside a query string, which
+keeps pagination stable for rows written in the same instant.
+
+### Consequences
+
+- The predicates carry their own types, so there is no inference to get wrong and no dialect-specific
+  ENUM handling in a query string.
+- Filter behaviour is Criteria-API behaviour over real SQL, so it is asserted in
+  `VendorCatalogIntegrationTest` against MySQL rather than in `ProductServiceTest`. A mocked
+  repository cannot demonstrate that `name=TULIP` matches `Yellow Tulip Bunch`; only the database can.
+- `nameContains` is a `LIKE '%term%'` and the name column is not indexed, so a broad search scans the
+  vendor's own rows. The vendor predicate narrows it first. If search becomes a real requirement, this
+  wants a full-text index, not a different query shape.
+- A blank `name=` narrows nothing rather than matching nothing. That is a deliberate reading of
+  `name=` as a client artefact rather than as an intent to find products with an empty name.

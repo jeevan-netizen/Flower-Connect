@@ -23,6 +23,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -70,7 +75,10 @@ class ProductServiceTest {
         ReflectionTestUtils.setField(productService, "entityManager", entityManager);
 
         vendor = VendorProfile.builder().id(1L).businessName("Test Blossoms").build();
-        category = Category.builder().id(1L).name("Roses").slug("roses").build();
+        // active defaults to false on the builder; task 3.5 refuses
+        // to assign a product to a deactivated category, so the
+        // fixture has to say so explicitly.
+        category = Category.builder().id(1L).name("Roses").slug("roses").active(true).build();
     }
 
     @Test
@@ -223,21 +231,171 @@ class ProductServiceTest {
     }
 
     @Test
-    void deleteRefusesAProductOwnedByAnotherVendor() {
-        Product foreign = Product.builder()
-                .id(10L).vendor(VendorProfile.builder().id(2L).build())
-                .category(category).name("Foreign").slug("foreign")
-                .basePrice(new BigDecimal("100.00")).status(ProductStatus.DRAFT)
-                .build();
+    void deactivateRefusesAProductOwnedByAnotherVendor() {
+        Product foreign = foreignProduct();
         when(productRepository.findById(10L)).thenReturn(Optional.of(foreign));
         when(vendorProfileRepository.findByUserEmail("florist@test.com"))
                 .thenReturn(Optional.of(vendor));
 
         BusinessException thrown = catchBusinessException(() ->
-                productService.delete("florist@test.com", 10L));
+                productService.deactivate("florist@test.com", 10L));
 
         assertThat(thrown.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
-        verify(productRepository, never()).delete(any());
+        verify(productRepository, never()).saveAndFlush(any());
+        verify(productRepository, never()).delete(any(Product.class));
+    }
+
+    @Test
+    void deactivateMovesTheProductToInactiveWithoutDeletingIt() {
+        Product own = ownProduct("Roses Only");
+        when(productRepository.findById(10L)).thenReturn(Optional.of(own));
+        when(vendorProfileRepository.findByUserEmail("florist@test.com"))
+                .thenReturn(Optional.of(vendor));
+        when(productRepository.saveAndFlush(any(Product.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        productService.deactivate("florist@test.com", 10L);
+
+        assertThat(own.getStatus()).isEqualTo(ProductStatus.INACTIVE);
+        verify(productRepository).saveAndFlush(own);
+        verify(productRepository, never()).delete(any(Product.class));
+    }
+
+    @Test
+    void getByIdForVendorReturnsTheProduct() {
+        Product own = ownProduct("Roses Only");
+        when(productRepository.findById(10L)).thenReturn(Optional.of(own));
+        when(vendorProfileRepository.findByUserEmail("florist@test.com"))
+                .thenReturn(Optional.of(vendor));
+        when(inventoryRepository.findByProductId(10L)).thenReturn(Optional.empty());
+        when(productImageRepository.findByProductIdOrderBySortOrderAscIdAsc(10L))
+                .thenReturn(List.of());
+        when(mapper.toFullResponse(any(), any(), any()))
+                .thenReturn(ProductResponse.builder().id(10L).build());
+
+        assertThat(productService.getByIdForVendor("florist@test.com", 10L).getId()).isEqualTo(10L);
+    }
+
+    @Test
+    void getByIdForVendorRefusesAProductOwnedByAnotherVendor() {
+        when(productRepository.findById(10L)).thenReturn(Optional.of(foreignProduct()));
+        when(vendorProfileRepository.findByUserEmail("florist@test.com"))
+                .thenReturn(Optional.of(vendor));
+
+        BusinessException thrown = catchBusinessException(() ->
+                productService.getByIdForVendor("florist@test.com", 10L));
+
+        assertThat(thrown.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
+    }
+
+    @Test
+    void getByIdForVendorReportsAMissingProductAsNotFound() {
+        when(productRepository.findById(404L)).thenReturn(Optional.empty());
+
+        BusinessException thrown = catchBusinessException(() ->
+                productService.getByIdForVendor("florist@test.com", 404L));
+
+        assertThat(thrown.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    // ------------------------------------------------------------------
+    // Category and price rules (task 3.5)
+    // ------------------------------------------------------------------
+
+    @Test
+    void createRejectsADeactivatedCategory() {
+        Category hidden = Category.builder()
+                .id(2L).name("Seasonal").slug("seasonal").active(false).build();
+        when(vendorProfileRepository.findByUserEmail("florist@test.com"))
+                .thenReturn(Optional.of(vendor));
+        when(categoryRepository.findById(2L)).thenReturn(Optional.of(hidden));
+
+        assertThatThrownBy(() -> productService.create("florist@test.com",
+                ProductRequest.builder()
+                        .name("Winter Rose")
+                        .categoryId(2L)
+                        .basePrice(new BigDecimal("150.00"))
+                        .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Category is not active");
+    }
+
+    @Test
+    void createRejectsAZeroPrice() {
+        when(vendorProfileRepository.findByUserEmail("florist@test.com"))
+                .thenReturn(Optional.of(vendor));
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
+
+        assertThatThrownBy(() -> productService.create("florist@test.com",
+                ProductRequest.builder()
+                        .name("Free Rose")
+                        .categoryId(1L)
+                        .basePrice(BigDecimal.ZERO)
+                        .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("greater than zero");
+
+        verify(productRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateRejectsAZeroPriceWithoutSaving() {
+        when(productRepository.findById(10L)).thenReturn(Optional.of(ownProduct("Roses Only")));
+        when(vendorProfileRepository.findByUserEmail("florist@test.com"))
+                .thenReturn(Optional.of(vendor));
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
+
+        assertThatThrownBy(() -> productService.update("florist@test.com", 10L,
+                ProductRequest.builder()
+                        .name("Roses Only")
+                        .categoryId(1L)
+                        .basePrice(new BigDecimal("-1.00"))
+                        .build()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("greater than zero");
+
+        verify(productRepository, never()).saveAndFlush(any());
+    }
+
+    // ------------------------------------------------------------------
+    // Listing (task 3.5)
+    //
+    // Only the parts of the listing that the service itself decides
+    // are unit-tested here: the vendor is resolved from the JWT
+    // subject, and page/size are clamped. Which rows the composed
+    // predicates actually select is Criteria-API behaviour, so it is
+    // asserted against real SQL in VendorCatalogIntegrationTest.
+    // ------------------------------------------------------------------
+
+    @Test
+    void listClampsThePageSizeAndRejectsNegativePages() {
+        stubList();
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+
+        productService.list("florist@test.com", null, null, null, -3, 5000);
+
+        verify(productRepository).findAll(any(Specification.class), captor.capture());
+        assertThat(captor.getValue().getPageNumber()).isZero();
+        assertThat(captor.getValue().getPageSize()).isEqualTo(100);
+    }
+
+    @Test
+    void listRejectsAnUnknownVendor() {
+        when(vendorProfileRepository.findByUserEmail("florist@test.com"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                productService.list("florist@test.com", null, null, null, 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Vendor profile not found");
+    }
+
+    /** Stubs an empty page for the listing tests. */
+    private void stubList() {
+        when(vendorProfileRepository.findByUserEmail("florist@test.com"))
+                .thenReturn(Optional.of(vendor));
+        when(productRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
     }
 
     // ------------------------------------------------------------------
@@ -258,6 +416,24 @@ class ProductServiceTest {
                 .thenReturn(List.of());
         when(mapper.toFullResponse(any(), any(), any()))
                 .thenReturn(ProductResponse.builder().id(10L).build());
+    }
+
+    /** A product owned by vendor 1, ready to be updated or deactivated. */
+    private Product ownProduct(String name) {
+        return Product.builder()
+                .id(10L).vendor(vendor).category(category)
+                .name(name).slug("roses-only")
+                .basePrice(new BigDecimal("100.00")).status(ProductStatus.DRAFT)
+                .build();
+    }
+
+    /** A product owned by vendor 2 — out of scope for vendor 1. */
+    private Product foreignProduct() {
+        return Product.builder()
+                .id(10L).vendor(VendorProfile.builder().id(2L).build())
+                .category(category).name("Foreign").slug("foreign")
+                .basePrice(new BigDecimal("100.00")).status(ProductStatus.DRAFT)
+                .build();
     }
 
     private ProductRequest request(String name) {

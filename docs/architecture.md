@@ -411,6 +411,11 @@ yet, so `@RequiresApprovedVendor` currently guards no production route — see
 | POST   | `/api/v1/admin/vendors/{id}/reinstate` | Reinstate a suspended vendor (ADMIN) | Phase 2c|
 | GET    | `/api/v1/admin/users`   | List/filter users by role and status (ADMIN) | Phase 2d|
 | PATCH  | `/api/v1/admin/users/{id}/status` | Change a user's status; reason required, tokens revoked (ADMIN) | Phase 2d|
+| POST   | `/api/v1/vendors/products` | Create a product (FLORIST, APPROVED) | Phase 3c|
+| GET    | `/api/v1/vendors/products` | List the vendor's own products (paged; `status` / `categoryId` / `name` filters) | Phase 3c|
+| GET    | `/api/v1/vendors/products/{id}` | Read one of the vendor's products | Phase 3c|
+| PUT    | `/api/v1/vendors/products/{id}` | Update a product; a rename regenerates the slug | Phase 3c|
+| PATCH  | `/api/v1/vendors/products/{id}/deactivate` | Soft delete: move the product to `INACTIVE` | Phase 3c|
 | GET    | `/actuator/health`   | Health check (no auth)              | Phase 0|
 
 ## 7. Configuration

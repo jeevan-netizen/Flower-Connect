@@ -10,6 +10,7 @@ import com.flowerconnect.catalog.mapper.ProductMapper;
 import com.flowerconnect.catalog.repository.CategoryRepository;
 import com.flowerconnect.catalog.repository.ProductImageRepository;
 import com.flowerconnect.catalog.repository.ProductRepository;
+import com.flowerconnect.catalog.specification.ProductSpecifications;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.inventory.domain.Inventory;
@@ -24,19 +25,19 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
  * Product domain service — the foundation of the catalog
- * (plan tasks 3.2–3.4). The HTTP API that exposes these
- * operations is plan task 3.5 and is deliberately not built
- * here.
+ * (plan tasks 3.2–3.4) and the vendor-facing operations of task 3.5.
  *
- * <p>Three invariants are owned here:
+ * <p>Four invariants are owned here:
  * <ul>
  *   <li><b>Slug uniqueness</b> — the slug is generated from the
  *       product name (lowercase, non-alphanumeric collapsed to a
@@ -53,10 +54,22 @@ import java.util.regex.Pattern;
  *       movement is written for the initial zero: the log records
  *       <em>changes</em>, and zero is the starting state, not a
  *       change.</li>
- *   <li><b>Ownership</b> — update and delete are scoped to the
- *       calling vendor: a foreign product is a 403, a missing one
- *       a 404.</li>
+ *   <li><b>Ownership</b> — update, read and deactivate are scoped
+ *       to the calling vendor: a foreign product is a 403, a
+ *       missing one a 404. Every method resolves the vendor from
+ *       the JWT subject rather than from a parameter, so no caller
+ *       can name another vendor.</li>
+ *   <li><b>Active category</b> — a product may only be assigned to
+ *       a category that is active. A soft-deleted (deactivated)
+ *       category must not become assignable through the catalog
+ *       API, so the check lives here rather than only in the
+ *       public category listing.</li>
  * </ul>
+ *
+ * <p>Removal is soft: {@link #deactivate} sets
+ * {@link ProductStatus#INACTIVE} and leaves the row, its images and
+ * its inventory in place, so historical stock movements stay
+ * readable.
  */
 @Slf4j
 @Service
@@ -86,7 +99,8 @@ public class ProductService {
     @Transactional
     public ProductResponse create(String vendorEmail, ProductRequest request) {
         VendorProfile vendor = requireVendor(vendorEmail);
-        Category category = requireCategory(request.getCategoryId());
+        Category category = requireActiveCategory(request.getCategoryId());
+        validatePrice(request.getBasePrice());
         String base = normalizeSlug(request.getName());
 
         Product product = persistWithUniqueSlug(vendor, category, request, base);
@@ -114,7 +128,8 @@ public class ProductService {
     @Transactional
     public ProductResponse update(String vendorEmail, Long productId, ProductRequest request) {
         Product product = requireOwnedProduct(vendorEmail, productId);
-        Category category = requireCategory(request.getCategoryId());
+        Category category = requireActiveCategory(request.getCategoryId());
+        validatePrice(request.getBasePrice());
 
         boolean nameChanged = !product.getName().equals(request.getName());
         String base = nameChanged ? normalizeSlug(request.getName()) : null;
@@ -136,18 +151,23 @@ public class ProductService {
     }
 
     /**
-     * Hard-deletes a product the calling vendor owns. The database
-     * cascades to the product's images and inventory row.
+     * Soft-deletes a product the calling vendor owns by moving it to
+     * {@link ProductStatus#INACTIVE}. Nothing is removed: the row, its images
+     * and its inventory remain so historical stock movements stay readable, and
+     * the vendor can reactivate it through {@link #update}.
      */
     @Transactional
-    public void delete(String vendorEmail, Long productId) {
+    public void deactivate(String vendorEmail, Long productId) {
         Product product = requireOwnedProduct(vendorEmail, productId);
-        productRepository.delete(product);
-        log.info("Deleted product {} by {}", productId, vendorEmail);
+        product.setStatus(ProductStatus.INACTIVE);
+        productRepository.saveAndFlush(product);
+        log.info("Deactivated product {} by {}", productId, vendorEmail);
     }
 
     /**
-     * Single product by id.
+     * Single product by id, without a vendor scope. Reserved for the
+     * storefront read path, which has no authenticated vendor; every
+     * vendor-facing read goes through {@link #getByIdForVendor}.
      */
     @Transactional(readOnly = true)
     public ProductResponse getById(Long productId) {
@@ -156,18 +176,49 @@ public class ProductService {
     }
 
     /**
-     * Vendor-scoped listing, newest first, page size clamped to
-     * {@code 1..100}.
+     * Single product by id, restricted to the calling vendor's catalog. A
+     * product owned by another vendor is a 403 and a product that does not
+     * exist is a 404, so the two cases stay distinguishable to the client.
      */
     @Transactional(readOnly = true)
-    public ProductPageResponse list(String vendorEmail, int page, int size) {
+    public ProductResponse getByIdForVendor(String vendorEmail, Long productId) {
+        return toResponse(requireOwnedProduct(vendorEmail, productId));
+    }
+
+    /**
+     * Vendor-scoped listing, newest first, page size clamped to {@code 1..100}.
+     *
+     * <p>{@code status}, {@code categoryId} and {@code name} are optional filters;
+     * a null or blank value omits the corresponding predicate rather than
+     * matching nothing. Sorting is pinned to {@code createdAt} then {@code id} so
+     * pagination is stable for rows written in the same instant.
+     */
+    @Transactional(readOnly = true)
+    public ProductPageResponse list(String vendorEmail,
+                                    ProductStatus status,
+                                    Long categoryId,
+                                    String name,
+                                    int page,
+                                    int size) {
         VendorProfile vendor = requireVendor(vendorEmail);
         int safePage = Math.max(0, page);
         int safeSize = Math.min(Math.max(1, size), MAX_PAGE_SIZE);
         Pageable pageable = PageRequest.of(
                 safePage, safeSize,
                 Sort.by("createdAt").descending().and(Sort.by("id").descending()));
-        Page<Product> result = productRepository.findByVendorId(vendor.getId(), pageable);
+
+        Specification<Product> spec = ProductSpecifications.forVendor(vendor.getId());
+        if (status != null) {
+            spec = spec.and(ProductSpecifications.withStatus(status));
+        }
+        if (categoryId != null) {
+            spec = spec.and(ProductSpecifications.inCategory(categoryId));
+        }
+        if (name != null && !name.isBlank()) {
+            spec = spec.and(ProductSpecifications.nameContains(name));
+        }
+
+        Page<Product> result = productRepository.findAll(spec, pageable);
 
         return ProductPageResponse.builder()
                 .content(result.getContent().stream().map(this::toResponse).toList())
@@ -309,6 +360,30 @@ public class ProductService {
         }
         return categoryRepository.findById(categoryId)
                 .orElseThrow(() -> BusinessException.badRequest("Category not found"));
+    }
+
+    /**
+     * Resolves a category for assignment to a product, refusing a deactivated
+     * one. Without this a vendor could keep filing products under a category
+     * the storefront no longer lists.
+     */
+    private Category requireActiveCategory(Long categoryId) {
+        Category category = requireCategory(categoryId);
+        if (!category.isActive()) {
+            throw BusinessException.badRequest("Category is not active");
+        }
+        return category;
+    }
+
+    /**
+     * A price of zero or less is rejected in the service as well as in
+     * {@code ProductRequest}, so the rule holds for any writer rather than only
+     * for HTTP callers (D-12).
+     */
+    private void validatePrice(BigDecimal price) {
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw BusinessException.badRequest("Base price must be greater than zero");
+        }
     }
 
     private Product requireOwnedProduct(String vendorEmail, Long productId) {

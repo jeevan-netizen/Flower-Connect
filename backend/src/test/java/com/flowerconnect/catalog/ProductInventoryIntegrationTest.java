@@ -1,6 +1,7 @@
 package com.flowerconnect.catalog;
 
 import com.flowerconnect.catalog.domain.Product;
+import com.flowerconnect.catalog.domain.Product.ProductStatus;
 import com.flowerconnect.catalog.domain.ProductImage;
 import com.flowerconnect.catalog.dto.ProductRequest;
 import com.flowerconnect.catalog.dto.ProductResponse;
@@ -335,7 +336,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     // ------------------------------------------------------------------
 
     @Test
-    void deletingAProductCascadesToImagesAndInventory() {
+    void deactivatingAProductKeepsItsRowImagesAndInventory() {
         ProductResponse product = productService.create(
                 vendorEmail, request("Cascade Rose"));
         Long productId = product.getId();
@@ -344,13 +345,17 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
                         + "VALUES (?, 'cascade/rose.jpg', 'image/jpeg', 1024, 0, b'1')",
                 productId);
 
-        productService.delete(vendorEmail, productId);
+        productService.deactivate(vendorEmail, productId);
 
-        assertTrue(productRepository.findById(productId).isEmpty());
-        assertEquals(0L, jdbcTemplate.queryForObject(
+        // Removal is soft: the product, its image and its inventory
+        // row all survive so historical stock movements stay
+        // readable.
+        assertEquals(ProductStatus.INACTIVE,
+                productRepository.findById(productId).orElseThrow().getStatus());
+        assertEquals(1L, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM product_images WHERE product_id = ?",
                 Long.class, productId));
-        assertEquals(0L, jdbcTemplate.queryForObject(
+        assertEquals(1L, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM inventory WHERE product_id = ?",
                 Long.class, productId));
     }
@@ -369,7 +374,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void updateAndDeleteRefuseAProductOwnedByAnotherVendor() {
+    void updateAndDeactivateRefuseAProductOwnedByAnotherVendor() {
         ProductResponse product = productService.create(
                 vendorEmail, request("Foreign Rose"));
         // createVendor records the email of the profile it just
@@ -382,9 +387,9 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
                         otherVendorEmail, product.getId(), request("Stolen Rose")));
         assertEquals(ErrorCode.FORBIDDEN, update.getErrorCode());
 
-        BusinessException delete = assertThrows(BusinessException.class, () ->
-                productService.delete(otherVendorEmail, product.getId()));
-        assertEquals(ErrorCode.FORBIDDEN, delete.getErrorCode());
+        BusinessException deactivate = assertThrows(BusinessException.class, () ->
+                productService.deactivate(otherVendorEmail, product.getId()));
+        assertEquals(ErrorCode.FORBIDDEN, deactivate.getErrorCode());
 
         assertTrue(productRepository.findById(product.getId()).isPresent());
     }
