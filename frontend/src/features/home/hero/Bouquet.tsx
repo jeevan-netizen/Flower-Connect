@@ -4,19 +4,28 @@ import {
   BOUQUET_FLOWERS,
   BOUQUET_LEAVES,
   GEOMETRY,
+  LEAF_COLOR,
   STEM_BASE,
+  STEM_COLOR,
   WRAP,
+  WRAP_COLOR,
+  WRAP_TRIM_COLOR,
 } from "./bouquet-layout";
 
 /** Stems and the bouquet group are modelled along +Y; instances are aimed onto it. */
 const UP = new THREE.Vector3(0, 1, 0);
 
 /**
- * The bouquet itself: four draw calls, all procedural.
+ * The bouquet itself: five draw calls, all procedural.
  *
  * Stems, heads and leaves are each one `InstancedMesh`, so the flower count does
  * not multiply draw calls. Head colour is per-instance (`setColorAt`), which
- * keeps seven differently coloured blooms on a single material.
+ * keeps eighteen differently coloured blooms on a single material. The wrap cone
+ * and its trim ring are two plain meshes.
+ *
+ * Material colours come from `bouquet-layout`, which mirrors the landing design
+ * tokens — the scene takes literal strings, so this is the seam where CSS
+ * variables meet Three.
  *
  * Geometry and materials are created once in `useMemo` and disposed on unmount,
  * because R3F does not own objects handed to it through `args`.
@@ -45,12 +54,20 @@ export function Bouquet() {
       1,
       true,
     );
+    const trimGeometry = new THREE.CylinderGeometry(
+      WRAP.rimRadius,
+      WRAP.rimRadius,
+      WRAP.rimHeight,
+      GEOMETRY.wrapRadialSegments,
+      1,
+      true,
+    );
 
     return {
-      geometries: { stemGeometry, headGeometry, leafGeometry, wrapGeometry },
+      geometries: { stemGeometry, headGeometry, leafGeometry, wrapGeometry, trimGeometry },
       materials: {
         stem: new THREE.MeshStandardMaterial({
-          color: "#15803d",
+          color: STEM_COLOR,
           roughness: 0.9,
           metalness: 0,
           flatShading: true,
@@ -62,15 +79,22 @@ export function Bouquet() {
           flatShading: true,
         }),
         leaf: new THREE.MeshStandardMaterial({
-          color: "#22c55e",
+          color: LEAF_COLOR,
           roughness: 0.85,
           metalness: 0,
           flatShading: true,
           side: THREE.DoubleSide,
         }),
         wrap: new THREE.MeshStandardMaterial({
-          color: "#dcfce7",
+          color: WRAP_COLOR,
           roughness: 0.95,
+          metalness: 0,
+          flatShading: true,
+          side: THREE.DoubleSide,
+        }),
+        trim: new THREE.MeshStandardMaterial({
+          color: WRAP_TRIM_COLOR,
+          roughness: 0.8,
           metalness: 0,
           flatShading: true,
           side: THREE.DoubleSide,
@@ -157,6 +181,13 @@ export function Bouquet() {
         args={[geometries.leafGeometry, materials.leaf, BOUQUET_LEAVES.length]}
       />
       <mesh position={WRAP.position} geometry={geometries.wrapGeometry} material={materials.wrap} />
+      {/* Trim ring around the mouth of the cone: two meshes rather than one so
+          the wrap is not a single flat silhouette. */}
+      <mesh
+        position={[WRAP.position[0], WRAP.position[1] + WRAP.halfHeight, WRAP.position[2]]}
+        geometry={geometries.trimGeometry}
+        material={materials.trim}
+      />
     </group>
   );
 }

@@ -14,6 +14,14 @@
     --fc-motion-duration-ui: 240ms;
     --fc-motion-duration-page: 320ms;
     --fc-motion-duration-ambient: 6000ms;
+    /*
+     * Decorative loops (landing petals, floating glass cards) are authored as
+     * multiples of the ambient period rather than as new durations, so the one
+     * slow-loop token stays the only authored value. Mirrored in
+     * `src/motion/tokens.ts` as `driftSeconds` / `floatSeconds`.
+     */
+    --fc-motion-duration-drift: calc(var(--fc-motion-duration-ambient) * 3);
+    --fc-motion-duration-float: calc(var(--fc-motion-duration-ambient) * 2);
 
     --fc-motion-ease-standard: cubic-bezier(0.22, 0.61, 0.36, 1);
     --fc-motion-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
@@ -23,6 +31,82 @@
     --fc-motion-distance-enter: 12px;
     --fc-motion-distance-exit: -8px;
     --fc-motion-distance-lift: -2px;
+
+    /*
+     * Landing design tokens — the single source of truth for the dark landing
+     * palette, glass surfaces, radii and type stacks.
+     *
+     * `tailwind.config.ts` re-exports each name as a utility (`bg-bolder-bg`,
+     * `text-bolder-muted`, `rounded-card`, `font-display`, `shadow-glass`, ...),
+     * so no component ever names a colour, radius or font. A light landing theme
+     * is a matter of overriding these same names under a theme selector; the
+     * component tree needs no change.
+     */
+    --color-bg: #1a0d17;
+    --color-text: #f4e6ec;
+    --color-text-muted: #cdb8c4;
+    --color-placeholder: #7a6572;
+
+    --color-rose: #f27a9b;
+    --color-rose-strong: #e8567f;
+    --color-rose-deep: #d63f6c;
+    /*
+     * Action surface for a solid rose button. `--color-rose` measures 2.61:1
+     * against white text and `--color-rose-deep` 4.39:1, so neither can carry
+     * the button label at WCAG AA; this deeper rose reaches 5.49:1 while staying
+     * in the supplied family. `--color-rose` itself is unchanged and still
+     * drives the accents (the italic headline word, the focus ring, the icon
+     * tiles) where it is used as a large-text or non-text colour.
+     */
+    --color-rose-action: #c22d5c;
+
+    --color-blush: #f7b8c8;
+    --color-blush-light: #fac1d0;
+
+    --color-leaf: #5fae91;
+    --color-leaf-text: #8fd0b6;
+    --color-leaf-dark: #3e8f73;
+
+    --color-gold: #f2b84b;
+    --color-plum: #3a1b33;
+
+    /* Icon tiles behind the line icons; solid, because they must stay legible
+       on a glass surface without relying on a second alpha layer. */
+    --tile-leaf: rgba(143, 208, 182, 0.16);
+    --tile-rose: rgba(242, 122, 155, 0.16);
+
+    --glass-bg: rgba(255, 255, 255, 0.09);
+    --glass-bg-soft: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.18);
+    --glass-border-soft: rgba(255, 255, 255, 0.12);
+    /* Solid stand-ins, used only where `backdrop-filter` is unsupported. */
+    --glass-bg-fallback: #33202f;
+    --glass-bg-soft-fallback: #2a1a27;
+
+    --radius-pill: 999px;
+    --radius-card: 20px;
+    --radius-chip: 18px;
+    --radius-glass-card: 18px;
+
+    --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --font-body: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+    --glow-rose: radial-gradient(
+      circle,
+      rgba(242, 122, 155, 0.3) 0%,
+      rgba(214, 63, 108, 0.14) 42%,
+      rgba(26, 13, 23, 0) 70%
+    );
+    --glow-leaf: radial-gradient(
+      circle,
+      rgba(95, 174, 145, 0.26) 0%,
+      rgba(62, 143, 115, 0.12) 45%,
+      rgba(26, 13, 23, 0) 72%
+    );
+
+    --shadow-glass: 0 18px 40px rgba(10, 4, 9, 0.45);
+    --shadow-search: 0 18px 44px rgba(10, 4, 9, 0.55);
+    --shadow-button: 0 10px 24px rgba(194, 45, 92, 0.35);
   }
 }
 
@@ -158,4 +242,174 @@
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+
+  /*
+   * The drifting petals are removed outright rather than frozen: a petal that
+   * has stopped moving but is still painted reads as a speck of dust on the
+   * hero, which is worse than not drawing it at all.
+   */
+  .fc-petal {
+    display: none;
+  }
+}
+
+/*
+ * Landing decoration layer.
+ *
+ * Art direction — glow geometry, ring diameters, petal placement, the watermark
+ * and the glass recipe — lives here rather than in the components, for the same
+ * reason motion values live in `src/motion/tokens.ts`: one place to change it,
+ * and no hex, radius or font in a component. Everything in this block is
+ * decorative, so each rule is inert to the pointer and hidden from assistive
+ * technology by the component that applies it.
+ */
+
+@keyframes fc-petal-drift {
+  from {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(18px, -46px, 0) rotate(140deg);
+  }
+}
+
+@keyframes fc-glass-float {
+  from {
+    transform: translate3d(0, -6px, 0);
+  }
+  to {
+    transform: translate3d(0, 6px, 0);
+  }
+}
+
+.fc-glow {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.fc-glow-rose {
+  width: 900px;
+  height: 900px;
+  right: -120px;
+  top: 60px;
+  background-image: var(--glow-rose);
+}
+
+.fc-glow-leaf {
+  width: 700px;
+  height: 700px;
+  left: -200px;
+  bottom: -260px;
+  background-image: var(--glow-leaf);
+}
+
+.fc-watermark {
+  position: absolute;
+  left: 20px;
+  top: 250px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 380px;
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  user-select: none;
+}
+
+.fc-petal {
+  position: absolute;
+  border-radius: 9999px 9999px 9999px 0;
+  background-color: var(--color-blush);
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.fc-petal-drift {
+  animation: fc-petal-drift var(--fc-motion-duration-drift) var(--fc-motion-ease-standard)
+    infinite alternate;
+}
+
+/* Six placements across the right half of the hero, beside the bouquet. */
+.fc-petal-1 {
+  width: 13px;
+  height: 13px;
+  left: 55%;
+  top: 11%;
+}
+.fc-petal-2 {
+  width: 9px;
+  height: 9px;
+  left: 72%;
+  top: 18%;
+}
+.fc-petal-3 {
+  width: 16px;
+  height: 16px;
+  left: 86%;
+  top: 33%;
+}
+.fc-petal-4 {
+  width: 10px;
+  height: 10px;
+  left: 63%;
+  top: 42%;
+}
+.fc-petal-5 {
+  width: 12px;
+  height: 12px;
+  left: 93%;
+  top: 62%;
+}
+.fc-petal-6 {
+  width: 8px;
+  height: 8px;
+  left: 50%;
+  top: 68%;
+}
+
+.fc-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.fc-ring-solid {
+  width: 520px;
+  height: 520px;
+  border: 1px solid var(--glass-border-soft);
+}
+
+.fc-ring-dashed {
+  width: 620px;
+  height: 620px;
+  border: 1px dashed var(--glass-border-soft);
+}
+
+/*
+ * The only `backdrop-filter` in the app (the two floating hero cards): a
+ * full-page blur would be repainted on every scroll frame. Browsers without
+ * `backdrop-filter` get the solid stand-in instead of see-through text.
+ */
+.fc-glass {
+  background-color: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  .fc-glass {
+    background-color: var(--glass-bg-fallback);
+  }
+}
+
+.fc-glass-float {
+  animation: fc-glass-float var(--fc-motion-duration-float) var(--fc-motion-ease-standard)
+    infinite alternate;
 }

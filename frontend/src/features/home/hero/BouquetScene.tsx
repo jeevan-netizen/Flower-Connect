@@ -2,6 +2,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
 import { Bouquet } from "./Bouquet";
+import { BLOOM_COLORS } from "./bouquet-palette";
 import type { InteractionLevel } from "./useHeroInteractionLevel";
 import { durations } from "@/motion/tokens";
 
@@ -14,8 +15,15 @@ export interface BouquetSceneProps {
   onContextRestored: () => void;
 }
 
-/** Fixed camera: no camera animation, no controls, no reframing on scroll. */
-const CAMERA = { position: [0, -0.05, 2.4] as [number, number, number], fov: 32 };
+/**
+ * Fixed camera: no camera animation, no controls, no reframing on scroll.
+ *
+ * Pulled back far enough to hold the wrap's mouth and its full width inside the
+ * frame, so the bouquet reads as a complete object rather than a crop. The
+ * outermost blooms may just touch the left and right edges at the narrowest
+ * hero column, which is what makes the cluster look generous.
+ */
+const CAMERA = { position: [0, -0.1, 2.6] as [number, number, number], fov: 32 };
 
 /** Lean amplitude per interaction level, in radians. */
 const POINTER_LEAN = {
@@ -65,13 +73,21 @@ function BouquetRig({ interaction, staticMode }: Pick<BouquetSceneProps, "intera
   );
 }
 
+/**
+ * Three lights, no shadow maps and no environment map: `castShadow` stays off
+ * everywhere and there is no post-processing, so lighting costs three uniforms
+ * per material rather than extra render passes.
+ *
+ * The rim light is the one that matters for the dark landing design: without it
+ * a flat-shaded bloom on a near-black background loses its edge and the bouquet
+ * turns into a silhouette. Its colour is the landing rose token.
+ */
 function Lights() {
   return (
     <>
-      {/* Two lights, no shadow maps: `castShadow` stays off everywhere, so the
-          scene costs no extra shadow passes. */}
-      <ambientLight intensity={0.85} />
-      <directionalLight position={[2, 3, 4]} intensity={0.8} />
+      <ambientLight intensity={0.95} />
+      <directionalLight position={[2, 3, 4]} intensity={1.15} />
+      <pointLight position={[-2.2, 1.2, -1.8]} intensity={9} distance={9} color={BLOOM_COLORS.rose} />
     </>
   );
 }

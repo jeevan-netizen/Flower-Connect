@@ -17,3 +17,15 @@ export const PRESSABLE =
 /** The focus ring shared by every control, so keyboard focus looks the same app-wide. */
 export const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2";
+
+/**
+ * The focus ring for the dark landing surface.
+ *
+ * Same shape as `FOCUS_RING` — the ring itself is still two pixels of an accent
+ * colour plus a two-pixel offset — but the accent and the offset come from the
+ * landing tokens. A green ring with a green offset reads as a halo on the dark
+ * header and hero, so the surface supplies its own pair here instead of every
+ * control on that surface hand-rolling one.
+ */
+export const FOCUS_RING_DARK =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bolder-rose focus-visible:ring-offset-2 focus-visible:ring-offset-bolder-bg";

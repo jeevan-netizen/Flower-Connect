@@ -1,21 +1,35 @@
-import { Suspense, lazy } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { FadeIn } from "@/motion/FadeIn";
-import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
+import { Suspense, useMemo } from "react";
+import { Link } from "react-router-dom";
+import { AnimatedList } from "@/motion/AnimatedList";
+import { FOCUS_RING_DARK } from "@/motion/pressable";
+import { FeatureRow } from "@/features/home/components/FeatureRow";
+import { HeroBackdrop } from "@/features/home/components/HeroBackdrop";
+import { HeroFloatingCards } from "@/features/home/components/HeroFloatingCards";
+import { HeroSearch } from "@/features/home/components/HeroSearch";
+import { MapPinIcon } from "@/features/home/components/icons";
 import { HeroFallback } from "@/features/home/hero/HeroFallback";
 import { SceneErrorBoundary } from "@/features/home/hero/SceneErrorBoundary";
-import { lazyWithRetry } from "@/features/home/hero/lazyWithRetry";
+import { createRetryableLazy } from "@/features/home/hero/lazyWithRetry";
 
 /**
- * Set once the hero chunk retry has been spent, so a genuinely missing asset
- * costs one extra request rather than a retry on every render.
+ * Set once an attempt at the hero chunk has spent its retry, so a genuinely
+ * missing asset costs one extra request per visit rather than a retry on every
+ * render.
  */
 const HERO_RETRY_FLAG = "fc-hero-chunk-retry";
 
 /**
  * The 3D bouquet is a dynamic import, so Three.js and R3F are only fetched when
- * the public landing page is actually visited and they land in their own chunk
- * rather than the initial `index-*.js` bundle.
+ * the landing page is actually visited and they land in their own chunk rather
+ * than the initial `index-*.js` bundle.
+ *
+ * The attempt is built **per visit**, inside the component, through
+ * `createRetryableLazy`. `React.lazy` caches a rejected payload and re-throws it
+ * for the life of the component object, so an attempt hoisted to module scope —
+ * the obvious way to write this — stays dead after its retry fails, and
+ * navigating away and back replays the rejection instead of asking for the chunk
+ * again. Building it here means each visit arrives with an empty cache and its
+ * own one-shot retry budget. See `retryableLazy.test.tsx`.
  *
  * The Suspense fallback is the same static bouquet the WebGL and error paths
  * render, so the frame is filled — at the same size, so no layout shift — from
@@ -27,62 +41,109 @@ const HERO_RETRY_FLAG = "fc-hero-chunk-retry";
  * nothing above it, one failed chunk fetch would unmount the whole application
  * and take the heading, copy and calls to action with it. `SceneErrorBoundary`
  * imports nothing from Three, so hoisting it here keeps the main chunk clean.
- *
- * The import is retried exactly once (`lazyWithRetry`). `React.lazy` caches a
- * rejected payload and re-throws it, so without this a single dropped request
- * would cost the visitor the hero until a full page reload.
  */
-const BouquetHero = lazy(() =>
-  lazyWithRetry(() => import("@/features/home/hero/BouquetHero"), HERO_RETRY_FLAG),
-);
+function useBouquetHero() {
+  return useMemo(
+    () =>
+      createRetryableLazy(
+        () => import("@/features/home/hero/BouquetHero"),
+        HERO_RETRY_FLAG,
+      ),
+    [],
+  );
+}
 
 function handleHeroChunkError(error: Error): void {
   console.error("[home] 3D bouquet chunk failed to load; showing the static fallback", error);
 }
 
-const PRIMARY_CTA =
-  `inline-flex items-center justify-center rounded-md bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-700 ${FOCUS_RING} ${PRESSABLE}`;
+/**
+ * Text for a reader who never sees the canvas. The bouquet is decoration, so it
+ * carries no accessible name of its own; this is the sentence that carries its
+ * meaning instead, which is why it is on the page rather than in an `alt`.
+ */
+const BOUQUET_DESCRIPTION =
+  "A hand-tied bouquet of rose, blush and gold blooms with green foliage, wrapped in plum paper.";
 
-const SECONDARY_CTA =
-  `inline-flex items-center justify-center rounded-md border border-brand-600 px-5 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 ${FOCUS_RING} ${PRESSABLE}`;
+const FLORIST_CTA =
+  `inline-flex w-fit items-center gap-2 rounded-sm border-b border-bolder-leaf text-[15px] font-medium text-bolder-leaf-text transition-colors duration-micro ease-standard hover:border-bolder-leaf-text hover:text-bolder-leaf ${FOCUS_RING_DARK}`;
 
 export function HomePage() {
-  // `location.key` changes on every navigation, which is exactly the signal the
-  // boundary needs: coming back to `/` deserves a fresh attempt at the chunk.
-  const location = useLocation();
+  const { Component: BouquetHero } = useBouquetHero();
 
   return (
-    <FadeIn className="mx-auto w-full max-w-7xl px-4 py-12">
-      <div className="grid items-center gap-10 lg:grid-cols-2">
-        <div className="order-2 min-w-0 text-center lg:order-1 lg:text-left">
-          <h1 className="text-4xl font-bold text-brand-700 sm:text-5xl">FlowerConnect</h1>
-          <p className="mt-3 text-lg text-slate-600">Hyperlocal flower marketplace</p>
-          <p className="mt-4 max-w-prose text-slate-600">
-            Order same-day bouquets from florists around your neighbourhood, or list your shop and
-            sell to nearby customers.
-          </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start">
-            <Link className={PRIMARY_CTA} to="/browse">
-              Browse flowers
-            </Link>
-            <Link className={SECONDARY_CTA} to="/register">
-              Create an account
-            </Link>
-          </div>
-        </div>
+    <div className="relative isolate overflow-hidden bg-bolder-bg font-body text-bolder-text">
+      <HeroBackdrop />
 
-        <div className="order-1 min-w-0 lg:order-2">
-          <SceneErrorBoundary
-            fallback={<HeroFallback />}
-            onError={handleHeroChunkError}
-            resetKeys={[location.key]}
-          >
-            <Suspense fallback={<HeroFallback />}>
-              <BouquetHero />
-            </Suspense>
-          </SceneErrorBoundary>
-        </div>
+      <div className="relative mx-auto w-full max-w-landing px-5 sm:px-8 lg:px-14">
+        {/*
+          One column below `lg`, text first, then the bouquet. The overflow clip
+          is here as well as on the page: the decorative rings and glass cards
+          overhang their column by design, and a hero that can scroll sideways is
+          worse than a ring that gets cut.
+        */}
+        <section aria-labelledby="landing-heading" className="overflow-hidden py-9">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+            {/*
+              Entry order: badge, heading, supporting copy, search, florist call
+              to action — `AnimatedList` schedules its children one stagger
+              interval apart using the shared variants, so this is the same motion
+              the rest of the app already runs and it collapses to nothing under
+              `prefers-reduced-motion`.
+            */}
+            <AnimatedList className="flex min-w-0 flex-col gap-7">
+              <span className="inline-flex w-fit items-center gap-2 rounded-pill border border-glass-border bg-glass px-4 py-2 text-[14px] font-medium text-bolder-blush">
+                <MapPinIcon className="h-4 w-4" />
+                Local florists near you
+              </span>
+
+              <h1
+                id="landing-heading"
+                className="font-display text-[40px] font-normal leading-none tracking-[-0.025em] text-bolder-text sm:text-[52px] lg:text-[84px]"
+              >
+                Flowers,{" "}
+                <em className="font-display italic text-bolder-rose">beautifully</em> delivered.
+              </h1>
+
+              <p className="max-w-[470px] text-[19px] leading-[1.55] text-bolder-muted">
+                Discover independent florists in your neighbourhood and send something meaningful,
+                today or on the day that matters.
+              </p>
+
+              <HeroSearch />
+
+              <div className="flex flex-col gap-2">
+                <Link className={FLORIST_CTA} to="/vendor/register">
+                  Become a Florist
+                  <span aria-hidden="true">&rarr;</span>
+                </Link>
+                <p className="text-[14px] text-bolder-muted">
+                  Selling flowers? Open your shop in minutes.
+                </p>
+              </div>
+            </AnimatedList>
+
+            <div className="relative min-w-0">
+              {/* Decorative rings, behind the bouquet. Desktop-only: below the
+                  two-column breakpoint a 620px ring would sit under the copy. */}
+              <span aria-hidden="true" className="fc-ring fc-ring-solid hidden lg:block" />
+              <span aria-hidden="true" className="fc-ring fc-ring-dashed hidden lg:block" />
+
+              <SceneErrorBoundary fallback={<HeroFallback />} onError={handleHeroChunkError}>
+                <Suspense fallback={<HeroFallback />}>
+                  <BouquetHero />
+                </Suspense>
+              </SceneErrorBoundary>
+
+              <HeroFloatingCards />
+
+              <p className="sr-only">{BOUQUET_DESCRIPTION}</p>
+            </div>
+          </div>
+        </section>
+
+        <FeatureRow />
       </div>
-    </FadeIn>
+    </div>
   );
 }

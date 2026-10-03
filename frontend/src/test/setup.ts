@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom";
 import { configure } from "@testing-library/react";
+import { WIDE_HEADER_QUERY } from "@/app/hooks/useMediaQuery";
 
 // The suite runs several jsdom workers in parallel, and every vendor assertion
 // waits on a query/mutation to settle. Testing Library's 1s default is too tight
@@ -14,6 +15,12 @@ configure({ asyncUtilTimeout: 5000 });
  * left at 0, and existing tests keep asserting against exactly what a real user
  * with reduced motion sees.
  *
+ * The same stub reports a desktop-width viewport, so a component that renders one
+ * of two layouts from the real viewport (`useMediaQuery`, used by the header's
+ * navigation) renders the wide one by default. Suites that need the narrow one
+ * override this with `vi.stubGlobal`; `src/motion/*.test.tsx` does the same for
+ * the animated branch.
+ *
  * This is test infrastructure, not a test change: no existing assertion was
  * touched. `src/motion/*.test.tsx` overrides it with `vi.stubGlobal` for the
  * few cases that need the animated branch.
@@ -25,7 +32,7 @@ if (typeof window !== "undefined") {
     configurable: true,
     writable: true,
     value: (query: string) => ({
-      matches: query === REDUCED_MOTION_QUERY,
+      matches: query === REDUCED_MOTION_QUERY || query === WIDE_HEADER_QUERY,
       media: query,
       onchange: null,
       addEventListener: () => {},

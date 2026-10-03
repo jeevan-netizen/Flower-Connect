@@ -1,23 +1,14 @@
-import {
-  createBrowserRouter,
-  Link,
-  Outlet,
-  RouterProvider,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useLocation, Outlet, RouterProvider, createBrowserRouter } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { AnimatedPage } from "@/motion/AnimatedPage";
 import { FadeIn } from "@/motion/FadeIn";
 import { useInitAuth, RequireAuth, RequireUnauth } from "@/features/auth/hooks/useAuth";
-import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { SiteHeader } from "@/app/components/SiteHeader";
 import { HomePage } from "@/features/home/pages/HomePage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
-import { clearVendorCache } from "@/features/vendor/queries";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
 import { VendorDashboardPage } from "@/features/vendor/pages/VendorDashboardPage";
 import { VendorProfilePage } from "@/features/vendor/pages/VendorProfilePage";
@@ -27,7 +18,6 @@ import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
 import { AdminUsersPage } from "@/features/admin/pages/AdminUsersPage";
-import { clearAdminCache } from "@/features/admin/queries";
 
 /**
  * Application role for a vendor. The plan calls this role "VENDOR"; the seeded
@@ -38,86 +28,12 @@ const VENDOR_ROLE = "FLORIST";
 /** Seeded role name for administrators (`roles` row 3, V3__seed_roles.sql). */
 const ADMIN_ROLE = "ADMIN";
 
-/**
- * Header link/button treatment. Durations come from the motion tokens via
- * `tailwind.config.ts`; the `focus-visible` ring is explicit because the header
- * background is dark and the default ring does not read against it.
- */
-const NAV_LINK =
-  "rounded transition-colors duration-micro ease-standard hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-600";
-
 function Layout() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const location = useLocation();
-  const { isAuthenticated, user, logout } = useAuthStore();
-
-  const handleLogout = () => {
-    // Vendor and admin data are each cached under their own query key; drop both
-    // so the next account to sign in on this tab never sees the previous user's
-    // profile, user list or vendor list.
-    clearVendorCache(queryClient);
-    clearAdminCache(queryClient);
-    logout();
-    navigate("/", { replace: true });
-  };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="bg-brand-600 text-white">
-        <nav className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link
-            to="/"
-            className="rounded text-xl font-bold transition-opacity duration-micro ease-standard hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-600"
-          >
-            FlowerConnect
-          </Link>
-          <div className="flex gap-4 text-sm">
-            {isAuthenticated ? (
-              <>
-                <Link className={NAV_LINK} to="/browse">
-                  Browse
-                </Link>
-                <Link className={NAV_LINK} to="/cart">
-                  Cart
-                </Link>
-                <Link className={NAV_LINK} to="/orders">
-                  Orders
-                </Link>
-                {user?.role === VENDOR_ROLE && (
-                  <Link className={NAV_LINK} to="/vendor">
-                    Vendor
-                  </Link>
-                )}
-                {user?.role === ADMIN_ROLE && (
-                  <Link className={NAV_LINK} to="/admin">
-                    Admin
-                  </Link>
-                )}
-                <button onClick={handleLogout} className={`${NAV_LINK} hover:underline`}>
-                  Log out
-                </button>
-              </>
-            ) : (
-              <>
-                <Link className={NAV_LINK} to="/login">
-                  Login
-                </Link>
-                <Link className={NAV_LINK} to="/register">
-                  Register
-                </Link>
-                {/* Phase 1's vendor onboarding entry point: it was a forward link to a
-                    Phase 2 that did not exist yet, and now resolves to the registration
-                    page. Kept in the signed-out branch because registering creates a new
-                    account — a signed-in visitor must not end up with two. */}
-                <Link className={NAV_LINK} to="/vendor/register">
-                  For florists
-                </Link>
-              </>
-            )}
-          </div>
-        </nav>
-      </header>
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader />
       <main className="flex-1">
         {/*
           Route transition. `AnimatedPage` is keyed by pathname, so a navigation
@@ -140,7 +56,7 @@ function Layout() {
           </AnimatedPage>
         </AnimatePresence>
       </main>
-      <footer className="bg-slate-100 text-center text-sm py-4">
+      <footer className="border-t border-glass-border-soft bg-bolder-bg py-4 text-center text-sm text-bolder-muted">
         &copy; 2026 FlowerConnect
       </footer>
     </div>

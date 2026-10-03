@@ -27,8 +27,8 @@ describe("bouquet geometry budget", () => {
 
   it("keeps draw calls independent of the flower count", () => {
     // One instanced stem mesh, one instanced head mesh (per-instance colour),
-    // one instanced leaf mesh, one wrap.
-    expect(BOUQUET_DRAW_CALLS).toBe(4);
+    // one instanced leaf mesh, the wrap cone and its trim ring.
+    expect(BOUQUET_DRAW_CALLS).toBe(5);
     expect(BOUQUET_DRAW_CALLS).toBeLessThanOrEqual(BUDGET.maxDrawCalls);
   });
 
