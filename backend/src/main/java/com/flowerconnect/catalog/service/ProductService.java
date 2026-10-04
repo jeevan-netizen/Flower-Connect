@@ -386,7 +386,15 @@ public class ProductService {
         }
     }
 
-    private Product requireOwnedProduct(String vendorEmail, Long productId) {
+    /**
+     * Resolves a product the calling vendor owns, distinguishing a foreign
+     * product (403) from a missing one (404).
+     *
+     * <p>Package-private rather than private so {@link ProductImageService} uses
+     * the same rule for the image routes instead of restating it: one definition
+     * of "yours" means a future change cannot leave the two disagreeing.
+     */
+    Product requireOwnedProduct(String vendorEmail, Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> BusinessException.notFound("Product not found"));
         VendorProfile vendor = requireVendor(vendorEmail);

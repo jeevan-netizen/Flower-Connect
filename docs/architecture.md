@@ -4,10 +4,13 @@
 
 FlowerConnect is a **hyperlocal flower marketplace**. It connects local florists with customers for same-day or scheduled flower delivery within a tight geographic radius. The platform handles browsing, ordering, payments, and delivery coordination.
 
-Current development phase: **Phase 2d (Admin Frontend)** — authentication (Phase 1), service
+Current development phase: **Phase 3f (Image handling)** — authentication (Phase 1), service
 locations (Phase 2a), and vendor registration/approval with the `audit_log` trail (Phase 2b/2c) are
-implemented. Phase 2d adds the admin user listing and status-management APIs, backed by the same
-`audit_log` table and the existing `users.status` column.
+implemented, as are the admin user listing and status-management APIs (Phase 2d), the vendor and
+admin frontends (Phase 2d), categories (Phase 3a), the product/inventory/stock-movement data model
+(Phase 3b), the vendor catalog and inventory APIs (Phase 3c/3d), the expiry sweep (Phase 3e) and
+product image handling (Phase 3f). The bytes of an uploaded image live behind a `StorageService`
+abstraction — local disk today, a declared S3 stub behind the `s3` profile.
 
 ## 2. High-Level Architecture
 
@@ -116,7 +119,11 @@ FlowerConnect/
 │           │   ├── service/              # Business logic
 │           │   ├── controller/           # REST controllers
 │           │   ├── dto/                  # Request/response DTOs
-│               │   ├── geo/                  # Service locations feature slice
+│           │   ├── catalog/              # Categories, products, product images
+│           │   ├── inventory/            # Stock levels + append-only movement log
+│           │   ├── storage/              # StorageService (local disk / S3 stub) + image pipeline
+│           │   │   └── image/            # Type sniffing, decode/scale/encode, upload limits
+│           │   ├── geo/                  # Service locations feature slice
 │               │   ├── vendor/               # Vendor profile + admin feature slice
 │               │   │   ├── controller/
 │               │   │   ├── dto/
@@ -385,9 +392,9 @@ sees neither list. See `docs/decisions.md` (D-16).
 
 ### Implemented Endpoints
 Phase 1 (auth), Phase 2a (service locations), Phase 2c (vendor registration and admin approval),
-Phase 3a (admin categories), Phase 3c (vendor catalog) and Phase 3d (vendor inventory) endpoints are
-implemented. `@RequiresApprovedVendor` guards the catalog and inventory routes; no order or payment
-endpoint exists yet — see `docs/decisions.md` (D-13).
+Phase 3a (admin categories), Phase 3c (vendor catalog), Phase 3d (vendor inventory) and Phase 3f
+(product images) endpoints are implemented. `@RequiresApprovedVendor` guards the catalog, inventory
+and image routes; no order or payment endpoint exists yet — see `docs/decisions.md` (D-13).
 
 | Method | Path                | Description                        | Phase  |
 |--------|---------------------|------------------------------------|--------|
@@ -425,6 +432,11 @@ endpoint exists yet — see `docs/decisions.md` (D-13).
 | PUT    | `/api/v1/vendors/products/{id}/inventory/low-stock-threshold` | Set the low-stock threshold | Phase 3d|
 | PUT    | `/api/v1/vendors/products/{id}/inventory/expiry-date` | Set or clear the expiry date | Phase 3d|
 | GET    | `/api/v1/vendors/products/{id}/inventory/movements` | Paged movement history for one product | Phase 3d|
+| POST   | `/api/v1/vendors/products/{productId}/images` | Upload an image (multipart `file`, optional `primary`); decoded, scaled and re-encoded by the server | Phase 3f|
+| GET    | `/api/v1/vendors/products/{productId}/images` | List a product's images in display order | Phase 3f|
+| PUT    | `/api/v1/vendors/products/{productId}/images/{imageId}/primary` | Set the product cover; clears the previous one | Phase 3f|
+| PUT    | `/api/v1/vendors/products/{productId}/images/order` | Reorder images; must be an exact permutation | Phase 3f|
+| DELETE | `/api/v1/vendors/products/{productId}/images/{imageId}` | Delete an image and its stored object; promotes the next when the cover is removed | Phase 3f|
 | GET    | `/actuator/health`   | Health check (no auth)              | Phase 0|
 
 ## 7. Configuration
@@ -449,6 +461,7 @@ All configuration is externalized via environment variables. Copy `.env.example`
 | `JWT_REFRESH_TTL_MS`| `604800000` (7 days)                             | Refresh token TTL              |
 | `APP_BASE_URL`      | `http://localhost:5173`                          | Frontend origin (CORS, links)  |
 | `APP_CORS_ORIGINS`  | `http://localhost:5173`                          | Allowed CORS origins           |
+| `STORAGE_LOCAL_DIR` | `uploads` (dev) / `/var/lib/flowerconnect/uploads` (prod) | Root directory for local-disk uploads (D-26) |
 | `SMTP_HOST`         | `localhost`                                      | SMTP server (notifications)    |
 | `SMTP_PORT`         | `587`                                            | SMTP port                      |
 | `SMTP_USER`         | —                                                | SMTP username                  |
@@ -547,6 +560,10 @@ See `docs/decisions.md` for the full ADR log. Key decisions made so far:
 - **Secrets**: Never committed; all via `.env` (gitignored)
 - **API**: All endpoints except `/actuator/health` will require JWT once auth is implemented
 - **Input validation**: Backend validates all requests (frontend validation is convenience only)
+- **Uploads**: The format is decided by the file's leading bytes, never the filename or the declared
+  `Content-Type`; every accepted image is decoded, scaled and re-encoded by the server, so EXIF/GPS is
+  dropped and the stored object is never the bytes the client sent. Keys are server-generated. See
+  `docs/decisions.md` (D-27, D-26)
 
 ### Authorization layering
 

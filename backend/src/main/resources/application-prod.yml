@@ -51,6 +51,19 @@ app:
   base-url: ${APP_BASE_URL}
   cors:
     origins: ${APP_CORS_ORIGINS}
+  storage:
+    # The local-disk backend is what runs when the 's3' profile is absent, which
+    # is the state of this build: the S3StorageService behind that profile is a
+    # declared stub that throws (docs/decisions.md D-26). A container-local
+    # directory is therefore the only functional option today, and it does not
+    # survive a redeploy — mount a volume here before storing real uploads.
+    local-directory: ${STORAGE_LOCAL_DIR:/var/lib/flowerconnect/uploads}
+  image-upload:
+    max-file-size-bytes: 5242880
+    max-images-per-product: 8
+    max-dimension: 1600
+    max-pixels: 40000000
+    jpeg-quality: 0.85
 
 management:
   endpoints:

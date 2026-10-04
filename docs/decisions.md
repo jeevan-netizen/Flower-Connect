@@ -367,6 +367,9 @@ of a constraint name.
 | D-23 | Optional listing filters are composed Specifications | Decision | Accepted | Phase 3c |
 | D-24 | Stock mutations take a pessimistic row lock, after the ownership check | Decision | Accepted | Phase 3d |
 | D-25 | The expiry sweep writes off available stock only, and delists by exclusive transition | Decision | Accepted | Phase 3e |
+| D-26 | The storage backend is chosen by profile, and the S3 backend is a declared stub | Decision | Accepted | Phase 3f |
+| D-27 | Every accepted image is decoded, scaled and re-encoded by the server | Decision | Accepted | Phase 3f |
+| D-28 | The one-primary image rule is enforced under a product-scoped row lock | Decision | Accepted | Phase 3f |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -1241,4 +1244,253 @@ per run. The movement log is append-only and is the audit trail of how a level g
   sweep is driven directly with the `MutableClock` bean instead. Both the clock and the batch
   cap are restored after each test, because the Spring context is cached and shared across
   the integration suite.
+
+---
+
+## D-26: The storage backend is chosen by profile, and the S3 backend is a declared stub
+
+**Status:** Accepted
+**Date:** Phase 3f (Task 3.8)
+
+### Context
+
+Plan task 3.8 asks for "`StorageService` interface: local disk (dev), S3 implementation pluggable by
+profile", and plan section 9 repeats it. The interface has to exist before either backend can be
+written, and the choice of *how the backend is selected* is not part of the plan. Three mechanisms
+were available: a `@ConditionalOnProperty` flag, an abstract factory, or Spring profiles.
+
+The S3 half is the harder question, and the plan does not settle it. This project has no AWS SDK
+dependency, no bucket, no region, no credential-resolution story and no environment to test any of
+them in. Adding `software.amazon.awssdk:s3` for code that cannot run would bring a large transitive
+dependency tree (Netty, the AWS CRT, URL connection clients) into a build whose only purpose at
+this point is to be correct.
+
+The failure mode to avoid is specific: an S3 implementation that compiles, activates, logs a put and
+stores nothing. A production deployment would then serve `201 Created`, write zero bytes, and the
+symptom would surface days later as missing product images on the storefront rather than as a
+deploy error.
+
+### Decision
+
+- **`StorageService` knows nothing about images.** It is a flat key/value store —
+  `store`, `delete`, `exists`, `describe` — so product images today and any other binary asset later
+  share one abstraction, and swapping the backend changes no call site in the domain layer.
+- **The key contract belongs to the interface, not to one implementation.** A key is always
+  server-generated, `/`-separated and relative, and must resolve inside the backend's root. No
+  client-supplied value ever becomes a key: the uploaded filename is kept in
+  `product_images.original_filename` for display only.
+- **The backend is a profile decision, not a property.** `LocalDiskStorageService` is
+  `@Profile("!s3")` and `S3StorageService` is `@Profile("s3")`. A property flag
+  (`app.storage.backend=s3`) would be a runtime switch that could point production at a developer's
+  disk because an environment variable was wrong; a profile is already the mechanism this project
+  uses for dev/prod differences and is set at deploy time.
+- **The S3 backend is a declared stub that throws on every method.** It replaces the local bean
+  correctly when the profile is active — so the switch is real and every other call site keeps
+  working — but `store`/`delete`/`exists`/`describe` each raise `StorageException` with a message
+  naming exactly what is missing. Completing it is self-contained: add the SDK v2 S3 dependency, hold
+  an `S3Client` bean, implement the four methods against `putObject`/`getObject`/`deleteObject`/
+  `headObject`, and add the bucket/region/prefix/credentials properties the stub documents.
+- **Local writes are atomic and traversal-checked.** `LocalDiskStorageService` writes to a
+  `<name>.part` sibling and moves it into place with `ATOMIC_MOVE`, so a reader never observes a
+  half-written object and a crash mid-write leaves a `.part` file rather than a truncated image the
+  catalog believes is intact. `resolve` rejects a blank key, a backslash, an absolute or `~`-rooted
+  path, and anything that normalises outside the root — four checks because they fail differently,
+  and the last one is the check that actually catches `../`.
+- **The root is created at startup** (`@PostConstruct`), so a misconfigured or read-only path fails
+  on boot rather than on a vendor's first upload.
+- **Storage failures are `StorageException` and surface as 500.** They are never converted into a
+  4xx: telling a caller "storage failed" invites exactly the retry that an outage makes worse. All
+  caller-side validation (ownership, size, format, count) happens before a byte is written, so a
+  `StorageException` means the write itself failed and no row should be kept.
+
+### Consequences
+
+- Two of the two backends work in this build. Production runs local disk, and
+  `application-prod.yml` documents that the directory does not survive a redeploy — a volume must be
+  mounted before real uploads are stored there.
+- Activating `s3` in this build fails loudly on the first upload with a 500 naming the gap, instead
+  of silently storing nothing. `S3StorageServiceTest` asserts every method throws.
+- The interface contract is checked in two places: `LocalDiskStorageServiceTest` covers each
+  rejection case against a real temporary directory, and `ProductImageIntegrationTest` covers the
+  upload/delete path end to end through HTTP.
+- Storage tests touch the filesystem under `backend/target/`, never the configured `uploads`
+  directory — the test profile points `app.storage.local-directory` at `target/test-uploads/...`.
+- A future backend (S3, CloudFront+CDN, anything) implements four methods and touches nothing else.
+
+---
+
+## D-27: Every accepted image is decoded, scaled and re-encoded by the server
+
+**Status:** Accepted
+**Date:** Phase 3f (Task 3.8)
+
+### Context
+
+Plan task 3.8 requires a "type whitelist (JPEG/PNG/WebP) checked by content sniffing, max size,
+random filenames, no path traversal, resize/compress". Each of those is a requirement; none of them
+says whether the bytes are *stored* or *transformed*, and the plan's word "compress" sits next to
+"resize" as if both were optional tidy-ups.
+
+The gap between validating and trusting is where image uploads go wrong. Magic-byte sniffing alone
+accepts a polyglot — a file with a valid PNG header and a hostile payload. Decoding alone lets the
+JDK's pluggable `ImageIO` readers decide what is acceptable, including formats (BMP, TIFF, GIF, PDF-
+rendered-to-bitmap) that have no business in a product catalog. And whatever passes is then stored
+verbatim, re-serving whatever metadata the original carried: EXIF GPS coordinates, camera serials,
+embedded thumbnails.
+
+Compression matters for a second reason specific to this codebase: `products` and `product_images`
+live in MySQL, but the bytes live on disk or in S3, and the storefront will serve them from a
+different process than the one that wrote them. Storing bytes the server did not produce means the
+stored size, the stored dimensions and the declared `mime_type` can each disagree with reality,
+and every consumer of the object has to re-derive that for itself.
+
+The WebP requirement adds a codec problem. `ImageIO` reads JPEG and PNG natively but ships no WebP
+reader, so a WebP upload cannot be decoded at all without a plugin — and an upload pipeline that
+cannot decode a format the plan requires to accept is not validating anything.
+
+### Decision
+
+- **Format is decided by content, never by the client.** `ImageTypeDetector` reads only the leading
+  bytes: `FF D8 FF` for JPEG, the eight-byte PNG signature, and `RIFF....WEBP` for WebP (a plain
+  RIFF container such as a WAV is rejected). Neither the filename nor the part's declared
+  `Content-Type` is consulted or trusted. An unrecognised format is `415 UNSUPPORTED_MEDIA_TYPE`,
+  which is distinct from `VALIDATION_FAILED` precisely so a client can tell "wrong format" from
+  "broken file".
+- **Detection is a candidate, not an acceptance.** `ImageProcessor` then decodes the file, which is
+  what rejects a ZIP wearing a PNG header and a truncated file wearing a WebP header. Both checks
+  are kept deliberately: neither one alone is sufficient.
+- **Nothing is stored as it arrived.** Every accepted upload is decoded and re-encoded by the
+  server, so metadata is dropped rather than re-served later, and the stored bytes, the stored
+  dimensions and the stored `mime_type` are all the pipeline's own output.
+- **The pixel ceiling is checked from the header, before the pixels exist.** `max-pixels`
+  (40,000,000) is read from `reader.getWidth/getHeight` before `reader.read(0)`, because a few
+  kilobytes can claim 20000×20000 and cost 1.6 GB to decode. The file-size limit is not a memory
+  limit; this is the decompression-bomb bound, and it is rejected with `413` rather than scaled,
+  because an image that large is never legitimate.
+- **Largest-edge images are scaled down; smaller ones are not upscaled.** `max-dimension` (1600)
+  with bilinear interpolation and antialiasing. This is a scaling rule rather than a rejection
+  because a vendor photographing a bouquet on a 48-megapixel phone should get a catalog image, not
+  an error.
+- **The output format follows the input, with one documented exception.** PNG output keeps its alpha;
+  JPEG output is re-encoded at `jpeg-quality` (0.85). WebP is **decoded and stored as JPEG**: the
+  JDK cannot encode WebP and the plugin registered here (`com.twelvemonkeys.imageio:imageio-webp`)
+  is a reader only, so keeping the format would mean either shipping the file undecoded (losing
+  every guarantee above) or adding a second codec. Alpha is composited onto white in that case.
+  The stored extension and `mime_type` both come from the *storage* format, never the client's name.
+- **Limits are configuration, not constants** (`app.image-upload.*`), because each encodes a
+  product or operational decision rather than an implementation detail. The container ceiling
+  (`spring.servlet.multipart.max-file-size: 5MB`) and the service ceiling
+  (`max-file-size-bytes`) are set to the same value and must be raised together — the container
+  rejects first, before the request reaches the controller, and `GlobalExceptionHandler` overrides
+  `handleMaxUploadSizeExceededException` so that refusal carries the same `ErrorResponse` envelope
+  and the same `PAYLOAD_TOO_LARGE` code as the service-level one.
+- **Image count is bounded per product** (`max-images-per-product`, default 8) and the check happens
+  under the same row lock as the primary rule, so concurrent uploads cannot both squeeze past the
+  limit.
+
+### Consequences
+
+- Stored images are smaller than uploaded ones and carry no EXIF. A vendor's photo location data
+  does not survive; this is intentional.
+- A WebP upload comes back as JPEG, so its `mime_type` and extension differ from what was sent. The
+  response DTO reports what was actually stored, and the test suite asserts the conversion rather
+  than hiding it.
+- `ImageProcessorTest` and `ImageTypeDetectorTest` cover the polyglot, truncated, renamed,
+  oversized-pixel and scaling cases against real ImageIO rather than a mocked decoder, because the
+  behaviour under test *is* what ImageIO does with those bytes.
+- Two new `ErrorCode` values exist: `UNSUPPORTED_MEDIA_TYPE` (415) and `PAYLOAD_TOO_LARGE` (413).
+  The latter is reused for the pixel budget, which is a ceiling breach in the same sense the byte
+  ceiling is.
+- A WebP-only build would need a WebP encoder (`imageio-webp` is reader-only); that is a deliberate
+  follow-on, not a bug in this pipeline.
+
+---
+
+## D-28: The one-primary image rule is enforced under a product-scoped row lock
+
+**Status:** Accepted
+**Date:** Phase 3f (Task 3.8)
+
+### Context
+
+D-21 already settled that "exactly one primary image per product" is a **service-level** invariant,
+because MySQL has no filtered unique index and the generated-column workaround cannot coexist with
+the required `product_id` foreign key (error 1215). Task 3.8 is the first task to write
+`is_primary`, so it is the first task to have to make that invariant hold under concurrency rather
+than in a single-threaded test.
+
+The race is small and worth naming, because it is what the integration test exists to kill. Two
+concurrent "make this the cover" requests on a product with images A (primary) and B:
+
+```
+T1: SELECT images -> [A(primary), B]   T2: SELECT images -> [A(primary), B]
+T1: UPDATE B SET is_primary = true     T2: UPDATE A SET is_primary = false
+T1: COMMIT                            T2: COMMIT
+```
+
+Depending on interleaving the product ends with two primaries, none, or a primary that no longer
+belongs to the row the client just set. The catalog then has two rows claiming to be the cover, and
+the storefront picks one arbitrarily — a state the invariant exists to prevent and which no single
+request can detect, because each one's own write succeeded.
+
+Two secondary questions follow from D-21's promise that the service is the sole enforcement point:
+what happens to the primary when it is deleted, and whether the invariant is also *asserted* after
+the fact or only maintained by construction.
+
+### Decision
+
+- **Every write path that can change `is_primary` runs inside one transaction that first takes a
+  pessimistic write lock on the product's image rows.**
+  `ProductImageRepository.findByProductIdForUpdate` (`@Lock(PESSIMISTIC_WRITE)`,
+  `ORDER BY sortOrder, id`) is the single way the image service reads a set it is about to modify —
+  the same discipline D-24 applies to inventory, including the same ordering rule.
+- **The ownership check comes before the lock.** As in D-24, a lock taken before the ownership check
+  would let any authenticated florist stall another vendor's image set for as long as it liked, just
+  by naming a foreign `productId` in a loop. `ProductService.requireOwnedProduct` (now
+  package-private for exactly this reuse) resolves ownership from an unlocked read first, so one
+  definition of "yours" serves both the catalog and the image routes.
+- **Promotion is clear-then-set within the transaction.** `setPrimary` clears every current primary,
+  sets the target, flushes, and only then verifies. Same for the implicit promotion on upload.
+- **The first image of a product becomes primary automatically.** A product with images and no
+  cover is the failure state worth preventing at the source, and requiring a separate
+  `PUT /{imageId}/primary` before a product is usable would be a rule a vendor would trip over
+  constantly. An explicit `primary=true` on a later upload takes the cover; without it the existing
+  cover is left alone.
+- **Deleting the cover promotes the next image** in display order rather than leaving the product
+  with images and no cover. Deleting the last image leaves it with none, which is allowed —
+  `expected` is computed as `images == 0 ? 0 : 1` rather than being hard-coded to one.
+- **Reorder requires an exact permutation.** `PUT /order` must name every image of the product
+  exactly once; a partial list, a repeated id, or an id from another product is a 400. Guessing
+  where an omitted image belongs is not something the server can do honestly.
+- **An unknown image id is 404, not 403.** The caller asked for an image *of this product* and this
+  product does not have it; 403 would imply the image exists and belongs to someone else. The image
+  is resolved from the already-locked set, so the check cannot race.
+- **The invariant is also asserted, not only maintained.** `requireSinglePrimary` re-counts primaries
+  and images after each mutation and raises `IllegalStateException` on a violation. It is a
+  post-condition, not the mechanism — the clear-then-set above is what enforces the rule — but it
+  turns a silent corruption into a failed request.
+- **File and row are not atomic, and the asymmetry is deliberate.** Uploads store the object first
+  and delete it again if the row cannot be written; deletes remove the row first and treat a failed
+  object removal as a logged orphan. Neither direction can leave a visible row pointing at bytes
+  that are not there — which is the failure a storefront user would actually notice.
+
+### Consequences
+
+- Two concurrent primary changes on one product serialise; changes on *different* products do not,
+  because each locks only its own rows. The common case (uploading a catalogue) stays parallel.
+- The lock is verified by `ProductImageIntegrationTest` with real threads released together by a
+  `CountDownLatch`, asserting only end state — exactly the method that `InventoryConcurrencyIntegrationTest`
+  uses for D-24. A sequential test cannot observe the absence of a lock: every request would see the
+  previous one's committed rows.
+- `requireSinglePrimary` costs two `COUNT` queries per mutation. That is a deliberate price for
+  turning a silent invariant violation into a 500 that names the product id.
+- The image count limit is enforced under the same lock as the primary rule, so two concurrent
+  uploads at the limit cannot both pass the budget check.
+- `ProductImageService` must be reached through the Spring proxy for the lock to be real, exactly as
+  in D-24 — a self-invocation would run outside the transaction and the lock would be held by
+  nothing. There is no internal call today, so this holds by construction.
+- Because the invariant is service-level only, a writer that bypasses `ProductImageService` (a
+  scheduled job, admin tooling, a direct data fix) can still leave two primaries. `requireSinglePrimary`
+  is the only backstop, and it fires only on paths that go through the service. This is the accepted
+  cost recorded in D-21.
 

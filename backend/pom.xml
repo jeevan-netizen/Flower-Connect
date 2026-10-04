@@ -28,6 +28,7 @@
         <bucket4j.version>7.6.1</bucket4j.version>
         <caffeine.version>3.1.8</caffeine.version>
         <springdoc.version>2.3.0</springdoc.version>
+        <twelvemonkeys.version>3.15.2</twelvemonkeys.version>
     </properties>
 
     <dependencies>
@@ -127,6 +128,17 @@
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
             <version>${caffeine.version}</version>
+        </dependency>
+
+        <!-- Image decoding: WebP reader for the upload pipeline (plan task 3.8).
+             The JDK's ImageIO reads JPEG and PNG natively; WebP does not. This
+             plugin registers an image/webp ImageReader through the ServiceLoader,
+             so every accepted upload can actually be decoded and validated instead
+             of being trusted on its magic bytes alone. -->
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>${twelvemonkeys.version}</version>
         </dependency>
 
         <!-- API Documentation: springdoc-openapi -->

@@ -163,6 +163,32 @@ _None currently blocked._
   set up by updating the column with `JdbcTemplate` before the request under test. Without that the
   409 this API exists to return would never fire and the test would silently prove nothing.
 
+## Testing Gotchas (Phase 3f)
+
+- **A `@Configuration`-annotated `@ConfigurationProperties` class must not also be listed in
+  `@EnableConfigurationProperties`.** `StorageProperties` and `ImageUploadProperties` carry
+  `@Configuration` so component scan picks them up (which is why `FlowerConnectApplication` was left
+  alone); listing them as well registers a *second* bean of the same name and the context fails at
+  startup with `BeanDefinitionOverrideException: Invalid bean definition with name
+  'storageProperties' ... There is already a bean defined with the name 'storageProperties'`. Every
+  `@SpringBootTest` in the run then reports the same `ApplicationContext failure threshold (1)
+  exceeded`, so the real cause is only in the first stack trace. Two registration mechanisms, one
+  bean — pick one per properties class in this codebase.
+- **`MockMultipartHttpServletRequestBuilder.file(...)` returns the parent builder type.** Chaining
+  `multipart(url).file(part).param("primary", "true").header(...)` fails to compile, because
+  `file` returns `MockMultipartHttpServletRequestBuilder` (the multipart parent) and `param`/`header`
+  belong to `MockHttpServletRequestBuilder`. Assign in steps:
+  `MockMultipartHttpServletRequestBuilder request = multipart(url); request.file(part); request.param(...)`.
+- **A storage test that points at the configured `uploads` directory writes into the repo.**
+  `application-test.yml` sets `app.storage.local-directory: target/test-uploads/default`, and
+  `ProductImageIntegrationTest` overrides it per class with a JUnit `@TempDir`. `uploads/` is in
+  `.gitignore`, so a leak is invisible to `git status` — which is exactly why the test profile
+  redirects the root rather than relying on the ignore rule.
+- **An `@Test` count read with a text grep is not a test count.** `Select-String '@Test'` over the
+  new image test files over-reports by one or two per file (37 vs the 36 the service suite actually
+  runs), so the totals in `docs/progress.md` come from the surefire/failsafe `.txt` reports under
+  `target/`, not from a source scan.
+
 ## Testing Gotchas (Phase 3e)
 
 - **A `@Scheduled` cron takes exactly six fields — there is no year field.** The natural way to keep a

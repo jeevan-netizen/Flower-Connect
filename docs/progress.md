@@ -4,42 +4,53 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 3e — Task 3.7 (Expiry scheduler) completed**
+**Phase 3f — Task 3.8 (Image handling) completed**
 
-Task 3.7 turns the `expiry_date` column written in task 3.3 into behaviour: `InventoryExpiryService`
-sweeps expired stock and `InventoryExpiryScheduler` runs it on `app.expiry-sweep-cron` (default
-`0 0 3 * * ?`, overridable with `APP_EXPIRY_SWEEP_CRON`). No endpoint is added and no migration is
-written — this reuses `inventory.expiry_date`, `stock_movements.movement_type = WASTE` and
-`products.status` as they already exist.
+Task 3.8 is the first task that puts user-supplied bytes in the system.
+`VendorProductImageController` is mounted at `/api/v1/vendors/products/{productId}/images`
+(`POST`, `GET`, `PUT /{imageId}/primary`, `PUT /order`, `DELETE /{imageId}`) inside the existing
+vendor namespace, so D-13's two authorization layers keep their order and no `SecurityConfig` change
+was needed. No migration: `product_images` from task 3.2 already holds the rows, and the bytes live
+behind a new abstraction.
 
-Four rules were not settled by the plan's one line and are decided in D-25:
+Three things the plan's one line does not settle are decided in D-26, D-27 and D-28:
 
-- **Expired means `expiryDate < LocalDate.now(clock)`** on the injected `Clock`. The stored date is
-  the last day the stock may be used, so the write-off begins on the following day. Nothing in the
-  sweep calls `Instant.now()`.
-- **Only available stock is written off.** `available = quantity − reserved_quantity` is removed and
-  `quantity` is set to `reserved_quantity`, never below it; a write-off that leaves nothing available
-  writes no movement, because a `WASTE` row with a zero delta would be a movement recording no change.
-  The movement has a null actor and no reference — there is no authenticated user behind a scheduled
-  job — and a reason naming the expiry date and the sweep date.
-- **Only `ACTIVE` is delisted** (`ACTIVE → INACTIVE`). `DRAFT`, `INACTIVE` and `ARCHIVED` are already
-  off the storefront, so rewriting them would report a change that did not happen.
-  `ProductService.deactivate` is not reused: it needs a JWT subject and audits a human decision.
-- **Idempotency comes from the candidate predicate**, not a processed flag: rows are selected where
-  `expiryDate < :today AND (quantity > reservedQuantity OR product.status = :activeStatus)`.
-  Processing a row makes it stop matching, so the next run has nothing to redo — which is also what
-  makes it safe for a sweep to process only a bounded batch and leave the rest to the next run.
+- **`StorageService` is chosen by profile, and the S3 half is a declared stub.**
+  `LocalDiskStorageService` is `@Profile("!s3")`, `S3StorageService` is `@Profile("s3")` and throws
+  `StorageException` on every method with a message naming what is missing. A property flag would let
+  an environment variable point production at a developer's disk; a silently inert backend would let
+  a deployment serve `201 Created` and write nothing. Local writes go to a `.part` sibling and are
+  moved with `ATOMIC_MOVE`, and `resolve` rejects blank, backslash, absolute and root-escaping keys.
+- **Every accepted image is decoded, scaled and re-encoded by the server.**
+  `ImageTypeDetector` sniffs `FF D8 FF` / the 8-byte PNG signature / `RIFF....WEBP` — never the
+  filename or the part's declared `Content-Type` — and `415 UNSUPPORTED_MEDIA_TYPE` is distinct from
+  `VALIDATION_FAILED` so a client can tell "wrong format" from "broken file". Detection is a
+  candidate, not an acceptance: `ImageProcessor` must then decode the file, which rejects the
+  polyglot and the truncated file. Nothing is stored as it arrived, so EXIF/GPS is dropped and the
+  stored bytes, dimensions and `mime_type` are the pipeline's own output. The pixel ceiling
+  (40,000,000) is read from the header *before* `reader.read(0)`, because a few kilobytes can claim
+  20000×20000 and cost 1.6 GB. `max-dimension` (1600) scales down and never upscales. WebP is
+  decoded and stored as JPEG — `imageio-webp` registers a reader only, so keeping the format would
+  mean shipping the file undecoded.
+- **The one-primary rule is enforced under a product-scoped row lock.** D-21 settled that it is a
+  service-level invariant; task 3.8 is the first task to write `is_primary`, so
+  `ProductImageRepository.findByProductIdForUpdate` (`PESSIMISTIC_WRITE`, `ORDER BY sortOrder, id`)
+  serialises the read-decide-write sequence after the ownership check, exactly as D-24 does for stock.
+  The first image of a product becomes its cover automatically, deleting the cover promotes the next,
+  a reorder must be an exact permutation, and `requireSinglePrimary` asserts the invariant afterwards
+  so a silent violation becomes a failed request.
 
-Selection is unlocked and ordered by product id; each candidate is then locked individually through
-the existing `findByProductIdForUpdate`, the lock order plan section 6.2 mandates, and every condition
-is re-checked under the lock because a vendor may have corrected the row in between. The whole run is
-one transaction over at most `app.expiry-sweep-max-rows` rows (default 200, `APP_EXPIRY_SWEEP_MAX_ROWS`),
-which bounds how long row locks are held.
+File and row are deliberately not atomic: an upload writes the object first and deletes it again if
+the row cannot be written, while a delete removes the row first and treats a failed object removal as
+a logged orphan. Neither direction can leave a visible row pointing at bytes that are not there.
 
-16 new unit tests (14 service + 2 scheduler) and 12 integration tests against real MySQL, driven by
-the `MutableClock` bean. The test profile sets `app.expiry-sweep-cron: "-"` (Spring's `CRON_DISABLED`)
-so a scheduled run cannot fire mid-test. The earlier 3.6 inventory API work is summarised under
-**Completed Work**.
+93 new unit tests (36 service, 14 controller slice, 13 local disk, 5 S3 stub, 11 processor, 14
+detector) and 36 integration tests against real MySQL and a real temporary directory, including a
+`CountDownLatch`-released multi-thread case that proves the lock exists. The earlier 3.5–3.7 work is
+summarised under **Completed Work**.
+
+Verified at close-out with `./mvnw verify -Pintegration` (21:44 min): **506 unit tests** and **362
+integration tests**, all green — `BUILD SUCCESS`.
 
 ## Completed Work
 
@@ -168,7 +179,7 @@ so a scheduled run cannot fire mid-test. The earlier 3.6 inventory API work is s
 - [x] **3.5 — Catalog API**: `VendorProductController` at `/api/v1/vendors/products` — `POST` (201), `GET` (paginated, optional `status` / `categoryId` / `name` filters, page size clamped 1..100), `GET|PUT /{id}` (403 foreign / 404 missing), `PATCH /{id}/deactivate` (204). The vendor comes from the JWT subject, so cross-vendor access is not expressible in a request. `@RequiresApprovedVendor` on the class — the first production route to carry it. No migration; reuses `products`, `categories.active`, `vendor_profiles`. Listing filters are Criteria predicates in the new `ProductSpecifications` (D-23); soft delete sets `INACTIVE` and keeps the row, its images and its inventory (D-22). 24 new unit tests, 26 new integration tests
 - [x] **3.6 — Inventory API**: `VendorInventoryController` at `/api/v1/vendors` — read current inventory, `POST .../stock-in`, `.../stock-out`, `.../adjustments` (signed, nonblank reason), `.../write-offs` (`WASTE`), `PUT .../low-stock-threshold`, `PUT .../expiry-date`, `GET .../movements?page&size` (paged history), and vendor-wide `GET /api/v1/vendors/inventory/low-stock?page&size`. Availability is `quantity - reserved_quantity` and is never clamped; a change that would breach the floor is refused with a dedicated `409 INSUFFICIENT_STOCK` rather than silently applied at the floor. `@RequiresApprovedVendor` on the class; 403 for a foreign product and 404 for a missing one, both resolved before any row lock is taken. Every mutation takes a pessimistic write lock on the inventory row, then writes the new level and exactly one `stock_movements` row in one transaction (D-24); the movement's actor is the authenticated principal, so it cannot be client-supplied. The two alert settings take the same lock even though they write no movement, because Hibernate's whole-row `UPDATE` would otherwise write back a stale `quantity`. Low-stock rule is `available <= lowStockThreshold`, vendor-scoped, via `InventorySpecifications`. No migration — reuses `inventory` and `stock_movements` from tasks 3.3/3.4. 59 new unit tests, 35 HTTP integration tests, 6 real-thread concurrency tests
 - [x] **3.7 — Expiry scheduler**: `InventoryExpiryService` writes off available stock whose `expiry_date` has passed as a `WASTE` movement (null actor, no reference, reason naming the expiry date and the sweep date) and delists an `ACTIVE` product as `INACTIVE`; `InventoryExpiryScheduler` triggers it on `app.expiry-sweep-cron`. Expired means `expiryDate < LocalDate.now(clock)` on the injected `Clock`; reserved units are never written off (`quantity` stops at `reserved_quantity`); a row with nothing available is delisted without a movement. Candidates are selected unlocked and ordered by product id, then locked one at a time through the existing `findByProductIdForUpdate` with every condition re-checked under the lock, and the whole run is one transaction bounded by `app.expiry-sweep-max-rows`. Idempotency is the candidate predicate (`quantity > reservedQuantity OR status = ACTIVE`), not a processed flag (D-25). No endpoint and no migration. 16 new unit tests, 12 integration tests
-- [ ] **3.8 — Image handling**: `StorageService` interface: local disk (dev), S3 implementation pluggable by profile. Validation: type whitelist (JPEG/PNG/WebP) checked by content sniffing, max size, random filenames, no path traversal, resize/compress. Enforces the D-21 one-primary-image invariant transactionally
+- [x] **3.8 — Image handling**: `StorageService` (`store`/`delete`/`exists`/`describe`) with `LocalDiskStorageService` (`@Profile("!s3")`, `.part` + `ATOMIC_MOVE` writes, traversal-checked `resolve`, root created at startup) and `S3StorageService` (`@Profile("s3")`) as a declared stub that throws on every method and names what is missing — the AWS SDK is not a dependency and a silently inert implementation would serve `201 Created` and write nothing (D-26). `VendorProductImageController` at `/api/v1/vendors/products/{productId}/images` — `POST` (multipart part `file`, optional `primary` flag, 201), `GET` (ordered list), `PUT /{imageId}/primary`, `PUT /order` (must be an exact permutation of the product's image ids), `DELETE /{imageId}` (204, promotes the next image when the cover is removed). `@RequiresApprovedVendor` on the class; ownership resolved through `ProductService.requireOwnedProduct`, made package-private so "yours" is defined once for the catalog and the image routes. Validation order is ownership → empty part (400) → declared length over `max-file-size-bytes` (413, before the bytes are buffered) → content sniffing (415) → decode (400) → pixel budget (413) → image count (409), so a rejected upload leaves neither a row nor a file. Format is decided by the leading bytes only, never the filename or the part's `Content-Type`; every accepted upload is decoded, scaled to `max-dimension` and re-encoded, so EXIF/GPS is dropped and the stored bytes, dimensions and `mime_type` are the pipeline's own output; WebP is decoded and stored as JPEG (D-27). Keys are `product-images/{productId}/{uuid}.{ext}`, always server-generated. The one-primary invariant is enforced under `findByProductIdForUpdate` (`PESSIMISTIC_WRITE`, ordered by `sortOrder, id`), the first image becomes the cover automatically, and `requireSinglePrimary` asserts the invariant after every mutation (D-28). Uploads store the object then the row and remove the object if the row cannot be written; deletes remove the row first and treat a failed object removal as a logged orphan. No migration. 93 new unit tests, 36 integration tests including a `CountDownLatch` concurrency case
 - [ ] **3.9 — Vendor catalog UI**: Product list and form (Shopify-style), inventory table with stock adjustments, low-stock badges
 - [ ] **3.T — Tests**: Ownership checks; slug collision; expiry job with a fake clock; upload rejection cases; RBAC checklist
 
@@ -186,6 +197,7 @@ so a scheduled run cannot fire mid-test. The earlier 3.6 inventory API work is s
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-04 | Phase 3f Task 3.8: StorageService with a profile-selected local backend and a declared S3 stub, content-sniffed image pipeline that decodes/rescales/re-encodes, one-primary invariant under a product row lock | `storage/**` (StorageService, LocalDiskStorageService, S3StorageService, StorageProperties, StorageException, image/{ImageFormat, ImageTypeDetector, ImageProcessor, ImageUploadProperties, ProcessedImage}), `VendorProductImageController.java`, `ProductImageService.java`, `ProductImageOrderRequest.java`, `ProductImageRepository.java`, `ProductService.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, `pom.xml`, 4 `application*.yml`, 7 test classes, `docs/decisions.md` (D-26, D-27, D-28), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-04 | Phase 3e Task 3.7: inventory expiry sweep on the injected Clock, configurable cron and bounded batch, self-clearing candidate predicate | `InventoryExpiryService.java`, `InventoryExpiryScheduler.java`, `InventoryRepository.java`, `AppProperties.java`, `application-test.yml`, `InventoryExpiryServiceTest.java`, `InventoryExpirySchedulerTest.java`, `InventoryExpiryIntegrationTest.java`, `docs/decisions.md` (D-25), `docs/progress.md` |
 | 2026-10-04 | Phase 3d Task 3.6: vendor inventory API with pessimistic row locking, reserved-quantity floor, and movement audit trail | `InventoryService.java`, `VendorInventoryController.java`, `InventoryRepository.java`, `StockMovementRepository.java`, `InventorySpecifications.java`, `StockMovementMapper.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, 10 DTOs, `InventoryServiceTest.java`, `VendorInventoryControllerTest.java`, `VendorInventoryIntegrationTest.java`, `InventoryConcurrencyIntegrationTest.java`, `docs/decisions.md` (D-24), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-03 | Phase 3c Task 3.5: vendor catalog API with approval gating, ownership scoping, filtered listing and soft delete | `VendorProductController.java`, `ProductService.java`, `ProductRepository.java`, `ProductSpecifications.java`, `ProductRequest.java`, `VendorProductControllerTest.java`, `VendorCatalogIntegrationTest.java`, `ProductServiceTest.java`, `ProductInventoryIntegrationTest.java`, `docs/decisions.md` (D-22, D-23), `docs/progress.md`, `docs/known-issues.md` |
