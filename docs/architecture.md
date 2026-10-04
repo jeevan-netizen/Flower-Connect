@@ -384,10 +384,10 @@ cache is cleared on logout alongside the vendor cache, so the next account to si
 sees neither list. See `docs/decisions.md` (D-16).
 
 ### Implemented Endpoints
-Phase 1 (auth), Phase 2a (service locations), and Phase 2c (vendor registration, admin
-approval, and approval gating) endpoints are implemented. No catalog or order endpoint exists
-yet, so `@RequiresApprovedVendor` currently guards no production route — see
-`docs/decisions.md` (D-13).
+Phase 1 (auth), Phase 2a (service locations), Phase 2c (vendor registration and admin approval),
+Phase 3a (admin categories), Phase 3c (vendor catalog) and Phase 3d (vendor inventory) endpoints are
+implemented. `@RequiresApprovedVendor` guards the catalog and inventory routes; no order or payment
+endpoint exists yet — see `docs/decisions.md` (D-13).
 
 | Method | Path                | Description                        | Phase  |
 |--------|---------------------|------------------------------------|--------|
@@ -416,6 +416,15 @@ yet, so `@RequiresApprovedVendor` currently guards no production route — see
 | GET    | `/api/v1/vendors/products/{id}` | Read one of the vendor's products | Phase 3c|
 | PUT    | `/api/v1/vendors/products/{id}` | Update a product; a rename regenerates the slug | Phase 3c|
 | PATCH  | `/api/v1/vendors/products/{id}/deactivate` | Soft delete: move the product to `INACTIVE` | Phase 3c|
+| GET    | `/api/v1/vendors/inventory/low-stock` | List this vendor's low-stock products (paged) | Phase 3d|
+| GET    | `/api/v1/vendors/products/{id}/inventory` | Read one product's inventory | Phase 3d|
+| POST   | `/api/v1/vendors/products/{id}/inventory/stock-in` | Add stock (`STOCK_IN`) | Phase 3d|
+| POST   | `/api/v1/vendors/products/{id}/inventory/stock-out` | Remove stock (`STOCK_OUT`) | Phase 3d|
+| POST   | `/api/v1/vendors/products/{id}/inventory/adjustments` | Signed correction (`ADJUSTMENT`); reason required | Phase 3d|
+| POST   | `/api/v1/vendors/products/{id}/inventory/write-offs` | Record a write-off (`WASTE`); reason required | Phase 3d|
+| PUT    | `/api/v1/vendors/products/{id}/inventory/low-stock-threshold` | Set the low-stock threshold | Phase 3d|
+| PUT    | `/api/v1/vendors/products/{id}/inventory/expiry-date` | Set or clear the expiry date | Phase 3d|
+| GET    | `/api/v1/vendors/products/{id}/inventory/movements` | Paged movement history for one product | Phase 3d|
 | GET    | `/actuator/health`   | Health check (no auth)              | Phase 0|
 
 ## 7. Configuration

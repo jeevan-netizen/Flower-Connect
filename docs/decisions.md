@@ -365,6 +365,7 @@ of a constraint name.
 | D-16 | The admin UI derives backend rules instead of inventing transitions | Decision | Accepted | Phase 2d |
 | D-22 | Vendor catalog lives in the vendor namespace; removal is soft | Decision | Accepted | Phase 3c |
 | D-23 | Optional listing filters are composed Specifications | Decision | Accepted | Phase 3c |
+| D-24 | Stock mutations take a pessimistic row lock, after the ownership check | Decision | Accepted | Phase 3d |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -1033,3 +1034,103 @@ keeps pagination stable for rows written in the same instant.
   wants a full-text index, not a different query shape.
 - A blank `name=` narrows nothing rather than matching nothing. That is a deliberate reading of
   `name=` as a client artefact rather than as an intent to find products with an empty name.
+
+---
+
+## D-24: Stock mutations take a pessimistic row lock, and take it after the ownership check
+
+**Status:** Accepted
+**Date:** Phase 3d (Task 3.6)
+
+### Context
+
+Plan section 6.2 prescribes the lock: "pessimistic lock (`SELECT ... FOR UPDATE`) on inventory rows
+**ordered by product id** to avoid deadlocks, for every operation above". Task 3.6 is the first phase
+that actually writes stock, so the discipline is established here rather than inherited — and the
+instruction "unless the existing architecture strongly favors another strategy" asks whether it does.
+It does not: this project has no cache in front of the database (Redis was removed in stage 6, plan
+v2.2) and no eventual-consistency story, so a read-modify-write against a plain `SELECT` is the only
+alternative, and it is a lost-update bug waiting for two concurrent requests.
+
+The concrete race is small and worth naming, because it is what the tests exist to kill. A stock-in
+reads `quantity`, adds N, writes `quantity + N`:
+
+```
+T1: SELECT quantity -> 10        T2: SELECT quantity -> 10
+T1: UPDATE SET quantity = 15     T2: UPDATE SET quantity = 14
+```
+
+Final state 14 for two deliveries of 5 units that should have produced 20, and **two** movement rows
+each claiming +5. The stock level and its own audit trail would then disagree, permanently, with
+nothing to reconcile them. Optimistic locking would detect it (`@Version` and retry) but would still
+have written the two movement rows before the collision was noticed, so it moves the problem rather
+than removing it.
+
+Three things the plan does not settle, and each one forced a choice here.
+
+**Where the lock sits relative to the ownership check.** A lock must be the *last* thing taken, not
+the first. `SELECT ... FOR UPDATE` on another vendor's inventory row would let any authenticated
+florist stall that product's stock for as long as it liked, simply by naming a foreign product id in a
+loop. Ownership is therefore checked first, from a non-locking read, and the lock is only taken once
+the caller is the owner.
+
+**Which writes take it.** The plan says "every operation above" about the stock-movement list, and says
+nothing about the two alert settings. They take the lock too, and not for tidiness: Hibernate issues
+whole-row `UPDATE` statements, so a threshold write concurrent with a stock change would write back the
+*quantity it read before* the change landed, silently undoing a delivery. The lock is what makes a
+partial-column write safe here without `@DynamicUpdate`.
+
+**Whether the "ordered by product id" rule applies yet.** Every 3.6 route mutates exactly one product,
+so a one-element lock order cannot deadlock. The ordering rule is recorded as binding on the later
+multi-product operations (checkout with a multi-shop cart, and the order-accept path) rather than
+invented here; there is nothing in this phase for it to order.
+
+### Decision
+
+- **Pessimistic write lock** (`LockModeType.PESSIMISTIC_WRITE`, i.e. `SELECT ... FOR UPDATE`) on the
+  inventory row, acquired through the single repository method
+  `InventoryRepository.findByProductIdForUpdate`. It was already present from task 3.3; task 3.6 makes
+  it the only way the service reaches a row it is about to write.
+- **Order inside a mutation is fixed** and identical for every operation, in
+  `InventoryService.applyStockChange`: check ownership (unlocked) ? resolve the actor ? lock the
+  inventory row ? validate against the locked quantities ? write the new level ? append exactly one
+  movement. All five steps are one transaction, so a failure in either write leaves neither.
+- **Reads do not lock.** The inventory read, the low-stock list and the movement history are
+  `readOnly` transactions: they report a level, they do not change one, and a lock would make a
+  dashboard view block the very stock movement it is watching.
+- **The two alert settings take the same lock** as the stock mutations, for the whole-row-`UPDATE`
+  reason above, even though they write no movement.
+- **Availability is recomputed, never clamped.** Every operation computes the candidate
+  `quantity` first and refuses it if it would fall below `reserved_quantity`. Clamping would report
+  success for a request that was not performed and would leave the level disagreeing with the
+  movements that produced it. The refusal is `409 INSUFFICIENT_STOCK`, a dedicated `ErrorCode` rather
+  than a generic `CONFLICT`, because "the stock numbers do not allow this" and "this resource already
+  exists" call for different client behaviour.
+- **The two invariants are checked in the service and in the database** (D-12). The service returns a
+  specific 409 before the database is reached; `ck_inventory_reserved_le_quantity` is the backstop for
+  any writer that bypasses the service.
+
+### Consequences
+
+- Two stock changes to one product serialise. Two stock changes to *different* products do not: each
+  locks only its own row, so the common case (a vendor restocking a whole catalogue) stays parallel.
+- Every stock mutation costs one extra `SELECT ... FOR UPDATE`. That is a deliberate payment for
+  correctness on the write path, and it is why the read paths stay lock-free.
+- `InventoryService` must be reached through the Spring proxy for the lock to be real: a
+  self-invocation inside the class would run outside the transaction and the lock would be held by
+  nothing. The service is a single bean with no internal call from a `REQUIRES_NEW` path, so this is
+  currently safe by construction — a future refactor that calls a `@Transactional` method on `this`
+  would silently break the guarantee.
+- The lock is verified by `InventoryConcurrencyIntegrationTest`, which runs 6–8 real threads against
+  one product and asserts only end state: the final quantity equals the sum of the deltas, the
+  movement count equals the number of changes, and with one unit of stock and eight contenders exactly
+  one thread succeeds while the other seven receive `INSUFFICIENT_STOCK`. A sequential test cannot
+  demonstrate any of this — run one after another, every call sees the previous one's committed level
+  and the lock's absence is invisible.
+- `reserved_quantity` has no route in this phase (`RESERVE` movements arrive with checkout in Phase 5),
+  so the 409 floor is set up in the integration tests by updating the column directly. Without
+  reserved units the floor could never bind, and the 409 this API exists to return would be untested.
+- A caller that is refused by the floor learns only that the change is impossible, not what the level
+  is; it must re-read `GET /inventory` to find out. Returning the current level inside the 409 body
+  would help, and is a reasonable follow-on if a client turns out to need it.
+

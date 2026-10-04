@@ -133,6 +133,36 @@ _None currently blocked._
   object. Asserting `$.validation.id` fails with `No value at JSON path "$.validation.id"`. Only
   `@Valid @RequestBody` violations populate that map.
 
+## Testing Gotchas (Phase 3d)
+
+- **A test fixture that creates a product over HTTP cannot run as a PENDING or SUSPENDED vendor.**
+  The approval gate lives on the controller (D-13), not in `ProductService`, so
+  `POST /api/v1/vendors/products` returns `403 VENDOR_NOT_APPROVED` for a vendor the product itself
+  does not care about. Two `VendorInventoryIntegrationTest` cases set up exactly those states (the
+  pending-vendor refusal and the reinstate-restores-access case, whose vendor is suspended when the
+  product is created) and both failed with `Status expected:<201> but was:<403>` from the fixture
+  helper, not from the assertion under test. `createProduct` now calls `productService.create(...)`
+  directly. The rule generalises: **an approval-gated state is awkward to reach through a gated
+  fixture, so build the fixture below the gate.**
+- **`VendorProfile.builder()` needs `.status(...)` explicitly** in a hand-rolled vendor fixture. The
+  builder has no default, so an omitted status persists as `null` and fails `ddl-auto: validate` on
+  the ENUM column (D-20) at flush time — with a schema-validation message that names no test line.
+  `InventoryConcurrencyIntegrationTest.createVendor` is the reference fixture.
+- **A pessimistic-lock test cannot assert its own serialisation.** Run the contenders one after
+  another and every call sees the previous one's committed level, so an unlocked implementation
+  passes. `InventoryConcurrencyIntegrationTest` uses a `CountDownLatch` to release all threads
+  together and asserts only end state (final quantity = sum of deltas, movement count = number of
+  successful changes). With one unit of stock and eight contenders exactly one thread must succeed
+  and the other seven must get `INSUFFICIENT_STOCK`; if more than one succeeds, the lock is absent.
+- **Concurrent creates can deadlock on the product unique index (error 1213)**, which is the same
+  transient MySQL behaviour already documented for slug collisions under Phase 3b. Keep fixture
+  names unique per test and retry the whole create in a fresh transaction
+  (`ProductInventoryIntegrationTest.createWithDeadlockRetry`).
+- **`INSUFFICIENT_STOCK` needs reserved units to be reachable at all.** No route in this phase
+  writes `reserved_quantity` (`RESERVE` movements arrive with checkout in Phase 5), so the floor is
+  set up by updating the column with `JdbcTemplate` before the request under test. Without that the
+  409 this API exists to return would never fire and the test would silently prove nothing.
+
 ## Testing Gotchas (Phase 3c)
 
 - **`Category.builder().active(true)` is required in a product-service fixture.** `active` is a

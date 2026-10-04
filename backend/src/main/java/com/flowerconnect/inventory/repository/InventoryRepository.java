@@ -3,6 +3,7 @@ package com.flowerconnect.inventory.repository;
 import com.flowerconnect.inventory.domain.Inventory;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -23,9 +24,17 @@ import java.util.Optional;
  * POS sale) so concurrent operations on the same product serialise
  * instead of interleaving; the lock is acquired here, and callers
  * lock rows in ascending product-id order to avoid deadlocks.
+ *
+ * <p>{@code JpaSpecificationExecutor} backs the vendor-scoped
+ * low-stock listing added in task 3.6. That listing selects rows
+ * where {@code quantity − reserved_quantity <= low_stock_threshold},
+ * which is an expression over three columns rather than a field, so
+ * a derived query method cannot express it; see
+ * {@link com.flowerconnect.inventory.specification.InventorySpecifications}.
  */
 @Repository
-public interface InventoryRepository extends JpaRepository<Inventory, Long> {
+public interface InventoryRepository extends JpaRepository<Inventory, Long>,
+        JpaSpecificationExecutor<Inventory> {
 
     Optional<Inventory> findByProductId(Long productId);
 

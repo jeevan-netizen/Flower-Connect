@@ -38,6 +38,18 @@ public class BusinessException extends RuntimeException {
         return new BusinessException(ErrorCode.CONFLICT, message);
     }
 
+    /**
+     * The stock change the caller asked for is not possible against the
+     * current quantities: it would drive {@code quantity} below
+     * {@code reserved_quantity}, or would consume more than the
+     * available stock. Rendered as HTTP 409 with the
+     * {@code INSUFFICIENT_STOCK} code so a client can distinguish it
+     * from a duplicate-resource conflict.
+     */
+    public static BusinessException insufficientStock(String message) {
+        return new BusinessException(ErrorCode.INSUFFICIENT_STOCK, message);
+    }
+
     public static BusinessException rateLimited(String message) {
         return new BusinessException(ErrorCode.RATE_LIMITED, message);
     }

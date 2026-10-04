@@ -4,24 +4,35 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 3c — Task 3.5 (Vendor Catalog API) completed**
+**Phase 3d — Task 3.6 (Inventory API) completed**
 
-Task 3.5 exposes the Phase 3b product data model over HTTP as `VendorProductController` at
-`/api/v1/vendors/products`: create, vendor-scoped read, paginated list, update, and a soft
-`deactivate`. The base path sits inside the existing `/api/v1/vendors/**` namespace rather than a
-new `/vendor/` prefix, so `SecurityConfig`'s `hasRole("FLORIST")` rule already covers it and the two
-authorization layers keep their documented order (D-13): the namespace answers "is this a vendor
-account?", `@RequiresApprovedVendor` answers "may this vendor transact?". The controller is the first
-production route to carry the approval annotation, which D-13 predicted would happen in Phase 3.
+Task 3.6 puts the Phase 3b inventory tables behind `VendorInventoryController` at
+`/api/v1/vendors`, following the namespace decision of D-22 rather than the plan's singular
+`/api/v1/vendor` wording, so `SecurityConfig`'s `hasRole("FLORIST")` rule already covers it. Eight
+operations: read the current inventory, stock in, stock out, adjustment, write-off, low-stock
+threshold, expiry date, paginated movement history, and a paginated vendor-wide low-stock list. (The
+low-stock list sits at `/api/v1/vendors/inventory/low-stock` rather than nested under a product id,
+because it is the one route in this task that is not per-product and nesting it would make
+`/products/{productId}/inventory` ambiguous between a product and the literal segment `inventory`.)
 
-Three rules were added to `ProductService` alongside the endpoints: a product may only be assigned to
-an **active** category, the base price must be **greater than zero** (enforced in both the DTO and the
-service, per D-12), and `delete` became `deactivate` — a soft delete that sets `INACTIVE` and leaves
-the row, its images and its inventory in place so historical stock movements stay readable. The
-optional listing filters (`status`, `categoryId`, `name`) are composed as Criteria predicates in the
-new `ProductSpecifications` rather than as a `:param IS NULL` JPQL query, because the latter makes
-Hibernate infer the parameter type from the null side of the comparison (D-23). 24 new unit tests and
-26 new integration tests. Verified at 338 unit + 273 integration tests.
+Every write is `@RequiresApprovedVendor` at the class level (D-13) and ownership-scoped: a product
+that does not exist is a 404 and a product owned by another vendor is a 403, checked *before* any
+lock is taken. Availability is `quantity - reserved_quantity` and is never clamped — a change that
+would drop `quantity` below `reserved_quantity` is refused with a dedicated `409 INSUFFICIENT_STOCK`,
+because reporting success for a request that was not performed would leave the level disagreeing
+with the movements that produced it (D-24). Adjustments and write-offs require a nonblank reason;
+stock in and stock out treat the reason as optional. The authenticated principal is resolved as the
+movement's actor, so no client can attribute a movement to someone else.
+
+Each mutation locks the inventory row pessimistically, writes the new level, and appends exactly one
+`stock_movements` row in one transaction; the two alert settings take the same lock even though they
+write no movement, because Hibernate's whole-row `UPDATE` would otherwise write back a stale
+`quantity`. The `reserved_quantity` floor is enforced in the service and by
+`ck_inventory_reserved_le_quantity` (D-12). No migration: this reuses `inventory` and
+`stock_movements` as written in task 3.3/3.4. 59 new unit tests (29 service + 30 controller slice),
+35 HTTP integration tests, and 6 real-thread concurrency tests. The locking protocol itself is
+D-24; the earlier 3.5 catalog work is summarised under **Completed Work**. Verified at
+**397 unit tests** and **314 integration tests**.
 
 ## Completed Work
 
@@ -148,7 +159,7 @@ Hibernate infer the parameter type from the null side of the comparison (D-23). 
 - [x] **3.3 — Inventory entity**: `inventory` table (V10), one row per product (unique on product_id) with `quantity`, `reserved_quantity`, `low_stock_threshold`, optional `expiry_date`. Created automatically at quantity 0 in the same transaction as the product; no stock movement is written for the initial zero. CHECKs: quantity >= 0, reserved_quantity >= 0, low_stock_threshold >= 0, reserved_quantity <= quantity. Availability = quantity − reserved (computed in the entity)
 - [x] **3.4 — Stock movement log**: `stock_movements` table (V11) records every change — movement_type (native ENUM of the nine plan section 6.2 types), signed quantity_delta, reason, reference id/type, nullable actor. Append-only (no updated_at). Product creation writes no movement; the log records changes only
 - [x] **3.5 — Catalog API**: `VendorProductController` at `/api/v1/vendors/products` — `POST` (201), `GET` (paginated, optional `status` / `categoryId` / `name` filters, page size clamped 1..100), `GET|PUT /{id}` (403 foreign / 404 missing), `PATCH /{id}/deactivate` (204). The vendor comes from the JWT subject, so cross-vendor access is not expressible in a request. `@RequiresApprovedVendor` on the class — the first production route to carry it. No migration; reuses `products`, `categories.active`, `vendor_profiles`. Listing filters are Criteria predicates in the new `ProductSpecifications` (D-23); soft delete sets `INACTIVE` and keeps the row, its images and its inventory (D-22). 24 new unit tests, 26 new integration tests
-- [ ] **3.6 — Inventory API**: Stock in/out, adjustment with reason, write-off, low-stock list; availability = quantity − reserved; adjustments may not drop `quantity` below `reserved_quantity` (409)
+- [x] **3.6 — Inventory API**: `VendorInventoryController` at `/api/v1/vendors` — read current inventory, `POST .../stock-in`, `.../stock-out`, `.../adjustments` (signed, nonblank reason), `.../write-offs` (`WASTE`), `PUT .../low-stock-threshold`, `PUT .../expiry-date`, `GET .../movements?page&size` (paged history), and vendor-wide `GET /api/v1/vendors/inventory/low-stock?page&size`. Availability is `quantity - reserved_quantity` and is never clamped; a change that would breach the floor is refused with a dedicated `409 INSUFFICIENT_STOCK` rather than silently applied at the floor. `@RequiresApprovedVendor` on the class; 403 for a foreign product and 404 for a missing one, both resolved before any row lock is taken. Every mutation takes a pessimistic write lock on the inventory row, then writes the new level and exactly one `stock_movements` row in one transaction (D-24); the movement's actor is the authenticated principal, so it cannot be client-supplied. The two alert settings take the same lock even though they write no movement, because Hibernate's whole-row `UPDATE` would otherwise write back a stale `quantity`. Low-stock rule is `available <= lowStockThreshold`, vendor-scoped, via `InventorySpecifications`. No migration — reuses `inventory` and `stock_movements` from tasks 3.3/3.4. 59 new unit tests, 35 HTTP integration tests, 6 real-thread concurrency tests
 - [ ] **3.7 — Expiry scheduler**: `@Scheduled` job using the injected `Clock`: expired stock → `WASTE` movement and product delisted
 - [ ] **3.8 — Image handling**: `StorageService` interface: local disk (dev), S3 implementation pluggable by profile. Validation: type whitelist (JPEG/PNG/WebP) checked by content sniffing, max size, random filenames, no path traversal, resize/compress. Enforces the D-21 one-primary-image invariant transactionally
 - [ ] **3.9 — Vendor catalog UI**: Product list and form (Shopify-style), inventory table with stock adjustments, low-stock badges
@@ -168,6 +179,7 @@ Hibernate infer the parameter type from the null side of the comparison (D-23). 
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-04 | Phase 3d Task 3.6: vendor inventory API with pessimistic row locking, reserved-quantity floor, and movement audit trail | `InventoryService.java`, `VendorInventoryController.java`, `InventoryRepository.java`, `StockMovementRepository.java`, `InventorySpecifications.java`, `StockMovementMapper.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, 10 DTOs, `InventoryServiceTest.java`, `VendorInventoryControllerTest.java`, `VendorInventoryIntegrationTest.java`, `InventoryConcurrencyIntegrationTest.java`, `docs/decisions.md` (D-24), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-03 | Phase 3c Task 3.5: vendor catalog API with approval gating, ownership scoping, filtered listing and soft delete | `VendorProductController.java`, `ProductService.java`, `ProductRepository.java`, `ProductSpecifications.java`, `ProductRequest.java`, `VendorProductControllerTest.java`, `VendorCatalogIntegrationTest.java`, `ProductServiceTest.java`, `ProductInventoryIntegrationTest.java`, `docs/decisions.md` (D-22, D-23), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-03 | Phase 3b Tasks 3.2–3.4: product, image, inventory and stock-movement data model with ProductService foundation | `V8__products.sql`, `V9__product_images.sql`, `V10__inventory.sql`, `V11__stock_movements.sql`, `backend/src/main/java/com/flowerconnect/catalog/**` (Product, ProductImage, repositories, DTOs, ProductMapper, ProductService), `backend/src/main/java/com/flowerconnect/inventory/**` (Inventory, StockMovement, repositories), `backend/src/test/java/com/flowerconnect/catalog/**` (ProductServiceTest, ProductInventoryIntegrationTest), `docs/decisions.md` (D-20, D-21), `docs/progress.md` |
 | 2026-10-03 | Phase 3a Task 3.1: Category entity with hierarchical admin CRUD and public read | `V7__categories.sql`, `backend/src/main/java/com/flowerconnect/catalog/**` (domain, repository, service, controller, dto, mapper), `SecurityConfig.java`, `backend/src/test/java/com/flowerconnect/catalog/**` (CategoryServiceTest, AdminCategoryControllerTest, CategoryApiIntegrationTest, CategorySeedIntegrityTest), `docs/decisions.md` (D-17, D-18, D-19), `docs/progress.md` |
