@@ -366,6 +366,7 @@ of a constraint name.
 | D-22 | Vendor catalog lives in the vendor namespace; removal is soft | Decision | Accepted | Phase 3c |
 | D-23 | Optional listing filters are composed Specifications | Decision | Accepted | Phase 3c |
 | D-24 | Stock mutations take a pessimistic row lock, after the ownership check | Decision | Accepted | Phase 3d |
+| D-25 | The expiry sweep writes off available stock only, and delists by exclusive transition | Decision | Accepted | Phase 3e |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -1133,4 +1134,111 @@ invented here; there is nothing in this phase for it to order.
 - A caller that is refused by the floor learns only that the change is impossible, not what the level
   is; it must re-read `GET /inventory` to find out. Returning the current level inside the 409 body
   would help, and is a reasonable follow-on if a client turns out to need it.
+
+---
+
+## D-25: The expiry sweep writes off available stock only, and delists by exclusive transition
+
+**Status:** Accepted
+**Date:** Phase 3e (Task 3.7)
+
+### Context
+
+Plan task 3.7 is one line: "@Scheduled job using the injected `Clock`: expired stock ?
+`WASTE` movement and product delisted". Four things it does not settle each change what the
+job actually writes, and each of them is a place where the obvious implementation silently
+corrupts data.
+
+**Which day counts as expired.** Plan section 6.2 defines the sweep's effect but not its
+boundary, and the two available readings differ by a day of sellable stock.
+
+**What happens to reserved units.** `inventory` carries `reserved_quantity` for units already
+promised to placed-but-unaccepted orders, and section 6.2 requires the vendor's accept to
+re-check `quantity >= q` precisely because an expiry write-off may have reduced the level.
+`ck_inventory_reserved_le_quantity` (`V10`) forbids `quantity < reserved_quantity`, so a
+write-off that took reserved units would either be refused by the database or need the
+constraint relaxed.
+
+**Which products get delisted.** `products.status` has four values (D-22) and no transition
+table; `ProductService.deactivate` already exists as the vendor-facing `ACTIVE ? INACTIVE`
+path, and it resolves a vendor from a JWT subject and is reachable only by an authenticated
+caller — neither of which a scheduled job has.
+
+**How a repeated run behaves.** `@Scheduled` runs unattended and repeatedly. A sweep that
+selects "every row whose expiry date has passed" re-selects rows it already processed,
+forever, and the cheapest way to make it look like progress is to append a `WASTE` movement
+per run. The movement log is append-only and is the audit trail of how a level got there
+(D-24), so a zero-delta or duplicate movement there is a permanent, wrong claim.
+
+### Decision
+
+- **Expired means `expiryDate < today`, where `today` is `LocalDate.now(clock)` on the
+  injected `Clock`.** The stored date is the last day the stock may be used, so stock is
+  written off from the following day and is sellable throughout the date itself. Nothing in
+  the sweep calls `Instant.now()`; this is the one job whose behaviour has to be provable
+  with a fake clock (plan section 3, and the plan's own definition of done for 3.7).
+- **Only available stock is written off.** `available = quantity ? reservedQuantity` is
+  removed and `quantity` is set to `reservedQuantity`, never below it. Reserved units belong
+  to orders that have not been accepted yet; taking them as waste would both break the
+  `reserved_quantity <= quantity` invariant and invalidate pending orders the moment they
+  were placed. The consequences for an order are already designed for: section 6.2 has the
+  vendor's accept re-check the level, and a shortfall is a 409 that the vendor answers by
+  rejecting. A write-off that leaves nothing available writes no movement at all — a `WASTE`
+  row with a zero delta would be a movement recording no change, which the vendor's own
+  `ADJUSTMENT` path refuses to write.
+- **Delisting is an exclusive transition: `ACTIVE ? INACTIVE`, and nothing else.** A `DRAFT`,
+  `INACTIVE` or `ARCHIVED` product is already off the storefront, so rewriting it would be a
+  no-op update that reports a change which did not happen. `ProductService.deactivate` is not
+  reused: it needs a JWT subject and it audits a human decision. A vendor who reactivates a
+  delisted product while restoring stock and an expiry date in the same request stays listed;
+  one who reactivates without replacing the expired date is delisted again by the next sweep,
+  because a reachable expiry date means the stock is still expired.
+- **The movement has no actor and no reference.** There is no authenticated user behind a
+  scheduled job, so `actor_user_id`, `reference_id` and `reference_type` stay null and the
+  reason states the expiry date and the sweep date instead. Attributing the write-off to
+  whichever admin last touched the product would be a fabricated audit trail.
+- **Idempotency comes from the candidate predicate, not from a marker.** Rows are selected
+  where the expiry date has passed **and** something still has to change:
+  `expiryDate IS NOT NULL AND expiryDate < :today AND (quantity > reservedQuantity OR
+  product.status = :activeStatus)`. Processing a row makes it stop matching — the write-off
+  drops `quantity` to `reservedQuantity` and the delist moves the product off `ACTIVE`, and
+  neither is reversible by the sweep — so the next run has nothing to redo. This is why the
+  query joins `products` and compares an enum column: an alternative that selected expired
+  rows alone would need a separate "already processed" flag, which is state the sweep would
+  have to maintain forever.
+- **Selection is unlocked, locking is per row, and every condition is re-checked under the
+  lock.** Candidates are read in ascending product-id order and then locked one at a time
+  through the existing `InventoryRepository.findByProductIdForUpdate`, which is the lock order
+  section 6.2 mandates and the same order the vendor stock path takes (D-24). Between
+  selecting a row and locking it a vendor may have corrected the expiry date, adjusted the
+  level, or delisted the product, so a row that no longer needs work is skipped rather than
+  written to.
+- **One sweep is one bounded transaction.** A run handles at most `app.expiry-sweep-max-rows`
+  rows and commits once, which keeps the lock window finite; a backlog larger than the cap is
+  finished by later runs rather than in one long transaction. This is safe only because of
+  the self-clearing predicate above, and it is why the cap is configuration
+  (`app.expiry-sweep-max-rows`, `app.expiry-sweep-cron`, overridable as
+  `APP_EXPIRY_SWEEP_MAX_ROWS` / `APP_EXPIRY_SWEEP_CRON`) rather than a constant.
+
+### Consequences
+
+- A product's expiry date is the last usable day. A vendor who means "unsellable on this
+  date" must store the following day; the boundary is asserted at the service level and
+  against MySQL so it cannot drift.
+- The sweep never touches reserved units, so an expired product with a pending order shows
+  `quantity = reservedQuantity` and `available = 0`. That product is delisted, and its
+  in-flight order continues to the accept/reject decision section 6.2 describes — the same
+  split D-6 draws for a suspended vendor.
+- A single failed row fails the whole sweep's transaction and the next run retries it,
+  because the predicate is unchanged. Per-row error isolation was not built: with one row per
+  failure per run the sweep converges on its own, and swallowing an exception would hide a
+  database-level problem in a job nobody watches.
+- Nothing about the sweep is observable over HTTP — no endpoint reports "last swept at" or
+  "N products expired". Until one exists, an operator's only signal is the log line. A
+  metrics endpoint is a reasonable follow-on, not an omission.
+- The test profile disables the schedule (`app.expiry-sweep-cron: "-"`, Spring's
+  `CRON_DISABLED`) so a scheduled run cannot fire in the middle of an integration test; the
+  sweep is driven directly with the `MutableClock` bean instead. Both the clock and the batch
+  cap are restored after each test, because the Spring context is cached and shared across
+  the integration suite.
 

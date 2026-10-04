@@ -4,35 +4,42 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 3d — Task 3.6 (Inventory API) completed**
+**Phase 3e — Task 3.7 (Expiry scheduler) completed**
 
-Task 3.6 puts the Phase 3b inventory tables behind `VendorInventoryController` at
-`/api/v1/vendors`, following the namespace decision of D-22 rather than the plan's singular
-`/api/v1/vendor` wording, so `SecurityConfig`'s `hasRole("FLORIST")` rule already covers it. Eight
-operations: read the current inventory, stock in, stock out, adjustment, write-off, low-stock
-threshold, expiry date, paginated movement history, and a paginated vendor-wide low-stock list. (The
-low-stock list sits at `/api/v1/vendors/inventory/low-stock` rather than nested under a product id,
-because it is the one route in this task that is not per-product and nesting it would make
-`/products/{productId}/inventory` ambiguous between a product and the literal segment `inventory`.)
+Task 3.7 turns the `expiry_date` column written in task 3.3 into behaviour: `InventoryExpiryService`
+sweeps expired stock and `InventoryExpiryScheduler` runs it on `app.expiry-sweep-cron` (default
+`0 0 3 * * ?`, overridable with `APP_EXPIRY_SWEEP_CRON`). No endpoint is added and no migration is
+written — this reuses `inventory.expiry_date`, `stock_movements.movement_type = WASTE` and
+`products.status` as they already exist.
 
-Every write is `@RequiresApprovedVendor` at the class level (D-13) and ownership-scoped: a product
-that does not exist is a 404 and a product owned by another vendor is a 403, checked *before* any
-lock is taken. Availability is `quantity - reserved_quantity` and is never clamped — a change that
-would drop `quantity` below `reserved_quantity` is refused with a dedicated `409 INSUFFICIENT_STOCK`,
-because reporting success for a request that was not performed would leave the level disagreeing
-with the movements that produced it (D-24). Adjustments and write-offs require a nonblank reason;
-stock in and stock out treat the reason as optional. The authenticated principal is resolved as the
-movement's actor, so no client can attribute a movement to someone else.
+Four rules were not settled by the plan's one line and are decided in D-25:
 
-Each mutation locks the inventory row pessimistically, writes the new level, and appends exactly one
-`stock_movements` row in one transaction; the two alert settings take the same lock even though they
-write no movement, because Hibernate's whole-row `UPDATE` would otherwise write back a stale
-`quantity`. The `reserved_quantity` floor is enforced in the service and by
-`ck_inventory_reserved_le_quantity` (D-12). No migration: this reuses `inventory` and
-`stock_movements` as written in task 3.3/3.4. 59 new unit tests (29 service + 30 controller slice),
-35 HTTP integration tests, and 6 real-thread concurrency tests. The locking protocol itself is
-D-24; the earlier 3.5 catalog work is summarised under **Completed Work**. Verified at
-**397 unit tests** and **314 integration tests**.
+- **Expired means `expiryDate < LocalDate.now(clock)`** on the injected `Clock`. The stored date is
+  the last day the stock may be used, so the write-off begins on the following day. Nothing in the
+  sweep calls `Instant.now()`.
+- **Only available stock is written off.** `available = quantity − reserved_quantity` is removed and
+  `quantity` is set to `reserved_quantity`, never below it; a write-off that leaves nothing available
+  writes no movement, because a `WASTE` row with a zero delta would be a movement recording no change.
+  The movement has a null actor and no reference — there is no authenticated user behind a scheduled
+  job — and a reason naming the expiry date and the sweep date.
+- **Only `ACTIVE` is delisted** (`ACTIVE → INACTIVE`). `DRAFT`, `INACTIVE` and `ARCHIVED` are already
+  off the storefront, so rewriting them would report a change that did not happen.
+  `ProductService.deactivate` is not reused: it needs a JWT subject and audits a human decision.
+- **Idempotency comes from the candidate predicate**, not a processed flag: rows are selected where
+  `expiryDate < :today AND (quantity > reservedQuantity OR product.status = :activeStatus)`.
+  Processing a row makes it stop matching, so the next run has nothing to redo — which is also what
+  makes it safe for a sweep to process only a bounded batch and leave the rest to the next run.
+
+Selection is unlocked and ordered by product id; each candidate is then locked individually through
+the existing `findByProductIdForUpdate`, the lock order plan section 6.2 mandates, and every condition
+is re-checked under the lock because a vendor may have corrected the row in between. The whole run is
+one transaction over at most `app.expiry-sweep-max-rows` rows (default 200, `APP_EXPIRY_SWEEP_MAX_ROWS`),
+which bounds how long row locks are held.
+
+16 new unit tests (14 service + 2 scheduler) and 12 integration tests against real MySQL, driven by
+the `MutableClock` bean. The test profile sets `app.expiry-sweep-cron: "-"` (Spring's `CRON_DISABLED`)
+so a scheduled run cannot fire mid-test. The earlier 3.6 inventory API work is summarised under
+**Completed Work**.
 
 ## Completed Work
 
@@ -160,7 +167,7 @@ D-24; the earlier 3.5 catalog work is summarised under **Completed Work**. Verif
 - [x] **3.4 — Stock movement log**: `stock_movements` table (V11) records every change — movement_type (native ENUM of the nine plan section 6.2 types), signed quantity_delta, reason, reference id/type, nullable actor. Append-only (no updated_at). Product creation writes no movement; the log records changes only
 - [x] **3.5 — Catalog API**: `VendorProductController` at `/api/v1/vendors/products` — `POST` (201), `GET` (paginated, optional `status` / `categoryId` / `name` filters, page size clamped 1..100), `GET|PUT /{id}` (403 foreign / 404 missing), `PATCH /{id}/deactivate` (204). The vendor comes from the JWT subject, so cross-vendor access is not expressible in a request. `@RequiresApprovedVendor` on the class — the first production route to carry it. No migration; reuses `products`, `categories.active`, `vendor_profiles`. Listing filters are Criteria predicates in the new `ProductSpecifications` (D-23); soft delete sets `INACTIVE` and keeps the row, its images and its inventory (D-22). 24 new unit tests, 26 new integration tests
 - [x] **3.6 — Inventory API**: `VendorInventoryController` at `/api/v1/vendors` — read current inventory, `POST .../stock-in`, `.../stock-out`, `.../adjustments` (signed, nonblank reason), `.../write-offs` (`WASTE`), `PUT .../low-stock-threshold`, `PUT .../expiry-date`, `GET .../movements?page&size` (paged history), and vendor-wide `GET /api/v1/vendors/inventory/low-stock?page&size`. Availability is `quantity - reserved_quantity` and is never clamped; a change that would breach the floor is refused with a dedicated `409 INSUFFICIENT_STOCK` rather than silently applied at the floor. `@RequiresApprovedVendor` on the class; 403 for a foreign product and 404 for a missing one, both resolved before any row lock is taken. Every mutation takes a pessimistic write lock on the inventory row, then writes the new level and exactly one `stock_movements` row in one transaction (D-24); the movement's actor is the authenticated principal, so it cannot be client-supplied. The two alert settings take the same lock even though they write no movement, because Hibernate's whole-row `UPDATE` would otherwise write back a stale `quantity`. Low-stock rule is `available <= lowStockThreshold`, vendor-scoped, via `InventorySpecifications`. No migration — reuses `inventory` and `stock_movements` from tasks 3.3/3.4. 59 new unit tests, 35 HTTP integration tests, 6 real-thread concurrency tests
-- [ ] **3.7 — Expiry scheduler**: `@Scheduled` job using the injected `Clock`: expired stock → `WASTE` movement and product delisted
+- [x] **3.7 — Expiry scheduler**: `InventoryExpiryService` writes off available stock whose `expiry_date` has passed as a `WASTE` movement (null actor, no reference, reason naming the expiry date and the sweep date) and delists an `ACTIVE` product as `INACTIVE`; `InventoryExpiryScheduler` triggers it on `app.expiry-sweep-cron`. Expired means `expiryDate < LocalDate.now(clock)` on the injected `Clock`; reserved units are never written off (`quantity` stops at `reserved_quantity`); a row with nothing available is delisted without a movement. Candidates are selected unlocked and ordered by product id, then locked one at a time through the existing `findByProductIdForUpdate` with every condition re-checked under the lock, and the whole run is one transaction bounded by `app.expiry-sweep-max-rows`. Idempotency is the candidate predicate (`quantity > reservedQuantity OR status = ACTIVE`), not a processed flag (D-25). No endpoint and no migration. 16 new unit tests, 12 integration tests
 - [ ] **3.8 — Image handling**: `StorageService` interface: local disk (dev), S3 implementation pluggable by profile. Validation: type whitelist (JPEG/PNG/WebP) checked by content sniffing, max size, random filenames, no path traversal, resize/compress. Enforces the D-21 one-primary-image invariant transactionally
 - [ ] **3.9 — Vendor catalog UI**: Product list and form (Shopify-style), inventory table with stock adjustments, low-stock badges
 - [ ] **3.T — Tests**: Ownership checks; slug collision; expiry job with a fake clock; upload rejection cases; RBAC checklist
@@ -179,6 +186,7 @@ D-24; the earlier 3.5 catalog work is summarised under **Completed Work**. Verif
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-04 | Phase 3e Task 3.7: inventory expiry sweep on the injected Clock, configurable cron and bounded batch, self-clearing candidate predicate | `InventoryExpiryService.java`, `InventoryExpiryScheduler.java`, `InventoryRepository.java`, `AppProperties.java`, `application-test.yml`, `InventoryExpiryServiceTest.java`, `InventoryExpirySchedulerTest.java`, `InventoryExpiryIntegrationTest.java`, `docs/decisions.md` (D-25), `docs/progress.md` |
 | 2026-10-04 | Phase 3d Task 3.6: vendor inventory API with pessimistic row locking, reserved-quantity floor, and movement audit trail | `InventoryService.java`, `VendorInventoryController.java`, `InventoryRepository.java`, `StockMovementRepository.java`, `InventorySpecifications.java`, `StockMovementMapper.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, 10 DTOs, `InventoryServiceTest.java`, `VendorInventoryControllerTest.java`, `VendorInventoryIntegrationTest.java`, `InventoryConcurrencyIntegrationTest.java`, `docs/decisions.md` (D-24), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-03 | Phase 3c Task 3.5: vendor catalog API with approval gating, ownership scoping, filtered listing and soft delete | `VendorProductController.java`, `ProductService.java`, `ProductRepository.java`, `ProductSpecifications.java`, `ProductRequest.java`, `VendorProductControllerTest.java`, `VendorCatalogIntegrationTest.java`, `ProductServiceTest.java`, `ProductInventoryIntegrationTest.java`, `docs/decisions.md` (D-22, D-23), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-03 | Phase 3b Tasks 3.2–3.4: product, image, inventory and stock-movement data model with ProductService foundation | `V8__products.sql`, `V9__product_images.sql`, `V10__inventory.sql`, `V11__stock_movements.sql`, `backend/src/main/java/com/flowerconnect/catalog/**` (Product, ProductImage, repositories, DTOs, ProductMapper, ProductService), `backend/src/main/java/com/flowerconnect/inventory/**` (Inventory, StockMovement, repositories), `backend/src/test/java/com/flowerconnect/catalog/**` (ProductServiceTest, ProductInventoryIntegrationTest), `docs/decisions.md` (D-20, D-21), `docs/progress.md` |

@@ -163,6 +163,28 @@ _None currently blocked._
   set up by updating the column with `JdbcTemplate` before the request under test. Without that the
   409 this API exists to return would never fire and the test would silently prove nothing.
 
+## Testing Gotchas (Phase 3e)
+
+- **A `@Scheduled` cron takes exactly six fields — there is no year field.** The natural way to keep a
+  scheduled job from firing during a test is a far-future date, and Quartz-style
+  `"0 0 0 1 1 ? 2099"` fails at **context startup** with
+  `Encountered invalid @Scheduled method 'sweepExpiredStock': Cron expression must consist of 6 fields`.
+  Every test then reports the same `ApplicationContext failure threshold (1) exceeded`, so the real
+  cause is only in the first stack trace. Use `"-"` (Spring's `Scheduled.CRON_DISABLED`), which
+  `application-test.yml` now sets for `app.expiry-sweep-cron`.
+- **`Sort.Order` has no two-argument `asc`.** `Sort.Order.asc("product", "id")` does not compile;
+  the varargs overload belongs to `Sort.by(...)`. For the expiry sweep the ordering was left in the
+  `@Query` string anyway (`ORDER BY i.product.id ASC`), because ascending product id is the lock
+  order plan section 6.2 mandates and must not be something a caller's `Pageable` can override.
+- **`MutableClock` and `AppProperties` are cached singleton beans shared by the whole integration
+  suite.** A test that moves the clock (to reach "tomorrow") or lowers
+  `expiry-sweep-max-rows` must restore both in `@AfterEach`, or the next test class in the same
+  context inherits them. `InventoryExpiryIntegrationTest.restoreClockAndBatchCap` is the reference.
+- **A scheduled job is a live actor inside an integration test.** Nothing else in the suite left a
+  past-dated `expiry_date` behind (`VendorInventoryIntegrationTest` sets one and clears it in the
+  same test), but a stray 03:00 run would still have been able to write off a row a test was
+  asserting on — hence the disabled cron in the test profile rather than relying on the run's timing.
+
 ## Testing Gotchas (Phase 3c)
 
 - **`Category.builder().active(true)` is required in a product-service fixture.** `active` is a

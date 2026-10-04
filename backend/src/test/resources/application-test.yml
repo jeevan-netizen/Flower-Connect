@@ -36,6 +36,10 @@ app:
   cors:
     origins: http://localhost:5173
   refresh-cookie-secure: false
+  # Disabled ("-" is Spring's CRON_DISABLED) so a scheduled run cannot fire in the middle
+  # of a test and mutate rows the test is asserting on. The expiry sweep is driven directly
+  # with the MutableClock bean in InventoryExpiryIntegrationTest instead.
+  expiry-sweep-cron: "-"
   rate-limit:
     enabled: false
     auth:
