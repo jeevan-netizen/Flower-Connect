@@ -4,7 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createTestQueryClient } from "@/test/render";
-import { makePage, makeServiceLocations, makeVendorProfile } from "@/test/factories";
+import {
+  makeInventory,
+  makePage,
+  makeProduct,
+  makeServiceLocations,
+  makeVendorProfile,
+} from "@/test/factories";
 // `vi.mock` is hoisted above these, so the router, guard and pages all bind to
 // the mocked store and the mocked vendor API client.
 import { router as appRouter } from "@/app/router";
@@ -15,6 +21,13 @@ import type { UserResponse } from "@/features/auth/types";
 
 const mockFetch = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
+const mockFetchCategories = vi.hoisted(() => vi.fn());
+const mockFetchProducts = vi.hoisted(() => vi.fn());
+const mockFetchProduct = vi.hoisted(() => vi.fn());
+const mockFetchImages = vi.hoisted(() => vi.fn());
+const mockFetchInventory = vi.hoisted(() => vi.fn());
+const mockFetchMovements = vi.hoisted(() => vi.fn());
+const mockFetchLowStock = vi.hoisted(() => vi.fn());
 const mockFetchAdminVendors = vi.hoisted(() => vi.fn());
 const mockFetchAdminUsers = vi.hoisted(() => vi.fn());
 const mockFetchServiceLocations = vi.hoisted(() => vi.fn());
@@ -26,9 +39,34 @@ const mockState = vi.hoisted(() => ({
   logout: vi.fn(),
 }));
 
+/**
+ * The whole vendor API surface is stubbed, not just the profile read: the Phase 3g
+ * pages bind every catalog and inventory client at module load, so a partial stub
+ * would fail on the import rather than on the assertion under test.
+ */
 vi.mock("@/features/vendor/api", () => ({
   fetchOwnProfile: mockFetch,
   updateOwnProfile: mockUpdate,
+  fetchCategories: mockFetchCategories,
+  fetchProducts: mockFetchProducts,
+  fetchProduct: mockFetchProduct,
+  createProduct: vi.fn(),
+  updateProduct: vi.fn(),
+  deactivateProduct: vi.fn(),
+  fetchProductImages: mockFetchImages,
+  uploadProductImage: vi.fn(),
+  setPrimaryProductImage: vi.fn(),
+  reorderProductImages: vi.fn(),
+  deleteProductImage: vi.fn(),
+  fetchInventory: mockFetchInventory,
+  fetchLowStockProducts: mockFetchLowStock,
+  fetchStockMovements: mockFetchMovements,
+  stockIn: vi.fn(),
+  stockOut: vi.fn(),
+  adjustStock: vi.fn(),
+  writeOffStock: vi.fn(),
+  updateLowStockThreshold: vi.fn(),
+  updateExpiryDate: vi.fn(),
 }));
 
 vi.mock("@/features/vendor-registration/api", () => ({
@@ -89,6 +127,13 @@ describe("application router", () => {
     mockState.hasLoadedInitial = true;
     mockState.user = florist();
     mockFetch.mockResolvedValue(makeVendorProfile());
+    mockFetchCategories.mockResolvedValue(makePage([]));
+    mockFetchProducts.mockResolvedValue(makePage([]));
+    mockFetchProduct.mockResolvedValue(makeProduct());
+    mockFetchImages.mockResolvedValue([]);
+    mockFetchInventory.mockResolvedValue(makeInventory());
+    mockFetchMovements.mockResolvedValue(makePage([]));
+    mockFetchLowStock.mockResolvedValue(makePage([]));
     mockFetchAdminVendors.mockResolvedValue(makePage([]));
     mockFetchAdminUsers.mockResolvedValue(makePage([]));
   });
@@ -101,7 +146,7 @@ describe("application router", () => {
     expect(paths).toEqual(expect.arrayContaining(["browse", "cart", "orders", "login", "register"]));
   });
 
-  it("adds the four vendor paths under a guarded /vendor namespace", () => {
+  it("adds the vendor paths under a guarded /vendor namespace", () => {
     // `RouteObject` is the widened shape: the router's discriminated union of
     // index and path routes does not expose `element` on every member.
     const vendorRoute = appRouter.routes
@@ -114,11 +159,18 @@ describe("application router", () => {
         <VendorLayout />
       </ProtectedRoute>,
     );
+    // `catalog/new` is declared before `catalog/:productId` so the literal segment
+    // is matched first; with the dynamic one first it would win and "new" would be
+    // read as a product id.
     expect(vendorRoute?.children?.map((child) => child.path)).toEqual([
       undefined,
       "profile",
       "settings",
       "hours",
+      "catalog",
+      "catalog/new",
+      "catalog/:productId",
+      "inventory",
     ]);
   });
 
@@ -136,6 +188,67 @@ describe("application router", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
+    });
+  });
+
+  it("renders the catalog for an approved florist", async () => {
+    renderAt("/vendor/catalog");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Catalog" })).toBeInTheDocument();
+    });
+    expect(mockFetchProducts).toHaveBeenCalledWith(
+      { status: null, categoryId: null, name: "", page: 0 },
+      expect.anything(),
+    );
+  });
+
+  it("renders the create-product form at /vendor/catalog/new", async () => {
+    renderAt("/vendor/catalog/new");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/product name/i)).toBeInTheDocument();
+    });
+    // The create form has no product, so nothing keyed by an id is fetched.
+    expect(mockFetchProduct).not.toHaveBeenCalled();
+  });
+
+  it("renders the product editor at /vendor/catalog/:productId", async () => {
+    renderAt("/vendor/catalog/101");
+
+    await waitFor(() => {
+      expect(mockFetchProduct).toHaveBeenCalledWith(101);
+    });
+    expect(await screen.findByRole("heading", { name: /edit red rose bouquet/i })).toBeInTheDocument();
+  });
+
+  it("renders the inventory screen for an approved florist", async () => {
+    renderAt("/vendor/inventory");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Inventory" })).toBeInTheDocument();
+    });
+    expect(mockFetchLowStock).toHaveBeenCalledWith(0, 20, expect.anything());
+  });
+
+  it("refuses the catalog to a florist who is not approved, without calling the catalog API", async () => {
+    mockFetch.mockResolvedValue(makeVendorProfile({ status: "PENDING_APPROVAL" }));
+
+    renderAt("/vendor/catalog");
+
+    expect(await screen.findByText(/catalog unavailable/i)).toBeInTheDocument();
+    // The gate reads the cached profile only: nothing gated is ever requested.
+    expect(mockFetchProducts).not.toHaveBeenCalled();
+    expect(mockFetchLowStock).not.toHaveBeenCalled();
+  });
+
+  it("leaves the ungated vendor areas reachable while the catalog is withheld", async () => {
+    mockFetch.mockResolvedValue(makeVendorProfile({ status: "PENDING_APPROVAL" }));
+
+    renderAt("/vendor/settings");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/base delivery fee/i)).toBeInTheDocument();
     });
   });
 

@@ -40,7 +40,7 @@ describe("VendorLayout", () => {
     mockFetch.mockResolvedValue(makeVendorProfile());
   });
 
-  it("navigates to the four Phase 2 vendor areas only", async () => {
+  it("navigates to the four Phase 2 vendor areas", async () => {
     renderLayout();
 
     const nav = await screen.findByRole("navigation", { name: /vendor/i });
@@ -53,12 +53,42 @@ describe("VendorLayout", () => {
     expect(screen.getByRole("link", { name: "Operating hours" })).toHaveAttribute("href", "/vendor/hours");
   });
 
-  it("does not link to Phase 3 areas that have no API yet", async () => {
+  it("offers the Phase 3g catalog areas to an approved vendor", async () => {
+    renderLayout();
+
+    await screen.findByRole("navigation", { name: /vendor/i });
+    // The navigation renders in every state, so wait for the profile it filters on:
+    // the banner row only appears once the query has settled.
+    await waitFor(() => {
+      expect(screen.getByText(/2 of 7 days open/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("link", { name: "Catalog" })).toHaveAttribute("href", "/vendor/catalog");
+    expect(screen.getByRole("link", { name: "Inventory" })).toHaveAttribute("href", "/vendor/inventory");
+  });
+
+  it("withholds the catalog areas from a vendor who is not approved", async () => {
+    mockFetch.mockResolvedValue(makeVendorProfile({ status: "PENDING_APPROVAL" }));
+
+    renderLayout();
+
+    await waitFor(() => {
+      expect(screen.getByText(/2 of 7 days open/i)).toBeInTheDocument();
+    });
+
+    ["Catalog", "Inventory"].forEach((label) => {
+      expect(screen.queryByRole("link", { name: new RegExp(label, "i") })).not.toBeInTheDocument();
+    });
+    // The areas a pending vendor still needs stay reachable.
+    expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
+  });
+
+  it("does not link to the Phase 5/6 areas that have no API yet", async () => {
     renderLayout();
 
     await screen.findByRole("navigation", { name: /vendor/i });
 
-    ["Catalog", "Inventory", "Orders", "Payments", "Delivery tracking"].forEach((label) => {
+    ["Orders", "Payments", "Delivery tracking"].forEach((label) => {
       expect(screen.queryByRole("link", { name: new RegExp(label, "i") })).not.toBeInTheDocument();
     });
   });

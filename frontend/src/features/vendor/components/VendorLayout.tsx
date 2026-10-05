@@ -12,15 +12,27 @@ interface VendorNavItem {
   to: string;
   label: string;
   end?: boolean;
+  /**
+   * `true` for screens that need an approved vendor profile. The backend enforces
+   * this per handler (`@RequiresApprovedVendor`, D-13); the link is simply not
+   * offered to a vendor who would be refused, because a navigation item that always
+   * fails is worse than an absent one.
+   */
+  requiresApproval?: boolean;
 }
 
 /**
- * Phase 2 only. Catalog, inventory, orders, payments and delivery management are
- * Phase 3+ and have no API yet, so they are deliberately absent here rather
- * than rendered as dead links (plan tasks 2.9 / 3.9 / 6.x).
+ * Orders, payments and delivery tracking are still absent: those phases have no
+ * API yet, so they are not rendered as dead links (plan tasks 6.x, 7.x).
+ *
+ * Catalog and inventory are present as of Phase 3g (tasks 3.5–3.9) and are gated on
+ * the approval state rather than on the role — the nav follows the same rule the
+ * routes do, and reads it from the same cached profile.
  */
 const NAV_ITEMS: VendorNavItem[] = [
   { to: "/vendor", label: "Dashboard", end: true },
+  { to: "/vendor/catalog", label: "Catalog", requiresApproval: true },
+  { to: "/vendor/inventory", label: "Inventory", requiresApproval: true },
   { to: "/vendor/profile", label: "Profile" },
   { to: "/vendor/settings", label: "Delivery settings" },
   { to: "/vendor/hours", label: "Operating hours" },
@@ -72,13 +84,15 @@ export function VendorLayout() {
 
           <nav className="mt-4 rounded-lg border border-slate-200 bg-white p-2 shadow-sm" aria-label="Vendor">
             <ul className="flex flex-col gap-1 md:flex-col">
-              {NAV_ITEMS.map((item) => (
-                <li key={item.to}>
-                  <NavLink to={item.to} end={item.end} className={navClass}>
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
+              {NAV_ITEMS.filter((item) => !item.requiresApproval || profile?.status === "APPROVED").map(
+                (item) => (
+                  <li key={item.to}>
+                    <NavLink to={item.to} end={item.end} className={navClass}>
+                      {item.label}
+                    </NavLink>
+                  </li>
+                ),
+              )}
             </ul>
           </nav>
 

@@ -62,8 +62,38 @@ export function isVendorNotApproved(error: unknown): boolean {
   return toApiError(error).code === VENDOR_NOT_APPROVED_CODE;
 }
 
-/** True when the authenticated account simply has no vendor profile. */
+/** The path whose 404 means "this account has no vendor profile". */
+const VENDOR_PROFILE_PATH = "/vendors/profile";
+
+function requestUrlOf(error: unknown): string | null {
+  if (!isAxiosErrorLike(error)) {
+    return null;
+  }
+  return error.config?.url ?? null;
+}
+
+/**
+ * True when the authenticated account simply has no vendor profile.
+ *
+ * Scoped to the profile read on purpose. A `404` is not evidence about the *account*
+ * — it is evidence about the *resource*, and Phase 3 introduced resources that can be
+ * missing for a vendor who has a perfectly good profile: a deleted product id, a
+ * removed category. Telling such a vendor "this account does not have a vendor
+ * profile, contact support" sends them to the wrong place, so the URL of the failed
+ * request decides.
+ *
+ * An error carrying no URL (a hand-built rejection in a test, or an interceptor that
+ * discarded the config) is treated as the profile read, because that was the only
+ * 404 this function existed for before Phase 3.
+ */
 export function isMissingVendorProfile(error: unknown): boolean {
   const info = toApiError(error);
-  return info.status === 404 && (info.code === NOT_FOUND_CODE || info.code === null);
+  if (info.status !== 404) {
+    return false;
+  }
+  if (info.code !== NOT_FOUND_CODE && info.code !== null) {
+    return false;
+  }
+  const url = requestUrlOf(error);
+  return url === null || url.includes(VENDOR_PROFILE_PATH);
 }

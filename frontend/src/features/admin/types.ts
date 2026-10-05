@@ -36,6 +36,7 @@ import {
   type VendorStatus,
   type Weekday,
 } from "@/features/vendor/types";
+import type { PageResponse } from "@/shared/types";
 
 export type {
   VendorHours,
@@ -151,18 +152,12 @@ export interface UserStatusUpdateRequest {
  *
  * `page` is **zero-based** — `AdminVendorController` and `AdminUserController`
  * both default it to `0` and clamp it with `Math.max(0, page)`.
+ *
+ * The interface itself moved to `@/shared/types` when the vendor catalog (plan
+ * task 3.9) started paginating against the same envelope; it is re-exported
+ * here so every admin import path keeps working unchanged.
  */
-export interface PageResponse<T> {
-  content: T[];
-  /** Zero-based page index, as returned by Spring Data. */
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-  first: boolean;
-  last: boolean;
-  empty: boolean;
-}
+export type { PageResponse };
 
 export type VendorProfilePageResponse = PageResponse<VendorProfile>;
 export type AdminUserPageResponse = PageResponse<AdminUser>;

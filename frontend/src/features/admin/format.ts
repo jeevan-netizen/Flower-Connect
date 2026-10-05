@@ -66,10 +66,11 @@ export function formatDateTime(value: string | null | undefined): string {
 /**
  * One-based page number for display. The wire format is zero-based: both
  * `AdminVendorController` and `AdminUserController` default `page` to `0`.
+ *
+ * Moved to `@/shared/format` when the vendor catalog (plan task 3.9) needed the
+ * same conversion; re-exported here so existing imports keep working.
  */
-export function displayPageNumber(page: number): number {
-  return page + 1;
-}
+export { displayPageNumber } from "@/shared/format";
 
 export function formatVendorStatus(status: VendorStatus): string {
   return VENDOR_STATUS_LABELS[status];

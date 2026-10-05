@@ -44,3 +44,20 @@ export function validationError(validation: Record<string, string>) {
 export function businessError(status: number, code: string, message: string) {
   return apiError(status, { code, message });
 }
+
+/**
+ * A rejection that remembers which endpoint failed.
+ *
+ * Needed wherever the *request* decides the message: `isMissingVendorProfile` treats a
+ * `404` as "no vendor profile" only when the profile read is what failed, because a
+ * missing product or category must not be reported as a missing account.
+ */
+export function apiErrorFor(
+  url: string,
+  status: number,
+  body: Partial<ErrorResponse> = {},
+): AxiosError<ErrorResponse> {
+  const error = apiError(status, body);
+  error.config = { ...error.config, url } as typeof error.config;
+  return error;
+}

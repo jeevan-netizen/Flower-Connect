@@ -22,6 +22,9 @@
 | 017 | Test      | (a) Testcontainers 1.20.2 could not connect to Docker Desktop 29.8.0 without `~/.docker-java.properties` (`api.version=1.44`) — both `EnvironmentAndSystemPropertyClientProviderStrategy` and `NpipeSocketClientProviderStrategy` failed with `BadRequestException (Status 400)`; (b) `@Container` on `IntegrationTestBase.MYSQL` caused Testcontainers to create and destroy a new MySQL container per test class (per-class lifecycle), with four containers started (one per test class); `AuthApiIntegrationTest` and `RefreshTokenRepositoryIT` passed, `RoleRepositoryIT` and `UserRepositoryIT` got Connection refused | Fixed | (a) Upgraded Testcontainers to 1.21.4, which resolves Docker Desktop 29.x compatibility — `~/.docker-java.properties` is no longer required. (b) Removed `@Container` annotation; container now starts once via `static { MYSQL.start(); }` in `IntegrationTestBase` and is shared across all IT classes. One MySQL container per JVM run. |
 | 018 | Test      | `./mvnw verify -Pintegration` fails every integration test with `Could not find a valid Docker environment` when the Docker Desktop daemon is not running, even though the Docker CLI is on `PATH` | Environment | Testcontainers needs the running daemon, not just the client. Start Docker Desktop before the failsafe run; Testcontainers fails fast with an `ExceptionInInitializerError` per test class rather than skipping. |
 | 019 | Backend / Frontend | `SecurityConfig.corsConfigurationSource()` set `allowedMethods` to `GET, POST, PUT, DELETE, OPTIONS` — **`PATCH` was missing**, so any cross-origin browser request to a `PATCH` endpoint failed the CORS preflight. This blocked `PATCH /api/v1/admin/users/{id}/status` (task 2.10) and `PATCH /api/v1/users/me` (Phase 1) from the SPA on the dev setup (`:5173` → `:8080`) | Fixed | `"PATCH"` added to the allow-list in `SecurityConfig.corsConfigurationSource()` (commit `c27ef19`). Verified end-to-end from the browser during the Phase 2 close-out: the admin user status change succeeds cross-origin. |
+| 020 | Backend / Frontend | **No route serves product image bytes.** `product_images` rows exist and the objects are written through `StorageService` (task 3.8), but `GET /api/v1/vendors/products/{productId}/images` returns metadata only and `storageKey` is an opaque backend key (`product-images/{productId}/{uuid}.{ext}`) that a client cannot turn into a URL. The vendor catalog UI therefore lists image metadata rather than rendering thumbnails, so no storefront or catalog screen can display a product photo yet | Open | Record the bytes as an authenticated `GET` that resolves the key through `StorageService` and streams it with the stored `mime_type`. Until then the UI deliberately avoids `<img>` so a vendor never sees a broken image and mistakes it for a failed upload (D-31). |
+| 021 | Backend | **`GET /api/v1/categories` returns only root categories.** `docs/architecture.md` describes the endpoint as a flat list of active categories, but `CategoryService.listActive()` builds a `CategoryPageResponse` from `findByActiveOrderByDisplayOrder()` and that query returns parents only, so children such as the seeded *Roses*, *Bouquets*, *Arrangements* and *Occasions* are absent | Open | Either flatten the query with a recursive/`LEFT JOIN` traversal or amend the documented contract to say "active root categories". The vendor product form's category filter is therefore shallow until this is settled; no client workaround is planned, because a client-side flatten cannot know whether a parent is inactive. |
+| 022 | Frontend / Security | **`auth-store.ts` persists tokens to `localStorage`.** The Zustand store's `persist` middleware writes `accessToken` and `refreshToken` to durable storage, which is contrary to the project's memory-only intent for token handling | Open | Deliberately left unchanged by task 3.9, which was scoped to the catalog UI and to not redesign authentication. Any fix must handle the Axios single-flight refresh in `src/shared/lib/api.ts` (both read from the store) and the 401 retry path together, or a reload mid-refresh will log the user out. |
 
 ## Known Limitations
 
@@ -188,6 +191,25 @@ _None currently blocked._
   new image test files over-reports by one or two per file (37 vs the 36 the service suite actually
   runs), so the totals in `docs/progress.md` come from the surefire/failsafe `.txt` reports under
   `target/`, not from a source scan.
+
+## Testing Gotchas (Phase 3g)
+
+- **`findByRole` on a container that renders in every state resolves before the query that gates its
+  contents.** `VendorLayout` always renders the `<nav>`, so
+  `await screen.findByRole("navigation", …)` succeeds on the first frame while `profile` is still
+  `undefined` and the approval-gated Catalog/Inventory links have not been added yet. The symptom is
+  `Unable to find an accessible element with the role "link" and name "Catalog"` under the full suite
+  only, because the isolated run happened to settle first. Wait for something the *query* produces
+  (the banner's `2 of 7 days open` row) before asserting the conditional links.
+- **A zod numeric pattern must match the DTO's signedness, not the intuitive one.** The adjustment
+  dialog's `/^\d+$/` mirrored "a number" and silently made the one action that accepts a *negative*
+  quantity untypeable, while the three positive actions needed the same pattern plus an explicit `> 0`
+  refine. Signed actions take `/^-?\d+$/`; positive ones keep `/^\d+$/`.
+- **A derived "is this past its date" marker must use the same boundary as whatever acts on it.**
+  `isPastExpiryDate` compared against *tomorrow* (`format(addDays(parseIsoDate(value), 1), "d MMM yyyy")`)
+  to line up with `isExpiredToday` marking a product expiring today, which turned the "past its expiry
+  date" badge red a day before D-25's sweep would write the stock off. The product form now compares the
+  date against today directly, matching the sweep's `expiryDate < today`.
 
 ## Testing Gotchas (Phase 3e)
 

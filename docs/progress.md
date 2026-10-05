@@ -4,7 +4,49 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 3f — Task 3.8 (Image handling) completed**
+**Phase 3g — Task 3.9 (Vendor catalog UI) completed**
+
+Task 3.9 is the first screen set built on the Phase 3c–3f APIs and changes no backend contract: it
+consumes `GET /api/v1/categories`, the vendor catalog routes, the image routes and the inventory routes
+exactly as tasks 3.5, 3.6 and 3.8 exposed them. Four screens, all inside the existing vendor shell so
+the Phase 2 design language and components carry over rather than being restated:
+
+- `/vendor/catalog` — the product table with search, a status filter, a category filter, pagination,
+  low-stock badges and a link into each product.
+- `/vendor/catalog/new` and `/vendor/catalog/:productId` — one Shopify-style form for create and edit,
+  plus (once a product exists) the image manager, the stock panel with the four stock actions, the two
+  alert settings, the movement history, and deactivation behind a confirmation.
+- `/vendor/inventory` — the shop-wide low-stock table with the four stock actions per row and the
+  movement history for whichever product a row acted on.
+
+Three things the plan's one line does not settle are decided in D-29, D-30 and D-31:
+
+- **Approval gating is a UX gate over the cached profile, not a second source of truth.**
+  `ApprovedVendorGate` wraps the three catalog routes and reads the same `["vendor","profile"]` query
+  the layout banner reads, so an unapproved vendor costs no extra request and the gate cannot disagree
+  with the banner above it. `VendorLayout` withholds the Catalog and Inventory links from a vendor whose
+  status is not `APPROVED`. D-13's authority is untouched: the backend still decides, per request, from
+  `vendor_profiles.status`.
+- **One stock dialog serves all four stock mutations, with the rules in one table.** `stock-in` and
+  `stock-out` take a positive quantity and an optional reason; `adjustment` takes a signed non-zero
+  quantity; `write-off` takes a positive quantity. Only the last two carry `@NotBlank`, and
+  `requiresReason` decides both the rendered reason box and the resolver, so the two cannot disagree.
+  A blank optional reason is sent as `null`, not `""`.
+- **Images are shown as metadata, not as thumbnails.** `ProductImageResponse.storageKey` is the opaque
+  backend key and no route serves the bytes, so the section lists filename, type, size and position
+  instead of an `<img>` that would 404 — a broken image reads as a corrupt upload rather than as an
+  absent delivery route. Recorded as a known issue, not a UI decision.
+
+Two bugs in this task's own code were caught by the tests and fixed rather than asserted around: the
+adjustment schema rejected a **negative** quantity (`/^\d+$/` where the DTO is signed), which made the
+one action that is supposed to accept a signed value impossible; and `isPastExpiryDate` compared against
+tomorrow, turning the "past its expiry date" marker red a day before the sweep that acts on it (D-25)
+would. Both are noted in the component doc comments.
+
+Verified at close-out with `npm run lint`, `npm run typecheck`, `npm run test` and `npm run build`:
+**514 frontend tests across 45 files**, all green. No backend change, so no Maven run was required.
+
+### Phase 3f — Task 3.8 (Image handling) completed
 
 Task 3.8 is the first task that puts user-supplied bytes in the system.
 `VendorProductImageController` is mounted at `/api/v1/vendors/products/{productId}/images`
@@ -180,7 +222,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 - [x] **3.6 — Inventory API**: `VendorInventoryController` at `/api/v1/vendors` — read current inventory, `POST .../stock-in`, `.../stock-out`, `.../adjustments` (signed, nonblank reason), `.../write-offs` (`WASTE`), `PUT .../low-stock-threshold`, `PUT .../expiry-date`, `GET .../movements?page&size` (paged history), and vendor-wide `GET /api/v1/vendors/inventory/low-stock?page&size`. Availability is `quantity - reserved_quantity` and is never clamped; a change that would breach the floor is refused with a dedicated `409 INSUFFICIENT_STOCK` rather than silently applied at the floor. `@RequiresApprovedVendor` on the class; 403 for a foreign product and 404 for a missing one, both resolved before any row lock is taken. Every mutation takes a pessimistic write lock on the inventory row, then writes the new level and exactly one `stock_movements` row in one transaction (D-24); the movement's actor is the authenticated principal, so it cannot be client-supplied. The two alert settings take the same lock even though they write no movement, because Hibernate's whole-row `UPDATE` would otherwise write back a stale `quantity`. Low-stock rule is `available <= lowStockThreshold`, vendor-scoped, via `InventorySpecifications`. No migration — reuses `inventory` and `stock_movements` from tasks 3.3/3.4. 59 new unit tests, 35 HTTP integration tests, 6 real-thread concurrency tests
 - [x] **3.7 — Expiry scheduler**: `InventoryExpiryService` writes off available stock whose `expiry_date` has passed as a `WASTE` movement (null actor, no reference, reason naming the expiry date and the sweep date) and delists an `ACTIVE` product as `INACTIVE`; `InventoryExpiryScheduler` triggers it on `app.expiry-sweep-cron`. Expired means `expiryDate < LocalDate.now(clock)` on the injected `Clock`; reserved units are never written off (`quantity` stops at `reserved_quantity`); a row with nothing available is delisted without a movement. Candidates are selected unlocked and ordered by product id, then locked one at a time through the existing `findByProductIdForUpdate` with every condition re-checked under the lock, and the whole run is one transaction bounded by `app.expiry-sweep-max-rows`. Idempotency is the candidate predicate (`quantity > reservedQuantity OR status = ACTIVE`), not a processed flag (D-25). No endpoint and no migration. 16 new unit tests, 12 integration tests
 - [x] **3.8 — Image handling**: `StorageService` (`store`/`delete`/`exists`/`describe`) with `LocalDiskStorageService` (`@Profile("!s3")`, `.part` + `ATOMIC_MOVE` writes, traversal-checked `resolve`, root created at startup) and `S3StorageService` (`@Profile("s3")`) as a declared stub that throws on every method and names what is missing — the AWS SDK is not a dependency and a silently inert implementation would serve `201 Created` and write nothing (D-26). `VendorProductImageController` at `/api/v1/vendors/products/{productId}/images` — `POST` (multipart part `file`, optional `primary` flag, 201), `GET` (ordered list), `PUT /{imageId}/primary`, `PUT /order` (must be an exact permutation of the product's image ids), `DELETE /{imageId}` (204, promotes the next image when the cover is removed). `@RequiresApprovedVendor` on the class; ownership resolved through `ProductService.requireOwnedProduct`, made package-private so "yours" is defined once for the catalog and the image routes. Validation order is ownership → empty part (400) → declared length over `max-file-size-bytes` (413, before the bytes are buffered) → content sniffing (415) → decode (400) → pixel budget (413) → image count (409), so a rejected upload leaves neither a row nor a file. Format is decided by the leading bytes only, never the filename or the part's `Content-Type`; every accepted upload is decoded, scaled to `max-dimension` and re-encoded, so EXIF/GPS is dropped and the stored bytes, dimensions and `mime_type` are the pipeline's own output; WebP is decoded and stored as JPEG (D-27). Keys are `product-images/{productId}/{uuid}.{ext}`, always server-generated. The one-primary invariant is enforced under `findByProductIdForUpdate` (`PESSIMISTIC_WRITE`, ordered by `sortOrder, id`), the first image becomes the cover automatically, and `requireSinglePrimary` asserts the invariant after every mutation (D-28). Uploads store the object then the row and remove the object if the row cannot be written; deletes remove the row first and treat a failed object removal as a logged orphan. No migration. 93 new unit tests, 36 integration tests including a `CountDownLatch` concurrency case
-- [ ] **3.9 — Vendor catalog UI**: Product list and form (Shopify-style), inventory table with stock adjustments, low-stock badges
+- [x] **3.9 — Vendor catalog UI**: four screens inside the existing vendor shell — `/vendor/catalog` (searchable, status- and category-filtered product table with pagination, low-stock badges and per-row links), `/vendor/catalog/new` + `/vendor/catalog/:productId` (one Shopify-style create/edit form, image manager, stock panel with the four stock actions, low-stock threshold and expiry date, movement history, deactivation behind a confirmation), and `/vendor/inventory` (shop-wide low-stock table with the four stock actions per row and the selected product's movement history). `ApprovedVendorGate` wraps the three gated routes over the cached `["vendor","profile"]` query and `VendorLayout` withholds the two new nav links from an unapproved vendor, so D-13 stays the authority (D-29). One `StockActionDialog` serves all four stock mutations with the per-action rules in one table; a blank optional reason is sent as `null` (D-30). Images render as metadata because no byte-serving route exists (D-31). The product editor is reachable at `/vendor/catalog/new` as its own route, so `useParams().productId` is *absent* there rather than the string "new". `isMissingVendorProfile` is scoped to the profile read by request URL, so a missing product no longer reports a missing account. 76 new frontend tests across 7 files (product form 9, stock dialog 15, approval gate 8, catalog page 14, inventory page 11, product editor page 17, plus additions to the API-client, query-cache, format and router suites). No backend change and no migration
 - [ ] **3.T — Tests**: Ownership checks; slug collision; expiry job with a fake clock; upload rejection cases; RBAC checklist
 
 #### Phase 3 — Ordering & Payments (Not Started)
@@ -197,6 +239,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-05 | Phase 3g Task 3.9: vendor catalog UI — listing with search/filters/pagination, Shopify-style create/edit, image manager, per-product and shop-wide stock panels, movement history, approval gate over the cached profile | `src/app/router.tsx`, `src/features/vendor/**` (types, api, queries, format, form-schema, 9 components, 3 pages, 5 test files), `src/shared/{types.ts,format.ts,components/Pagination.tsx}`, `src/shared/lib/api-error.ts`, `src/test/{factories.ts,api-errors.ts}`, `src/features/admin/**` (pagination extracted to shared), `docs/decisions.md` (D-29, D-30, D-31), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-04 | Phase 3f Task 3.8: StorageService with a profile-selected local backend and a declared S3 stub, content-sniffed image pipeline that decodes/rescales/re-encodes, one-primary invariant under a product row lock | `storage/**` (StorageService, LocalDiskStorageService, S3StorageService, StorageProperties, StorageException, image/{ImageFormat, ImageTypeDetector, ImageProcessor, ImageUploadProperties, ProcessedImage}), `VendorProductImageController.java`, `ProductImageService.java`, `ProductImageOrderRequest.java`, `ProductImageRepository.java`, `ProductService.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, `pom.xml`, 4 `application*.yml`, 7 test classes, `docs/decisions.md` (D-26, D-27, D-28), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-04 | Phase 3e Task 3.7: inventory expiry sweep on the injected Clock, configurable cron and bounded batch, self-clearing candidate predicate | `InventoryExpiryService.java`, `InventoryExpiryScheduler.java`, `InventoryRepository.java`, `AppProperties.java`, `application-test.yml`, `InventoryExpiryServiceTest.java`, `InventoryExpirySchedulerTest.java`, `InventoryExpiryIntegrationTest.java`, `docs/decisions.md` (D-25), `docs/progress.md` |
 | 2026-10-04 | Phase 3d Task 3.6: vendor inventory API with pessimistic row locking, reserved-quantity floor, and movement audit trail | `InventoryService.java`, `VendorInventoryController.java`, `InventoryRepository.java`, `StockMovementRepository.java`, `InventorySpecifications.java`, `StockMovementMapper.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, 10 DTOs, `InventoryServiceTest.java`, `VendorInventoryControllerTest.java`, `VendorInventoryIntegrationTest.java`, `InventoryConcurrencyIntegrationTest.java`, `docs/decisions.md` (D-24), `docs/progress.md`, `docs/known-issues.md` |

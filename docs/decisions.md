@@ -370,6 +370,9 @@ of a constraint name.
 | D-26 | The storage backend is chosen by profile, and the S3 backend is a declared stub | Decision | Accepted | Phase 3f |
 | D-27 | Every accepted image is decoded, scaled and re-encoded by the server | Decision | Accepted | Phase 3f |
 | D-28 | The one-primary image rule is enforced under a product-scoped row lock | Decision | Accepted | Phase 3f |
+| D-29 | Frontend approval gating reuses the cached vendor profile and withholds the links | Decision | Accepted | Phase 3g |
+| D-30 | One stock dialog serves all four mutations, and the rules live in one table | Decision | Accepted | Phase 3g |
+| D-31 | Product images are listed as metadata because no route serves the bytes | Decision | Accepted | Phase 3g |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -1493,4 +1496,174 @@ the fact or only maintained by construction.
   scheduled job, admin tooling, a direct data fix) can still leave two primaries. `requireSinglePrimary`
   is the only backstop, and it fires only on paths that go through the service. This is the accepted
   cost recorded in D-21.
+
+---
+
+## D-29: Frontend approval gating reuses the cached vendor profile and withholds the links
+
+**Status:** Accepted
+**Date:** Phase 3g (Task 3.9)
+
+### Context
+
+D-13 put approval enforcement on the backend, per handler, through
+`@RequiresApprovedVendor`. Task 3.9 is the first screen set behind that gate, so it is the first
+time the question of what the *client* should do with the same rule actually arises — and the
+options are not equivalent.
+
+The naive frontend versions of the rule all have the same defect: they become a second copy of an
+authority that already exists. A gate that reads the JWT cannot know about an approval that happened
+after the token was issued. A gate that fetches the vendor's own approval state from a *different*
+endpoint can disagree with the backend on the same request. And a nav that renders a Catalog link to a
+pending vendor offers a button that can only ever come back `403 VENDOR_NOT_APPROVED`.
+
+There is also a subtlety worth naming, because it cuts against the obvious implementation. The
+approval-gated screens are children of `VendorLayout`, and the layout already reads
+`GET /api/v1/vendors/profile` to render `VendorStatusBanner`. So the state the gate needs is already
+in the TanStack cache under `["vendor","profile"]`. A gate that issues its own request would be a
+second read of data that is one navigation away from being on screen.
+
+### Decision
+
+- **`ApprovedVendorGate` is a wrapper, and it reads the existing `useVendorProfile()` query.** The
+  three catalog routes (`catalog`, `catalog/new`, `catalog/:productId`) and `inventory` are wrapped in
+  it in `router.tsx`. It adds no request: the whole vendor area still costs one
+  `GET /api/v1/vendors/profile`, which is the property
+  `ApprovedVendorGate.test.tsx` asserts explicitly rather than leaving implicit.
+- **The gate is UX, not authorization, and it says so in its own doc comment.** Authority stays
+  exactly where D-13 put it. Approval state is never copied into the JWT and never inferred client-side,
+  so an admin's approval takes effect on the vendor's next request with no re-login — the same
+  guarantee the backend gives, and the reason the gate is allowed to exist at all.
+- **A non-approved vendor sees the layout's own banner inside the gate.** It is the same
+  `VendorStatusBanner` component reading the same cache entry, not a second banner with its own state,
+  so the panel shown when a vendor follows a direct catalog URL explains the state and keeps the rest
+  of the vendor area (profile, delivery settings, hours) reachable.
+- **`VendorLayout` withholds the Catalog and Inventory nav links unless `profile.status === "APPROVED"`.**
+  The nav follows the rule the route follows, so an unapproved vendor is neither shown a dead link nor
+  left wondering whether it would work. The dashboard's catalog card is gated the same way.
+- **`@RequiresApprovedVendor` is still the review checklist item.** Omitting it from a future vendor
+  route fails *open* on the backend; omitting the gate fails only on the client. The gate is therefore
+  a usability layer that may be forgotten without a security consequence — deliberately the asymmetry.
+
+### Consequences
+
+- Any future vendor feature needing approval composes `gated(element)` in `router.tsx`. It is a one-line
+  change and needs no new state, no new request and no new test fixture beyond asserting the children
+  are withheld.
+- An unapproved vendor loading `/vendor/catalog` sees no catalog data at all, because no gated query is
+  enabled. `router.test.tsx` asserts `fetchProducts` was never called, which is the difference between
+  "an empty table" and "an explanation".
+- If the approval state ever needs to be consulted by a screen outside the vendor area, the shared
+  query is the place to reach for — not a second endpoint.
+- The pending-state banner inside the gate duplicates a visible banner for a vendor who arrived at the
+  URL directly. That is intentional and is asserted by role/text rather than by count, so the duplicate
+  cannot become an unnoticed triple.
+
+---
+
+## D-30: One stock dialog serves all four mutations, and the rules live in one table
+
+**Status:** Accepted
+**Date:** Phase 3g (Task 3.9)
+
+### Context
+
+`VendorInventoryController` exposes four stock mutations that differ in two ways each:
+
+| Action     | Quantity             | Reason       | Route suffix   |
+|------------|----------------------|--------------|----------------|
+| `stock-in` | positive             | optional     | `stock-in`     |
+| `stock-out`| positive             | optional     | `stock-out`    |
+| `adjustment` | **signed, non-zero** | **required** | `adjustments`  |
+| `write-off`| positive             | **required** | `write-offs`   |
+
+The plan asks for "stock in/out/adjustment/write-off dialogs" without saying how many components that
+is. Four separate dialogs duplicate the quantity field, the reason field, the reserved-floor note and
+the error mapping four times over — and the duplication is exactly where the rules drift. A dialog with
+a *required* reason on `stock-in` implies the backend stores one; a dialog with an *optional* reason on
+`write-off` offers a way to be refused.
+
+There is a second, subtler decision here: what does a blank reason mean on the wire? The vendor log
+stores `reason` as nullable, and `InventoryService.normalize` deliberately stores `null` rather than an
+empty string, so "no reason given" stays distinguishable from "a reason that happens to be blank".
+
+### Decision
+
+- **One `StockActionDialog`, one `ACTION_CONTENT` table.** Each entry carries the heading, the
+  description, the confirm label, the quantity label and hint, `requiresReason`, `signedQuantity` and
+  the reason label and hint. `requiresReason` decides both whether a reason box is rendered *and*
+  which zod resolver runs, so the visible form and the validation cannot describe different rules.
+- **The four request shapes are a discriminated union, not one optional-reason type.**
+  `StockActionRequest` is `StockInRequest | StockOutRequest | StockAdjustmentRequest |
+  StockWriteOffRequest`, and the mutation variables are `{productId, action} & StockActionRequest`.
+  "Send a write-off with no reason" is a compile error rather than a 400 discovered in the browser, and
+  the reason-bearing actions cannot be sent through the optional-reason branch.
+- **A blank reason is sent as `null`, never `""`.** `stock-in` and `stock-out` translate `""` to
+  `null`; `adjustment` and `write-off` trim and send the string, which is already non-blank by then.
+- **The adjustment quantity is a text input, not a number input.** `<input type="number">` discards a
+  lone `-` as an invalid intermediate value, which makes a signed correction untypeable in several
+  browsers. The three positive actions keep the number input, where `min` and `step` belong. The
+  validator is a signed-integer pattern for the same reason.
+- **Both callers use the same dialog.** The product editor's `InventoryPanel` and the low-stock
+  listing's per-row buttons open the identical component, so a vendor correcting a shortfall from
+  either place meets identical validation, wording and error handling.
+- **Row buttons carry the product in their accessible name** (`Write off stock for Red Rose
+  Bouquet`). A column of identically named buttons is unusable with a screen reader, and it also
+  collides with the open dialog's own confirm button of the same label — a collision the test suite
+  found before it was designed away.
+
+### Consequences
+
+- Adding a fifth stock mutation is a new `ACTION_CONTENT` entry, a new union member and a new branch
+  in `useStockAction`. Nothing else changes, and the rules for it are impossible to add in only one of
+  the two surfaces.
+- The dialog owns no stock state: it renders the level it is handed and reports the payload the form
+  resolved. The page owns the mutation, so the same dialog serves the per-product panel and the
+  shop-wide list without either knowing about the other.
+- `INSUFFICIENT_STOCK` is explained rather than displayed raw, because the reserved-unit floor (D-24)
+  is the one refusal whose cause a vendor cannot see. Any other backend message is passed through
+  untouched.
+- The union means a caller cannot omit `reason` for `stock-in` at the type level either: it must be
+  `string | null` explicitly.
+
+---
+
+## D-31: Product images are listed as metadata because no route serves the bytes
+
+**Status:** Accepted
+**Date:** Phase 3g (Task 3.9)
+
+### Context
+
+`ProductImageResponse` carries `storageKey`, `originalFilename`, `mimeType`, `fileSize`, `sortOrder`
+and `primary`. The bytes exist — task 3.8 wrote them through `StorageService` — but the API has no
+endpoint that returns an image's content, and `storageKey` is an opaque backend key
+(`product-images/{productId}/{uuid}.{ext}`) that a client cannot construct a URL for.
+
+The obvious frontend rendering is a grid of `<img>` elements. With no delivery route every one of them
+404s, and the vendor sees broken-image icons where their photos should be — which reads as "my upload
+failed" rather than "this build has no image endpoint".
+
+### Decision
+
+- **The media section lists metadata, not thumbnails.** Filename (or the storage key when the original
+  filename was not retained), MIME type, file size, position in the display order and whether it is the
+  cover. No `<img>` is rendered, and the API client never builds a URL from `storageKey`.
+- **The reason is stated in the component, not hidden.** A vendor is told the accepted formats and
+  the 5 MB ceiling, and the gap is recorded in `docs/known-issues.md` as a missing route rather than
+  presented as a UI choice.
+- **Everything else about images works normally.** Upload, cover selection, reorder and delete are all
+  exercised, and the reorder sends the full id permutation the endpoint requires (D-28) — the move
+  buttons recompute the complete order rather than offering a partial list.
+
+### Consequences
+
+- A storefront-facing product page cannot yet show product photos. Adding the route is a small backend
+  task (an authenticated `GET` that resolves a key through `StorageService` and streams it), and this
+  UI is ready for it: the metadata rows are where the thumbnails will go.
+- Until then, the catalog screen's usefulness rests on name, price, stock and status. That is enough
+  to manage a catalogue and is not enough to sell from it, which is the honest trade for not shipping
+  a 404 on every image.
+- The `ProductImage.storageKey` field stays typed and unread. If a delivery route arrives, the field
+  becomes the only thing the client needs — no contract change.
 

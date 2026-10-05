@@ -10,10 +10,14 @@ import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
+import { ApprovedVendorGate } from "@/features/vendor/components/ApprovedVendorGate";
 import { VendorDashboardPage } from "@/features/vendor/pages/VendorDashboardPage";
 import { VendorProfilePage } from "@/features/vendor/pages/VendorProfilePage";
 import { VendorSettingsPage } from "@/features/vendor/pages/VendorSettingsPage";
 import { VendorHoursPage } from "@/features/vendor/pages/VendorHoursPage";
+import { VendorCatalogPage } from "@/features/vendor/pages/VendorCatalogPage";
+import { VendorProductFormPage } from "@/features/vendor/pages/VendorProductFormPage";
+import { VendorInventoryPage } from "@/features/vendor/pages/VendorInventoryPage";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
@@ -70,6 +74,20 @@ function Placeholder({ title }: { title: string }) {
       <p className="mt-2 text-slate-600">Phase 0 placeholder page.</p>
     </FadeIn>
   );
+}
+
+/**
+ * The catalog and inventory screens are wrapped in `ApprovedVendorGate`.
+ *
+ * This is UX, not authorization: `SecurityConfig`'s `hasRole("FLORIST")` on
+ * `/api/v1/vendors/**` and `@RequiresApprovedVendor` on every catalog and inventory
+ * handler are the authority (D-13). The gate exists so an unapproved vendor is not
+ * offered buttons that would each come back `403 VENDOR_NOT_APPROVED`, and it reads
+ * the same cached vendor profile the layout's banner does — there is no second copy
+ * of the approval state anywhere in the frontend.
+ */
+function gated(element: React.ReactElement) {
+  return <ApprovedVendorGate>{element}</ApprovedVendorGate>;
 }
 
 export const router = createBrowserRouter([
@@ -131,6 +149,13 @@ export const router = createBrowserRouter([
           { path: "profile", element: <VendorProfilePage /> },
           { path: "settings", element: <VendorSettingsPage /> },
           { path: "hours", element: <VendorHoursPage /> },
+          // Phase 3g catalog and inventory (plan tasks 3.5–3.9). `new` is declared
+          // before `:productId` so the literal segment is matched first; with the
+          // dynamic one first it would win and "new" would be read as a product id.
+          { path: "catalog", element: gated(<VendorCatalogPage />) },
+          { path: "catalog/new", element: gated(<VendorProductFormPage />) },
+          { path: "catalog/:productId", element: gated(<VendorProductFormPage />) },
+          { path: "inventory", element: gated(<VendorInventoryPage />) },
         ],
       },
       {
