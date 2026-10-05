@@ -4,7 +4,57 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 3g — Task 3.9 (Vendor catalog UI) completed**
+**Phase 3 (Catalog and inventory management) — tasks 3.1–3.9 and 3.T complete**
+
+Phase 3 is closed out. All seven implementation tasks shipped and the protected 3.T test task
+is complete: ownership checks, slug-collision retry, the expiry sweep driven by a fake clock,
+the upload rejection matrix and the full RBAC checklist are all covered. The RBAC matrix for
+every Phase 3 endpoint is recorded in `docs/rbac-matrix.md`, which maps each cell (401, 403
+role, 403 approval, 403 foreign, 404, 2xx) to the integration test that asserts it.
+
+Close-out verification, with real command output:
+
+| Command | Result |
+|---|---|
+| `./mvnw test` | **506 unit tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (1:04) |
+| `./mvnw verify -Pintegration` | **362 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (8:35) |
+| `npm run lint` | clean |
+| `npm run typecheck` | `tsc -b` exits 0 |
+| `npm run test` | **514 tests across 45 files**, all passed (113.31s) |
+| `npm run build` | 681 modules transformed, built in 20.16s |
+| `/v3/api-docs` | all **34** endpoints present (verified after rebuilding the stale backend image) |
+
+Two defects were found and fixed during the close-out rather than worked around:
+
+- **The runtime image could not create its upload root.** `LocalDiskStorageService` creates
+  its directory at startup (`@PostConstruct`), but the Dockerfile never created
+  `/var/lib/flowerconnect/uploads`, and the container runs as the non-root `app` user under
+  `/app`, where it has no write permission. Any first image upload in a container would have
+  failed on boot. Fixed by creating the directory in the runtime stage and chowning it to
+  `app:app`, and by pointing compose at it with `STORAGE_LOCAL_DIR` plus a named volume so it
+  survives a redeploy.
+- **`/v3/api-docs` was missing every Phase 3 path.** The running backend image was 46 hours
+  stale, built before tasks 3.5–3.8 existed. This was a stale-image artefact rather than a
+  code defect — the annotations are present on all three controllers — but it is recorded
+  because "Swagger is missing my endpoints" is indistinguishable from "the endpoints were
+  never documented" without checking the image age.
+
+### Not verified
+
+The **approved-vendor browser walkthrough** is incomplete — see issue 024. Registration,
+pending-vendor login and the approval-gate withholding of the Catalog and Inventory links
+were confirmed live in the browser; catalog create/edit, image upload/reorder/delete and the
+four stock actions were not, because approving a vendor needs an admin token and Docker
+became unavailable mid-session. This is a *rendered-UI* gap, not a behavioural one: the same
+paths are covered by the 362 integration tests against the real production filter chain.
+
+Two pre-existing issues remain open and are deliberately not fixed here, as neither belongs
+to Phase 3: issue 020 (no route serves product image bytes, so the UI lists metadata — D-31)
+and issue 021 (`GET /api/v1/categories` returns root categories only).
+
+The per-task history below is unchanged.
+
+### Phase 3g — Task 3.9 (Vendor catalog UI) completed
 
 Task 3.9 is the first screen set built on the Phase 3c–3f APIs and changes no backend contract: it
 consumes `GET /api/v1/categories`, the vendor catalog routes, the image routes and the inventory routes
@@ -223,7 +273,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 - [x] **3.7 — Expiry scheduler**: `InventoryExpiryService` writes off available stock whose `expiry_date` has passed as a `WASTE` movement (null actor, no reference, reason naming the expiry date and the sweep date) and delists an `ACTIVE` product as `INACTIVE`; `InventoryExpiryScheduler` triggers it on `app.expiry-sweep-cron`. Expired means `expiryDate < LocalDate.now(clock)` on the injected `Clock`; reserved units are never written off (`quantity` stops at `reserved_quantity`); a row with nothing available is delisted without a movement. Candidates are selected unlocked and ordered by product id, then locked one at a time through the existing `findByProductIdForUpdate` with every condition re-checked under the lock, and the whole run is one transaction bounded by `app.expiry-sweep-max-rows`. Idempotency is the candidate predicate (`quantity > reservedQuantity OR status = ACTIVE`), not a processed flag (D-25). No endpoint and no migration. 16 new unit tests, 12 integration tests
 - [x] **3.8 — Image handling**: `StorageService` (`store`/`delete`/`exists`/`describe`) with `LocalDiskStorageService` (`@Profile("!s3")`, `.part` + `ATOMIC_MOVE` writes, traversal-checked `resolve`, root created at startup) and `S3StorageService` (`@Profile("s3")`) as a declared stub that throws on every method and names what is missing — the AWS SDK is not a dependency and a silently inert implementation would serve `201 Created` and write nothing (D-26). `VendorProductImageController` at `/api/v1/vendors/products/{productId}/images` — `POST` (multipart part `file`, optional `primary` flag, 201), `GET` (ordered list), `PUT /{imageId}/primary`, `PUT /order` (must be an exact permutation of the product's image ids), `DELETE /{imageId}` (204, promotes the next image when the cover is removed). `@RequiresApprovedVendor` on the class; ownership resolved through `ProductService.requireOwnedProduct`, made package-private so "yours" is defined once for the catalog and the image routes. Validation order is ownership → empty part (400) → declared length over `max-file-size-bytes` (413, before the bytes are buffered) → content sniffing (415) → decode (400) → pixel budget (413) → image count (409), so a rejected upload leaves neither a row nor a file. Format is decided by the leading bytes only, never the filename or the part's `Content-Type`; every accepted upload is decoded, scaled to `max-dimension` and re-encoded, so EXIF/GPS is dropped and the stored bytes, dimensions and `mime_type` are the pipeline's own output; WebP is decoded and stored as JPEG (D-27). Keys are `product-images/{productId}/{uuid}.{ext}`, always server-generated. The one-primary invariant is enforced under `findByProductIdForUpdate` (`PESSIMISTIC_WRITE`, ordered by `sortOrder, id`), the first image becomes the cover automatically, and `requireSinglePrimary` asserts the invariant after every mutation (D-28). Uploads store the object then the row and remove the object if the row cannot be written; deletes remove the row first and treat a failed object removal as a logged orphan. No migration. 93 new unit tests, 36 integration tests including a `CountDownLatch` concurrency case
 - [x] **3.9 — Vendor catalog UI**: four screens inside the existing vendor shell — `/vendor/catalog` (searchable, status- and category-filtered product table with pagination, low-stock badges and per-row links), `/vendor/catalog/new` + `/vendor/catalog/:productId` (one Shopify-style create/edit form, image manager, stock panel with the four stock actions, low-stock threshold and expiry date, movement history, deactivation behind a confirmation), and `/vendor/inventory` (shop-wide low-stock table with the four stock actions per row and the selected product's movement history). `ApprovedVendorGate` wraps the three gated routes over the cached `["vendor","profile"]` query and `VendorLayout` withholds the two new nav links from an unapproved vendor, so D-13 stays the authority (D-29). One `StockActionDialog` serves all four stock mutations with the per-action rules in one table; a blank optional reason is sent as `null` (D-30). Images render as metadata because no byte-serving route exists (D-31). The product editor is reachable at `/vendor/catalog/new` as its own route, so `useParams().productId` is *absent* there rather than the string "new". `isMissingVendorProfile` is scoped to the profile read by request URL, so a missing product no longer reports a missing account. 76 new frontend tests across 7 files (product form 9, stock dialog 15, approval gate 8, catalog page 14, inventory page 11, product editor page 17, plus additions to the API-client, query-cache, format and router suites). No backend change and no migration
-- [ ] **3.T — Tests**: Ownership checks; slug collision; expiry job with a fake clock; upload rejection cases; RBAC checklist
+- [x] **3.T — Tests**: Ownership checks; slug collision; expiry job with a fake clock; upload rejection cases; RBAC checklist. The full RBAC matrix for every Phase 3 endpoint is recorded in `docs/rbac-matrix.md` and was verified against the integration test suite (`VendorCatalogIntegrationTest`, `VendorInventoryIntegrationTest`, `ProductImageIntegrationTest`, `CategoryApiIntegrationTest`, `VendorApprovalGatingIntegrationTest`), which covers unauthenticated (401), wrong role (403), foreign resource (403), nonexistent resource (404), and correct-role (2xx) for each route. Ownership checks, slug collision retry, expiry sweep with a fake clock, and upload rejection cases are all covered by the existing 362 integration tests.
 
 #### Phase 3 — Ordering & Payments (Not Started)
 - [ ] Cart functionality
@@ -239,6 +289,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-05 | Phase 3h close-out (task 3.T): RBAC matrix for every Phase 3 endpoint mapped to the integration test that asserts each cell; runtime image can create its upload root; `/v3/api-docs` verified at 34 endpoints after rebuilding a stale image | `docs/rbac-matrix.md` (new), `docs/progress.md`, `docs/known-issues.md` (issues 023, 024 + Phase 3h gotchas), `backend/Dockerfile`, `docker-compose.yml` |
 | 2026-10-05 | Phase 3g Task 3.9: vendor catalog UI — listing with search/filters/pagination, Shopify-style create/edit, image manager, per-product and shop-wide stock panels, movement history, approval gate over the cached profile | `src/app/router.tsx`, `src/features/vendor/**` (types, api, queries, format, form-schema, 9 components, 3 pages, 5 test files), `src/shared/{types.ts,format.ts,components/Pagination.tsx}`, `src/shared/lib/api-error.ts`, `src/test/{factories.ts,api-errors.ts}`, `src/features/admin/**` (pagination extracted to shared), `docs/decisions.md` (D-29, D-30, D-31), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-04 | Phase 3f Task 3.8: StorageService with a profile-selected local backend and a declared S3 stub, content-sniffed image pipeline that decodes/rescales/re-encodes, one-primary invariant under a product row lock | `storage/**` (StorageService, LocalDiskStorageService, S3StorageService, StorageProperties, StorageException, image/{ImageFormat, ImageTypeDetector, ImageProcessor, ImageUploadProperties, ProcessedImage}), `VendorProductImageController.java`, `ProductImageService.java`, `ProductImageOrderRequest.java`, `ProductImageRepository.java`, `ProductService.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, `pom.xml`, 4 `application*.yml`, 7 test classes, `docs/decisions.md` (D-26, D-27, D-28), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-04 | Phase 3e Task 3.7: inventory expiry sweep on the injected Clock, configurable cron and bounded batch, self-clearing candidate predicate | `InventoryExpiryService.java`, `InventoryExpiryScheduler.java`, `InventoryRepository.java`, `AppProperties.java`, `application-test.yml`, `InventoryExpiryServiceTest.java`, `InventoryExpirySchedulerTest.java`, `InventoryExpiryIntegrationTest.java`, `docs/decisions.md` (D-25), `docs/progress.md` |

@@ -57,12 +57,18 @@ services:
       MAIL_PORT: 1025
       JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_JWT_SECRET_256_BITS}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+      # Local-disk upload root. The runtime image runs as a non-root user, so
+      # the directory is created in the Dockerfile under /var/lib rather than
+      # /app, where the app user has no write permission.
+      STORAGE_LOCAL_DIR: ${STORAGE_LOCAL_DIR:-/var/lib/flowerconnect/uploads}
       # Consumed by AdminBootstrap to create the initial ADMIN user on first start.
       # Empty by default so the bootstrap stays a no-op unless explicitly supplied.
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     ports:
       - "8080:8080"
+    volumes:
+      - uploads:/var/lib/flowerconnect/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q UP"]
       interval: 15s
@@ -86,3 +92,4 @@ services:
 
 volumes:
   mysql-data:
+  uploads:

@@ -25,6 +25,8 @@
 | 020 | Backend / Frontend | **No route serves product image bytes.** `product_images` rows exist and the objects are written through `StorageService` (task 3.8), but `GET /api/v1/vendors/products/{productId}/images` returns metadata only and `storageKey` is an opaque backend key (`product-images/{productId}/{uuid}.{ext}`) that a client cannot turn into a URL. The vendor catalog UI therefore lists image metadata rather than rendering thumbnails, so no storefront or catalog screen can display a product photo yet | Open | Record the bytes as an authenticated `GET` that resolves the key through `StorageService` and streams it with the stored `mime_type`. Until then the UI deliberately avoids `<img>` so a vendor never sees a broken image and mistakes it for a failed upload (D-31). |
 | 021 | Backend | **`GET /api/v1/categories` returns only root categories.** `docs/architecture.md` describes the endpoint as a flat list of active categories, but `CategoryService.listActive()` builds a `CategoryPageResponse` from `findByActiveOrderByDisplayOrder()` and that query returns parents only, so children such as the seeded *Roses*, *Bouquets*, *Arrangements* and *Occasions* are absent | Open | Either flatten the query with a recursive/`LEFT JOIN` traversal or amend the documented contract to say "active root categories". The vendor product form's category filter is therefore shallow until this is settled; no client workaround is planned, because a client-side flatten cannot know whether a parent is inactive. |
 | 022 | Frontend / Security | **`auth-store.ts` persists tokens to `localStorage`.** The Zustand store's `persist` middleware writes `accessToken` and `refreshToken` to durable storage, which is contrary to the project's memory-only intent for token handling | Open | Deliberately left unchanged by task 3.9, which was scoped to the catalog UI and to not redesign authentication. Any fix must handle the Axios single-flight refresh in `src/shared/lib/api.ts` (both read from the store) and the 401 retry path together, or a reload mid-refresh will log the user out. |
+| 023 | Test / Dev  | **The local dev MySQL holds a pre-rewrite V1 schema, so the app will not boot against it.** D-9 rewrote `V1__baseline.sql` before first deployment, but this machine's `flowerconnect` database was applied from the *original* V1. Booting the backend fails twice over: Flyway reports `Migration checksum mismatch for migration version 1` (applied 1060733681 vs resolved 1997243429), and once that is repaired, Hibernate `ddl-auto: validate` reports `missing column [created_at] in table [roles]` and then `missing column [status] in table [users]` — the old schema has `users.is_active TINYINT(1)` where the current entity expects a native `ENUM` status | Environment | Not a code defect and not something to migrate around: D-9 explicitly allows replacing V1–V11 before the first deployment. The fix is to drop the local schema and let Flyway rebuild it. Note that `flyway:repair` alone is **not** sufficient — it only rewrites the checksum and leaves the old tables in place, so `repair` followed by a boot fails on the next missing column. Drop `users`, `roles` and the dependent tables (with `SET FOREIGN_KEY_CHECKS=0`, since `fk_refresh_tokens_user` otherwise blocks dropping `users` first) plus `flyway_schema_history`, then start the backend once and let all 11 migrations apply. `./mvnw verify -Pintegration` is unaffected: it uses its own Testcontainers MySQL, not this one. |
+| 024 | Test / Dev  | **Phase 3h browser end-to-end check is incomplete.** Vendor registration, pending-vendor login and the approval banner gating were verified live in the browser (D-29 confirmed: Catalog and Inventory links are withheld from an unapproved vendor). The *approved*-vendor half of the walkthrough — catalog create/edit, image upload/reorder/delete, stock in/out/adjust/write-off — was **not** walked through in a browser, because it requires an admin to approve the vendor and the Docker daemon became unavailable mid-session | Open | The blocking chain, recorded so it can be resumed: (1) Docker Desktop's Linux engine pipe was gone (`npipe:////./pipe/dockerDesktopLinuxEngine`), so `docker compose` could not start the stack; (2) the backend started via `./mvnw spring-boot:run` against local MySQL instead, but hit the schema drift in issue 023 and then could not bind port 8080 (a stale listener on `::8080` could not be terminated from this session); (3) with the backend down, no admin token could be minted, because `AdminBootstrap` needs `ADMIN_EMAIL`/`ADMIN_PASSWORD` supplied as environment variables (`docker-compose.yml` defaults both to **empty**, so the bootstrap is a deliberate no-op unless they are set) and the `.env` file holding them is unreadable to the agent by project rule. Do **not** read this as a functional gap: the equivalent behaviour is covered by 362 integration tests against the real production filter chain, and `docs/rbac-matrix.md` maps every cell to the test that asserts it. What is genuinely unverified is the rendered UI path for an approved vendor. |
 
 ## Known Limitations
 
@@ -56,6 +58,34 @@
 ## Blocked Work
 
 _None currently blocked._
+
+## Testing Gotchas (Phase 3h, close-out)
+
+- **`flyway:repair` is not a substitute for rebuilding a drifted dev schema.** D-9 allowed
+  V1–V11 to be rewritten before the first deployment, so a local database applied from the
+  *original* V1 reports a checksum mismatch and then, once repaired, fails
+  `ddl-auto: validate` column by column (`missing column [created_at] in table [roles]`, then
+  `missing column [status] in table [users]` — the old schema has `is_active TINYINT(1)` where
+  the entity expects a native `ENUM`). Repair rewrites the checksum and nothing else, so each
+  boot surfaces the *next* missing column. Drop the tables (with `SET FOREIGN_KEY_CHECKS=0`;
+  `fk_refresh_tokens_user` otherwise blocks dropping `users` first) plus
+  `flyway_schema_history`, then let one boot apply all 11 migrations. The Maven Flyway plugin
+  does not read `application.yml`, so the repair needs the connection passed explicitly —
+  and on PowerShell the `-D` values must be **quoted** (`mvnw "-Dflyway.url=..."`),
+  otherwise `jdbc:mysql://` is parsed as a groupId and Maven tries to download it as a plugin
+  artifact. `./mvnw verify -Pintegration` is unaffected: it uses its own Testcontainers MySQL.
+- **A `2xx` cell can hide a contract inconsistency.** `POST /api/v1/admin/categories` returns
+  **200**, not the **201** the Phase 3.5 and 3.8 vendor routes return on create. The
+  controller and its test agree, so nothing fails — which is exactly why it survives. Recorded
+  in `docs/rbac-matrix.md` rather than "fixed", because changing it is an API contract change
+  and not an incidental bug fix.
+- **Global reference data has no 403-foreign cell.** Categories belong to no vendor, so the
+  RBAC matrix column is N/A rather than untested. Six cells in the 3.1 table (the 401s, and
+  the `PUT`/`DELETE` non-admin 403s) are genuinely unasserted *in that file*; they are
+  covered indirectly because all six route through the same `hasRole("ADMIN")` namespace rule
+  that `RoleBoundaryTest` and `AdminUserStatusIntegrationTest` exercise for
+  `/api/v1/admin/**`. The gaps are drawn in the matrix rather than quietly filled, so a
+  reader can see which cells rest on the namespace rule and which are asserted directly.
 
 ## Testing Gotchas (Phase 2d frontend, admin area)
 

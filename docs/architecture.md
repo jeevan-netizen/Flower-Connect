@@ -579,3 +579,9 @@ A `PENDING_APPROVAL`, `REJECTED` or `SUSPENDED` vendor passes the first and fail
 is why the vendor's own `GET|PUT /api/v1/vendors/profile` stays reachable while the profile is not
 approved. Approval state is never cached in the JWT, so an admin approval or suspension takes effect
 on the vendor's very next request. See `docs/decisions.md` (D-13).
+
+Because the two layers produce two different 403 bodies, tests assert `$.code` and not only the
+HTTP status — `FORBIDDEN` means "not a vendor account", `VENDOR_NOT_APPROVED` means "a vendor
+that may not transact yet". `docs/rbac-matrix.md` records every Phase 3 endpoint with each cell
+(401, 403 role, 403 approval, 403 foreign, 404, 2xx) mapped to the integration test that asserts
+it, and explains why `@WebMvcTest` slices cannot cover any of it.
