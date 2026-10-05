@@ -740,13 +740,17 @@ Categories are reference data like locations, not private data like vendor profi
 
 - `GET /api/v1/categories` is `permitAll()` — public read access, mirroring `/api/v1/locations`
 - `GET /api/v1/admin/categories` and all mutations (`POST`, `PUT`, `DELETE`) require `ROLE_ADMIN` via the existing `/api/v1/admin/**` rule in `SecurityConfig`
-- The public endpoint returns a flat list of **active** categories, each with `id`, `name`, `slug`, `parentId`, `displayOrder`, so the client can reconstruct a tree if needed
+- The public endpoint returns the **active top-level** categories (`parent_id IS NULL AND active = true`), ordered by `display_order` then `id`, each row carrying `id`, `name`, `slug`, `parentId`, `displayOrder`. Top-level rows have a null parent, and the parent fields stay on the DTO so a client that is later served a child row can place it.
+- The active predicate lives in one repository method, `findByParentIdIsNullAndActiveTrueOrderByDisplayOrderAscIdAsc`, so there is no unfiltered roots-only query to reach for by mistake. The Phase 3 audit found the public read going through an unfiltered roots query while this decision promised active-only; that method no longer exists.
+- The admin listing returns **every** category — roots and children, active and inactive — paginated by `name` then `id`. An absent `parentId` means the whole table, not the roots; a supplied `parentId` means the direct children of that parent. `totalElements`/`totalPages` therefore describe every row an admin manages. The Phase 3 audit found this branch calling a roots-only paged query, which hid admin-created children from ordinary pagination and understated both counts.
 
 ### Consequences
 
-- The public read endpoint only returns `active = true` categories; inactive categories are hidden
-- Admin listing (`/api/v1/admin/categories`) returns all categories (active and inactive) with pagination
+- The public read endpoint only returns `active = true` categories; inactive categories are hidden. An inactive parent is not published merely because a child is active
+- Only top-level categories reach the public endpoint, so the storefront category chips (plan 4.7) and the vendor product form's category picker are one level deep — see known issue #025
+- Admin listing (`/api/v1/admin/categories`) returns all categories (active and inactive) with pagination, including children
 - Future storefront browsing can call the public endpoint without authentication
+- The public read is unpaged by design (it is a small reference list); the admin listing is paged. Both return the same `CategoryPageResponse` envelope
 
 ---
 
@@ -768,7 +772,7 @@ The `active` boolean flag already exists for soft hiding. Hard delete with child
 - `DELETE /api/v1/admin/categories/{id}` performs a **hard delete** (row removed)
 - If the category has children (`countByParentId > 0`), the delete is refused with 409 CONFLICT
 - To remove a branch, the admin must first delete/reparent all children, or use `PUT` to set `active = false` for a soft hide
-- Future product assignment (Phase 3.2) will add a 409 check for products referencing the category
+- A category a product still references is **not** guarded by a service check. `fk_products_category` (V8) is the backstop and refuses the delete, but the refusal arrives as a SQL constraint violation rather than a mapped 409 — see known issue #026. The promised "409 for products referencing the category" check was never written, and the Phase 3 audit recorded that as an open gap rather than a settled rule.
 
 ### Consequences
 

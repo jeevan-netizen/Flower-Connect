@@ -93,6 +93,14 @@ public class CategoryService {
      * slug; the parent may change, which is cycle-checked against the new
      * parent's ancestor chain. The {@code active} flag can be toggled to hide
      * the category from the public read endpoint without deleting it.
+     *
+     * <p>This is a <b>full replacement of the hierarchy and ordering fields</b>,
+     * not a patch, matching {@code PUT} semantics everywhere else in this
+     * project: an omitted {@code parentId} detaches the category to a
+     * top-level row, and an omitted {@code displayOrder} resets it to
+     * {@code 0}. {@code active} is the one field that keeps its stored value
+     * when omitted, so a caller reordering a category cannot deactivate it by
+     * accident. A client editing a single field must resend the whole category.
      */
     @Transactional
     public CategoryResponse update(String adminEmail, Long id, CategoryRequest request) {
@@ -122,6 +130,12 @@ public class CategoryService {
     /**
      * Hard-deletes a category. Refused with 409 if the category has children.
      * The audit row is written before the deletion so the trail remains.
+     *
+     * <p>A category that a product still references is blocked by the
+     * {@code fk_products_category} foreign key rather than by a service check;
+     * that refusal arrives as a constraint violation, not a mapped 409, which is
+     * recorded as known issue #026. It is not changed here: the service-level
+     * guard is a product-assignment concern (task 3.2/3.5), not a task 3.1 one.
      */
     @Transactional
     public void delete(String adminEmail, Long id) {
@@ -136,8 +150,12 @@ public class CategoryService {
     }
 
     /**
-     * Admin listing: paginated, optional parent filter. Sort is by name then id
-     * for stable pagination. Returns all categories (active and inactive).
+     * Admin listing: paginated over <em>every</em> category (roots and
+     * children, active and inactive), optionally narrowed to the direct
+     * children of one parent. {@code parentId == null} therefore paginates the
+     * whole table rather than the roots only, so {@code totalElements} and
+     * {@code totalPages} describe every row an admin manages. Sort is by name
+     * then id for stable pagination.
      */
     @Transactional(readOnly = true)
     public CategoryPageResponse list(Long parentId, int page, int size) {
@@ -146,7 +164,7 @@ public class CategoryService {
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by("name", "id"));
 
         Page<Category> result = parentId == null
-                ? categoryRepository.findByParentIdIsNull(pageable)
+                ? categoryRepository.findAll(pageable)
                 : categoryRepository.findByParentId(parentId, pageable);
 
         return CategoryPageResponse.builder()
@@ -162,13 +180,19 @@ public class CategoryService {
     }
 
     /**
-     * Public read endpoint: returns a flat list of active categories ordered by
-     * display_order then name. The parent is flattened to its id and name so
-     * the client can reconstruct a tree if needed.
+     * Public read endpoint: the active top-level categories, ordered by
+     * display_order then id (id only breaks ties, as {@code V7__categories.sql}
+     * documents). Inactive categories are excluded here and nowhere else — this
+     * is the reference list the storefront chips and the vendor product form
+     * read, so a deactivated category must disappear from it while its row
+     * stays for the admin listing (D-17, D-18). Each row carries its
+     * {@code parentId}, so a client that later receives a child row can place
+     * it; top-level rows carry a null parent.
      */
     @Transactional(readOnly = true)
     public CategoryPageResponse listActive() {
-        var categories = categoryRepository.findByParentIdIsNullOrderByDisplayOrderAscIdAsc();
+        var categories = categoryRepository
+                .findByParentIdIsNullAndActiveTrueOrderByDisplayOrderAscIdAsc();
         return CategoryPageResponse.builder()
                 .content(mapper.toResponse(categories))
                 .page(0)

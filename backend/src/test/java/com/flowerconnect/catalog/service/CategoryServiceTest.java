@@ -16,6 +16,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -241,18 +246,69 @@ class CategoryServiceTest {
         verify(auditLogRepository).save(any(AuditLog.class));
     }
 
+    /**
+     * The public read must go through the active-filtered roots query. A
+     * mocked repository cannot prove the predicate inside the JPQL, but it can
+     * prove which query the service asks for — and that is the wiring that let
+     * an unfiltered roots-only query reach the public endpoint.
+     */
     @Test
-    void listActiveReturnsFlatListOfActiveCategories() {
-        when(categoryRepository.findByParentIdIsNullOrderByDisplayOrderAscIdAsc())
-                .thenReturn(List.of(parentCategory, childCategory));
+    void listActiveReadsOnlyActiveTopLevelCategories() {
+        when(categoryRepository.findByParentIdIsNullAndActiveTrueOrderByDisplayOrderAscIdAsc())
+                .thenReturn(List.of(parentCategory));
+        when(categoryMapper.toResponse(anyList()))
+                .thenReturn(List.of(CategoryResponse.builder().id(1L).slug("roses").build()));
+
+        var response = categoryService.listActive();
+
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getTotalElements()).isEqualTo(1);
+        assertThat(response.getPage()).isZero();
+        assertThat(response.isEmpty()).isFalse();
+        verify(categoryRepository)
+                .findByParentIdIsNullAndActiveTrueOrderByDisplayOrderAscIdAsc();
+        verifyNoMoreInteractions(categoryRepository);
+    }
+
+    /**
+     * Without a parent filter the admin listing paginates every category —
+     * roots and children alike. Verifying {@code findAll(pageable)} (rather
+     * than a roots-only query) is what makes a children-blind listing fail here
+     * instead of passing with only the roots it happened to return.
+     */
+    @Test
+    void listWithoutParentIdPagesOverEveryCategoryIncludingChildren() {
+        Pageable pageable = PageRequest.of(0, 20, Sort.by("name", "id"));
+        when(categoryRepository.findAll(pageable))
+                .thenReturn(new PageImpl<>(List.of(parentCategory, childCategory), pageable, 2));
         when(categoryMapper.toResponse(anyList()))
                 .thenReturn(List.of(
                         CategoryResponse.builder().id(1L).slug("roses").build(),
                         CategoryResponse.builder().id(2L).slug("hybrid-tea").build()));
 
-        var response = categoryService.listActive();
+        var response = categoryService.list(null, 0, 20);
 
         assertThat(response.getContent()).hasSize(2);
         assertThat(response.getTotalElements()).isEqualTo(2);
+        assertThat(response.getTotalPages()).isEqualTo(1);
+        assertThat(response.isEmpty()).isFalse();
+        verify(categoryRepository).findAll(pageable);
+        verify(categoryRepository, never()).findByParentId(anyLong(), any(Pageable.class));
+    }
+
+    @Test
+    void listWithParentIdPagesOverThatParentsDirectChildren() {
+        Pageable pageable = PageRequest.of(0, 20, Sort.by("name", "id"));
+        when(categoryRepository.findByParentId(1L, pageable))
+                .thenReturn(new PageImpl<>(List.of(childCategory), pageable, 1));
+        when(categoryMapper.toResponse(anyList()))
+                .thenReturn(List.of(CategoryResponse.builder().id(2L).slug("hybrid-tea").build()));
+
+        var response = categoryService.list(1L, 0, 20);
+
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getTotalElements()).isEqualTo(1);
+        verify(categoryRepository).findByParentId(1L, pageable);
+        verify(categoryRepository, never()).findAll(any(Pageable.class));
     }
 }

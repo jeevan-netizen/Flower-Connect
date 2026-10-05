@@ -4,20 +4,37 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 3 (Catalog and inventory management) — tasks 3.1–3.9 and 3.T complete**
+**Phase 3 (Catalog and inventory management) — tasks 3.1–3.9 and 3.T implemented; Phase 3
+final audit fix in progress on task 3.1**
 
-Phase 3 is closed out. All seven implementation tasks shipped and the protected 3.T test task
-is complete: ownership checks, slug-collision retry, the expiry sweep driven by a fake clock,
-the upload rejection matrix and the full RBAC checklist are all covered. The RBAC matrix for
-every Phase 3 endpoint is recorded in `docs/rbac-matrix.md`, which maps each cell (401, 403
-role, 403 approval, 403 foreign, 404, 2xx) to the integration test that asserts it.
+Phase 3 is implemented and closed out as above, but a read-only final audit returned
+**FAIL — not releasable as-is** on two HIGH findings, both in task 3.1 (categories). Tasks
+3.2–3.9 and 3.T passed the audit. The two HIGH defects are now fixed:
+
+- **HIGH-1 — the public read served inactive categories.** `CategoryService.listActive()` went
+  through a roots-only query with no `active` predicate, so a deactivated top-level category was
+  still published to the storefront chips and the vendor product form's picker. The single
+  roots-scoped query is now `findByParentIdIsNullAndActiveTrueOrderByDisplayOrderAscIdAsc()`,
+  and the two unfiltered roots-only queries were removed so the defect cannot be reintroduced.
+- **HIGH-2 — the admin listing was roots-only.** With no `parentId`, `CategoryService.list()`
+  called a roots-only paged query, so admin-created child categories were omitted from ordinary
+  pagination and `totalElements`/`totalPages` understated both counts. It now paginates every
+  row through `findAll(pageable)`; `parentId=X` still means "the direct children of X".
+
+Issue #021 is corrected and closed, and two residual limitations are recorded rather than fixed
+(#025 the public read is top-level only, #026 a product-referenced category delete returns 500).
+Regression coverage was added at both levels: three `CategoryApiIntegrationTest` cases against
+real MySQL (inactive roots excluded; child reachable and counted by the unfiltered admin listing;
+grandchild and unrelated root excluded from the filtered one) and three `CategoryServiceTest`
+guards that verify *which* query each read path calls. Phase 3 is **not** re-closed until the
+integration suite runs with Docker available.
 
 Close-out verification, with real command output:
 
 | Command | Result |
 |---|---|
-| `./mvnw test` | **506 unit tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (1:04) |
-| `./mvnw verify -Pintegration` | **362 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (8:35) |
+| `./mvnw test` | **506 unit tests** at close-out, **508 after the task 3.1 audit fix** (+2 in `CategoryServiceTest`), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (1:04) |
+| `./mvnw verify -Pintegration` | **362 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (8:35). **Not re-run after the task 3.1 audit fix**: Docker Desktop's Linux engine was unavailable, so the three new `CategoryApiIntegrationTest` regression cases are compiled but unexecuted |
 | `npm run lint` | clean |
 | `npm run typecheck` | `tsc -b` exits 0 |
 | `npm run test` | **514 tests across 45 files**, all passed (113.31s) |
@@ -264,7 +281,7 @@ integration tests**, all green — `BUILD SUCCESS`.
   `npm run build` — all green.
 
 #### Phase 3a — Catalog and inventory management (Task 3.1 completed)
-- [x] **3.1 — Category entity**: `categories` table (V7 migration) with hierarchical structure (parent_id self-FK), `name`, `slug` (unique, auto-generated), `display_order`, `active` flag, `created_at`, `updated_at`. Four seed categories: Roses, Bouquets, Arrangements, Occasions. Admin CRUD at `/api/v1/admin/categories` (POST/PUT/DELETE/GET list with pagination), public read at `GET /api/v1/categories` (flat list of active categories, permitAll). Cycle prevention on parent assignment, delete protection (409 if has children), slug auto-generation with collision-safe suffix, audit trail on all mutations. 32 new unit tests + 9 integration tests. Verified with 296 unit + 231 integration tests.
+- [x] **3.1 — Category entity**: `categories` table (V7 migration) with hierarchical structure (parent_id self-FK), `name`, `slug` (unique, auto-generated), `display_order`, `active` flag, `created_at`, `updated_at`. Four seed categories: Roses, Bouquets, Arrangements, Occasions. Admin CRUD at `/api/v1/admin/categories` (POST/PUT/DELETE/GET list with pagination over every category, roots and children), public read at `GET /api/v1/categories` (active top-level categories only, permitAll — D-17, issue #025). Cycle prevention on parent assignment, delete protection (409 if has children), slug auto-generation with collision-safe suffix, audit trail on all mutations. 32 new unit tests + 9 integration tests. Verified with 296 unit + 231 integration tests.
 - [x] **3.2 — Product entity**: `products` table (V8) with vendor_id/category_id FKs, name, slug (unique, auto-generated with collision-safe suffix), description, base_price, status (native ENUM DRAFT/ACTIVE/INACTIVE/ARCHIVED). `product_images` (V9) holds ordered images with a single primary flag — the one-primary rule is a service-level invariant (D-21) because MySQL error 1215 rejects the generated-column unique-index trick next to the required product_id FK. `ProductService.create` generates the slug, treats the unique constraint as the authority, and retries with numeric suffixes after a lost race
 - [x] **3.3 — Inventory entity**: `inventory` table (V10), one row per product (unique on product_id) with `quantity`, `reserved_quantity`, `low_stock_threshold`, optional `expiry_date`. Created automatically at quantity 0 in the same transaction as the product; no stock movement is written for the initial zero. CHECKs: quantity >= 0, reserved_quantity >= 0, low_stock_threshold >= 0, reserved_quantity <= quantity. Availability = quantity − reserved (computed in the entity)
 - [x] **3.4 — Stock movement log**: `stock_movements` table (V11) records every change — movement_type (native ENUM of the nine plan section 6.2 types), signed quantity_delta, reason, reference id/type, nullable actor. Append-only (no updated_at). Product creation writes no movement; the log records changes only
@@ -289,6 +306,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-05 | Phase 3 final audit fix (task 3.1): active-only public category read and an all-category admin listing with correct pagination, plus regression coverage at service and HTTP level | `CategoryRepository.java`, `CategoryService.java`, `CategoryController.java`, `CategoryServiceTest.java`, `CategoryApiIntegrationTest.java`, `docs/decisions.md` (D-17, D-18), `docs/known-issues.md` (#021 closed, #025, #026), `docs/progress.md` |
 | 2026-10-05 | Phase 3h close-out (task 3.T): RBAC matrix for every Phase 3 endpoint mapped to the integration test that asserts each cell; runtime image can create its upload root; `/v3/api-docs` verified at 34 endpoints after rebuilding a stale image | `docs/rbac-matrix.md` (new), `docs/progress.md`, `docs/known-issues.md` (issues 023, 024 + Phase 3h gotchas), `backend/Dockerfile`, `docker-compose.yml` |
 | 2026-10-05 | Phase 3g Task 3.9: vendor catalog UI — listing with search/filters/pagination, Shopify-style create/edit, image manager, per-product and shop-wide stock panels, movement history, approval gate over the cached profile | `src/app/router.tsx`, `src/features/vendor/**` (types, api, queries, format, form-schema, 9 components, 3 pages, 5 test files), `src/shared/{types.ts,format.ts,components/Pagination.tsx}`, `src/shared/lib/api-error.ts`, `src/test/{factories.ts,api-errors.ts}`, `src/features/admin/**` (pagination extracted to shared), `docs/decisions.md` (D-29, D-30, D-31), `docs/progress.md`, `docs/known-issues.md` |
 | 2026-10-04 | Phase 3f Task 3.8: StorageService with a profile-selected local backend and a declared S3 stub, content-sniffed image pipeline that decodes/rescales/re-encodes, one-primary invariant under a product row lock | `storage/**` (StorageService, LocalDiskStorageService, S3StorageService, StorageProperties, StorageException, image/{ImageFormat, ImageTypeDetector, ImageProcessor, ImageUploadProperties, ProcessedImage}), `VendorProductImageController.java`, `ProductImageService.java`, `ProductImageOrderRequest.java`, `ProductImageRepository.java`, `ProductService.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, `pom.xml`, 4 `application*.yml`, 7 test classes, `docs/decisions.md` (D-26, D-27, D-28), `docs/progress.md`, `docs/known-issues.md` |
