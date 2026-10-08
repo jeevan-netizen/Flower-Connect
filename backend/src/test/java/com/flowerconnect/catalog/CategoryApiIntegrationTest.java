@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class CategoryApiIntegrationTest extends AbstractIntegrationTest {
+public class CategoryApiIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "password123";
 
