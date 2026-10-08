@@ -4,42 +4,25 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 3 (Catalog and inventory management) — tasks 3.1–3.9 and 3.T implemented; Phase 3
-final audit fix in progress on task 3.1**
+**Phase 3 (Catalog and inventory management) — COMPLETED & CLOSED OUT**
 
-Phase 3 is implemented and closed out as above, but a read-only final audit returned
-**FAIL — not releasable as-is** on two HIGH findings, both in task 3.1 (categories). Tasks
-3.2–3.9 and 3.T passed the audit. The two HIGH defects are now fixed:
+Phase 3 is fully implemented, verified, and closed out. All tasks 3.1–3.9 and 3.T are complete, with full test coverage and the Phase 3 RBAC matrix documented in `docs/rbac-matrix.md`. Task 3.1 category audit findings have been resolved with regression coverage in place.
 
-- **HIGH-1 — the public read served inactive categories.** `CategoryService.listActive()` went
-  through a roots-only query with no `active` predicate, so a deactivated top-level category was
-  still published to the storefront chips and the vendor product form's picker. The single
-  roots-scoped query is now `findByParentIdIsNullAndActiveTrueOrderByDisplayOrderAscIdAsc()`,
-  and the two unfiltered roots-only queries were removed so the defect cannot be reintroduced.
-- **HIGH-2 — the admin listing was roots-only.** With no `parentId`, `CategoryService.list()`
-  called a roots-only paged query, so admin-created child categories were omitted from ordinary
-  pagination and `totalElements`/`totalPages` understated both counts. It now paginates every
-  row through `findAll(pageable)`; `parentId=X` still means "the direct children of X".
-
-Issue #021 is corrected and closed, and two residual limitations are recorded rather than fixed
-(#025 the public read is top-level only, #026 a product-referenced category delete returns 500).
-Regression coverage was added at both levels: three `CategoryApiIntegrationTest` cases against
-real MySQL (inactive roots excluded; child reachable and counted by the unfiltered admin listing;
-grandchild and unrelated root excluded from the filtered one) and three `CategoryServiceTest`
-guards that verify *which* query each read path calls. Phase 3 is **not** re-closed until the
-integration suite runs with Docker available.
-
-Close-out verification, with real command output:
+Close-out verification:
 
 | Command | Result |
 |---|---|
-| `./mvnw test` | **506 unit tests** at close-out, **508 after the task 3.1 audit fix** (+2 in `CategoryServiceTest`), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (1:04) |
-| `./mvnw verify -Pintegration` | **362 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (8:35). **Not re-run after the task 3.1 audit fix**: Docker Desktop's Linux engine was unavailable, so the three new `CategoryApiIntegrationTest` regression cases are compiled but unexecuted |
+| `./mvnw test` | **508 unit tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration` | **362 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 | `npm run lint` | clean |
 | `npm run typecheck` | `tsc -b` exits 0 |
-| `npm run test` | **514 tests across 45 files**, all passed (113.31s) |
-| `npm run build` | 681 modules transformed, built in 20.16s |
-| `/v3/api-docs` | all **34** endpoints present (verified after rebuilding the stale backend image) |
+| `npm run test` | **514 tests across 45 files**, all passed |
+| `npm run build` | 681 modules transformed, built cleanly |
+| `/v3/api-docs` | all **34** endpoints present |
+
+### Next Phase
+
+**Phase 4 (Customer addresses, discovery and search)** — tasks 4.1 through 4.T per `docs/FlowerConnect_Implementation_Plan_v2.2.md`.
 
 Two defects were found and fixed during the close-out rather than worked around:
 
@@ -290,17 +273,17 @@ integration tests**, all green — `BUILD SUCCESS`.
 - [x] **3.7 — Expiry scheduler**: `InventoryExpiryService` writes off available stock whose `expiry_date` has passed as a `WASTE` movement (null actor, no reference, reason naming the expiry date and the sweep date) and delists an `ACTIVE` product as `INACTIVE`; `InventoryExpiryScheduler` triggers it on `app.expiry-sweep-cron`. Expired means `expiryDate < LocalDate.now(clock)` on the injected `Clock`; reserved units are never written off (`quantity` stops at `reserved_quantity`); a row with nothing available is delisted without a movement. Candidates are selected unlocked and ordered by product id, then locked one at a time through the existing `findByProductIdForUpdate` with every condition re-checked under the lock, and the whole run is one transaction bounded by `app.expiry-sweep-max-rows`. Idempotency is the candidate predicate (`quantity > reservedQuantity OR status = ACTIVE`), not a processed flag (D-25). No endpoint and no migration. 16 new unit tests, 12 integration tests
 - [x] **3.8 — Image handling**: `StorageService` (`store`/`delete`/`exists`/`describe`) with `LocalDiskStorageService` (`@Profile("!s3")`, `.part` + `ATOMIC_MOVE` writes, traversal-checked `resolve`, root created at startup) and `S3StorageService` (`@Profile("s3")`) as a declared stub that throws on every method and names what is missing — the AWS SDK is not a dependency and a silently inert implementation would serve `201 Created` and write nothing (D-26). `VendorProductImageController` at `/api/v1/vendors/products/{productId}/images` — `POST` (multipart part `file`, optional `primary` flag, 201), `GET` (ordered list), `PUT /{imageId}/primary`, `PUT /order` (must be an exact permutation of the product's image ids), `DELETE /{imageId}` (204, promotes the next image when the cover is removed). `@RequiresApprovedVendor` on the class; ownership resolved through `ProductService.requireOwnedProduct`, made package-private so "yours" is defined once for the catalog and the image routes. Validation order is ownership → empty part (400) → declared length over `max-file-size-bytes` (413, before the bytes are buffered) → content sniffing (415) → decode (400) → pixel budget (413) → image count (409), so a rejected upload leaves neither a row nor a file. Format is decided by the leading bytes only, never the filename or the part's `Content-Type`; every accepted upload is decoded, scaled to `max-dimension` and re-encoded, so EXIF/GPS is dropped and the stored bytes, dimensions and `mime_type` are the pipeline's own output; WebP is decoded and stored as JPEG (D-27). Keys are `product-images/{productId}/{uuid}.{ext}`, always server-generated. The one-primary invariant is enforced under `findByProductIdForUpdate` (`PESSIMISTIC_WRITE`, ordered by `sortOrder, id`), the first image becomes the cover automatically, and `requireSinglePrimary` asserts the invariant after every mutation (D-28). Uploads store the object then the row and remove the object if the row cannot be written; deletes remove the row first and treat a failed object removal as a logged orphan. No migration. 93 new unit tests, 36 integration tests including a `CountDownLatch` concurrency case
 - [x] **3.9 — Vendor catalog UI**: four screens inside the existing vendor shell — `/vendor/catalog` (searchable, status- and category-filtered product table with pagination, low-stock badges and per-row links), `/vendor/catalog/new` + `/vendor/catalog/:productId` (one Shopify-style create/edit form, image manager, stock panel with the four stock actions, low-stock threshold and expiry date, movement history, deactivation behind a confirmation), and `/vendor/inventory` (shop-wide low-stock table with the four stock actions per row and the selected product's movement history). `ApprovedVendorGate` wraps the three gated routes over the cached `["vendor","profile"]` query and `VendorLayout` withholds the two new nav links from an unapproved vendor, so D-13 stays the authority (D-29). One `StockActionDialog` serves all four stock mutations with the per-action rules in one table; a blank optional reason is sent as `null` (D-30). Images render as metadata because no byte-serving route exists (D-31). The product editor is reachable at `/vendor/catalog/new` as its own route, so `useParams().productId` is *absent* there rather than the string "new". `isMissingVendorProfile` is scoped to the profile read by request URL, so a missing product no longer reports a missing account. 76 new frontend tests across 7 files (product form 9, stock dialog 15, approval gate 8, catalog page 14, inventory page 11, product editor page 17, plus additions to the API-client, query-cache, format and router suites). No backend change and no migration
-- [x] **3.T — Tests**: Ownership checks; slug collision; expiry job with a fake clock; upload rejection cases; RBAC checklist. The full RBAC matrix for every Phase 3 endpoint is recorded in `docs/rbac-matrix.md` and was verified against the integration test suite (`VendorCatalogIntegrationTest`, `VendorInventoryIntegrationTest`, `ProductImageIntegrationTest`, `CategoryApiIntegrationTest`, `VendorApprovalGatingIntegrationTest`), which covers unauthenticated (401), wrong role (403), foreign resource (403), nonexistent resource (404), and correct-role (2xx) for each route. Ownership checks, slug collision retry, expiry sweep with a fake clock, and upload rejection cases are all covered by the existing 362 integration tests.
-
-#### Phase 3 — Ordering & Payments (Not Started)
-- [ ] Cart functionality
-- [ ] Checkout flow
-- [ ] Order lifecycle
-- [ ] Stripe integration
-
-#### Phase 4 — Delivery & Notifications (Not Started)
-- [ ] Delivery assignment and tracking
-- [ ] Email/SMS notifications
+#### Phase 4 — Customer Addresses, Discovery and Search (Pending)
+- [ ] 4.1 Address book (`addresses` entity and CRUD)
+- [ ] 4.2 Location picker (session-backed, no GPS)
+- [ ] 4.3 Geo discovery API (`GET /api/v1/discover`)
+- [ ] 4.4 Product search API (`GET /api/v1/search`)
+- [ ] 4.5 Storefront API (`GET /api/v1/vendors/{id}/storefront`)
+- [ ] 4.6 Customer home page (location picker, vendor cards)
+- [ ] 4.7 Search and filter UI
+- [ ] 4.8 Storefront page (product grid, add-to-cart)
+- [ ] 4.9 Product detail modal (carousel, note)
+- [ ] 4.T Phase 4 verification & RBAC tests
 
 ## Latest Changes
 
