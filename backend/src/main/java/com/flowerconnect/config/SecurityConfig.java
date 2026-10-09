@@ -91,6 +91,11 @@ public class SecurityConfig {
                 // own profile routes stay reachable while their profile is not approved.
                 // See docs/decisions.md (D-13).
                 .requestMatchers(HttpMethod.POST, "/api/v1/vendors/register").permitAll()
+                // Customer address book (plan task 4.1): the caller's own
+                // addresses, resolved from the JWT subject. CUSTOMER-only —
+                // a florist or admin account is refused with 403 rather than
+                // silently sharing another role's address book.
+                .requestMatchers("/api/v1/addresses/**").hasRole("CUSTOMER")
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/actuator/**").hasRole("ADMIN")

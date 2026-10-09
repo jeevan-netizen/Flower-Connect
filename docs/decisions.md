@@ -373,6 +373,8 @@ of a constraint name.
 | D-29 | Frontend approval gating reuses the cached vendor profile and withholds the links | Decision | Accepted | Phase 3g |
 | D-30 | One stock dialog serves all four mutations, and the rules live in one table | Decision | Accepted | Phase 3g |
 | D-31 | Product images are listed as metadata because no route serves the bytes | Decision | Accepted | Phase 3g |
+| D-32 | The default-address lock is the first read in the transaction | Decision | Accepted | Phase 4 (task 4.1) |
+| D-33 | Boolean DTO properties are named after the state, not the question | Decision | Accepted | Phase 4 (task 4.1) |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -1670,4 +1672,114 @@ failed" rather than "this build has no image endpoint".
   a 404 on every image.
 - The `ProductImage.storageKey` field stays typed and unread. If a delivery route arrives, the field
   becomes the only thing the client needs — no contract change.
+
+---
+
+## D-32: The default-address lock is the first read in the transaction
+
+**Status:** Accepted
+**Date:** Phase 4 (Task 4.1)
+
+### Context
+
+Task 4.1's one-default-per-customer rule is a service-level invariant
+(MySQL has no partial unique index — the D-21 finding), so it is only as
+good as the transaction that enforces it. D-24's discipline — resolve and
+check first, take the lock last — was written for the inventory path,
+where the locked row is the inventory row and the ownership check reads a
+*different* row (the product). Applied literally to the address book it
+produced a real defect, caught only by the concurrency integration test:
+8 simultaneous first-address creations all became the default, while
+every sequential test passed.
+
+The mechanism is MySQL REPEATABLE READ snapshot semantics. The original
+`lockUser` resolved the caller with a plain `findByEmailWithRole` and only
+then issued `SELECT ... FOR UPDATE`. The first *plain* read of a
+transaction establishes its snapshot; the locking read itself reads the
+latest committed data but creates no snapshot. So the later
+`findAllByUserId` — the read that decides whether a default already
+exists — read a snapshot taken *before* the lock was acquired, and could
+not see rows a concurrent transaction had committed in between. Every
+thread's snapshot was taken while the address table was still empty for
+that user, so every thread saw "no addresses exist" and set the flag.
+
+### Decision
+
+The locking read is the **first** read of the write transaction:
+`UserRepository.findByEmailForUpdate(email)` resolves and locks the
+caller's row in one statement. A locking read establishes no snapshot, so
+the snapshot is created by the first plain read *under the lock* and sees
+everything committed before it — including the previous lock holder's
+address rows. Create, set-default and delete-with-promotion all read the
+address table only after that point.
+
+This inverts D-24's "lock last" ordering deliberately, and that inversion
+is safe here for the reason D-24 itself identifies: the locked row is
+always the caller's own `users` row, resolved from the JWT subject. No
+caller can name another user's row, so the foreign-row stall attack that
+D-24's ordering guards against cannot happen. (The inventory path keeps
+D-24's ordering, because there the lock is on a row a caller *could*
+name through a request parameter.)
+
+The locking query joins nothing. A `JOIN FETCH` of the role would issue
+`FOR UPDATE` over the shared `roles` row too, serialising every
+customer's address writes against each other; the write path never reads
+the role, so the lazy proxy is never touched.
+
+### Consequences
+
+- The concurrency test is the only thing that can prove this: sequential
+  calls see the previous transaction's committed rows, so an unlocked
+  implementation passes. `AddressConcurrencyIntegrationTest` releases 8
+  real threads at once (a `CountDownLatch`, the
+  `InventoryConcurrencyIntegrationTest` harness) and asserts only end
+  state — exactly one default among the created rows.
+- Any future default-mutating address method must keep the lock as the
+  first read. A plain read before it — even a "harmless" resolve —
+  re-poisons the snapshot.
+- The same trap applies to any future REPEATABLE READ read-modify-write
+  that reads *other rows* after locking one row: check whether the first
+  read in the transaction is plain, and if so whether the snapshot it
+  establishes predates the lock.
+
+---
+
+## D-33: Boolean DTO properties are named after the state, not the question
+
+**Status:** Accepted
+**Date:** Phase 4 (Task 4.1)
+
+### Context
+
+The address request and response need a "which address is the default"
+flag. The intuitive property name is `isDefault`. For a *primitive*
+`boolean` field with that name, Lombok generates a getter named
+`isDefault()` (it does not double the "is" prefix), and Jackson derives
+the wire name by stripping the "is" prefix from the getter — so the API
+would silently expose the field as `default`, not `isDefault`. Nothing
+fails at compile time or in a mocked unit test; only a test that asserts
+the wire name at the HTTP boundary catches it. The entity already hit
+this: its property is `defaultAddress` (column `is_default`) precisely so
+the JPQL property path and the derived query methods are unambiguous.
+
+### Decision
+
+Boolean properties are named after the state (`defaultAddress`), never
+`is` + noun, on any class that carries a primitive boolean. The request
+DTO uses the same name as the entity and the response, so request,
+response and entity share one vocabulary — `defaultAddress` — on the wire
+and in Java.
+
+### Consequences
+
+- The wire field is `defaultAddress` on both the request and the response.
+  The naming trap is caught by `AddressApiIntegrationTest`, which asserts
+  `$.defaultAddress` at the HTTP boundary, so a rename that reintroduces
+  it fails as a contract drift rather than surviving silently.
+- Future primitive-boolean DTO fields follow the same rule. (A
+  `Boolean` wrapper named `isDefault` would serialize correctly — the
+  wrapper gets a `getIsDefault()` getter — but two names for one concept
+  across three classes is the trap D-33 exists to close.)
+- The `Address` entity's class javadoc already records the property-
+  resolution reasoning; the DTOs cite it.
 
