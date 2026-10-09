@@ -3,64 +3,17 @@ import type { VendorProfile } from "@/features/vendor/types";
 /**
  * Vendor registration (plan task 1.7) — the vendor's entry point.
  *
- * These types mirror two backend contracts:
- *   `GET /api/v1/locations`      -> {@link ServiceLocationGroup} / {@link ServiceLocationArea}
- *   `POST /api/v1/vendors/register` -> {@link VendorRegisterRequest} in, `VendorProfile` out
- */
-
-/**
- * One service area from `GET /api/v1/locations`.
+ * These types mirror one backend contract:
+ *   `POST /api/v1/vendors/register` -> {@link VendorRegisterRequest} in,
+ *   `VendorProfile` out
  *
- * `id` is the `service_locations.id` primary key and is what the registration
- * request must send as `serviceLocationId`. The area text alone is never enough:
- * the backend resolves coordinates and validates the FK from the id, so guessing
- * one would be a data-integrity bug.
+ * The service-location types (`ServiceLocationGroup` and friends) used to live
+ * here because this page was the only consumer of `GET /api/v1/locations`. Task
+ * 4.2's customer location picker shares that endpoint, so they now live in
+ * `@/features/location/types` — the customer shell must not import from a
+ * vendor feature slice, and one definition of the response shape is better than
+ * two.
  */
-export interface ServiceLocationArea {
-  id: number;
-  area: string;
-  pincode: string;
-  latitude: number;
-  longitude: number;
-}
-
-/** The API groups service areas by city: one entry per city, in city order. */
-export interface ServiceLocationGroup {
-  city: string;
-  areas: ServiceLocationArea[];
-}
-
-/** One flattened `<option>`: the id is the value, the label is human-readable. */
-export interface ServiceLocationOption {
-  id: string;
-  city: string;
-  label: string;
-}
-
-/**
- * Flattens the city-grouped response into option rows, dropping empty cities and
- * skipping areas with no usable id (a response shape the picker cannot submit).
- */
-export function toServiceLocationOptions(
-  groups: ServiceLocationGroup[] | undefined,
-): ServiceLocationOption[] {
-  if (!groups) return [];
-
-  return groups.flatMap((group) =>
-    group.areas
-      .filter((area) => typeof area.id === "number" && area.id > 0)
-      .map((area) => ({
-        id: String(area.id),
-        city: group.city,
-        label: `${area.area} (${area.pincode})`,
-      })),
-  );
-}
-
-/** True when the response carried no selectable area at all. */
-export function hasNoServiceLocations(options: ServiceLocationOption[]): boolean {
-  return options.length === 0;
-}
 
 /**
  * Exactly the fields this page sends.

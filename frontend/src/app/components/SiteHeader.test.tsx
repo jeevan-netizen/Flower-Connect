@@ -5,6 +5,8 @@ import { createMemoryRouter, Outlet, RouterProvider } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createTestQueryClient } from "@/test/render";
 import { WIDE_HEADER_QUERY } from "@/app/hooks/useMediaQuery";
+import { useLocationStore } from "@/features/location/stores/location-store";
+import type { ServiceLocationGroup } from "@/features/location/types";
 import type { UserResponse } from "@/features/auth/types";
 
 /**
@@ -33,6 +35,25 @@ vi.mock("@/features/auth/stores/auth-store", () => ({
     };
     return selector ? selector(state) : state;
   },
+}));
+
+/**
+ * The header's location control reads the shared locations query and the real
+ * session store, so the query is stubbed here (the store is exercised through
+ * its own suite) and both are reset before every test.
+ */
+const mockQueryState = vi.hoisted(() => ({
+  cities: undefined as ServiceLocationGroup[] | undefined,
+}));
+
+vi.mock("@/features/location/queries", () => ({
+  useServiceLocations: () => ({
+    data: mockQueryState.cities,
+    isPending: mockQueryState.cities === undefined,
+    error: null,
+    isSuccess: mockQueryState.cities !== undefined,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock("@/features/vendor/queries", () => ({ clearVendorCache: vi.fn() }));
@@ -100,6 +121,11 @@ describe("SiteHeader navigation", () => {
     mockState.user = null;
     mockState.logout.mockClear();
     vi.unstubAllGlobals();
+    // The location control's session store is real here; every test starts with
+    // no location chosen and a clean storage.
+    sessionStorage.clear();
+    useLocationStore.setState({ selected: null });
+    mockQueryState.cities = undefined;
   });
 
   it("shows the bar and no menu button on a wide viewport", () => {
@@ -209,5 +235,53 @@ describe("SiteHeader navigation", () => {
     // `xl` in Tailwind is 1280px. If either moves, this fails rather than the
     // two silently disagreeing.
     expect(WIDE_HEADER_QUERY).toBe("(min-width: 1280px)");
+  });
+
+  it("keeps the delivery-location control in the shell on every viewport", async () => {
+    renderAt();
+
+    // The chosen area is the context the whole marketplace runs on, so the
+    // control lives in the top bar rather than behind the mobile menu.
+    expect(screen.getByRole("button", { name: /delivery location/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /delivery location/i }));
+
+    expect(
+      screen.getByRole("button", { name: /delivery location/i }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+  });
+
+  it("closes the mobile menu when the location panel opens", async () => {
+    narrowViewport();
+    renderAt();
+
+    await userEvent.click(screen.getByRole("button", { name: /open menu/i }));
+    await userEvent.click(screen.getByRole("button", { name: /delivery location/i }));
+
+    // Two full-width panels anchored to the same header would overlap, so
+    // opening one closes the other.
+    expect(screen.getByRole("button", { name: /open menu/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("shows the chosen area once one has been picked in this tab", async () => {
+    useLocationStore.setState({
+      selected: {
+        id: 3,
+        city: "Bengaluru",
+        area: "Indiranagar",
+        pincode: "560038",
+        latitude: 12.971199,
+        longitude: 77.640586,
+      },
+    });
+
+    renderAt();
+
+    expect(screen.getByRole("button", { name: /delivery location/i })).toHaveTextContent(
+      "Indiranagar, 560038",
+    );
   });
 });

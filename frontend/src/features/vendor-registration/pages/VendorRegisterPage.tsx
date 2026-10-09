@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SlideUp } from "@/motion/SlideUp";
-import { useRegisterVendor, useServiceLocations } from "@/features/vendor-registration/queries";
+import { useServiceLocations } from "@/features/location/queries";
+import { useRegisterVendor } from "@/features/vendor-registration/queries";
 import {
   isVendorRegisterField,
   vendorRegisterSchema,
@@ -11,11 +12,13 @@ import {
 } from "@/features/vendor-registration/form-schema";
 import {
   buildVendorRegisterRequest,
-  hasNoServiceLocations,
-  toServiceLocationOptions,
   VENDOR_REGISTER_DEFAULTS,
   type VendorRegistrationResult,
 } from "@/features/vendor-registration/types";
+import {
+  hasNoServiceLocations,
+  toServiceLocationOptions,
+} from "@/features/location/types";
 import { LocationPicker } from "@/features/vendor-registration/components/LocationPicker";
 import { TextInput } from "@/features/vendor-registration/components/TextInput";
 import {
