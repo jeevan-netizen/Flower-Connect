@@ -11,7 +11,7 @@ import type {
   VendorProfile,
   VendorStatus,
 } from "@/features/vendor/types";
-import type { ServiceLocationGroup } from "@/features/vendor-registration/types";
+import type { ServiceLocationGroup } from "@/features/location/types";
 import type { AdminRole, AdminUser, UserStatus } from "@/features/admin/types";
 import type { PageResponse } from "@/shared/types";
 

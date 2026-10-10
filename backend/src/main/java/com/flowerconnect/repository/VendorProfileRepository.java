@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,4 +38,26 @@ public interface VendorProfileRepository
     List<VendorProfile> findAllByStatus(VendorProfile.Status status);
 
     Page<VendorProfile> findPageByStatus(VendorProfile.Status status, Pageable pageable);
+
+    /**
+     * Returns the maximum delivery radius among all approved vendors, or null
+     * if none exist. Used to compute a bounding box that cannot exclude any
+     * vendor that might be within range.
+     */
+    @Query("SELECT MAX(vp.deliveryRadiusKm) FROM VendorProfile vp WHERE vp.status = 'APPROVED'")
+    BigDecimal findMaxDeliveryRadiusForApproved();
+
+    /**
+     * Finds approved, accepting vendors whose denormalized coordinates fall
+     * within the given latitude/longitude bounding box. The Haversine distance
+     * and radius check are applied in Java after this prefilter.
+     */
+    @Query("SELECT vp FROM VendorProfile vp JOIN FETCH vp.serviceLocation " +
+            "WHERE vp.status = 'APPROVED' " +
+            "AND vp.acceptingOrders = true " +
+            "AND vp.latitude BETWEEN :minLat AND :maxLat " +
+            "AND vp.longitude BETWEEN :minLng AND :maxLng")
+    List<VendorProfile> findApprovedAcceptingInBoundingBox(
+            BigDecimal minLat, BigDecimal maxLat,
+            BigDecimal minLng, BigDecimal maxLng);
 }

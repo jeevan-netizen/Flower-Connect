@@ -80,6 +80,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/locations/**").permitAll()
+                .requestMatchers("/api/v1/discover/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/categories").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs").permitAll()
@@ -91,6 +92,11 @@ public class SecurityConfig {
                 // own profile routes stay reachable while their profile is not approved.
                 // See docs/decisions.md (D-13).
                 .requestMatchers(HttpMethod.POST, "/api/v1/vendors/register").permitAll()
+                // Customer address book (plan task 4.1): the caller's own
+                // addresses, resolved from the JWT subject. CUSTOMER-only —
+                // a florist or admin account is refused with 403 rather than
+                // silently sharing another role's address book.
+                .requestMatchers("/api/v1/addresses/**").hasRole("CUSTOMER")
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/actuator/**").hasRole("ADMIN")

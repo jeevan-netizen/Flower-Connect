@@ -187,3 +187,73 @@ gated route returns 200 instead of 403. Every cell in this document therefore co
 `@SpringBootTest` (`@AutoConfigureMockMvc`) running against the real production filter chain.
 The slice tests carry an explicit Javadoc note saying so, so a reader does not assume the
 gate is verified there.
+
+---
+
+## 4.1 — Customer address book (`/api/v1/addresses`)
+
+One authorization layer only: `SecurityConfig` maps `/api/v1/addresses/**` to
+`hasRole("CUSTOMER")`. There is no `@RequiresApprovedVendor` — the address book is a
+customer surface, not a vendor transaction surface. The caller is resolved from the JWT
+subject on every call, so cross-customer access is not expressible in a request: an
+address that belongs to another customer and one that does not exist are the same 404.
+
+| Method | Path | 401 | 403 role | 403 foreign | 404 | 2xx |
+|---|---|---|---|---|---|---|
+| GET | `/api/v1/addresses` | ✅ | ✅ `FORBIDDEN` (FLORIST, ADMIN) | n/a — own listing | n/a | 200 |
+| POST | `/api/v1/addresses` | ✅ | ✅ | n/a | n/a | 201 |
+| GET | `/api/v1/addresses/{id}` | ✅ | ✅ | ✅ (indistinguishable from 404) | ✅ | 200 |
+| PUT | `/api/v1/addresses/{id}` | ✅ | ✅ | ✅ | ✅ | 200 |
+| DELETE | `/api/v1/addresses/{id}` | ✅ | ✅ | ✅ | ✅ | 204 |
+
+Verified by `AddressApiIntegrationTest` (real JWTs minted through the login endpoint,
+so the whole production filter chain runs):
+
+| Assertion | Test |
+|---|---|
+| 401, GET and POST | `anUnauthenticatedRequestIsRefused` |
+| 403 role, FLORIST and ADMIN | `aFloristAccountCannotReachTheAddressBook`, `anAdminAccountCannotReachTheAddressBook` |
+| 404 foreign and nonexistent, GET/PUT/DELETE | `anotherCustomersAddressIs404`, `aMissingAddressIs404` |
+| 400 validation (blank label, unknown service location, non-positive id, bad page/size) | `aBlankLabelIsRefused`, `anUnknownServiceLocationIsRefused`, `updatingWithAnUnknownServiceLocationIs400`, `aNonPositiveAddressIdIsRefused`, `invalidPaginationParametersAreRefused` |
+| Default rules at the HTTP boundary (first-address auto-default, explicit default clears previous, omitted flag keeps it, delete promotes oldest, delete of only address leaves none) | `theFirstAddressBecomesTheDefaultWhateverTheRequestSays`, `anExplicitDefaultOnALaterAddressClearsThePreviousDefault`, `aLaterAddressWithoutExplicitDefaultStaysNonDefault`, `updateIsAFullReplacementThatKeepsTheStoredDefault`, `updateSettingAnotherDefaultClearsThePreviousDefault`, `updateExplicitlyClearingTheDefaultLeavesNoDefault`, `deletingTheDefaultPromotesTheOldestRemainingAddress`, `deletingANonDefaultAddressLeavesTheDefaultAlone`, `deletingTheOnlyAddressLeavesTheBookEmpty` |
+| Listing order (default first, then id ASC) and pagination totals | `listsTheCallersAddressesDefaultFirstThenIdAscending`, `listingIsPaginatedAndReportsTotals` |
+| Coordinates are the server-copied centroid (create and on service-location change) | `theFirstAddressBecomesTheDefaultWhateverTheRequestSays`, `updateRecopiesTheCentroidWhenTheServiceLocationChanges` |
+
+Concurrency is covered by `AddressConcurrencyIntegrationTest`: 8 simultaneous first-address
+creations leave exactly one default, and 8 competing default switches leave exactly one —
+the user-row lock is the serialization point (D-32), and only a real-threads test can
+prove it.
+
+**Note:** the 403-foreign cell is a 404 by design — "yours" is defined by the principal,
+so a client cannot distinguish "someone else's address" from "no such address". That is
+the intended information-hiding property, not a gap.
+
+---
+
+## 4.3 — Geo discovery (`/api/v1/discover`)
+
+One authorization layer only: `SecurityConfig` maps `/api/v1/discover/**` to
+`permitAll()`. No authentication required, no role check, no vendor approval check.
+The endpoint is public reference data for storefront browsing.
+
+| Method | Path | 401 | 403 role | 403 foreign | 404 | 2xx |
+|---|---|---|---|---|---|---|
+| GET | `/api/v1/discover` | **200** (public by design) | n/a — public | n/a — global | n/a | 200 |
+
+Required query parameter: `locationId` (Long). Missing or unknown returns 400 `VALIDATION_FAILED`.
+
+Verified by `DiscoveryControllerIntegrationTest`:
+
+| Assertion | Test |
+|---|---|
+| 200 public access | `discoverReturnsVendorsWithinRadius` (implicit — no auth headers sent) |
+| 400 missing `locationId` | `discoverReturns400WhenLocationIdIsNull` |
+| 400 unknown `locationId` | `discoverReturns400WhenLocationIdIsUnknown` |
+| Pagination works | `discoverPaginationWorks` |
+| Sorts by distance then id | `discoverSortsByDistanceThenId` |
+| Empty when no approved vendors | `discoverReturnsEmptyWhenNoApprovedVendors` |
+
+The endpoint filters to `vendor_profiles.status = APPROVED` AND `accepting_orders = true`,
+computes Haversine distance from the given service location, and includes only vendors
+within their `delivery_radius_km`. Response includes `distanceKm` and `estimatedDeliveryFee`
+(`baseDeliveryFee + perKmFee × distanceKm`), plus `freeDeliveryAbove` as informational.

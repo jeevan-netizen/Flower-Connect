@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { clearVendorCache } from "@/features/vendor/queries";
 import { clearAdminCache } from "@/features/admin/queries";
+import { LocationMenu } from "@/features/location/components/LocationMenu";
 import { FOCUS_RING_DARK, PRESSABLE } from "@/motion/pressable";
 import { useMediaQuery, WIDE_HEADER_QUERY } from "@/app/hooks/useMediaQuery";
 
@@ -226,21 +227,32 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        {isWide ? (
-          renderLinks("flex items-center gap-6 lg:gap-9")
-        ) : (
-          <button
-            type="button"
-            ref={toggleRef}
-            aria-expanded={menuOpen}
-            aria-controls={panelId}
-            onClick={() => setMenuOpen((open) => !open)}
-            className={`rounded-sm p-2 text-bolder-text transition-colors duration-micro ease-standard hover:text-bolder-blush ${PRESSABLE} ${FOCUS_RING_DARK}`}
-          >
-            <MenuIcon open={menuOpen} />
-            <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
-          </button>
-        )}
+        {/*
+          The location control sits in the top bar on every viewport, not inside
+          the disclosure panel: the chosen area is the context the whole
+          marketplace runs in, so it must be one click away from every page
+          rather than buried behind the mobile menu. Its own dropdown panel is
+          coordinated with the navigation panel — opening one closes the other,
+          because both are anchored full-width to this header.
+        */}
+        <div className="flex items-center gap-4 lg:gap-6">
+          <LocationMenu onOpen={() => setMenuOpen(false)} />
+          {isWide ? (
+            renderLinks("flex items-center gap-6 lg:gap-9")
+          ) : (
+            <button
+              type="button"
+              ref={toggleRef}
+              aria-expanded={menuOpen}
+              aria-controls={panelId}
+              onClick={() => setMenuOpen((open) => !open)}
+              className={`rounded-sm p-2 text-bolder-text transition-colors duration-micro ease-standard hover:text-bolder-blush ${PRESSABLE} ${FOCUS_RING_DARK}`}
+            >
+              <MenuIcon open={menuOpen} />
+              <span className="sr-only">{menuOpen ? "Close menu" : "Open menu"}</span>
+            </button>
+          )}
+        </div>
       </nav>
 
       {!isWide && menuOpen && (

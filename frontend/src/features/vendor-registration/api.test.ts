@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchServiceLocations, registerVendor } from "@/features/vendor-registration/api";
+import { registerVendor } from "@/features/vendor-registration/api";
 import {
   buildVendorRegisterRequest,
-  hasNoServiceLocations,
-  toServiceLocationOptions,
   VENDOR_REGISTER_DEFAULTS,
   type VendorRegisterFormValues,
 } from "@/features/vendor-registration/types";
 import { isVendorRegisterField, vendorRegisterSchema } from "@/features/vendor-registration/form-schema";
-import { makeServiceLocations, makeVendorProfile } from "@/test/factories";
+import { makeVendorProfile } from "@/test/factories";
 
 const mockApi = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }));
 
@@ -38,18 +36,6 @@ describe("vendor registration api client", () => {
     vi.clearAllMocks();
   });
 
-  it("reads the full service-area list from the unfiltered locations endpoint", async () => {
-    const locations = makeServiceLocations();
-    mockApi.get.mockResolvedValue({ data: locations });
-
-    const result = await fetchServiceLocations();
-
-    // No params: any `pincode`/`area`/`page`/`size` turns this into a paginated
-    // search and a picker cannot enumerate the region.
-    expect(mockApi.get).toHaveBeenCalledWith("/locations");
-    expect(result).toEqual(locations);
-  });
-
   it("posts the registration payload to /vendors/register", async () => {
     mockApi.post.mockResolvedValue({ data: makeVendorProfile({ status: "PENDING_APPROVAL" }) });
 
@@ -65,19 +51,15 @@ describe("vendor registration api client", () => {
     );
   });
 
-  it("returns only the fields the success panel needs, never credentials", async () => {
+  it("returns the created profile as-is, because the success panel reads it", async () => {
     mockApi.post.mockResolvedValue({ data: makeVendorProfile({ status: "PENDING_APPROVAL" }) });
 
     const result = await registerVendor(buildVendorRegisterRequest(formValues()));
 
-    expect(result).toEqual({
-      businessName: "Petal & Stem",
-      status: "PENDING_APPROVAL",
-      city: "Bengaluru",
-      area: "Indiranagar",
-      pincode: "560038",
-    });
-    expect(result).not.toHaveProperty("ownerEmail");
+    expect(result).toEqual(makeVendorProfile({ status: "PENDING_APPROVAL" }));
+    // The narrowing to the panel's fields happens in the page, not here: this
+    // client returns what the server sent and leaks nothing of its own.
+    expect(result).toHaveProperty("ownerEmail");
     expect(result).not.toHaveProperty("password");
   });
 });
@@ -139,46 +121,6 @@ describe("buildVendorRegisterRequest", () => {
     expect(request).not.toHaveProperty("reviewCount");
     expect(request).not.toHaveProperty("latitude");
     expect(request).not.toHaveProperty("longitude");
-  });
-});
-
-describe("toServiceLocationOptions", () => {
-  it("flattens the city-grouped response into id/label rows", () => {
-    const options = toServiceLocationOptions(makeServiceLocations());
-
-    expect(options).toEqual([
-      { id: "3", city: "Bengaluru", label: "Indiranagar (560038)" },
-      { id: "4", city: "Bengaluru", label: "Koramangala (560034)" },
-    ]);
-  });
-
-  it("keeps the id from the response instead of deriving one from the label", () => {
-    const [option] = toServiceLocationOptions(makeServiceLocations());
-
-    expect(option?.id).toBe("3");
-  });
-
-  it("returns an empty list when the query has not resolved", () => {
-    expect(toServiceLocationOptions(undefined)).toEqual([]);
-  });
-
-  it("drops an area with no usable id, because it could not be submitted", () => {
-    const options = toServiceLocationOptions(
-      makeServiceLocations({
-        areas: [
-          { id: 3, area: "Indiranagar", pincode: "560038", latitude: 12.97, longitude: 77.64 },
-          { id: 0, area: "Broken Row", pincode: "000000", latitude: 0, longitude: 0 },
-        ],
-      }),
-    );
-
-    expect(options).toHaveLength(1);
-    expect(options[0]?.label).toBe("Indiranagar (560038)");
-  });
-
-  it("reports the empty case rather than offering an unusable picker", () => {
-    expect(hasNoServiceLocations(toServiceLocationOptions([]))).toBe(true);
-    expect(hasNoServiceLocations(toServiceLocationOptions(makeServiceLocations()))).toBe(false);
   });
 });
 

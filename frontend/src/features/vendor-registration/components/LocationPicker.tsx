@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { ServiceLocationGroup, ServiceLocationOption } from "@/features/vendor-registration/types";
+import type { ServiceLocationGroup, ServiceLocationOption } from "@/features/location/types";
 import { FieldMessage } from "@/motion/FieldMessage";
 import { FIELD_TRANSITION } from "@/motion/pressable";
 

@@ -9,8 +9,14 @@ import { businessError, validationError } from "@/test/api-errors";
 const mockFetchServiceLocations = vi.hoisted(() => vi.fn());
 const mockRegisterVendor = vi.hoisted(() => vi.fn());
 
-vi.mock("@/features/vendor-registration/api", () => ({
+// The locations API moved to the shared location slice in task 4.2 (the
+// customer picker shares the endpoint); the registration client keeps only
+// what is specific to it.
+vi.mock("@/features/location/api", () => ({
   fetchServiceLocations: mockFetchServiceLocations,
+}));
+
+vi.mock("@/features/vendor-registration/api", () => ({
   registerVendor: mockRegisterVendor,
 }));
 

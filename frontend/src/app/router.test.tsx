@@ -69,8 +69,14 @@ vi.mock("@/features/vendor/api", () => ({
   updateExpiryDate: vi.fn(),
 }));
 
-vi.mock("@/features/vendor-registration/api", () => ({
+// The service-location API moved to the shared location slice in task 4.2: the
+// header's location control and the vendor registration form share one fetch,
+// so mocking the location module covers both.
+vi.mock("@/features/location/api", () => ({
   fetchServiceLocations: mockFetchServiceLocations,
+}));
+
+vi.mock("@/features/vendor-registration/api", () => ({
   registerVendor: mockRegisterVendor,
 }));
 
@@ -136,6 +142,9 @@ describe("application router", () => {
     mockFetchLowStock.mockResolvedValue(makePage([]));
     mockFetchAdminVendors.mockResolvedValue(makePage([]));
     mockFetchAdminUsers.mockResolvedValue(makePage([]));
+    // The shell's location control mounts on every page, so the shared
+    // locations fetch must resolve wherever the router renders.
+    mockFetchServiceLocations.mockResolvedValue(makeServiceLocations());
   });
 
   it("keeps every pre-existing customer route", () => {
@@ -337,6 +346,7 @@ describe("admin route protection", () => {
     mockFetch.mockResolvedValue(makeVendorProfile());
     mockFetchAdminVendors.mockResolvedValue(makePage([]));
     mockFetchAdminUsers.mockResolvedValue(makePage([]));
+    mockFetchServiceLocations.mockResolvedValue(makeServiceLocations());
   });
 
   it("adds the three admin paths under a guarded /admin namespace", () => {

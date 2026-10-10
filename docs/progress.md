@@ -4,40 +4,55 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 3 (Catalog and inventory management) — COMPLETED & CLOSED OUT**
+**Phase 4 (Customer addresses, discovery and search) — Stage 1 (task 4.1) COMPLETE**
 
-Phase 3 is fully implemented, verified, and closed out. All tasks 3.1–3.9 and 3.T are complete, with full test coverage and the Phase 3 RBAC matrix documented in `docs/rbac-matrix.md`. Task 3.1 category audit findings have been resolved with regression coverage in place.
+Task 4.1 (customer address book) is implemented, verified and committed on branch
+`phase-4-discovery-search`: the `addresses` table (V12), entity and repository,
+DTOs and MapStruct mapper, `AddressService` with the one-default-per-customer
+invariant enforced under a pessimistic lock on the caller's own `users` row
+(D-32), and `AddressController` at `/api/v1/addresses` inside a CUSTOMER-only
+namespace. Stage 0's design note (`docs/phase-4-stage-0-design.md`) records the
+decisions carried into the implementation.
 
-Close-out verification:
+Stage 1 verification:
 
 | Command | Result |
 |---|---|
-| `./mvnw test` | **508 unit tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
-| `./mvnw verify -Pintegration` | **362 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
-| `npm run lint` | clean |
-| `npm run typecheck` | `tsc -b` exits 0 |
-| `npm run test` | **514 tests across 45 files**, all passed |
-| `npm run build` | 681 modules transformed, built cleanly |
-| `/v3/api-docs` | all **34** endpoints present |
+| `./mvnw test` | **527 unit tests** (508 Phase 3 baseline + 19 new), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration` | **390 integration tests** (365 baseline + 25 new), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 
 ### Next Phase
 
-**Phase 4 (Customer addresses, discovery and search)** — tasks 4.1 through 4.T per `docs/FlowerConnect_Implementation_Plan_v2.2.md`.
+**Phase 4 tasks 4.2–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
+location picker (4.2), geo discovery (4.3), product search (4.4), storefront API
+(4.5), then the customer frontend (4.6–4.9) and Phase 4 verification (4.T).
 
-Two defects were found and fixed during the close-out rather than worked around:
+Two defects were found by the new tests and fixed during Stage 1 rather than
+worked around:
 
-- **The runtime image could not create its upload root.** `LocalDiskStorageService` creates
-  its directory at startup (`@PostConstruct`), but the Dockerfile never created
-  `/var/lib/flowerconnect/uploads`, and the container runs as the non-root `app` user under
-  `/app`, where it has no write permission. Any first image upload in a container would have
-  failed on boot. Fixed by creating the directory in the runtime stage and chowning it to
-  `app:app`, and by pointing compose at it with `STORAGE_LOCAL_DIR` plus a named volume so it
-  survives a redeploy.
-- **`/v3/api-docs` was missing every Phase 3 path.** The running backend image was 46 hours
-  stale, built before tasks 3.5–3.8 existed. This was a stale-image artefact rather than a
-  code defect — the annotations are present on all three controllers — but it is recorded
-  because "Swagger is missing my endpoints" is indistinguishable from "the endpoints were
-  never documented" without checking the image age.
+- **The default-address lock was not actually serialising.** The write path
+  resolved the caller with a plain `SELECT` before taking `SELECT ... FOR
+  UPDATE`. Under MySQL REPEATABLE READ the first plain read establishes the
+  transaction snapshot, so the later "does a default already exist" read could
+  not see rows a concurrent transaction committed after the snapshot — 8
+  simultaneous first-address creations all became the default. The locking
+  read is now the *first* read of the write transaction, so the snapshot is
+  created under the lock (D-32). Caught only by `AddressConcurrencyIntegrationTest`;
+  every sequential test passed while the race was live.
+- **`isDefault` would have serialized as `default`.** A primitive `boolean
+  isDefault` makes Lombok generate an `isDefault()` getter, from which Jackson
+  strips the "is" prefix. Every boolean property — entity, request and response
+  — is therefore named `defaultAddress` (D-33).
+
+Phase 3 close-out (fully implemented and verified; per-task detail under
+Completed Work): all tasks 3.1–3.9 and 3.T complete, with the Phase 3 RBAC
+matrix in `docs/rbac-matrix.md` and the task 3.1 category audit findings
+resolved with regression coverage. Two defects were fixed during that close-out
+rather than worked around: the runtime image could not create its upload root
+(`backend/Dockerfile` now creates and chowns `/var/lib/flowerconnect/uploads`,
+and compose points `STORAGE_LOCAL_DIR` at it with a named volume), and
+`/v3/api-docs` was missing every Phase 3 path because the running image was 46
+hours stale (a stale-image artefact, not a code defect).
 
 ### Not verified
 
@@ -273,10 +288,10 @@ integration tests**, all green — `BUILD SUCCESS`.
 - [x] **3.7 — Expiry scheduler**: `InventoryExpiryService` writes off available stock whose `expiry_date` has passed as a `WASTE` movement (null actor, no reference, reason naming the expiry date and the sweep date) and delists an `ACTIVE` product as `INACTIVE`; `InventoryExpiryScheduler` triggers it on `app.expiry-sweep-cron`. Expired means `expiryDate < LocalDate.now(clock)` on the injected `Clock`; reserved units are never written off (`quantity` stops at `reserved_quantity`); a row with nothing available is delisted without a movement. Candidates are selected unlocked and ordered by product id, then locked one at a time through the existing `findByProductIdForUpdate` with every condition re-checked under the lock, and the whole run is one transaction bounded by `app.expiry-sweep-max-rows`. Idempotency is the candidate predicate (`quantity > reservedQuantity OR status = ACTIVE`), not a processed flag (D-25). No endpoint and no migration. 16 new unit tests, 12 integration tests
 - [x] **3.8 — Image handling**: `StorageService` (`store`/`delete`/`exists`/`describe`) with `LocalDiskStorageService` (`@Profile("!s3")`, `.part` + `ATOMIC_MOVE` writes, traversal-checked `resolve`, root created at startup) and `S3StorageService` (`@Profile("s3")`) as a declared stub that throws on every method and names what is missing — the AWS SDK is not a dependency and a silently inert implementation would serve `201 Created` and write nothing (D-26). `VendorProductImageController` at `/api/v1/vendors/products/{productId}/images` — `POST` (multipart part `file`, optional `primary` flag, 201), `GET` (ordered list), `PUT /{imageId}/primary`, `PUT /order` (must be an exact permutation of the product's image ids), `DELETE /{imageId}` (204, promotes the next image when the cover is removed). `@RequiresApprovedVendor` on the class; ownership resolved through `ProductService.requireOwnedProduct`, made package-private so "yours" is defined once for the catalog and the image routes. Validation order is ownership → empty part (400) → declared length over `max-file-size-bytes` (413, before the bytes are buffered) → content sniffing (415) → decode (400) → pixel budget (413) → image count (409), so a rejected upload leaves neither a row nor a file. Format is decided by the leading bytes only, never the filename or the part's `Content-Type`; every accepted upload is decoded, scaled to `max-dimension` and re-encoded, so EXIF/GPS is dropped and the stored bytes, dimensions and `mime_type` are the pipeline's own output; WebP is decoded and stored as JPEG (D-27). Keys are `product-images/{productId}/{uuid}.{ext}`, always server-generated. The one-primary invariant is enforced under `findByProductIdForUpdate` (`PESSIMISTIC_WRITE`, ordered by `sortOrder, id`), the first image becomes the cover automatically, and `requireSinglePrimary` asserts the invariant after every mutation (D-28). Uploads store the object then the row and remove the object if the row cannot be written; deletes remove the row first and treat a failed object removal as a logged orphan. No migration. 93 new unit tests, 36 integration tests including a `CountDownLatch` concurrency case
 - [x] **3.9 — Vendor catalog UI**: four screens inside the existing vendor shell — `/vendor/catalog` (searchable, status- and category-filtered product table with pagination, low-stock badges and per-row links), `/vendor/catalog/new` + `/vendor/catalog/:productId` (one Shopify-style create/edit form, image manager, stock panel with the four stock actions, low-stock threshold and expiry date, movement history, deactivation behind a confirmation), and `/vendor/inventory` (shop-wide low-stock table with the four stock actions per row and the selected product's movement history). `ApprovedVendorGate` wraps the three gated routes over the cached `["vendor","profile"]` query and `VendorLayout` withholds the two new nav links from an unapproved vendor, so D-13 stays the authority (D-29). One `StockActionDialog` serves all four stock mutations with the per-action rules in one table; a blank optional reason is sent as `null` (D-30). Images render as metadata because no byte-serving route exists (D-31). The product editor is reachable at `/vendor/catalog/new` as its own route, so `useParams().productId` is *absent* there rather than the string "new". `isMissingVendorProfile` is scoped to the profile read by request URL, so a missing product no longer reports a missing account. 76 new frontend tests across 7 files (product form 9, stock dialog 15, approval gate 8, catalog page 14, inventory page 11, product editor page 17, plus additions to the API-client, query-cache, format and router suites). No backend change and no migration
-#### Phase 4 — Customer Addresses, Discovery and Search (Pending)
-- [ ] 4.1 Address book (`addresses` entity and CRUD)
+#### Phase 4 — Customer Addresses, Discovery and Search
+- [x] **4.1 — Address book**: `addresses` table (V12) — one row per saved address, `user_id` FK (CASCADE), `service_location_id` FK, `label`/`line1`/`line2`, centroid `latitude`/`longitude` copied from the service location at write time (D-4), `is_default` BIT(1) with no unique constraint (MySQL has no partial unique index and the generated-column trick conflicts with the required FK — the D-21 finding), so one-default-per-customer is a service-level invariant (D-32). `AddressService` resolves the caller from the JWT subject only; every write is one `@Transactional` whose *first* read locks the caller's own `users` row (`UserRepository.findByEmailForUpdate`, `PESSIMISTIC_WRITE`) and only then reads and mutates that user's addresses — the user row is the serialization point because a first-address creation has no address row to lock, and a plain read before the lock would poison the REPEATABLE READ snapshot (D-32). First address becomes the default automatically (an explicit `false` is not honoured); a later address is default only when the request says so and clears the previous default in the same transaction; deleting the default promotes the oldest remaining address (`MIN(id)`); deleting the only address leaves no default; an ordinary update never changes the stored flag unless the request sets it. `PUT` is a full replacement (D-15): an omitted `line2` clears it, an omitted `defaultAddress` keeps the flag, and changing the service location recopies the new centroid. `AddressController` at `/api/v1/addresses` — `GET` (paged, default first then id ASC, page/size validated 0../1..100), `POST` (201), `GET|PUT /{id}` (200), `DELETE /{id}` (204); `@Positive` path ids; a foreign id and a missing id are both 404 (ownership is scoped by `user_id` in every query); an unknown `serviceLocationId` is 400 `VALIDATION_FAILED` ("Unknown service location", the `VendorService` precedent). `SecurityConfig` maps `/api/v1/addresses/**` to `hasRole("CUSTOMER")` — a florist or admin account is 403 before the controller; unauthenticated is 401. 19 unit tests (`AddressServiceTest`) + 23 HTTP integration tests (`AddressApiIntegrationTest` — real JWTs minted through the login endpoint, so the full production filter chain runs; RBAC, ownership, validation, pagination, default rules and delete-promotion at the HTTP boundary) + 2 real-thread concurrency tests (`AddressConcurrencyIntegrationTest` — 8 simultaneous first-address creations leave exactly one default; 8 competing default switches leave exactly one). No frontend change.
 - [ ] 4.2 Location picker (session-backed, no GPS)
-- [ ] 4.3 Geo discovery API (`GET /api/v1/discover`)
+- [x] 4.3 Geo discovery API (`GET /api/v1/discover`)
 - [ ] 4.4 Product search API (`GET /api/v1/search`)
 - [ ] 4.5 Storefront API (`GET /api/v1/vendors/{id}/storefront`)
 - [ ] 4.6 Customer home page (location picker, vendor cards)
@@ -289,6 +304,8 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-10 | Implement Task 4.3: Geo discovery API (`GET /api/v1/discover`) | DiscoveryResponse DTO, DiscoveryService, DiscoveryController, SecurityConfig update, unit and integration tests |
+| 2026-10-09 | Phase 4 Stage 1 (task 4.1): customer address book — V12 migration, entity/repository, DTOs/MapStruct mapper, service with the one-default-per-customer invariant under a user-row lock (D-32), REST controller at `/api/v1/addresses` in a CUSTOMER-only namespace; two defects fixed during verification (REPEATABLE READ snapshot poisoning of the lock protocol, and the `isDefault` wire name — D-33) | `backend/src/main/java/com/flowerconnect/customer/**` (domain, repository, dto, mapper, service, controller), `backend/src/main/java/com/flowerconnect/repository/UserRepository.java`, `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java`, `backend/src/main/resources/db/migration/V12__create_addresses.sql`, `backend/src/test/java/com/flowerconnect/customer/**` (AddressServiceTest, AddressApiIntegrationTest, AddressConcurrencyIntegrationTest), `docs/decisions.md` (D-32, D-33), `docs/rbac-matrix.md`, `docs/progress.md` |
 | 2026-10-05 | Phase 3 final audit fix (task 3.1): active-only public category read and an all-category admin listing with correct pagination, plus regression coverage at service and HTTP level | `CategoryRepository.java`, `CategoryService.java`, `CategoryController.java`, `CategoryServiceTest.java`, `CategoryApiIntegrationTest.java`, `docs/decisions.md` (D-17, D-18), `docs/known-issues.md` (#021 closed, #025, #026), `docs/progress.md` |
 | 2026-10-05 | Phase 3h close-out (task 3.T): RBAC matrix for every Phase 3 endpoint mapped to the integration test that asserts each cell; runtime image can create its upload root; `/v3/api-docs` verified at 34 endpoints after rebuilding a stale image | `docs/rbac-matrix.md` (new), `docs/progress.md`, `docs/known-issues.md` (issues 023, 024 + Phase 3h gotchas), `backend/Dockerfile`, `docker-compose.yml` |
 | 2026-10-05 | Phase 3g Task 3.9: vendor catalog UI — listing with search/filters/pagination, Shopify-style create/edit, image manager, per-product and shop-wide stock panels, movement history, approval gate over the cached profile | `src/app/router.tsx`, `src/features/vendor/**` (types, api, queries, format, form-schema, 9 components, 3 pages, 5 test files), `src/shared/{types.ts,format.ts,components/Pagination.tsx}`, `src/shared/lib/api-error.ts`, `src/test/{factories.ts,api-errors.ts}`, `src/features/admin/**` (pagination extracted to shared), `docs/decisions.md` (D-29, D-30, D-31), `docs/progress.md`, `docs/known-issues.md` |
