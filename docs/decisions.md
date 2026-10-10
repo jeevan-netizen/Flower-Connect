@@ -1783,3 +1783,40 @@ and in Java.
 - The `Address` entity's class javadoc already records the property-
   resolution reasoning; the DTOs cite it.
 
+---
+
+## D-34: Geo discovery API is public and uses bounding-box + Haversine
+
+**Status:** Accepted
+**Date:** Phase 4 (Task 4.3)
+
+### Context
+
+Plan task 4.3 introduces `GET /api/v1/discover`: a public endpoint that returns approved vendors accepting orders within their delivery radius of a given service location. The endpoint requires a `locationId` parameter (referencing a `service_locations` row), and returns paginated vendor cards with computed `distanceKm` and `estimatedDeliveryFee` (base + per-km × distance).
+
+Two patterns for public data access existed:
+- `GET /api/v1/locations` — `permitAll()` (reference data)
+- `GET /api/v1/categories` — `permitAll()` (reference data, active roots only)
+
+The discovery endpoint is similar to locations/categories in that it serves reference data for the storefront, but it also computes real-time distances and filters by each vendor's `delivery_radius_km`.
+
+### Decision
+
+- **Public access**: `GET /api/v1/discover` is mapped to `permitAll()` in `SecurityConfig`, mirroring `/api/v1/locations` and `/api/v1/categories`. No authentication required.
+- **Required parameter**: `locationId` (Long) is required; missing or unknown returns 400 `VALIDATION_FAILED`.
+- **Filtering**: Only vendors with `status = APPROVED` AND `accepting_orders = true` are considered.
+- **Distance calculation**: Bounding-box prefilter using `idx_vendor_profiles_status_geo` (composite on `status, latitude, longitude`), then exact Haversine distance check against each vendor's `delivery_radius_km`. The bounding box radius is derived from the maximum `delivery_radius_km` among approved vendors.
+- **Sorting**: Results sorted by `distanceKm` ascending, tie-broken by vendor `id`.
+- **Pagination**: Standard `page` (0-based) and `size` (1..100, default 20) parameters. Response uses `PageResponse` envelope with `page`, `size`, `totalElements`, `totalPages`, `first`, `last`, `empty`.
+- **Fee estimation**: `estimatedDeliveryFee = baseDeliveryFee + perKmFee × distanceKm` (rounded to 2 decimals). `freeDeliveryAbove` is included as informational only.
+- **Error handling**: Unknown `locationId` ? 400 `VALIDATION_FAILED` ("Unknown service location"); missing `locationId` ? 400 `VALIDATION_FAILED` via the `MissingServletRequestParameterException` override in `GlobalExceptionHandler` (standard `ErrorResponse` envelope).
+
+### Consequences
+
+- The endpoint is usable by unauthenticated customers for storefront browsing (Phase 4.5+).
+- Bounding-box prefilter keeps the Haversine computation bounded even as vendor count grows.
+- The composite index `idx_vendor_profiles_status_geo` serves both the status filter and the bounding box.
+- `freeDeliveryAbove` is informational; the storefront UI decides whether to show "free delivery above X" badges.
+- The discovery query does not consider vendor prep time, slot availability, or max orders per slot — those are order-time concerns.
+- If no approved vendors exist, or max radius is null, an empty page is returned immediately without a bounding-box query.
+

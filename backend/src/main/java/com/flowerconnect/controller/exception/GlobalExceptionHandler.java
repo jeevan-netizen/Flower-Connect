@@ -13,6 +13,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -158,6 +159,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .error("Bad Request")
                 .errorCode(ErrorCode.VALIDATION_FAILED)
                 .message("Request body is required or malformed")
+                .build();
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(
+            MissingServletRequestParameterException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(clock))
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
+                .errorCode(ErrorCode.VALIDATION_FAILED)
+                .message("Required parameter '" + ex.getParameterName() + "' is not present")
                 .build();
         return ResponseEntity.badRequest().body(response);
     }

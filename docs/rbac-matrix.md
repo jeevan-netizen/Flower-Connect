@@ -227,3 +227,33 @@ prove it.
 **Note:** the 403-foreign cell is a 404 by design — "yours" is defined by the principal,
 so a client cannot distinguish "someone else's address" from "no such address". That is
 the intended information-hiding property, not a gap.
+
+---
+
+## 4.3 — Geo discovery (`/api/v1/discover`)
+
+One authorization layer only: `SecurityConfig` maps `/api/v1/discover/**` to
+`permitAll()`. No authentication required, no role check, no vendor approval check.
+The endpoint is public reference data for storefront browsing.
+
+| Method | Path | 401 | 403 role | 403 foreign | 404 | 2xx |
+|---|---|---|---|---|---|---|
+| GET | `/api/v1/discover` | **200** (public by design) | n/a — public | n/a — global | n/a | 200 |
+
+Required query parameter: `locationId` (Long). Missing or unknown returns 400 `VALIDATION_FAILED`.
+
+Verified by `DiscoveryControllerIntegrationTest`:
+
+| Assertion | Test |
+|---|---|
+| 200 public access | `discoverReturnsVendorsWithinRadius` (implicit — no auth headers sent) |
+| 400 missing `locationId` | `discoverReturns400WhenLocationIdIsNull` |
+| 400 unknown `locationId` | `discoverReturns400WhenLocationIdIsUnknown` |
+| Pagination works | `discoverPaginationWorks` |
+| Sorts by distance then id | `discoverSortsByDistanceThenId` |
+| Empty when no approved vendors | `discoverReturnsEmptyWhenNoApprovedVendors` |
+
+The endpoint filters to `vendor_profiles.status = APPROVED` AND `accepting_orders = true`,
+computes Haversine distance from the given service location, and includes only vendors
+within their `delivery_radius_km`. Response includes `distanceKm` and `estimatedDeliveryFee`
+(`baseDeliveryFee + perKmFee × distanceKm`), plus `freeDeliveryAbove` as informational.
