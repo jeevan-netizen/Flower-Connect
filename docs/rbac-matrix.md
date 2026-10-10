@@ -303,3 +303,50 @@ The endpoint filters to `products.status = ACTIVE` AND available stock > 0
 against each vendor's `delivery_radius_km`, and sorts in memory by the chosen criterion
 (distance / price_asc / price_desc / name). Response includes `distanceKm` and
 `estimatedDeliveryFee` per product (D-35).
+
+---
+
+## 4.5 — Vendor storefront (`/api/v1/vendors/{id}/storefront`)
+
+**Two authorization layers, and the storefront is the one route that inverts their order.**
+`SecurityConfig` carries a `permitAll()` exception for
+`HttpMethod.GET, "/api/v1/vendors/*/storefront"` **above** the
+`.requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")` rule, because Spring evaluates
+`requestMatchers` in declaration order (M5). This is the only public route under the vendor
+namespace, and the exception is method- and shape-narrow: GET, one wildcard segment. There is
+no `@RequiresApprovedVendor` on the handler — that annotation answers "may this vendor
+transact?", which is not the question here — the approval rule lives in the service, because
+the storefront is a read *about* a vendor rather than a request *from* one.
+
+| Method | Path | 401 | 403 role | 403 approval | 404 | 2xx |
+|---|---|---|---|---|---|---|
+| GET | `/api/v1/vendors/{id}/storefront` | **200** (public by design) | n/a — public | n/a — not a vendor request | ✅ unknown id, and every non-approved status | 200 |
+
+| Assertion | Test |
+|---|---|
+| 200 anonymous, no `Authorization` header | `anAnonymousCallerGetsAnApprovedStorefront` (integration) |
+| 200 for CUSTOMER, FLORIST and ADMIN alike | `everyAuthenticatedRoleCanReadThePublicStorefront` |
+| 404 unknown id | `anUnknownVendorIdIsNotFound` |
+| 404 `PENDING_APPROVAL` / `REJECTED` / `SUSPENDED` | `aNonApprovedVendorIsNotFound` |
+| Unknown and non-approved are indistinguishable | `aNonApprovedResponseIsIndistinguishableFromAnUnknownId` |
+| Paused shop is still readable, flag exposed | `anApprovedVendorWhoHasPausedOrderingIsStillReadable` |
+| Only ACTIVE products | `onlyActiveProductsAreReturned` |
+| Out-of-stock ACTIVE product stays with `inStock=false`; available stock is `true` | `anOutOfStockActiveProductStaysOnThePage` |
+| Standard envelope totals, `first`/`last`/`empty` | `paginationReportsTheStandardEnvelopeTotals` |
+| Stable `createdAt desc, id desc` order across pages | `anActiveProductOrderIsStableAcrossPages` |
+| Empty page (not 404) when no ACTIVE products, profile still returned | `aVendorWithNoActiveProductsReturnsAnEmptyPage` |
+| Approval re-read per request (suspend after a 200) | `approvalStatusIsReReadOnEveryRequest` |
+| 400 non-positive id, negative page, size < 1, size > 100 | `aNonPositiveVendorIdIsRejected`, `invalidPaginationParametersAreRejected` |
+| **Adjacent vendor routes still 401** (profile, catalog list/read, inventory read, movements, low-stock, image list), PUT to the public path still 401, one segment deeper still 401 | `neighbouringVendorRoutesStayProtectedForAnonymousCallers` |
+| Public DTO carries no private fields | `doesNotSerializePrivateVendorOrInventoryFields` (slice) |
+
+Verified against real MySQL through the production filter chain by
+`StorefrontControllerIntegrationTest` (15 tests) and `@SpringBootTest`, the response
+contract and parameter validation by `StorefrontControllerTest` (8 tests), and the
+visibility rules by `StorefrontServiceTest` (18 tests).
+
+**Note — the 404 column is the only authorization statement this route makes.** It is not a
+"foreign resource" 403 (the plan's Phase 3 cell vocabulary) because the path names a vendor
+rather than a row owned by the caller: a caller who is refused cannot tell whether the id
+exists, which is the information-hiding property the empty-page and 404-cell rules in D-35
+and the address book (D-32's "404 for foreign") share. See D-36.

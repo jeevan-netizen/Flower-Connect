@@ -98,6 +98,15 @@ public class SecurityConfig {
                 // a florist or admin account is refused with 403 rather than
                 // silently sharing another role's address book.
                 .requestMatchers("/api/v1/addresses/**").hasRole("CUSTOMER")
+                // Public vendor storefront (plan task 4.5). The one route under
+                // this namespace that is deliberately NOT florist-only, and the
+                // reason it works at all: Spring evaluates requestMatchers in
+                // declaration order, so this exception must stay ABOVE the
+                // namespace rule below. GET, one wildcard segment — the storefront
+                // of exactly one vendor. Every other /api/v1/vendors/** route still
+                // requires ROLE_FLORIST, and a longer path (e.g. .../storefront/x)
+                // does not match this matcher and falls through to it.
+                .requestMatchers(HttpMethod.GET, "/api/v1/vendors/*/storefront").permitAll()
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/actuator/**").hasRole("ADMIN")

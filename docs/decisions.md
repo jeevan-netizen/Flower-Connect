@@ -1938,3 +1938,129 @@ Haversine value, so the candidates must be materialised before sorting.
   branch and nothing else: the sort happens in Java on a list already filtered
   and mapped.
 
+---
+
+## D-36: The storefront is public, profile-shaped, and hides stock rather than deleting rows
+
+**Status:** Accepted
+**Date:** Phase 4 (task 4.5)
+
+### Context
+
+Plan task 4.5 is one line: `GET /api/v1/vendors/{id}/storefront` — public profile and
+active products, 404 for non-approved vendors. The design note
+(`docs/phase-4-stage-0-design.md` §D) expands it into a security conflict (M5), a payload,
+a 404 rule and a no-migration boundary, and carries no `[APPROVAL]` flags of its own.
+Five things it does not settle each change the response contract, and each was decided
+before the tests were written rather than after:
+
+**Where the route sits in the two authorization layers.** D-13 split authorization into a
+URL namespace rule (`/api/v1/vendors/**` ? `hasRole("FLORIST")`) and a per-handler
+approval rule (`@RequiresApprovedVendor`). The storefront is the first route under that
+namespace that must be *public*, so it needs an exception matcher declared **above** the
+namespace rule — Spring evaluates `requestMatchers` in declaration order (M5). The design
+note sketches the pattern as `/api/v1/vendors/{id}/storefront`, which is a design sketch
+rather than a working Spring Security pattern: the `String` matcher family interprets
+`{id}` differently depending on which implementation backs it, and the codebase has no
+path-variable matcher to copy a convention from. `/api/v1/vendors/*/storefront` is a
+single-segment wildcard under both readings and is behaviourally identical here, so that
+is what was used.
+
+**What an "active product" means.** Task 4.4 search requires
+`quantity - reserved_quantity > 0`; task 4.5 says only "active products". Read literally
+the two endpoints disagree about the same row: a product whose stock ran out would vanish
+from search but stay on the storefront, or vanish from the storefront while the vendor's
+own catalog screen still shows it.
+
+**Whether a paused shop has a storefront.** D-6 hides a suspended vendor from
+*discovery*, and the plan's 404 rule is about *approval status*, not about whether
+ordering is currently on.
+
+**Which profile fields are public.** `VendorProfileResponse` is the owning vendor's read
+model and carries everything the storefront must not: the owner's email, the exact
+coordinates, the street address, the approval status and the audit timestamps.
+
+**Whether `slotDurationMinutes` / `maxOrdersPerSlot` belong.** `docs/architecture.md` §5
+describes the profile's delivery settings as "minimum order amount, base delivery fee,
+per-km fee, free-delivery threshold, prep time, slot duration, orders per slot, and an
+accept-orders flag" — so the documented delivery-settings contract names both slot fields,
+while the only existing *public* vendor DTO (`DiscoveryResponse`) omits them.
+
+### Decision
+
+- **A narrow public exception, declared above the namespace rule.** `SecurityConfig` gains
+  `.requestMatchers(HttpMethod.GET, "/api/v1/vendors/*/storefront").permitAll()`
+  immediately before `.requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")`, with a
+  comment recording why the order is load-bearing. Method-restricted, one wildcard
+  segment, nothing else loosened. The route carries no `@RequiresApprovedVendor`: that
+  annotation answers "may this vendor transact?", and a storefront is a read *about* a
+  vendor, not a request *from* one.
+- **The response is compound: `vendor` + `products`.** `vendor` is the profile (not
+  paginated); `products` is the standard `PageResponse` envelope, so a client pages the
+  catalogue with the same `page`/`size` parameters and reads the same
+  `totalElements`/`totalPages` metadata it reads from discovery and search.
+  `PageResponses` gained a public `of(Page)` overload so the storefront wraps a
+  repository-paged result without recomputing totals from the page window.
+- **"Active products" is a lifecycle statement, not a stock statement.** Every `ACTIVE`
+  product is listed, including one with nothing available, and each row carries an
+  `inStock` boolean derived from `Inventory.getAvailable()` — the entity's own
+  `quantity - reservedQuantity` computation, not a second copy of that arithmetic. Raw
+  quantities and reserved quantities are not exposed. A product with no inventory row
+  reports `inStock = false`: the one-row-per-product invariant makes that unreachable
+  through the write paths, and "cannot be bought" is the safe answer for an unknown level.
+- **A paused shop is still browsable.** `APPROVED` + `accepting_orders = false` returns
+  200 with the flag exposed, so a client can render a closed-shop state. Suspension is
+  approval status and hides the page (D-6); pausing is not.
+- **A new public DTO, not a reused private one.** `StorefrontVendorResponse` carries
+  vendor id, business name, description, `logoUrl`, city/area/pincode,
+  `deliveryRadiusKm`, the delivery settings (`minOrderAmount`, `baseDeliveryFee`,
+  `perKmFee`, `freeDeliveryAbove`, `prepTimeMinutes`, `slotDurationMinutes`,
+  `maxOrdersPerSlot`), `acceptingOrders`, `avgRating`, `reviewCount` and the weekly hours
+  mapped through the shared `VendorMapper.toHoursResponses`. Omitted by name: owner email
+  and every user field, `commissionRate`, `status`, exact `latitude`/`longitude`,
+  `addressLine1`/`addressLine2`, and the audit timestamps. `logoUrl` is a vendor-supplied
+  URL column, not a `StorageService` key, so serving it is not a known-issue-020 problem.
+  Slot fields are included because the documented delivery-settings contract names them
+  and they need no schema change.
+- **Sorting is the vendor catalog listing's, not a new one: `createdAt desc, id desc`.**
+  The id tie-break is what makes pagination stable when two products share a creation
+  timestamp, and it means the two screens agree. Paging happens in the database through
+  `idx_products_vendor_status` rather than in memory, so the envelope reports real totals.
+- **Minimal by contract.** No `locationId`, no `distanceKm`, no estimated fee. A
+  storefront is browsed without a search origin, and the vendor's own `deliveryRadiusKm`
+  is reported as-is. Adding an origin would make one row's numbers depend on a parameter
+  that is not part of the route.
+- **No migration.** The route reads `vendor_profiles`, `vendor_hours`, `products` and
+  `inventory`, all present since V5/V8/V10. `InventoryRepository` gained one derived
+  query, `findByProductIdIn`, so availability for a whole page is one lookup instead of
+  one per row.
+
+### Consequences
+
+- The unknown-id and non-approved cases throw the *same* exception with the *same*
+  message, so a caller cannot enumerate which vendor ids exist or what state each is in.
+  This is the address book's 404-for-foreign property (D-15's ownership precedent)
+  applied to a public read, and it is why the RBAC matrix's "404" column is this route's
+  whole authorization statement rather than a foreign-resource 403.
+- Because the public matcher is the first thing that matches under
+  `/api/v1/vendors/**`, moving the namespace rule above it — or widening the exception to
+  `**` or to another method — silently exposes every vendor route.
+  `StorefrontControllerIntegrationTest.neighbouringVendorRoutesStayProtectedForAnonymousCallers`
+  asserts anonymous 401 on seven neighbouring routes, 401 on a PUT to the public path, and
+  401 one segment deeper than the wildcard, so the narrowness is proven rather than
+  assumed.
+- A product that sells out stays listed and reports `inStock = false`. The storefront and
+  the vendor's own catalog screen therefore agree, and the client has the flag it needs to
+  disable add-to-cart without the server hiding the row. Search still excludes it (D-35) —
+  the two endpoints answer different questions and now say so explicitly rather than by
+  accident.
+- `acceptingOrders` is now the second place a paused vendor is surfaced (discovery hides
+  them, the storefront flags them). If a future requirement is "also hide the page while
+  paused", that changes this decision, not a handler.
+- `PageResponses.of(Page)` is shared with nothing else today, but the private `envelope`
+  helper it replaced existed only so the two in-memory pagers could build one shape;
+  exposing it means a future database-paged endpoint reuses it instead of hand-rolling
+  the eight-field envelope.
+- The storefront reads three queries for a page (profile, hours, products) plus one for
+  availability, and takes no locks: it reports state, it does not change any.
+

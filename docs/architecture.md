@@ -444,6 +444,7 @@ and image routes; no order or payment endpoint exists yet — see `docs/decision
 | DELETE | `/api/v1/addresses/{id}` | Delete an address; deleting the default promotes the oldest remaining | Phase 4.1 |
 | GET    | `/api/v1/discover` | Public: approved, order-accepting vendors within delivery radius of `locationId` (public by design, D-34) | Phase 4.3 |
 | GET    | `/api/v1/search` | Public: ACTIVE, in-stock products near `locationId` with q/category/price/vendor filters and four sort modes (public by design, D-35) | Phase 4.4 |
+| GET    | `/api/v1/vendors/{id}/storefront` | Public: one vendor's public profile plus its ACTIVE products, paginated; 404 for an unknown or non-approved vendor (public by design, D-36) | Phase 4.5 |
 | GET    | `/actuator/health`   | Health check (no auth)              | Phase 0|
 
 ## 7. Configuration

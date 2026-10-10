@@ -69,7 +69,7 @@ public final class PageResponses {
         Pageable pageable = PageRequest.of(safePage, safeSize);
         Page<T> resultPage = new PageImpl<>(pageContent, pageable, sortedContent.size());
 
-        return envelope(resultPage);
+        return of(resultPage);
     }
 
     /**
@@ -78,10 +78,21 @@ public final class PageResponses {
     public static <T> PageResponse<T> empty(Integer page, Integer size) {
         Pageable pageable = PageRequest.of(safePage(page), safeSize(size));
         Page<T> empty = new PageImpl<>(List.of(), pageable, 0);
-        return envelope(empty);
+        return of(empty);
     }
 
-    private static <T> PageResponse<T> envelope(Page<T> resultPage) {
+    /**
+     * Wraps a page the repository already sliced, keeping its metadata
+     * verbatim rather than recomputing totals from the page window.
+     *
+     * <p>The storefront (plan task 4.5) sorts and pages in the database
+     * through a {@link Pageable} — its sort key is the vendor catalog's own
+     * {@code createdAt, id} order, which is a column order rather than a
+     * computed one — so the repository's {@link Page} already carries the
+     * right {@code totalElements} and {@code totalPages}. Going through the
+     * in-memory window instead would report the page size as the total.
+     */
+    public static <T> PageResponse<T> of(Page<T> resultPage) {
         return PageResponse.<T>builder()
                 .content(resultPage.getContent())
                 .page(resultPage.getNumber())

@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,6 +47,14 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long>,
         JpaSpecificationExecutor<Inventory> {
 
     Optional<Inventory> findByProductId(Long productId);
+
+    /**
+     * Loads the stock rows of several products in one query, so a read that
+     * reports availability for a whole page of products — the public
+     * storefront's {@code inStock} flag (plan task 4.5) — costs one lookup
+     * instead of one per row.
+     */
+    List<Inventory> findByProductIdIn(Collection<Long> productIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Inventory i WHERE i.product.id = :productId")
