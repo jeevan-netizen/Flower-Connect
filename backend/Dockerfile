@@ -23,7 +23,7 @@ FROM eclipse-temurin:17-jre-alpine AS runtime
 
 WORKDIR /app
 
-RUN addgroup -S app && adduser -S app -G app && apk add --no-cache curl
+RUN addgroup -S app && adduser -S app -G app && apk add --no-cache curl && mkdir -p /var/lib/flowerconnect/uploads && chown -R app:app /var/lib/flowerconnect/uploads
 
 COPY --from=build --chown=app:app /app/target/*.jar app.jar
 

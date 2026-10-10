@@ -4,38 +4,145 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 2 — Closed out (tasks 2.1–2.10, plus 2.T verification)**
+**Phase 3 (Catalog and inventory management) — COMPLETED & CLOSED OUT**
 
-Phase 2 is complete. The backend exposes service locations, vendor registration and self-service
-profile, admin vendor management with an audit trail, per-handler approval gating, and admin user
-status; the frontend adds the florist dashboard (`/vendor/*`) and the administrator dashboard
-(`/admin/*`). No production catalog or order endpoint exists yet, so `@RequiresApprovedVendor`
-guards no live route — the rule itself is proven by `VendorApprovalGatingIntegrationTest` against a
-test-probe controller under the real `/api/v1/vendors/**` namespace (D-13).
+Phase 3 is fully implemented, verified, and closed out. All tasks 3.1–3.9 and 3.T are complete, with full test coverage and the Phase 3 RBAC matrix documented in `docs/rbac-matrix.md`. Task 3.1 category audit findings have been resolved with regression coverage in place.
 
-The Phase 2 close-out audited every endpoint against the plan's 2.T checklist and closed the
-gaps it found. Added to `VendorApiIntegrationTest`:
+Close-out verification:
 
-- explicit orphan-`vendor_profiles` assertions for both registration failure modes (unknown service
-  location, which fails after the user insert, and an invalid week, which is rejected before any
-  write), so 2.T's "no orphan user **or profile** on failure" is asserted against the database rather
-  than inferred from the missing user;
-- the complete legal/illegal approval transition matrix at the HTTP boundary — all four legal
-  transitions, and all twelve illegal ones asserted as 409 with the stored status unchanged and no
-  audit row written;
-- `audit_log.actor_user_id` assertions on the vendor approve/reject/lifecycle paths, matching what
-  `AdminUserStatusIntegrationTest` already proved for user-status changes;
-- the remaining RBAC and 404 cells: `PUT /vendors/profile` for a FLORIST with no profile (404), all
-  four admin actions against an unknown id (404), a non-positive id (400), and reject/suspend/reinstate
-  refused for a FLORIST token.
+| Command | Result |
+|---|---|
+| `./mvnw test` | **508 unit tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration` | **362 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `npm run lint` | clean |
+| `npm run typecheck` | `tsc -b` exits 0 |
+| `npm run test` | **514 tests across 45 files**, all passed |
+| `npm run build` | 681 modules transformed, built cleanly |
+| `/v3/api-docs` | all **34** endpoints present |
 
-Documentation gaps closed at the same time: **D-4** (no GPS — seeded `service_locations` is the only
-coordinate source) and **D-6** (a suspended vendor is hidden from discovery immediately, but
-in-flight orders continue) were referenced throughout the docs and `D-13` but had never been written
-up as decisions, which plan section 4 requires. Known issue 019 (`PATCH` missing from the CORS
-allow-list) is now closed by `c27ef19` and verified from a browser.
+### Next Phase
 
-No production behaviour changed in the close-out; the diff is tests and docs only.
+**Phase 4 (Customer addresses, discovery and search)** — tasks 4.1 through 4.T per `docs/FlowerConnect_Implementation_Plan_v2.2.md`.
+
+Two defects were found and fixed during the close-out rather than worked around:
+
+- **The runtime image could not create its upload root.** `LocalDiskStorageService` creates
+  its directory at startup (`@PostConstruct`), but the Dockerfile never created
+  `/var/lib/flowerconnect/uploads`, and the container runs as the non-root `app` user under
+  `/app`, where it has no write permission. Any first image upload in a container would have
+  failed on boot. Fixed by creating the directory in the runtime stage and chowning it to
+  `app:app`, and by pointing compose at it with `STORAGE_LOCAL_DIR` plus a named volume so it
+  survives a redeploy.
+- **`/v3/api-docs` was missing every Phase 3 path.** The running backend image was 46 hours
+  stale, built before tasks 3.5–3.8 existed. This was a stale-image artefact rather than a
+  code defect — the annotations are present on all three controllers — but it is recorded
+  because "Swagger is missing my endpoints" is indistinguishable from "the endpoints were
+  never documented" without checking the image age.
+
+### Not verified
+
+The **approved-vendor browser walkthrough** is incomplete — see issue 024. Registration,
+pending-vendor login and the approval-gate withholding of the Catalog and Inventory links
+were confirmed live in the browser; catalog create/edit, image upload/reorder/delete and the
+four stock actions were not, because approving a vendor needs an admin token and Docker
+became unavailable mid-session. This is a *rendered-UI* gap, not a behavioural one: the same
+paths are covered by the 362 integration tests against the real production filter chain.
+
+Two pre-existing issues remain open and are deliberately not fixed here, as neither belongs
+to Phase 3: issue 020 (no route serves product image bytes, so the UI lists metadata — D-31)
+and issue 021 (`GET /api/v1/categories` returns root categories only).
+
+The per-task history below is unchanged.
+
+### Phase 3g — Task 3.9 (Vendor catalog UI) completed
+
+Task 3.9 is the first screen set built on the Phase 3c–3f APIs and changes no backend contract: it
+consumes `GET /api/v1/categories`, the vendor catalog routes, the image routes and the inventory routes
+exactly as tasks 3.5, 3.6 and 3.8 exposed them. Four screens, all inside the existing vendor shell so
+the Phase 2 design language and components carry over rather than being restated:
+
+- `/vendor/catalog` — the product table with search, a status filter, a category filter, pagination,
+  low-stock badges and a link into each product.
+- `/vendor/catalog/new` and `/vendor/catalog/:productId` — one Shopify-style form for create and edit,
+  plus (once a product exists) the image manager, the stock panel with the four stock actions, the two
+  alert settings, the movement history, and deactivation behind a confirmation.
+- `/vendor/inventory` — the shop-wide low-stock table with the four stock actions per row and the
+  movement history for whichever product a row acted on.
+
+Three things the plan's one line does not settle are decided in D-29, D-30 and D-31:
+
+- **Approval gating is a UX gate over the cached profile, not a second source of truth.**
+  `ApprovedVendorGate` wraps the three catalog routes and reads the same `["vendor","profile"]` query
+  the layout banner reads, so an unapproved vendor costs no extra request and the gate cannot disagree
+  with the banner above it. `VendorLayout` withholds the Catalog and Inventory links from a vendor whose
+  status is not `APPROVED`. D-13's authority is untouched: the backend still decides, per request, from
+  `vendor_profiles.status`.
+- **One stock dialog serves all four stock mutations, with the rules in one table.** `stock-in` and
+  `stock-out` take a positive quantity and an optional reason; `adjustment` takes a signed non-zero
+  quantity; `write-off` takes a positive quantity. Only the last two carry `@NotBlank`, and
+  `requiresReason` decides both the rendered reason box and the resolver, so the two cannot disagree.
+  A blank optional reason is sent as `null`, not `""`.
+- **Images are shown as metadata, not as thumbnails.** `ProductImageResponse.storageKey` is the opaque
+  backend key and no route serves the bytes, so the section lists filename, type, size and position
+  instead of an `<img>` that would 404 — a broken image reads as a corrupt upload rather than as an
+  absent delivery route. Recorded as a known issue, not a UI decision.
+
+Two bugs in this task's own code were caught by the tests and fixed rather than asserted around: the
+adjustment schema rejected a **negative** quantity (`/^\d+$/` where the DTO is signed), which made the
+one action that is supposed to accept a signed value impossible; and `isPastExpiryDate` compared against
+tomorrow, turning the "past its expiry date" marker red a day before the sweep that acts on it (D-25)
+would. Both are noted in the component doc comments.
+
+Verified at close-out with `npm run lint`, `npm run typecheck`, `npm run test` and `npm run build`:
+**514 frontend tests across 45 files**, all green. No backend change, so no Maven run was required.
+
+### Phase 3f — Task 3.8 (Image handling) completed
+
+Task 3.8 is the first task that puts user-supplied bytes in the system.
+`VendorProductImageController` is mounted at `/api/v1/vendors/products/{productId}/images`
+(`POST`, `GET`, `PUT /{imageId}/primary`, `PUT /order`, `DELETE /{imageId}`) inside the existing
+vendor namespace, so D-13's two authorization layers keep their order and no `SecurityConfig` change
+was needed. No migration: `product_images` from task 3.2 already holds the rows, and the bytes live
+behind a new abstraction.
+
+Three things the plan's one line does not settle are decided in D-26, D-27 and D-28:
+
+- **`StorageService` is chosen by profile, and the S3 half is a declared stub.**
+  `LocalDiskStorageService` is `@Profile("!s3")`, `S3StorageService` is `@Profile("s3")` and throws
+  `StorageException` on every method with a message naming what is missing. A property flag would let
+  an environment variable point production at a developer's disk; a silently inert backend would let
+  a deployment serve `201 Created` and write nothing. Local writes go to a `.part` sibling and are
+  moved with `ATOMIC_MOVE`, and `resolve` rejects blank, backslash, absolute and root-escaping keys.
+- **Every accepted image is decoded, scaled and re-encoded by the server.**
+  `ImageTypeDetector` sniffs `FF D8 FF` / the 8-byte PNG signature / `RIFF....WEBP` — never the
+  filename or the part's declared `Content-Type` — and `415 UNSUPPORTED_MEDIA_TYPE` is distinct from
+  `VALIDATION_FAILED` so a client can tell "wrong format" from "broken file". Detection is a
+  candidate, not an acceptance: `ImageProcessor` must then decode the file, which rejects the
+  polyglot and the truncated file. Nothing is stored as it arrived, so EXIF/GPS is dropped and the
+  stored bytes, dimensions and `mime_type` are the pipeline's own output. The pixel ceiling
+  (40,000,000) is read from the header *before* `reader.read(0)`, because a few kilobytes can claim
+  20000×20000 and cost 1.6 GB. `max-dimension` (1600) scales down and never upscales. WebP is
+  decoded and stored as JPEG — `imageio-webp` registers a reader only, so keeping the format would
+  mean shipping the file undecoded.
+- **The one-primary rule is enforced under a product-scoped row lock.** D-21 settled that it is a
+  service-level invariant; task 3.8 is the first task to write `is_primary`, so
+  `ProductImageRepository.findByProductIdForUpdate` (`PESSIMISTIC_WRITE`, `ORDER BY sortOrder, id`)
+  serialises the read-decide-write sequence after the ownership check, exactly as D-24 does for stock.
+  The first image of a product becomes its cover automatically, deleting the cover promotes the next,
+  a reorder must be an exact permutation, and `requireSinglePrimary` asserts the invariant afterwards
+  so a silent violation becomes a failed request.
+
+File and row are deliberately not atomic: an upload writes the object first and deletes it again if
+the row cannot be written, while a delete removes the row first and treats a failed object removal as
+a logged orphan. Neither direction can leave a visible row pointing at bytes that are not there.
+
+93 new unit tests (36 service, 14 controller slice, 13 local disk, 5 S3 stub, 11 processor, 14
+detector) and 36 integration tests against real MySQL and a real temporary directory, including a
+`CountDownLatch`-released multi-thread case that proves the lock exists. The earlier 3.5–3.7 work is
+summarised under **Completed Work**.
+
+Verified at close-out with `./mvnw verify -Pintegration` (21:44 min): **506 unit tests** and **362
+integration tests**, all green — `BUILD SUCCESS`.
 
 ## Completed Work
 
@@ -155,24 +262,42 @@ No production behaviour changed in the close-out; the diff is tests and docs onl
   and no migration changed. Verified at close-out: **264 unit tests**, **222 integration tests**,
   **314 frontend tests across 27 files**, plus `npm run lint`, `npm run typecheck` and
   `npm run build` — all green.
-- [ ] Florist entity and catalog CRUD
-- [ ] Product browsing UI
-- [ ] Search and filtering
 
-#### Phase 3 — Ordering & Payments (Not Started)
-- [ ] Cart functionality
-- [ ] Checkout flow
-- [ ] Order lifecycle
-- [ ] Stripe integration
-
-#### Phase 4 — Delivery & Notifications (Not Started)
-- [ ] Delivery assignment and tracking
-- [ ] Email/SMS notifications
+#### Phase 3a — Catalog and inventory management (Task 3.1 completed)
+- [x] **3.1 — Category entity**: `categories` table (V7 migration) with hierarchical structure (parent_id self-FK), `name`, `slug` (unique, auto-generated), `display_order`, `active` flag, `created_at`, `updated_at`. Four seed categories: Roses, Bouquets, Arrangements, Occasions. Admin CRUD at `/api/v1/admin/categories` (POST/PUT/DELETE/GET list with pagination over every category, roots and children), public read at `GET /api/v1/categories` (active top-level categories only, permitAll — D-17, issue #025). Cycle prevention on parent assignment, delete protection (409 if has children), slug auto-generation with collision-safe suffix, audit trail on all mutations. 32 new unit tests + 9 integration tests. Verified with 296 unit + 231 integration tests.
+- [x] **3.2 — Product entity**: `products` table (V8) with vendor_id/category_id FKs, name, slug (unique, auto-generated with collision-safe suffix), description, base_price, status (native ENUM DRAFT/ACTIVE/INACTIVE/ARCHIVED). `product_images` (V9) holds ordered images with a single primary flag — the one-primary rule is a service-level invariant (D-21) because MySQL error 1215 rejects the generated-column unique-index trick next to the required product_id FK. `ProductService.create` generates the slug, treats the unique constraint as the authority, and retries with numeric suffixes after a lost race
+- [x] **3.3 — Inventory entity**: `inventory` table (V10), one row per product (unique on product_id) with `quantity`, `reserved_quantity`, `low_stock_threshold`, optional `expiry_date`. Created automatically at quantity 0 in the same transaction as the product; no stock movement is written for the initial zero. CHECKs: quantity >= 0, reserved_quantity >= 0, low_stock_threshold >= 0, reserved_quantity <= quantity. Availability = quantity − reserved (computed in the entity)
+- [x] **3.4 — Stock movement log**: `stock_movements` table (V11) records every change — movement_type (native ENUM of the nine plan section 6.2 types), signed quantity_delta, reason, reference id/type, nullable actor. Append-only (no updated_at). Product creation writes no movement; the log records changes only
+- [x] **3.5 — Catalog API**: `VendorProductController` at `/api/v1/vendors/products` — `POST` (201), `GET` (paginated, optional `status` / `categoryId` / `name` filters, page size clamped 1..100), `GET|PUT /{id}` (403 foreign / 404 missing), `PATCH /{id}/deactivate` (204). The vendor comes from the JWT subject, so cross-vendor access is not expressible in a request. `@RequiresApprovedVendor` on the class — the first production route to carry it. No migration; reuses `products`, `categories.active`, `vendor_profiles`. Listing filters are Criteria predicates in the new `ProductSpecifications` (D-23); soft delete sets `INACTIVE` and keeps the row, its images and its inventory (D-22). 24 new unit tests, 26 new integration tests
+- [x] **3.6 — Inventory API**: `VendorInventoryController` at `/api/v1/vendors` — read current inventory, `POST .../stock-in`, `.../stock-out`, `.../adjustments` (signed, nonblank reason), `.../write-offs` (`WASTE`), `PUT .../low-stock-threshold`, `PUT .../expiry-date`, `GET .../movements?page&size` (paged history), and vendor-wide `GET /api/v1/vendors/inventory/low-stock?page&size`. Availability is `quantity - reserved_quantity` and is never clamped; a change that would breach the floor is refused with a dedicated `409 INSUFFICIENT_STOCK` rather than silently applied at the floor. `@RequiresApprovedVendor` on the class; 403 for a foreign product and 404 for a missing one, both resolved before any row lock is taken. Every mutation takes a pessimistic write lock on the inventory row, then writes the new level and exactly one `stock_movements` row in one transaction (D-24); the movement's actor is the authenticated principal, so it cannot be client-supplied. The two alert settings take the same lock even though they write no movement, because Hibernate's whole-row `UPDATE` would otherwise write back a stale `quantity`. Low-stock rule is `available <= lowStockThreshold`, vendor-scoped, via `InventorySpecifications`. No migration — reuses `inventory` and `stock_movements` from tasks 3.3/3.4. 59 new unit tests, 35 HTTP integration tests, 6 real-thread concurrency tests
+- [x] **3.7 — Expiry scheduler**: `InventoryExpiryService` writes off available stock whose `expiry_date` has passed as a `WASTE` movement (null actor, no reference, reason naming the expiry date and the sweep date) and delists an `ACTIVE` product as `INACTIVE`; `InventoryExpiryScheduler` triggers it on `app.expiry-sweep-cron`. Expired means `expiryDate < LocalDate.now(clock)` on the injected `Clock`; reserved units are never written off (`quantity` stops at `reserved_quantity`); a row with nothing available is delisted without a movement. Candidates are selected unlocked and ordered by product id, then locked one at a time through the existing `findByProductIdForUpdate` with every condition re-checked under the lock, and the whole run is one transaction bounded by `app.expiry-sweep-max-rows`. Idempotency is the candidate predicate (`quantity > reservedQuantity OR status = ACTIVE`), not a processed flag (D-25). No endpoint and no migration. 16 new unit tests, 12 integration tests
+- [x] **3.8 — Image handling**: `StorageService` (`store`/`delete`/`exists`/`describe`) with `LocalDiskStorageService` (`@Profile("!s3")`, `.part` + `ATOMIC_MOVE` writes, traversal-checked `resolve`, root created at startup) and `S3StorageService` (`@Profile("s3")`) as a declared stub that throws on every method and names what is missing — the AWS SDK is not a dependency and a silently inert implementation would serve `201 Created` and write nothing (D-26). `VendorProductImageController` at `/api/v1/vendors/products/{productId}/images` — `POST` (multipart part `file`, optional `primary` flag, 201), `GET` (ordered list), `PUT /{imageId}/primary`, `PUT /order` (must be an exact permutation of the product's image ids), `DELETE /{imageId}` (204, promotes the next image when the cover is removed). `@RequiresApprovedVendor` on the class; ownership resolved through `ProductService.requireOwnedProduct`, made package-private so "yours" is defined once for the catalog and the image routes. Validation order is ownership → empty part (400) → declared length over `max-file-size-bytes` (413, before the bytes are buffered) → content sniffing (415) → decode (400) → pixel budget (413) → image count (409), so a rejected upload leaves neither a row nor a file. Format is decided by the leading bytes only, never the filename or the part's `Content-Type`; every accepted upload is decoded, scaled to `max-dimension` and re-encoded, so EXIF/GPS is dropped and the stored bytes, dimensions and `mime_type` are the pipeline's own output; WebP is decoded and stored as JPEG (D-27). Keys are `product-images/{productId}/{uuid}.{ext}`, always server-generated. The one-primary invariant is enforced under `findByProductIdForUpdate` (`PESSIMISTIC_WRITE`, ordered by `sortOrder, id`), the first image becomes the cover automatically, and `requireSinglePrimary` asserts the invariant after every mutation (D-28). Uploads store the object then the row and remove the object if the row cannot be written; deletes remove the row first and treat a failed object removal as a logged orphan. No migration. 93 new unit tests, 36 integration tests including a `CountDownLatch` concurrency case
+- [x] **3.9 — Vendor catalog UI**: four screens inside the existing vendor shell — `/vendor/catalog` (searchable, status- and category-filtered product table with pagination, low-stock badges and per-row links), `/vendor/catalog/new` + `/vendor/catalog/:productId` (one Shopify-style create/edit form, image manager, stock panel with the four stock actions, low-stock threshold and expiry date, movement history, deactivation behind a confirmation), and `/vendor/inventory` (shop-wide low-stock table with the four stock actions per row and the selected product's movement history). `ApprovedVendorGate` wraps the three gated routes over the cached `["vendor","profile"]` query and `VendorLayout` withholds the two new nav links from an unapproved vendor, so D-13 stays the authority (D-29). One `StockActionDialog` serves all four stock mutations with the per-action rules in one table; a blank optional reason is sent as `null` (D-30). Images render as metadata because no byte-serving route exists (D-31). The product editor is reachable at `/vendor/catalog/new` as its own route, so `useParams().productId` is *absent* there rather than the string "new". `isMissingVendorProfile` is scoped to the profile read by request URL, so a missing product no longer reports a missing account. 76 new frontend tests across 7 files (product form 9, stock dialog 15, approval gate 8, catalog page 14, inventory page 11, product editor page 17, plus additions to the API-client, query-cache, format and router suites). No backend change and no migration
+#### Phase 4 — Customer Addresses, Discovery and Search (Pending)
+- [ ] 4.1 Address book (`addresses` entity and CRUD)
+- [ ] 4.2 Location picker (session-backed, no GPS)
+- [ ] 4.3 Geo discovery API (`GET /api/v1/discover`)
+- [ ] 4.4 Product search API (`GET /api/v1/search`)
+- [ ] 4.5 Storefront API (`GET /api/v1/vendors/{id}/storefront`)
+- [ ] 4.6 Customer home page (location picker, vendor cards)
+- [ ] 4.7 Search and filter UI
+- [ ] 4.8 Storefront page (product grid, add-to-cart)
+- [ ] 4.9 Product detail modal (carousel, note)
+- [ ] 4.T Phase 4 verification & RBAC tests
 
 ## Latest Changes
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-05 | Phase 3 final audit fix (task 3.1): active-only public category read and an all-category admin listing with correct pagination, plus regression coverage at service and HTTP level | `CategoryRepository.java`, `CategoryService.java`, `CategoryController.java`, `CategoryServiceTest.java`, `CategoryApiIntegrationTest.java`, `docs/decisions.md` (D-17, D-18), `docs/known-issues.md` (#021 closed, #025, #026), `docs/progress.md` |
+| 2026-10-05 | Phase 3h close-out (task 3.T): RBAC matrix for every Phase 3 endpoint mapped to the integration test that asserts each cell; runtime image can create its upload root; `/v3/api-docs` verified at 34 endpoints after rebuilding a stale image | `docs/rbac-matrix.md` (new), `docs/progress.md`, `docs/known-issues.md` (issues 023, 024 + Phase 3h gotchas), `backend/Dockerfile`, `docker-compose.yml` |
+| 2026-10-05 | Phase 3g Task 3.9: vendor catalog UI — listing with search/filters/pagination, Shopify-style create/edit, image manager, per-product and shop-wide stock panels, movement history, approval gate over the cached profile | `src/app/router.tsx`, `src/features/vendor/**` (types, api, queries, format, form-schema, 9 components, 3 pages, 5 test files), `src/shared/{types.ts,format.ts,components/Pagination.tsx}`, `src/shared/lib/api-error.ts`, `src/test/{factories.ts,api-errors.ts}`, `src/features/admin/**` (pagination extracted to shared), `docs/decisions.md` (D-29, D-30, D-31), `docs/progress.md`, `docs/known-issues.md` |
+| 2026-10-04 | Phase 3f Task 3.8: StorageService with a profile-selected local backend and a declared S3 stub, content-sniffed image pipeline that decodes/rescales/re-encodes, one-primary invariant under a product row lock | `storage/**` (StorageService, LocalDiskStorageService, S3StorageService, StorageProperties, StorageException, image/{ImageFormat, ImageTypeDetector, ImageProcessor, ImageUploadProperties, ProcessedImage}), `VendorProductImageController.java`, `ProductImageService.java`, `ProductImageOrderRequest.java`, `ProductImageRepository.java`, `ProductService.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, `pom.xml`, 4 `application*.yml`, 7 test classes, `docs/decisions.md` (D-26, D-27, D-28), `docs/progress.md`, `docs/known-issues.md` |
+| 2026-10-04 | Phase 3e Task 3.7: inventory expiry sweep on the injected Clock, configurable cron and bounded batch, self-clearing candidate predicate | `InventoryExpiryService.java`, `InventoryExpiryScheduler.java`, `InventoryRepository.java`, `AppProperties.java`, `application-test.yml`, `InventoryExpiryServiceTest.java`, `InventoryExpirySchedulerTest.java`, `InventoryExpiryIntegrationTest.java`, `docs/decisions.md` (D-25), `docs/progress.md` |
+| 2026-10-04 | Phase 3d Task 3.6: vendor inventory API with pessimistic row locking, reserved-quantity floor, and movement audit trail | `InventoryService.java`, `VendorInventoryController.java`, `InventoryRepository.java`, `StockMovementRepository.java`, `InventorySpecifications.java`, `StockMovementMapper.java`, `ErrorCode.java`, `BusinessException.java`, `GlobalExceptionHandler.java`, 10 DTOs, `InventoryServiceTest.java`, `VendorInventoryControllerTest.java`, `VendorInventoryIntegrationTest.java`, `InventoryConcurrencyIntegrationTest.java`, `docs/decisions.md` (D-24), `docs/progress.md`, `docs/known-issues.md` |
+| 2026-10-03 | Phase 3c Task 3.5: vendor catalog API with approval gating, ownership scoping, filtered listing and soft delete | `VendorProductController.java`, `ProductService.java`, `ProductRepository.java`, `ProductSpecifications.java`, `ProductRequest.java`, `VendorProductControllerTest.java`, `VendorCatalogIntegrationTest.java`, `ProductServiceTest.java`, `ProductInventoryIntegrationTest.java`, `docs/decisions.md` (D-22, D-23), `docs/progress.md`, `docs/known-issues.md` |
+| 2026-10-03 | Phase 3b Tasks 3.2–3.4: product, image, inventory and stock-movement data model with ProductService foundation | `V8__products.sql`, `V9__product_images.sql`, `V10__inventory.sql`, `V11__stock_movements.sql`, `backend/src/main/java/com/flowerconnect/catalog/**` (Product, ProductImage, repositories, DTOs, ProductMapper, ProductService), `backend/src/main/java/com/flowerconnect/inventory/**` (Inventory, StockMovement, repositories), `backend/src/test/java/com/flowerconnect/catalog/**` (ProductServiceTest, ProductInventoryIntegrationTest), `docs/decisions.md` (D-20, D-21), `docs/progress.md` |
+| 2026-10-03 | Phase 3a Task 3.1: Category entity with hierarchical admin CRUD and public read | `V7__categories.sql`, `backend/src/main/java/com/flowerconnect/catalog/**` (domain, repository, service, controller, dto, mapper), `SecurityConfig.java`, `backend/src/test/java/com/flowerconnect/catalog/**` (CategoryServiceTest, AdminCategoryControllerTest, CategoryApiIntegrationTest, CategorySeedIntegrityTest), `docs/decisions.md` (D-17, D-18, D-19), `docs/progress.md` |
 | 2026-10-01 | Phase 2 close-out: 2.T checklist gaps closed, D-4/D-6 written up, issue 019 closed | `VendorApiIntegrationTest.java`, `docs/progress.md`, `docs/decisions.md`, `docs/known-issues.md` |
 | 2026-10-01 | Task 2.10 admin frontend: dashboard, vendor management with reason dialog, user management with pagination and filters | `src/app/router.tsx`, `src/app/router.test.tsx`, `src/features/admin/**` (types, api, queries, format, form-schema, components, pages, 5 test files), `src/test/factories.ts`, `docs/*` |
 | 2026-10-01 | Task 2.9 vendor frontend: dashboard, profile, settings and hours screens behind a reusable `ProtectedRoute` | `src/app/router.tsx`, `src/features/vendor/**` (types, api, queries, format, form-schema, components, pages), `src/shared/components/ProtectedRoute.tsx`, `src/shared/lib/api-error.ts`, `src/features/auth/types.ts`, `src/test/**`, `package.json`, `vite.config.ts`, `docs/*` |

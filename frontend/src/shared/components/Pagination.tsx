@@ -1,5 +1,5 @@
-import { displayPageNumber } from "@/features/admin/format";
-import type { PageResponse } from "@/features/admin/types";
+import { displayPageNumber } from "@/shared/format";
+import type { PageResponse } from "@/shared/types";
 import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
 const PAGE_BUTTON_CLASS = `rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
@@ -13,8 +13,10 @@ interface PaginationProps<T> {
 }
 
 /**
- * Pagination control shared by both admin listings, because
- * `VendorProfilePageResponse` and `AdminUserPageResponse` are the same shape.
+ * Pagination control shared by every paginated listing: the two admin listings
+ * (plan task 2.10), the vendor catalog (task 3.9) and the vendor low-stock list
+ * (task 3.9). It is generic over the page's content type because the envelope
+ * is the same `PageResponse` in every case.
  *
  * The buttons are driven by the backend's own `first` / `last` / `totalPages`
  * rather than recomputed from `content.length`, so the control agrees with the

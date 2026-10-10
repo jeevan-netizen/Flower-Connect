@@ -1,11 +1,19 @@
-import type { VendorHours, VendorProfile, VendorStatus } from "@/features/vendor/types";
-import type { ServiceLocationGroup } from "@/features/vendor-registration/types";
 import type {
-  AdminRole,
-  AdminUser,
-  PageResponse,
-  UserStatus,
-} from "@/features/admin/types";
+  Category,
+  InventorySummary,
+  LowStockProduct,
+  MovementType,
+  Product,
+  ProductImage,
+  ProductStatus,
+  StockMovement,
+  VendorHours,
+  VendorProfile,
+  VendorStatus,
+} from "@/features/vendor/types";
+import type { ServiceLocationGroup } from "@/features/vendor-registration/types";
+import type { AdminRole, AdminUser, UserStatus } from "@/features/admin/types";
+import type { PageResponse } from "@/shared/types";
 
 /**
  * A profile fixture shaped exactly like `VendorProfileResponse`, so tests exercise
@@ -130,6 +138,108 @@ export function makePage<T>(
     first: true,
     last: true,
     empty: content.length === 0,
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Catalog and inventory fixtures (plan task 3.9)                               */
+/*                                                                             */
+/* Shaped exactly like the backend DTOs — including the fields the UI does not   */
+/* render (`storageKey`, `referenceId`, `vendorId`) — so a test cannot pass      */
+/* against a response shape the server never sends.                             */
+/* -------------------------------------------------------------------------- */
+
+/** One seeded catalog category, as `GET /api/v1/categories` returns it. */
+export function makeCategory(overrides: Partial<Category> = {}): Category {
+  return {
+    id: 1,
+    parentId: null,
+    parentName: null,
+    name: "Roses",
+    slug: "roses",
+    displayOrder: 1,
+    active: true,
+    createdAt: "2026-09-01T10:00:00",
+    updatedAt: "2026-09-01T10:00:00",
+    ...overrides,
+  };
+}
+
+export function makeInventory(overrides: Partial<InventorySummary> = {}): InventorySummary {
+  return {
+    productId: 101,
+    quantity: 12,
+    reservedQuantity: 0,
+    available: 12,
+    lowStockThreshold: 4,
+    expiryDate: null,
+    lowStock: false,
+    ...overrides,
+  };
+}
+
+export function makeProductImage(overrides: Partial<ProductImage> = {}): ProductImage {
+  return {
+    id: 201,
+    storageKey: "product-images/101/2f1c8a90-1f2b-4c3d-9e8a-77b1c0d4e5f6.jpg",
+    originalFilename: "bouquet.jpg",
+    mimeType: "image/jpeg",
+    fileSize: 84_231,
+    sortOrder: 0,
+    primary: true,
+    createdAt: "2026-09-05T09:00:00",
+    ...overrides,
+  };
+}
+
+export function makeProduct(overrides: Partial<Product> = {}): Product {
+  const { inventory, images, ...rest } = {
+    id: 101,
+    vendorId: 7,
+    categoryId: 1,
+    categoryName: "Roses",
+    name: "Red Rose Bouquet",
+    slug: "red-rose-bouquet",
+    description: "A dozen deep red roses.",
+    basePrice: 899,
+    status: "DRAFT" as ProductStatus,
+    inventory: makeInventory({ productId: 101 }),
+    images: [makeProductImage()],
+    createdAt: "2026-09-05T09:00:00",
+    updatedAt: "2026-09-05T09:00:00",
+    ...overrides,
+  };
+
+  return { ...rest, inventory, images };
+}
+
+export function makeStockMovement(overrides: Partial<StockMovement> = {}): StockMovement {
+  return {
+    id: 301,
+    productId: 101,
+    movementType: "STOCK_IN" as MovementType,
+    quantityDelta: 12,
+    reason: "Weekly delivery",
+    referenceId: null,
+    referenceType: null,
+    actorUserId: 7,
+    actorEmail: "petal@example.com",
+    createdAt: "2026-09-05T09:05:00",
+    ...overrides,
+  };
+}
+
+export function makeLowStockProduct(overrides: Partial<LowStockProduct> = {}): LowStockProduct {
+  return {
+    productId: 101,
+    productName: "Red Rose Bouquet",
+    quantity: 3,
+    reservedQuantity: 0,
+    available: 3,
+    lowStockThreshold: 4,
+    expiryDate: null,
+    lowStock: true,
     ...overrides,
   };
 }

@@ -36,6 +36,20 @@ app:
   cors:
     origins: http://localhost:5173
   refresh-cookie-secure: false
+  # Disabled ("-" is Spring's CRON_DISABLED) so a scheduled run cannot fire in the middle
+  # of a test and mutate rows the test is asserting on. The expiry sweep is driven directly
+  # with the MutableClock bean in InventoryExpiryIntegrationTest instead.
+  expiry-sweep-cron: "-"
+  storage:
+    # Overridden per test class that exercises the filesystem
+    # (ProductImageIntegrationTest points this at target/test-uploads).
+    local-directory: target/test-uploads/default
+  image-upload:
+    max-file-size-bytes: 5242880
+    max-images-per-product: 8
+    max-dimension: 1600
+    max-pixels: 40000000
+    jpeg-quality: 0.85
   rate-limit:
     enabled: false
     auth:

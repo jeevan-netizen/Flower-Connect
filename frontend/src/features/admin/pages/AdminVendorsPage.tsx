@@ -21,7 +21,7 @@ import { PageHeading } from "@/features/vendor/components/StatCard";
 import { SuccessMessage } from "@/features/vendor/components/FormFields";
 import { AdminErrorState } from "@/features/admin/components/AdminErrorState";
 import { AdminVendorStatusBadge } from "@/features/admin/components/AdminStatusBadge";
-import { Pagination } from "@/features/admin/components/Pagination";
+import { Pagination } from "@/shared/components/Pagination";
 import { ReasonDialog } from "@/features/admin/components/ReasonDialog";
 import { AnimatePresence } from "framer-motion";
 import { FadeIn } from "@/motion/FadeIn";

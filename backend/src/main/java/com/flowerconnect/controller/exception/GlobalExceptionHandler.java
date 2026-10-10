@@ -16,6 +16,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.time.Clock;
@@ -74,6 +76,52 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "A resource with this identifier already exists", ErrorCode.CONFLICT, null);
     }
 
+    /**
+     * Raised by the servlet container before the request reaches a controller,
+     * when the multipart body exceeds {@code spring.servlet.multipart.max-file-size}
+     * (plan task 3.8). The service enforces the same ceiling on the part it
+     * receives; this override exists so the container-level refusal has the same
+     * envelope and the same {@code PAYLOAD_TOO_LARGE} code as the service-level
+     * one. Overridden rather than added as a new {@code @ExceptionHandler} because
+     * the parent class already declares this exception — a second handler for it
+     * is ambiguous and fails the context at startup.
+     */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(clock))
+                .status(HttpStatus.PAYLOAD_TOO_LARGE.value())
+                .error("Payload Too Large")
+                .errorCode(ErrorCode.PAYLOAD_TOO_LARGE)
+                .message("Uploaded file is larger than the maximum allowed size")
+                .build();
+        return new ResponseEntity<>(response, HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+
+    /**
+     * A required multipart part was absent — an upload request with no
+     * {@code file}. Overridden rather than added as a new handler because the
+     * parent class already declares one for this exception, and a second
+     * {@code @ExceptionHandler} for it is ambiguous at context startup. The
+     * parent's default renders a {@code ProblemDetail}; this keeps the shared
+     * {@code ErrorResponse} envelope instead.
+     */
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestPart(
+            MissingServletRequestPartException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now(clock))
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Bad Request")
+                .errorCode(ErrorCode.VALIDATION_FAILED)
+                .message("File part is required")
+                .build();
+        return ResponseEntity.badRequest().body(response);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex, WebRequest request) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);
@@ -121,9 +169,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case FORBIDDEN -> HttpStatus.FORBIDDEN;
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
             case CONFLICT -> HttpStatus.CONFLICT;
+            case INSUFFICIENT_STOCK -> HttpStatus.CONFLICT;
             case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
             case ACCOUNT_SUSPENDED -> HttpStatus.FORBIDDEN;
             case VENDOR_NOT_APPROVED -> HttpStatus.FORBIDDEN;
+            case UNSUPPORTED_MEDIA_TYPE -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
+            case PAYLOAD_TOO_LARGE -> HttpStatus.REQUEST_ENTITY_TOO_LARGE;
         };
     }
 

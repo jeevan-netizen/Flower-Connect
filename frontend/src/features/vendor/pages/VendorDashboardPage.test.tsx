@@ -107,7 +107,7 @@ describe("VendorDashboardPage", () => {
     });
   });
 
-  it("links to the three editable areas and no Phase 3 area", async () => {
+  it("links to the three editable areas and, once approved, the catalog areas", async () => {
     setup();
 
     await waitFor(() => {
@@ -115,8 +115,20 @@ describe("VendorDashboardPage", () => {
     });
     expect(screen.getByRole("link", { name: /edit delivery settings/i })).toHaveAttribute("href", "/vendor/settings");
     expect(screen.getByRole("link", { name: /edit operating hours/i })).toHaveAttribute("href", "/vendor/hours");
-    expect(screen.queryByRole("link", { name: /catalog/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /inventory/i })).not.toBeInTheDocument();
+    // `makeVendorProfile()` is APPROVED, so the Phase 3g entry points are offered.
+    expect(screen.getByRole("link", { name: /manage products/i })).toHaveAttribute("href", "/vendor/catalog");
+    expect(screen.getByRole("link", { name: /review stock/i })).toHaveAttribute("href", "/vendor/inventory");
+  });
+
+  it("offers no catalog entry point to a vendor who is not approved", async () => {
+    setup(makeVendorProfile({ status: "PENDING_APPROVAL" as VendorStatus }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /edit profile/i })).toBeInTheDocument();
+    });
+    expect(screen.getByText(/not discoverable yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /manage products/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /review stock/i })).not.toBeInTheDocument();
   });
 
   it("reports a failed load with a retry affordance", async () => {

@@ -117,6 +117,27 @@ export function VendorDashboardPage() {
           </Link>
         </Card>
 
+        {profile.status === "APPROVED" && (
+          <Card title="Catalog">
+            <p className="text-sm text-slate-700">
+              Products, photos and stock live in the catalog. Nothing is listed to customers until a
+              product is active and its stock is above zero.
+            </p>
+            <ul className="mt-3 space-y-1">
+              <li>
+                <Link to="/vendor/catalog" className={CARD_LINK_CLASS}>
+                  Manage products
+                </Link>
+              </li>
+              <li>
+                <Link to="/vendor/inventory" className={CARD_LINK_CLASS}>
+                  Review stock
+                </Link>
+              </li>
+            </ul>
+          </Card>
+        )}
+
         <Card title="Profile completeness">
           <p className="text-sm text-slate-700">
             Everything a customer sees about your shop is editable from the profile and settings

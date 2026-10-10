@@ -64,6 +64,14 @@ app:
       register-requests-per-hour: 5
       forgot-password-requests-per-hour: 5
       reset-password-requests-per-hour: 5
+  storage:
+    local-directory: ${STORAGE_LOCAL_DIR:uploads}
+  image-upload:
+    max-file-size-bytes: 5242880
+    max-images-per-product: 8
+    max-dimension: 1600
+    max-pixels: 40000000
+    jpeg-quality: 0.85
 
 logging:
   level:

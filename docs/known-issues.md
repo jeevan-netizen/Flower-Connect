@@ -22,6 +22,14 @@
 | 017 | Test      | (a) Testcontainers 1.20.2 could not connect to Docker Desktop 29.8.0 without `~/.docker-java.properties` (`api.version=1.44`) — both `EnvironmentAndSystemPropertyClientProviderStrategy` and `NpipeSocketClientProviderStrategy` failed with `BadRequestException (Status 400)`; (b) `@Container` on `IntegrationTestBase.MYSQL` caused Testcontainers to create and destroy a new MySQL container per test class (per-class lifecycle), with four containers started (one per test class); `AuthApiIntegrationTest` and `RefreshTokenRepositoryIT` passed, `RoleRepositoryIT` and `UserRepositoryIT` got Connection refused | Fixed | (a) Upgraded Testcontainers to 1.21.4, which resolves Docker Desktop 29.x compatibility — `~/.docker-java.properties` is no longer required. (b) Removed `@Container` annotation; container now starts once via `static { MYSQL.start(); }` in `IntegrationTestBase` and is shared across all IT classes. One MySQL container per JVM run. |
 | 018 | Test      | `./mvnw verify -Pintegration` fails every integration test with `Could not find a valid Docker environment` when the Docker Desktop daemon is not running, even though the Docker CLI is on `PATH` | Environment | Testcontainers needs the running daemon, not just the client. Start Docker Desktop before the failsafe run; Testcontainers fails fast with an `ExceptionInInitializerError` per test class rather than skipping. |
 | 019 | Backend / Frontend | `SecurityConfig.corsConfigurationSource()` set `allowedMethods` to `GET, POST, PUT, DELETE, OPTIONS` — **`PATCH` was missing**, so any cross-origin browser request to a `PATCH` endpoint failed the CORS preflight. This blocked `PATCH /api/v1/admin/users/{id}/status` (task 2.10) and `PATCH /api/v1/users/me` (Phase 1) from the SPA on the dev setup (`:5173` → `:8080`) | Fixed | `"PATCH"` added to the allow-list in `SecurityConfig.corsConfigurationSource()` (commit `c27ef19`). Verified end-to-end from the browser during the Phase 2 close-out: the admin user status change succeeds cross-origin. |
+| 020 | Backend / Frontend | **No route serves product image bytes.** `product_images` rows exist and the objects are written through `StorageService` (task 3.8), but `GET /api/v1/vendors/products/{productId}/images` returns metadata only and `storageKey` is an opaque backend key (`product-images/{productId}/{uuid}.{ext}`) that a client cannot turn into a URL. The vendor catalog UI therefore lists image metadata rather than rendering thumbnails, so no storefront or catalog screen can display a product photo yet | Open | Record the bytes as an authenticated `GET` that resolves the key through `StorageService` and streams it with the stored `mime_type`. Until then the UI deliberately avoids `<img>` so a vendor never sees a broken image and mistakes it for a failed upload (D-31). |
+| 021 | Backend | **Category read paths disagreed with their contracts** — two defects found by the Phase 3 final audit. (1) **The public read served inactive categories:** `CategoryService.listActive()` built its response from `findByParentIdIsNullOrderByDisplayOrderAscIdAsc()`, which filters on `parent IS NULL` but has **no `active` predicate**, so a category an admin had deactivated was still published to the storefront chips (plan 4.7) and to the vendor product form's category picker, contradicting D-17. (2) **The admin listing was roots-only:** with no `parentId`, `CategoryService.list()` called `findByParentIdIsNull(pageable)`, so admin-created child categories never appeared in ordinary pagination and `totalElements`/`totalPages` counted roots only — an admin managing a two-level tree was told the wrong totals. Neither defect was catchable by the tests that existed: `CategoryServiceTest.listActiveReturnsFlatListOfActiveCategories` mocked the repository with rows it had already made active, and `CategorySeedIntegrityTest` validated fixtures it built itself rather than the database | Fixed | `CategoryRepository` now has exactly one roots-scoped query, `findByParentIdIsNullAndActiveTrueOrderByDisplayOrderAscIdAsc()`, whose name, JPQL and Javadoc all carry `active = true`; both unfiltered roots-only methods (`findByParentIdIsNullOrderByDisplayOrderAscIdAsc` and the paged `findByParentIdIsNull`) were **removed**, so neither defect can be reintroduced by reaching for the old query. The admin listing now paginates the whole table through `findAll(pageable)` when `parentId` is absent, while `parentId=X` still means "the direct children of X", sorted by `name` then `id` for stable pagination. Regression tests against real MySQL: `CategoryApiIntegrationTest.publicCategoryReadExcludesInactiveRoots` (creates an active root, an inactive root and an inactive root with an active child, then asserts the published slugs and the exact published count), `.adminListingWithoutParentIdIncludesChildrenAndCountsThem` (walks every page, asserts the child is reachable and that `totalElements`/`totalPages` at `size=1` equal one page per row) and `.adminListingWithParentIdReturnsOnlyThatParentsDirectChildren` (grandchild and unrelated root excluded). `CategoryServiceTest` additionally verifies *which* query each read path calls, so the wiring cannot drift again. Corrected as part of the audit fix: the previous text of this issue named a repository method that never existed (`findByActiveOrderByDisplayOrder`) and described the four seeded top-level categories as children. |
+| 022 | Frontend / Security | **`auth-store.ts` persists tokens to `localStorage`.** The Zustand store's `persist` middleware writes `accessToken` and `refreshToken` to durable storage, which is contrary to the project's memory-only intent for token handling | Open | Deliberately left unchanged by task 3.9, which was scoped to the catalog UI and to not redesign authentication. Any fix must handle the Axios single-flight refresh in `src/shared/lib/api.ts` (both read from the store) and the 401 retry path together, or a reload mid-refresh will log the user out. |
+| 023 | Test / Dev  | **The local dev MySQL holds a pre-rewrite V1 schema, so the app will not boot against it.** D-9 rewrote `V1__baseline.sql` before first deployment, but this machine's `flowerconnect` database was applied from the *original* V1. Booting the backend fails twice over: Flyway reports `Migration checksum mismatch for migration version 1` (applied 1060733681 vs resolved 1997243429), and once that is repaired, Hibernate `ddl-auto: validate` reports `missing column [created_at] in table [roles]` and then `missing column [status] in table [users]` — the old schema has `users.is_active TINYINT(1)` where the current entity expects a native `ENUM` status | Environment | Not a code defect and not something to migrate around: D-9 explicitly allows replacing V1–V11 before the first deployment. The fix is to drop the local schema and let Flyway rebuild it. Note that `flyway:repair` alone is **not** sufficient — it only rewrites the checksum and leaves the old tables in place, so `repair` followed by a boot fails on the next missing column. Drop `users`, `roles` and the dependent tables (with `SET FOREIGN_KEY_CHECKS=0`, since `fk_refresh_tokens_user` otherwise blocks dropping `users` first) plus `flyway_schema_history`, then start the backend once and let all 11 migrations apply. `./mvnw verify -Pintegration` is unaffected: it uses its own Testcontainers MySQL, not this one. |
+| 024 | Test / Dev  | **Phase 3h browser end-to-end check is incomplete.** Vendor registration, pending-vendor login and the approval banner gating were verified live in the browser (D-29 confirmed: Catalog and Inventory links are withheld from an unapproved vendor). The *approved*-vendor half of the walkthrough — catalog create/edit, image upload/reorder/delete, stock in/out/adjust/write-off — was **not** walked through in a browser, because it requires an admin to approve the vendor and the Docker daemon became unavailable mid-session | Open | The blocking chain, recorded so it can be resumed: (1) Docker Desktop's Linux engine pipe was gone (`npipe:////./pipe/dockerDesktopLinuxEngine`), so `docker compose` could not start the stack; (2) the backend started via `./mvnw spring-boot:run` against local MySQL instead, but hit the schema drift in issue 023 and then could not bind port 8080 (a stale listener on `::8080` could not be terminated from this session); (3) with the backend down, no admin token could be minted, because `AdminBootstrap` needs `ADMIN_EMAIL`/`ADMIN_PASSWORD` supplied as environment variables (`docker-compose.yml` defaults both to **empty**, so the bootstrap is a deliberate no-op unless they are set) and the `.env` file holding them is unreadable to the agent by project rule. Do **not** read this as a functional gap: the equivalent behaviour is covered by 362 integration tests against the real production filter chain, and `docs/rbac-matrix.md` maps every cell to the test that asserts it. What is genuinely unverified is the rendered UI path for an approved vendor. |
+
+| 025 | Backend / Frontend | **`GET /api/v1/categories` publishes only top-level categories, so the category picker and filter are one level deep.** D-17 now states the contract explicitly — active top-level categories (`parent_id IS NULL AND active = true`) — and the public query enforces it. A child category is therefore reachable through `GET /api/v1/admin/categories?parentId={id}` but never through the public list, so a vendor cannot assign a product to a sub-category and the storefront category chips show only the top level | Open | Deliberate for Phase 3: the plan names the four seeded categories as the chip level (4.7) and only asks for a hierarchical *entity*. Widening the public read to every active category (or exposing a tree) is an API contract change and is a decision to make before Phase 4.4 product search is built on it, not a bug fix. No client workaround is possible: a client-side flatten cannot know whether a parent is inactive. |
+| 026 | Backend | **Deleting a category a product still references returns 500, not 409.** `CategoryService.delete()` refuses only the has-children case with a mapped `CONFLICT`. A referenced category is blocked by `fk_products_category` (V8), and the resulting MySQL constraint violation surfaces as a server error rather than the documented 409 | Open | Left unchanged by the Phase 3 audit fix, which was scoped to the two category read-path defects. `PUT /api/v1/admin/categories/{id}` with `active = false` is the supported way to retire a category that products still use. Adding a `countByCategoryId`-style service check would turn it into a clean 409, but that is product-assignment behaviour (tasks 3.2/3.5) and needs its own decision. |
 
 ## Known Limitations
 
@@ -53,6 +61,34 @@
 ## Blocked Work
 
 _None currently blocked._
+
+## Testing Gotchas (Phase 3h, close-out)
+
+- **`flyway:repair` is not a substitute for rebuilding a drifted dev schema.** D-9 allowed
+  V1–V11 to be rewritten before the first deployment, so a local database applied from the
+  *original* V1 reports a checksum mismatch and then, once repaired, fails
+  `ddl-auto: validate` column by column (`missing column [created_at] in table [roles]`, then
+  `missing column [status] in table [users]` — the old schema has `is_active TINYINT(1)` where
+  the entity expects a native `ENUM`). Repair rewrites the checksum and nothing else, so each
+  boot surfaces the *next* missing column. Drop the tables (with `SET FOREIGN_KEY_CHECKS=0`;
+  `fk_refresh_tokens_user` otherwise blocks dropping `users` first) plus
+  `flyway_schema_history`, then let one boot apply all 11 migrations. The Maven Flyway plugin
+  does not read `application.yml`, so the repair needs the connection passed explicitly —
+  and on PowerShell the `-D` values must be **quoted** (`mvnw "-Dflyway.url=..."`),
+  otherwise `jdbc:mysql://` is parsed as a groupId and Maven tries to download it as a plugin
+  artifact. `./mvnw verify -Pintegration` is unaffected: it uses its own Testcontainers MySQL.
+- **A `2xx` cell can hide a contract inconsistency.** `POST /api/v1/admin/categories` returns
+  **200**, not the **201** the Phase 3.5 and 3.8 vendor routes return on create. The
+  controller and its test agree, so nothing fails — which is exactly why it survives. Recorded
+  in `docs/rbac-matrix.md` rather than "fixed", because changing it is an API contract change
+  and not an incidental bug fix.
+- **Global reference data has no 403-foreign cell.** Categories belong to no vendor, so the
+  RBAC matrix column is N/A rather than untested. Six cells in the 3.1 table (the 401s, and
+  the `PUT`/`DELETE` non-admin 403s) are genuinely unasserted *in that file*; they are
+  covered indirectly because all six route through the same `hasRole("ADMIN")` namespace rule
+  that `RoleBoundaryTest` and `AdminUserStatusIntegrationTest` exercise for
+  `/api/v1/admin/**`. The gaps are drawn in the matrix rather than quietly filled, so a
+  reader can see which cells rest on the namespace rule and which are asserted directly.
 
 ## Testing Gotchas (Phase 2d frontend, admin area)
 
@@ -132,6 +168,149 @@ _None currently blocked._
   `{"code":"VALIDATION_FAILED","message":"Validation failed: ..."}` with no per-field `validation`
   object. Asserting `$.validation.id` fails with `No value at JSON path "$.validation.id"`. Only
   `@Valid @RequestBody` violations populate that map.
+
+## Testing Gotchas (Phase 3d)
+
+- **A test fixture that creates a product over HTTP cannot run as a PENDING or SUSPENDED vendor.**
+  The approval gate lives on the controller (D-13), not in `ProductService`, so
+  `POST /api/v1/vendors/products` returns `403 VENDOR_NOT_APPROVED` for a vendor the product itself
+  does not care about. Two `VendorInventoryIntegrationTest` cases set up exactly those states (the
+  pending-vendor refusal and the reinstate-restores-access case, whose vendor is suspended when the
+  product is created) and both failed with `Status expected:<201> but was:<403>` from the fixture
+  helper, not from the assertion under test. `createProduct` now calls `productService.create(...)`
+  directly. The rule generalises: **an approval-gated state is awkward to reach through a gated
+  fixture, so build the fixture below the gate.**
+- **`VendorProfile.builder()` needs `.status(...)` explicitly** in a hand-rolled vendor fixture. The
+  builder has no default, so an omitted status persists as `null` and fails `ddl-auto: validate` on
+  the ENUM column (D-20) at flush time — with a schema-validation message that names no test line.
+  `InventoryConcurrencyIntegrationTest.createVendor` is the reference fixture.
+- **A pessimistic-lock test cannot assert its own serialisation.** Run the contenders one after
+  another and every call sees the previous one's committed level, so an unlocked implementation
+  passes. `InventoryConcurrencyIntegrationTest` uses a `CountDownLatch` to release all threads
+  together and asserts only end state (final quantity = sum of deltas, movement count = number of
+  successful changes). With one unit of stock and eight contenders exactly one thread must succeed
+  and the other seven must get `INSUFFICIENT_STOCK`; if more than one succeeds, the lock is absent.
+- **Concurrent creates can deadlock on the product unique index (error 1213)**, which is the same
+  transient MySQL behaviour already documented for slug collisions under Phase 3b. Keep fixture
+  names unique per test and retry the whole create in a fresh transaction
+  (`ProductInventoryIntegrationTest.createWithDeadlockRetry`).
+- **`INSUFFICIENT_STOCK` needs reserved units to be reachable at all.** No route in this phase
+  writes `reserved_quantity` (`RESERVE` movements arrive with checkout in Phase 5), so the floor is
+  set up by updating the column with `JdbcTemplate` before the request under test. Without that the
+  409 this API exists to return would never fire and the test would silently prove nothing.
+
+## Testing Gotchas (Phase 3f)
+
+- **A `@Configuration`-annotated `@ConfigurationProperties` class must not also be listed in
+  `@EnableConfigurationProperties`.** `StorageProperties` and `ImageUploadProperties` carry
+  `@Configuration` so component scan picks them up (which is why `FlowerConnectApplication` was left
+  alone); listing them as well registers a *second* bean of the same name and the context fails at
+  startup with `BeanDefinitionOverrideException: Invalid bean definition with name
+  'storageProperties' ... There is already a bean defined with the name 'storageProperties'`. Every
+  `@SpringBootTest` in the run then reports the same `ApplicationContext failure threshold (1)
+  exceeded`, so the real cause is only in the first stack trace. Two registration mechanisms, one
+  bean — pick one per properties class in this codebase.
+- **`MockMultipartHttpServletRequestBuilder.file(...)` returns the parent builder type.** Chaining
+  `multipart(url).file(part).param("primary", "true").header(...)` fails to compile, because
+  `file` returns `MockMultipartHttpServletRequestBuilder` (the multipart parent) and `param`/`header`
+  belong to `MockHttpServletRequestBuilder`. Assign in steps:
+  `MockMultipartHttpServletRequestBuilder request = multipart(url); request.file(part); request.param(...)`.
+- **A storage test that points at the configured `uploads` directory writes into the repo.**
+  `application-test.yml` sets `app.storage.local-directory: target/test-uploads/default`, and
+  `ProductImageIntegrationTest` overrides it per class with a JUnit `@TempDir`. `uploads/` is in
+  `.gitignore`, so a leak is invisible to `git status` — which is exactly why the test profile
+  redirects the root rather than relying on the ignore rule.
+- **An `@Test` count read with a text grep is not a test count.** `Select-String '@Test'` over the
+  new image test files over-reports by one or two per file (37 vs the 36 the service suite actually
+  runs), so the totals in `docs/progress.md` come from the surefire/failsafe `.txt` reports under
+  `target/`, not from a source scan.
+
+## Testing Gotchas (Phase 3g)
+
+- **`findByRole` on a container that renders in every state resolves before the query that gates its
+  contents.** `VendorLayout` always renders the `<nav>`, so
+  `await screen.findByRole("navigation", …)` succeeds on the first frame while `profile` is still
+  `undefined` and the approval-gated Catalog/Inventory links have not been added yet. The symptom is
+  `Unable to find an accessible element with the role "link" and name "Catalog"` under the full suite
+  only, because the isolated run happened to settle first. Wait for something the *query* produces
+  (the banner's `2 of 7 days open` row) before asserting the conditional links.
+- **A zod numeric pattern must match the DTO's signedness, not the intuitive one.** The adjustment
+  dialog's `/^\d+$/` mirrored "a number" and silently made the one action that accepts a *negative*
+  quantity untypeable, while the three positive actions needed the same pattern plus an explicit `> 0`
+  refine. Signed actions take `/^-?\d+$/`; positive ones keep `/^\d+$/`.
+- **A derived "is this past its date" marker must use the same boundary as whatever acts on it.**
+  `isPastExpiryDate` compared against *tomorrow* (`format(addDays(parseIsoDate(value), 1), "d MMM yyyy")`)
+  to line up with `isExpiredToday` marking a product expiring today, which turned the "past its expiry
+  date" badge red a day before D-25's sweep would write the stock off. The product form now compares the
+  date against today directly, matching the sweep's `expiryDate < today`.
+
+## Testing Gotchas (Phase 3e)
+
+- **A `@Scheduled` cron takes exactly six fields — there is no year field.** The natural way to keep a
+  scheduled job from firing during a test is a far-future date, and Quartz-style
+  `"0 0 0 1 1 ? 2099"` fails at **context startup** with
+  `Encountered invalid @Scheduled method 'sweepExpiredStock': Cron expression must consist of 6 fields`.
+  Every test then reports the same `ApplicationContext failure threshold (1) exceeded`, so the real
+  cause is only in the first stack trace. Use `"-"` (Spring's `Scheduled.CRON_DISABLED`), which
+  `application-test.yml` now sets for `app.expiry-sweep-cron`.
+- **`Sort.Order` has no two-argument `asc`.** `Sort.Order.asc("product", "id")` does not compile;
+  the varargs overload belongs to `Sort.by(...)`. For the expiry sweep the ordering was left in the
+  `@Query` string anyway (`ORDER BY i.product.id ASC`), because ascending product id is the lock
+  order plan section 6.2 mandates and must not be something a caller's `Pageable` can override.
+- **`MutableClock` and `AppProperties` are cached singleton beans shared by the whole integration
+  suite.** A test that moves the clock (to reach "tomorrow") or lowers
+  `expiry-sweep-max-rows` must restore both in `@AfterEach`, or the next test class in the same
+  context inherits them. `InventoryExpiryIntegrationTest.restoreClockAndBatchCap` is the reference.
+- **A scheduled job is a live actor inside an integration test.** Nothing else in the suite left a
+  past-dated `expiry_date` behind (`VendorInventoryIntegrationTest` sets one and clears it in the
+  same test), but a stray 03:00 run would still have been able to write off a row a test was
+  asserting on — hence the disabled cron in the test profile rather than relying on the run's timing.
+
+## Testing Gotchas (Phase 3c)
+
+- **`Category.builder().active(true)` is required in a product-service fixture.** `active` is a
+  primitive `boolean`, so the builder defaults it to `false` — and task 3.5 refuses to assign a
+  product to a deactivated category. A fixture written before that rule fails with
+  `Category is not active` rather than anything mentioning `active`, so the symptom looks like the
+  service is rejecting a perfectly good category.
+- **`verify(repo, never()).delete(any())` becomes ambiguous once a repository extends
+  `JpaSpecificationExecutor`.** `JpaSpecificationExecutor` adds `delete(Specification<T>)`, which
+  matches a bare `any()` exactly as well as `CrudRepository.delete(T)` does. Use
+  `delete(any(Product.class))`.
+- **Do not try to unit-test a `Specification` by calling `toPredicate` with null Criteria
+  arguments.** It does not throw, it returns something meaningless, and any assertion written
+  against it silently passes or silently fails depending on the stub. Filter *behaviour* belongs in
+  an integration test against real SQL; a unit test can only assert that the right `Pageable` was
+  passed and that an absent filter contributed no predicate.
+- **`@RequiresApprovedVendor` cannot be covered by a `@WebMvcTest` slice** (D-13). The controller
+  slice test carries an explicit Javadoc note saying so, because the slice happily returns 200 for
+  every gated route and a reader would otherwise assume the gate is verified there.
+
+## Testing Gotchas (Phase 3b)
+
+- **Enum-typed entity fields require native MySQL `ENUM` columns.** Hibernate 6.4 with the
+  MySQL dialect maps `@Enumerated(EnumType.STRING)` to the dialect's native ENUM type, so
+  `ddl-auto: validate` fails at startup if the migration declares the column `VARCHAR(32)`:
+  `Schema-validation: wrong column type encountered in column [status] ... found [varchar
+  (Types#VARCHAR)], but expecting [enum (...) (Types#ENUM)]`. Write the migration column as
+  `ENUM('A', 'B', ...)` with the Java constants' exact names (see D-20). A `CHECK ... IN
+  (...)` constraint on an ENUM column is redundant and was dropped from V11.
+- **An unknown ENUM value is rejected by the column type, not a named constraint.** Inserting
+  a value outside the ENUM list fails with MySQL error 1265 ("Data truncated for column
+  ..."), so a test cannot assert a CHECK-constraint name in the failure chain — assert the
+  column name instead (see `ProductInventoryIntegrationTest.stockMovementsRejectAnUnknownMovementType`).
+- **Concurrent creates with the same slug can deadlock (error 1213).** Several transactions
+  inserting the same unique-key value at once take gap locks on the unique index and can
+  deadlock; InnoDB rolls the victim's whole transaction back (the service's in-method
+  duplicate-key retry cannot recover from that — the transaction is already dead). MySQL's
+  own error message says "try restarting transaction", so the caller retries the whole
+  create in a fresh transaction; `ProductInventoryIntegrationTest.createWithDeadlockRetry`
+  is the reference helper. This is transient infrastructure behaviour, not a slug bug.
+- **A test's product name must be unique to that test.** The integration database accumulates
+  rows across every test in the run (non-transactional `@SpringBootTest`), so a slug test
+  that reuses a name another test already created (e.g. "Hybrid Tea") collides before its
+  first create and the whole expected suffix sequence shifts by one. Give each slug test its
+  own product name, or assert the suffix sequence relative to the first create's slug.
 
 ## Testing Gotchas (Phase 2c)
 

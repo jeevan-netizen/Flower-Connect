@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VendorErrorState } from "@/features/vendor/components/VendorErrorState";
-import { apiError, businessError, vendorNotApprovedError } from "@/test/api-errors";
+import { apiError, apiErrorFor, businessError, vendorNotApprovedError } from "@/test/api-errors";
 
 describe("VendorErrorState", () => {
   it("guides a not-approved vendor instead of implying they must sign in again", () => {
@@ -17,6 +17,22 @@ describe("VendorErrorState", () => {
     render(<VendorErrorState error={businessError(404, "NOT_FOUND", "No vendor profile exists")} />);
 
     expect(screen.getByText(/no vendor profile/i)).toBeInTheDocument();
+  });
+
+  it("does not blame the account for a missing product", () => {
+    render(
+      <VendorErrorState
+        error={apiErrorFor("/vendors/products/101", 404, {
+          code: "NOT_FOUND",
+          message: "Product not found",
+        })}
+      />,
+    );
+
+    // The same status, a different resource: "contact support" would send a vendor
+    // with a working profile to the wrong place.
+    expect(screen.queryByText(/no vendor profile/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/product not found/i)).toBeInTheDocument();
   });
 
   it("distinguishes a role failure from an approval failure", () => {
