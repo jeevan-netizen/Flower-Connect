@@ -257,3 +257,49 @@ The endpoint filters to `vendor_profiles.status = APPROVED` AND `accepting_order
 computes Haversine distance from the given service location, and includes only vendors
 within their `delivery_radius_km`. Response includes `distanceKm` and `estimatedDeliveryFee`
 (`baseDeliveryFee + perKmFee × distanceKm`), plus `freeDeliveryAbove` as informational.
+
+---
+
+## 4.4 — Product search (`/api/v1/search`)
+
+One authorization layer only: `SecurityConfig` maps `/api/v1/search/**` to `permitAll()`.
+No authentication required, no role check. The endpoint is public reference data for
+storefront browsing.
+
+| Method | Path | 401 | 403 role | 403 foreign | 404 | 2xx |
+|---|---|---|---|---|---|---|
+| GET | `/api/v1/search` | **200** (public by design) | n/a — public | n/a — global | n/a | 200 |
+
+Required query parameter: `locationId` (Long). Optional: `q`, `category`, `priceMin`,
+`priceMax`, `sort`, `vendorId`, `page`, `size`. Zero results returns an empty page, not
+a 404.
+
+Verified by `SearchControllerIntegrationTest`:
+
+| Assertion | Test |
+|---|---|
+| 200 public access (no auth headers) | `searchPublicAccessNoAuthenticationRequired` |
+| 400 missing `locationId` | `searchReturns400WhenLocationIdIsMissing` |
+| 400 unknown `locationId` | `searchReturns400WhenLocationIdIsUnknown` |
+| 400 `priceMin > priceMax` | `searchReturns400WhenPriceMinExceedsPriceMax` |
+| 400 invalid `sort` | `searchReturns400WhenSortIsInvalid` |
+| 400 unknown category | `searchReturns400WhenCategoryIsUnknown` |
+| 400 inactive category | `searchReturns400WhenCategoryIsInactive` |
+| Returns products within delivery radius | `searchReturnsProductsWithinDeliveryRadius` |
+| Filters by query (`q`) | `searchFiltersByQuery` |
+| Filters by category | `searchFiltersByCategory` |
+| Filters by price range | `searchFiltersByPriceRange` |
+| Filters by vendorId | `searchFiltersByVendorId` |
+| Sorts by distance (default) | `searchSortsByDistance` |
+| Sorts by price descending | `searchSortsByPriceDesc` |
+| Pagination works | `searchPaginationWorks` |
+| Empty page when no results | `searchReturnsEmptyPageWhenNoResults` |
+| Unknown vendorId returns empty page (not 400) | `searchUnknownVendorIdReturnsEmptyPage` |
+| Subtree prunes at an inactive node | `searchExcludesProductsUnderAnInactiveIntermediateCategory` |
+
+The endpoint filters to `products.status = ACTIVE` AND available stock > 0
+(`quantity - reserved_quantity`) AND `vendor_profiles.status = APPROVED` AND
+`accepting_orders = true`, computes Haversine distance from the given service location
+against each vendor's `delivery_radius_km`, and sorts in memory by the chosen criterion
+(distance / price_asc / price_desc / name). Response includes `distanceKm` and
+`estimatedDeliveryFee` per product (D-35).

@@ -4,7 +4,7 @@
 
 FlowerConnect is a **hyperlocal flower marketplace**. It connects local florists with customers for same-day or scheduled flower delivery within a tight geographic radius. The platform handles browsing, ordering, payments, and delivery coordination.
 
-Current development phase: **Phase 3f (Image handling)** — authentication (Phase 1), service
+Current development phase: **Phase 4 (Customer addresses, discovery and search)** — authentication (Phase 1), service
 locations (Phase 2a), and vendor registration/approval with the `audit_log` trail (Phase 2b/2c) are
 implemented, as are the admin user listing and status-management APIs (Phase 2d), the vendor and
 admin frontends (Phase 2d), categories (Phase 3a), the product/inventory/stock-movement data model
@@ -437,6 +437,13 @@ and image routes; no order or payment endpoint exists yet — see `docs/decision
 | PUT    | `/api/v1/vendors/products/{productId}/images/{imageId}/primary` | Set the product cover; clears the previous one | Phase 3f|
 | PUT    | `/api/v1/vendors/products/{productId}/images/order` | Reorder images; must be an exact permutation | Phase 3f|
 | DELETE | `/api/v1/vendors/products/{productId}/images/{imageId}` | Delete an image and its stored object; promotes the next when the cover is removed | Phase 3f|
+| GET    | `/api/v1/addresses` | List the caller's saved addresses (paged, default first) | Phase 4.1 |
+| POST   | `/api/v1/addresses` | Save an address; the first becomes the default automatically | Phase 4.1 |
+| GET    | `/api/v1/addresses/{id}` | Read one of the caller's addresses | Phase 4.1 |
+| PUT    | `/api/v1/addresses/{id}` | Full-replacement update of one address | Phase 4.1 |
+| DELETE | `/api/v1/addresses/{id}` | Delete an address; deleting the default promotes the oldest remaining | Phase 4.1 |
+| GET    | `/api/v1/discover` | Public: approved, order-accepting vendors within delivery radius of `locationId` (public by design, D-34) | Phase 4.3 |
+| GET    | `/api/v1/search` | Public: ACTIVE, in-stock products near `locationId` with q/category/price/vendor filters and four sort modes (public by design, D-35) | Phase 4.4 |
 | GET    | `/actuator/health`   | Health check (no auth)              | Phase 0|
 
 ## 7. Configuration

@@ -4,7 +4,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 4 (Customer addresses, discovery and search) — Stage 1 (task 4.1) COMPLETE**
+**Phase 4 (Customer addresses, discovery and search) — Tasks 4.1, 4.3 and 4.4 COMPLETE**
 
 Task 4.1 (customer address book) is implemented, verified and committed on branch
 `phase-4-discovery-search`: the `addresses` table (V12), entity and repository,
@@ -14,18 +14,33 @@ invariant enforced under a pessimistic lock on the caller's own `users` row
 namespace. Stage 0's design note (`docs/phase-4-stage-0-design.md`) records the
 decisions carried into the implementation.
 
+Task 4.3 (geo discovery, `GET /api/v1/discover`) is implemented and verified: a
+public `permitAll()` endpoint returning approved, order-accepting vendors within
+their `delivery_radius_km` of a required `locationId`, with a bounding-box
+prefilter on `idx_vendor_profiles_status_geo` and an exact Haversine refinement,
+a `distanceKm`/`estimatedDeliveryFee` per vendor, and a sorted, paginated
+`PageResponse` envelope. Migrations: none (reused V5).
+
+Task 4.4 (product search, `GET /api/v1/search`) is implemented and verified: a
+public endpoint returning ACTIVE, in-stock products from approved vendors within
+radius, with `q` / `category` (active subtree) / `priceMin` / `priceMax` /
+`vendorId` filters, four sort modes (default distance), in-memory pagination
+after the radius filter, and D-35's decisions on the shared geo helpers
+(`GeoDistance`, `GeoCandidates`, `PageResponses`, `DeliveryFee`), the sort
+whitelist, the cross-field price rule and the unknown-vendor empty page.
+
 Stage 1 verification:
 
 | Command | Result |
 |---|---|
-| `./mvnw test` | **527 unit tests** (508 Phase 3 baseline + 19 new), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
-| `./mvnw verify -Pintegration` | **390 integration tests** (365 baseline + 25 new), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw test` | **558 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration` | **414 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 
 ### Next Phase
 
-**Phase 4 tasks 4.2–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
-location picker (4.2), geo discovery (4.3), product search (4.4), storefront API
-(4.5), then the customer frontend (4.6–4.9) and Phase 4 verification (4.T).
+**Phase 4 remaining tasks 4.2, 4.5–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
+location picker (4.2, session-backed), storefront API (4.5), then the customer
+frontend (4.6–4.9) and Phase 4 verification (4.T).
 
 Two defects were found by the new tests and fixed during Stage 1 rather than
 worked around:
@@ -291,8 +306,8 @@ integration tests**, all green — `BUILD SUCCESS`.
 #### Phase 4 — Customer Addresses, Discovery and Search
 - [x] **4.1 — Address book**: `addresses` table (V12) — one row per saved address, `user_id` FK (CASCADE), `service_location_id` FK, `label`/`line1`/`line2`, centroid `latitude`/`longitude` copied from the service location at write time (D-4), `is_default` BIT(1) with no unique constraint (MySQL has no partial unique index and the generated-column trick conflicts with the required FK — the D-21 finding), so one-default-per-customer is a service-level invariant (D-32). `AddressService` resolves the caller from the JWT subject only; every write is one `@Transactional` whose *first* read locks the caller's own `users` row (`UserRepository.findByEmailForUpdate`, `PESSIMISTIC_WRITE`) and only then reads and mutates that user's addresses — the user row is the serialization point because a first-address creation has no address row to lock, and a plain read before the lock would poison the REPEATABLE READ snapshot (D-32). First address becomes the default automatically (an explicit `false` is not honoured); a later address is default only when the request says so and clears the previous default in the same transaction; deleting the default promotes the oldest remaining address (`MIN(id)`); deleting the only address leaves no default; an ordinary update never changes the stored flag unless the request sets it. `PUT` is a full replacement (D-15): an omitted `line2` clears it, an omitted `defaultAddress` keeps the flag, and changing the service location recopies the new centroid. `AddressController` at `/api/v1/addresses` — `GET` (paged, default first then id ASC, page/size validated 0../1..100), `POST` (201), `GET|PUT /{id}` (200), `DELETE /{id}` (204); `@Positive` path ids; a foreign id and a missing id are both 404 (ownership is scoped by `user_id` in every query); an unknown `serviceLocationId` is 400 `VALIDATION_FAILED` ("Unknown service location", the `VendorService` precedent). `SecurityConfig` maps `/api/v1/addresses/**` to `hasRole("CUSTOMER")` — a florist or admin account is 403 before the controller; unauthenticated is 401. 19 unit tests (`AddressServiceTest`) + 23 HTTP integration tests (`AddressApiIntegrationTest` — real JWTs minted through the login endpoint, so the full production filter chain runs; RBAC, ownership, validation, pagination, default rules and delete-promotion at the HTTP boundary) + 2 real-thread concurrency tests (`AddressConcurrencyIntegrationTest` — 8 simultaneous first-address creations leave exactly one default; 8 competing default switches leave exactly one). No frontend change.
 - [ ] 4.2 Location picker (session-backed, no GPS)
-- [x] 4.3 Geo discovery API (`GET /api/v1/discover`)
-- [ ] 4.4 Product search API (`GET /api/v1/search`)
+- [x] **4.3 — Geo discovery API**: public `GET /api/v1/discover` (`permitAll()`, mirroring `/api/v1/locations`) returning approved, order-accepting vendors within their `delivery_radius_km` of a required `locationId`. The query takes a bounding-box prefilter derived from the maximum approved `delivery_radius_km` (served by `idx_vendor_profiles_status_geo`) and then an exact Haversine refinement per vendor, so the radius rule is the vendor's own, not a global one. Response carries `distanceKm` and `estimatedDeliveryFee` (`baseDeliveryFee + perKmFee x distanceKm`) per vendor, `freeDeliveryAbove` as informational only, in the standard `PageResponse` envelope sorted by distance then id. Missing `locationId` is 400 via the `MissingServletRequestParameterException` handler ("Required parameter 'locationId' is not present"); an unknown one is 400 `VALIDATION_FAILED` ("Unknown service location"). No migration (reuses V5). 10 unit tests (`DiscoveryServiceTest`) + 6 integration tests (`DiscoveryControllerIntegrationTest`) covering radius inclusion/exclusion, non-approved exclusion, both 400s, pagination metadata and distance-then-id ordering
+- [x] **4.4 — Product search API**: public `GET /api/v1/search` returning ACTIVE, in-stock products (`quantity - reserved_quantity > 0`) from approved, order-accepting vendors within their delivery radius, with `q` / `category` / `priceMin` / `priceMax` / `vendorId` filters, a four-value `sort` whitelist (`distance | price_asc | price_desc | name`, default `distance`, normalised by trim + lowercase, every mode tie-broken by product id so pagination is stable) and in-memory pagination taken after the radius filter and sort, because `distanceKm` is not a column on `products` (D-35). Eligibility is one Specification (`SearchSpecifications.eligibleForStorefront`) following the D-23 precedent; positive stock is a correlated `EXISTS` subquery over `inventory` because `Inventory` owns the FK and `Product` deliberately has no inverse mapping. A `category` filter resolves to the whole active subtree, pruning at an inactive node; an unknown or inactive category is 400. `priceMin > priceMax` is a cross-field 400; there is no per-field positivity bound, because a negative price bracket has a well-defined empty result. An unknown `vendorId` is an empty page, not a 400 — a filter that selects nothing is a successful search with zero results. The geo work is shared with task 4.3 through three utilities in `com.flowerconnect.geo`: `GeoDistance` (Haversine, bounding-box deltas, display scale), `GeoCandidates` (the whole vendor-radius resolution — bounding box from the maximum approved radius, then the exact Haversine refinement per vendor, each returned with its distance) and `PageResponses` (clamping, the page window, the `PageResponse` envelope, with 64-bit window arithmetic so a caller-supplied page cannot overflow it); `DeliveryFee` holds the fee formula both endpoints quote, so they cannot drift. `SecurityConfig` maps `/api/v1/search/**` to `permitAll()`. `Product.vendor`/`Product.category` carry `@BatchSize(size = 100)` so the storefront's lazy loads batch instead of running one select per row. No migration. 21 unit tests (`SearchServiceTest`) + 18 integration tests (`SearchControllerIntegrationTest`)
 - [ ] 4.5 Storefront API (`GET /api/v1/vendors/{id}/storefront`)
 - [ ] 4.6 Customer home page (location picker, vendor cards)
 - [ ] 4.7 Search and filter UI
@@ -304,6 +319,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-10 | Implement Task 4.4: Product search API (`GET /api/v1/search`) | SearchResponse DTO, SearchSpecifications, SearchService, SearchController, GeoDistance/GeoCandidates/PageResponses/DeliveryFee shared utils, DiscoveryService refactor, Product @BatchSize, SecurityConfig update, unit and integration tests |
 | 2026-10-10 | Implement Task 4.3: Geo discovery API (`GET /api/v1/discover`) | DiscoveryResponse DTO, DiscoveryService, DiscoveryController, SecurityConfig update, unit and integration tests |
 | 2026-10-09 | Phase 4 Stage 1 (task 4.1): customer address book — V12 migration, entity/repository, DTOs/MapStruct mapper, service with the one-default-per-customer invariant under a user-row lock (D-32), REST controller at `/api/v1/addresses` in a CUSTOMER-only namespace; two defects fixed during verification (REPEATABLE READ snapshot poisoning of the lock protocol, and the `isDefault` wire name — D-33) | `backend/src/main/java/com/flowerconnect/customer/**` (domain, repository, dto, mapper, service, controller), `backend/src/main/java/com/flowerconnect/repository/UserRepository.java`, `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java`, `backend/src/main/resources/db/migration/V12__create_addresses.sql`, `backend/src/test/java/com/flowerconnect/customer/**` (AddressServiceTest, AddressApiIntegrationTest, AddressConcurrencyIntegrationTest), `docs/decisions.md` (D-32, D-33), `docs/rbac-matrix.md`, `docs/progress.md` |
 | 2026-10-05 | Phase 3 final audit fix (task 3.1): active-only public category read and an all-category admin listing with correct pagination, plus regression coverage at service and HTTP level | `CategoryRepository.java`, `CategoryService.java`, `CategoryController.java`, `CategoryServiceTest.java`, `CategoryApiIntegrationTest.java`, `docs/decisions.md` (D-17, D-18), `docs/known-issues.md` (#021 closed, #025, #026), `docs/progress.md` |

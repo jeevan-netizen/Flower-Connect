@@ -375,6 +375,8 @@ of a constraint name.
 | D-31 | Product images are listed as metadata because no route serves the bytes | Decision | Accepted | Phase 3g |
 | D-32 | The default-address lock is the first read in the transaction | Decision | Accepted | Phase 4 (task 4.1) |
 | D-33 | Boolean DTO properties are named after the state, not the question | Decision | Accepted | Phase 4 (task 4.1) |
+| D-34 | Geo discovery API is public and uses bounding-box + Haversine | Decision | Accepted | Phase 4 (task 4.3) |
+| D-35 | Product search reuses the discovery geography, and the category filter is a subtree | Decision | Accepted | Phase 4 (task 4.4) |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -1819,4 +1821,120 @@ The discovery endpoint is similar to locations/categories in that it serves refe
 - `freeDeliveryAbove` is informational; the storefront UI decides whether to show "free delivery above X" badges.
 - The discovery query does not consider vendor prep time, slot availability, or max orders per slot — those are order-time concerns.
 - If no approved vendors exist, or max radius is null, an empty page is returned immediately without a bounding-box query.
+
+---
+
+## D-35: Product search reuses the discovery geography, and the category filter is a subtree
+
+**Status:** Accepted
+**Date:** Phase 4 (Task 4.4)
+
+### Context
+
+Plan task 4.4 adds `GET /api/v1/search`: a public product search that returns
+products near a location, with query/category/price/vendor filters, sort
+variants and pagination. Task 4.3 had just built the vendor-geo half of the
+same problem, so the question is how much of that work the search reuses and
+where the two diverge.
+
+The two endpoints answer different questions. Discovery answers "which
+vendors serve me?"; search answers "which products can I buy from them?".
+Discovery's response carries a computed `distanceKm` and
+`estimatedDeliveryFee` per vendor; search carries them per product, and then
+has to sort *products* by a criterion the caller chooses, which discovery
+never has to do.
+
+Four things the plan does not settle, and each one changed the shape of the
+implementation:
+
+**Where the geographic helpers live.** Task 4.3 wrote a Haversine method and
+two bounding-box delta methods as private statics inside `DiscoveryService`.
+Task 4.4 needs the same three functions. Duplicating them would mean two
+copies of the same distance arithmetic, which is precisely the kind of drift
+that makes "2.1 km" mean two different things on two endpoints.
+
+**What a `category` filter matches.** The categories are a two-level tree
+(D-17), the public read serves active roots only, and products may be assigned
+to any category. A filter that matched only the exact category id would make a
+child-categorised product invisible from its parent; a filter that walked into
+children of an inactive node would publish products under a category the
+storefront no longer lists.
+
+**Whether price bounds and the `vendorId` filter can fail.** A `priceMin`
+above `priceMax` is a caller error; an unknown `sort` is a caller error. An
+unknown `vendorId` is not the caller's — it is a filter that simply matches
+nothing, and returning an empty page is the honest answer rather than a 400
+that tells a client a valid id was invalid.
+
+**How pagination interacts with distance sort.** `distanceKm` is computed from
+the vendor's latitude/longitude, which is not a column on `products`. Sorting
+by it in SQL is not portable JPQL, and the radius check itself needs the
+Haversine value, so the candidates must be materialised before sorting.
+
+### Decision
+
+- **The geography is extracted to `GeoDistance`, and the vendor-radius
+  resolution to `GeoCandidates`.** `GeoDistance` (`com.flowerconnect.geo.util`)
+  holds `haversineKm`, `latDeltaForRadius`, `lngDeltaForRadius` and the
+  display-scale rule, so discovery and search cannot disagree about how far a
+  vendor is. `GeoCandidates.approvedAcceptingWithinRadius` holds the whole
+  candidate algorithm — bounding box from the maximum approved radius, then
+  the exact Haversine refinement against each vendor's own
+  `delivery_radius_km` — and returns each vendor with its distance, so neither
+  service re-implements the prefilter nor recomputes Haversine per row. The
+  fee formula (`DeliveryFee.estimate`) and the `PageResponse` envelope
+  (`PageResponses`, whose page-window arithmetic is 64-bit so a caller-supplied
+  page cannot overflow it) are shared for the same reason. Extracting only the
+  arithmetic and leaving the algorithm duplicated would have preserved exactly
+  the drift risk the extraction exists to remove.
+- **A `category` filter resolves to the whole active subtree.**
+  `SearchService.resolveCategorySubtree` starts at the given category, walks
+  children, and **prunes at an inactive node** — children of a deactivated
+  category are excluded even when they are themselves active, matching the
+  storefront's own publication rule (D-17/D-18). An unknown category is 400
+  `VALIDATION_FAILED` ("Unknown category"); an inactive one is 400
+  ("Category is inactive").
+- **`sort` is a whitelist, normalised by trim + lowercase.**
+  `distance | price_asc | price_desc | name`, default `distance`. An
+  unrecognised value is 400 with a message naming the value the caller sent,
+  not the normalised form, so the client can see its own mistake. Normalising
+  by trim + lowercase means `" Price_Asc "` works rather than 400s on
+  whitespace.
+- **`priceMin`/`priceMax` are cross-field validated, not bound-validated.**
+  `priceMin > priceMax` is 400 `VALIDATION_FAILED`; there is no per-field
+  `@Positive` bound, because a negative price is a filter that matches nothing
+  in practice (`base_price > 0` is a product invariant, D-22) and adding the
+  constraint would reject a request that has a perfectly well-defined empty
+  result rather than letting it return one.
+- **An unknown `vendorId` is an empty page, not a 400.** The filter composes
+  into the Specification and matches nothing. This is consistent with an
+  unknown `q` or an out-of-range price bracket: a filter that selects nothing
+  is a successful search with zero results.
+- **Pagination is in memory, after the radius and sort.** Candidates come
+  back unpaged, are filtered by exact Haversine distance against each
+  vendor's `delivery_radius_km`, are sorted by the chosen criterion, and only
+  then is the page window taken. `totalElements` is the count of eligible
+  products, not the count before the radius filter. The same bounding-box +
+  Haversine refinement task 4.3 uses narrows the vendor set first, so the
+  candidate list is the products of nearby vendors rather than the whole
+  table.
+
+### Consequences
+
+- The endpoint's eligibility rule is one Specification
+  (`SearchSpecifications.eligibleForStorefront`) carrying the product-level
+  predicates (`ACTIVE`, available stock > 0) and the vendor-level predicates
+  (`APPROVED`, accepting orders), because both scopes are needed to answer
+  "can this be bought from here". The optional filters compose on top with
+  `Specification#and`, following the D-23 precedent.
+- Availability is `quantity - reserved_quantity` computed in SQL, so a product
+  whose stock is fully reserved is excluded from search before the radius
+  check runs. This is the storefront-facing half of the invariant D-24
+  protects on the write side.
+- Because pagination is in memory, a very large result set is materialised
+  before the page window is taken. The bounding-box prefilter bounds this to
+  nearby vendors' products, which is the same bound 4.3 accepted.
+- A future "sort by rating" or "sort by delivery time" adds a comparator
+  branch and nothing else: the sort happens in Java on a list already filtered
+  and mapped.
 

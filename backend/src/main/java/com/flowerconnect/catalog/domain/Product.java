@@ -3,6 +3,7 @@ package com.flowerconnect.catalog.domain;
 import com.flowerconnect.domain.VendorProfile;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -45,11 +46,22 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Owning vendor. Batched so a storefront query that touches vendor data
+     * on many products (plan task 4.4 search) collapses the lazy loads into
+     * one select per batch instead of one per row.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
+    @BatchSize(size = 100)
     @JoinColumn(name = "vendor_id", nullable = false)
     private VendorProfile vendor;
 
+    /**
+     * Admin-managed category. Batched for the same reason as the vendor: the
+     * storefront reads the category name of every product on the page.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
+    @BatchSize(size = 100)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
