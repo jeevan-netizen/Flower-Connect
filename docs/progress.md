@@ -85,8 +85,7 @@ handled: open, close, focus management, backdrop click, Escape key.
 
 ### Next Phase
 
-**Phase 4 remaining task 4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
-Phase 4 verification.
+**Phase 4 verification (Task 4.T) COMPLETE** per `docs/FlowerConnect_Implementation_Plan_v2.2.md`.
 
 Stage 1 verification:
 
@@ -94,6 +93,10 @@ Stage 1 verification:
 |---|---|
 | `./mvnw test` | **584 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4 + 26 for task 4.5 + 19 for task 4.6 + 0 for task 4.7 + 0 for task 4.8 + 0 for task 4.9), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 | `./mvnw verify -Pintegration` | **429 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4 + 15 for task 4.5 + 0 for task 4.6 + 0 for task 4.7 + 0 for task 4.8 + 0 for task 4.9), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `npm run lint` | ✅ Pass |
+| `npm run typecheck` | ✅ Pass |
+| `npx vitest run` | **614 tests**, 0 failures — **PASS** |
+| `npm run build` | ✅ Production build succeeds |
 
 Two defects were found by the new tests and fixed during Stage 1 rather than
 worked around:
