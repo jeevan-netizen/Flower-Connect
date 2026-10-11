@@ -7,6 +7,35 @@
  *   `GET /api/v1/locations` -> {@link ServiceLocationGroup}[] (hierarchical)
  */
 
+// Category types for public category endpoint
+/**
+ * One category from the public `GET /api/v1/categories`.
+ * Mirrors backend `CategoryResponse`.
+ */
+export interface CategoryResponse {
+  id: number;
+  parentId: number | null;
+  parentName: string | null;
+  name: string;
+  slug: string;
+  displayOrder: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Paginated listing of categories. Mirrors backend `CategoryPageResponse`. */
+export interface CategoryPageResponse {
+  content: CategoryResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
 /**
  * One service area from `GET /api/v1/locations`.
  *

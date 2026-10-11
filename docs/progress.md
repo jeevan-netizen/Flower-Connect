@@ -4,7 +4,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 4 (Customer addresses, discovery and search) — Tasks 4.1, 4.3, 4.4, 4.5 and 4.6 COMPLETE**
+**Phase 4 (Customer addresses, discovery and search) — Tasks 4.1, 4.3, 4.4, 4.5, 4.6 and 4.7 COMPLETE**
 
 Task 4.1 (customer address book) is implemented, verified and committed on branch
 `phase-4-discovery-search`: the `addresses` table (V12), entity and repository,
@@ -47,17 +47,28 @@ page visible during pagination (no layout shift). Pagination resets to page 0 on
 location change. `useLocationSelection` hook validates the stored location against
 the live `service_locations` list (D-34).
 
+Task 4.7 (search and filter UI) is implemented and verified: a public `/search` route
+with a search bar, root-level active category chips, minimum/maximum price inputs,
+a sort dropdown (distance, price_asc, price_desc, name), clear-filters action,
+and responsive product-card grid with pagination. Reuses the session-scoped
+`fc-location` store via `useLocationSelection`. Category chips are fetched from
+the public `GET /api/v1/categories` endpoint (active roots only, per D-17/Issue 025).
+Price inputs are numeric with decimal-safe validation. Pagination resets to page 0
+on any filter or location change. `useSearch` query uses `placeholderData` for
+smooth pagination. No cart/add-to-cart implementation (Phase 7+). Product images
+render as a generic flower placeholder (D-31, Issue 020).
+
 ### Next Phase
 
-**Phase 4 remaining tasks 4.7–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
-the customer frontend (4.7–4.9) and Phase 4 verification (4.T).
+**Phase 4 remaining tasks 4.8–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
+the customer frontend (4.8–4.9) and Phase 4 verification (4.T).
 
 Stage 1 verification:
 
 | Command | Result |
 |---|---|
-| `./mvnw test` | **584 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4 + 26 for task 4.5 + 19 for task 4.6), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
-| `./mvnw verify -Pintegration` | **429 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4 + 15 for task 4.5 + 0 for task 4.6), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw test` | **584 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4 + 26 for task 4.5 + 19 for task 4.6 + 0 for task 4.7), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration` | **429 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4 + 15 for task 4.5 + 0 for task 4.6 + 0 for task 4.7), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 
 Two defects were found by the new tests and fixed during Stage 1 rather than
 worked around:

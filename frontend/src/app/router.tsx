@@ -9,6 +9,7 @@ import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
 import { BrowsePage } from "@/features/customer/pages/BrowsePage";
+import { SearchPage } from "@/features/customer/pages/SearchPage";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
 import { ApprovedVendorGate } from "@/features/vendor/components/ApprovedVendorGate";
@@ -103,6 +104,13 @@ export const router = createBrowserRouter([
         // scoped location picker. Anonymous visitors can browse freely.
         path: "browse",
         element: <BrowsePage />,
+      },
+      {
+        // Phase 4.7: Public customer search page. No auth guard — the
+        // search endpoint is permitAll() and the page uses the session-
+        // scoped location picker. Anonymous visitors can search freely.
+        path: "search",
+        element: <SearchPage />,
       },
       {
         path: "cart",
