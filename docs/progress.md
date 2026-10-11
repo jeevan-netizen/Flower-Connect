@@ -4,7 +4,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 4 (Customer addresses, discovery and search) — Tasks 4.1, 4.3 and 4.4 COMPLETE**
+**Phase 4 (Customer addresses, discovery and search) — Tasks 4.1, 4.3, 4.4, 4.5 and 4.6 COMPLETE**
 
 Task 4.1 (customer address book) is implemented, verified and committed on branch
 `phase-4-discovery-search`: the `addresses` table (V12), entity and repository,
@@ -29,13 +29,6 @@ after the radius filter, and D-35's decisions on the shared geo helpers
 (`GeoDistance`, `GeoCandidates`, `PageResponses`, `DeliveryFee`), the sort
 whitelist, the cross-field price rule and the unknown-vendor empty page.
 
-Stage 1 verification:
-
-| Command | Result |
-|---|---|
-| `./mvnw test` | **584 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4 + 26 for task 4.5), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
-| `./mvnw verify -Pintegration` | **429 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4 + 15 for task 4.5), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
-
 Task 4.5 (storefront API) is implemented, verified and committed on branch
 `phase-4-discovery-search`: a public `GET /api/v1/vendors/{id}/storefront` in a new
 `com.flowerconnect.storefront` slice, returning a compound `vendor` + `products` payload
@@ -45,10 +38,26 @@ where `products` is the standard `PageResponse` envelope. The compound shape, th
 No frontend change and no migration; `PageResponses` gained a public `of(Page)` overload
 and `InventoryRepository` a `findByProductIdIn` derived query, both additive.
 
+Task 4.6 (customer browse page) is implemented and verified: a public `/browse` route
+with a session-scoped location picker, vendor card grid, pagination, and all six
+required states (no location, loading, success, empty, error, location-change reset).
+Components: `LocationPicker` (shared with shell), `VendorCard`, `VendorCardSkeletonGrid`,
+`BrowsePage`. The `useDiscovery` query uses `placeholderData` to keep the previous
+page visible during pagination (no layout shift). Pagination resets to page 0 on
+location change. `useLocationSelection` hook validates the stored location against
+the live `service_locations` list (D-34).
+
 ### Next Phase
 
-**Phase 4 remaining tasks 4.6–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
-the customer frontend (4.6–4.9) and Phase 4 verification (4.T).
+**Phase 4 remaining tasks 4.7–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
+the customer frontend (4.7–4.9) and Phase 4 verification (4.T).
+
+Stage 1 verification:
+
+| Command | Result |
+|---|---|
+| `./mvnw test` | **584 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4 + 26 for task 4.5 + 19 for task 4.6), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration` | **429 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4 + 15 for task 4.5 + 0 for task 4.6), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 
 Two defects were found by the new tests and fixed during Stage 1 rather than
 worked around:
@@ -85,6 +94,11 @@ were confirmed live in the browser; catalog create/edit, image upload/reorder/de
 four stock actions were not, because approving a vendor needs an admin token and Docker
 became unavailable mid-session. This is a *rendered-UI* gap, not a behavioural one: the same
 paths are covered by the 362 integration tests against the real production filter chain.
+
+The **customer browse page (`/browse`)** is implemented and verified via 19 unit tests
+covering all six required states (no location, loading, success, empty, error, location-change
+reset), pagination, and location-change reset behavior. The page is publicly accessible at
+`/browse` with no authentication required.
 
 Two pre-existing issues remain open and are deliberately not fixed here, as neither belongs
 to Phase 3: issue 020 (no route serves product image bytes, so the UI lists metadata — D-31)

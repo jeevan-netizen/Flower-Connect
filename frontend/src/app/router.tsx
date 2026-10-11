@@ -8,6 +8,7 @@ import { HomePage } from "@/features/home/pages/HomePage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
+import { BrowsePage } from "@/features/customer/pages/BrowsePage";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
 import { ApprovedVendorGate } from "@/features/vendor/components/ApprovedVendorGate";
@@ -97,12 +98,11 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       {
+        // Phase 4.6: Public customer browse page. No auth guard — the
+        // discovery endpoint is permitAll() and the page uses the session-
+        // scoped location picker. Anonymous visitors can browse freely.
         path: "browse",
-        element: (
-          <RequireAuth>
-            <Placeholder title="Browse" />
-          </RequireAuth>
-        ),
+        element: <BrowsePage />,
       },
       {
         path: "cart",

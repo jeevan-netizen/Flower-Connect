@@ -122,7 +122,7 @@ describe("isSelectedLocation", () => {
   });
 
   it("rejects a row whose id is missing, the obsolete-schema case", () => {
-    const { id, ...obsolete } = valid;
+    const obsolete = { city: valid.city, area: valid.area, pincode: valid.pincode, latitude: valid.latitude, longitude: valid.longitude };
     expect(isSelectedLocation(obsolete)).toBe(false);
   });
 });

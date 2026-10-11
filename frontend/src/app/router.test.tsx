@@ -325,7 +325,7 @@ describe("application router", () => {
     renderAt("/browse");
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Browse" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Discover Florists Near You", level: 1 })).toBeInTheDocument();
     });
   });
 });
