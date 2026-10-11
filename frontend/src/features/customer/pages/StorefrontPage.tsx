@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useStorefront } from "@/features/customer/queries";
 import { ProductCardSkeletonGrid } from "@/features/customer/components/ProductCardSkeleton";
+import { ProductDetailModal } from "@/features/customer/components/ProductDetailModal";
 import { Pagination } from "@/shared/components/Pagination";
 import { toStorefrontProductCardView, type StorefrontProductCardView } from "@/features/customer/types";
 import { formatMoney } from "@/features/vendor/format";
@@ -25,9 +26,23 @@ const WEEKDAY_LABELS: Record<string, string> = {
  * Displays product name, category, price, stock status, and vendor name.
  * Uses a generic flower placeholder for images (D-31, Issue 020).
  */
-function StorefrontProductCard({ product }: { product: StorefrontProductCardView }) {
+function StorefrontProductCard({ product, onClick }: { product: StorefrontProductCardView; onClick?: () => void }) {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (onClick && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
   return (
-    <article className="flex flex-col h-full bg-white rounded-xl border border-slate-200 shadow-card p-4 transition-shadow duration-micro ease-standard hover:shadow-card-hover">
+    <article
+      className="flex flex-col h-full bg-white rounded-xl border border-slate-200 shadow-card p-4 transition-shadow duration-micro ease-standard hover:shadow-card-hover"
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={onClick ? 0 : undefined}
+      role={onClick ? "button" : "article"}
+      aria-label={onClick ? `View details for ${product.name}` : undefined}
+    >
       <div className="flex flex-col flex-1">
         {/* Generic flower placeholder */}
         <div className="mb-3 aspect-square bg-slate-100 rounded-lg flex items-center justify-center">
@@ -114,6 +129,17 @@ export function StorefrontPage() {
   useMemo(() => {
     setCurrentPage(0);
   }, [vendorId]);
+
+  // Product detail modal state
+  const [selectedProduct, setSelectedProduct] = useState<StorefrontProductCardView | null>(null);
+
+  const openProductDetail = useCallback((product: StorefrontProductCardView) => {
+    setSelectedProduct(product);
+  }, []);
+
+  const closeProductDetail = useCallback(() => {
+    setSelectedProduct(null);
+  }, []);
 
   if (!isValidVendorId) {
     return (
@@ -314,7 +340,7 @@ export function StorefrontPage() {
               <>
                 <AnimatedList className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                   {products.map((product) => (
-                    <StorefrontProductCard key={product.id} product={toStorefrontProductCardView(product)} />
+                    <StorefrontProductCard key={product.id} product={toStorefrontProductCardView(product)} onClick={() => openProductDetail(toStorefrontProductCardView(product))} />
                   ))}
                 </AnimatedList>
 
@@ -325,8 +351,14 @@ export function StorefrontPage() {
                     disabled={isFetching}
                   />
                 )}
-              </>
-            )}
+              
+              {/* Product Detail Modal */}
+              <ProductDetailModal
+                product={selectedProduct}
+                onClose={closeProductDetail}
+              />
+            </>
+          )}
           </div>
         </>
       ) : (

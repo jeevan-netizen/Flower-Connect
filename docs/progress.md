@@ -4,7 +4,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 4 (Customer addresses, discovery and search) — Tasks 4.1, 4.3, 4.4, 4.5, 4.6, 4.7 and 4.8 COMPLETE**
+**Phase 4 (Customer addresses, discovery and search) — Tasks 4.1, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8 and 4.9 COMPLETE**
 
 Task 4.1 (customer address book) is implemented, verified and committed on branch
 `phase-4-discovery-search`: the `addresses` table (V12), entity and repository,
@@ -71,17 +71,29 @@ loading skeletons, success, empty catalogue, unavailable storefront (indistingui
 404 for unknown/non-approved), API error with retry, pagination. Vendor navigation
 resets pagination and never shows stale data. No cart/add-to-cart (Phase 7+).
 
+Task 4.9 (product detail modal) is implemented and verified: a reusable
+`ProductDetailModal` component accessible from `/browse` (vendor cards — shows
+vendor products), `/search`, and `/vendors/:vendorId` product cards. Displays
+product name, price, category, vendor name (when available), stock status,
+distance/delivery fee (when available), description, and a generic flower
+placeholder for images (D-31, Issue 020). Optional gift note preview supported
+(Phase 5+ for persistence). Accessibility: ARIA dialog semantics, focus trapping,
+focus restoration to trigger on close, Escape/backdrop close, keyboard
+navigation, reduced-motion support. Clicking vendor links on `/browse` still
+navigates to `/vendors/:vendorId`; clicking product cards opens modal. All states
+handled: open, close, focus management, backdrop click, Escape key.
+
 ### Next Phase
 
-**Phase 4 remaining tasks 4.9–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
-the customer frontend (4.9) and Phase 4 verification (4.T).
+**Phase 4 remaining task 4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
+Phase 4 verification.
 
 Stage 1 verification:
 
 | Command | Result |
 |---|---|
-| `./mvnw test` | **584 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4 + 26 for task 4.5 + 19 for task 4.6 + 0 for task 4.7 + 0 for task 4.8), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
-| `./mvnw verify -Pintegration` | **429 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4 + 15 for task 4.5 + 0 for task 4.6 + 0 for task 4.7 + 0 for task 4.8), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw test` | **584 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4 + 26 for task 4.5 + 19 for task 4.6 + 0 for task 4.7 + 0 for task 4.8 + 0 for task 4.9), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration` | **429 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4 + 15 for task 4.5 + 0 for task 4.6 + 0 for task 4.7 + 0 for task 4.8 + 0 for task 4.9), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 
 Two defects were found by the new tests and fixed during Stage 1 rather than
 worked around:

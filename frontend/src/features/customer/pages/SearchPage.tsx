@@ -6,9 +6,10 @@ import { useLocationSelection } from "@/features/location/hooks/useLocationSelec
 import { useSearch } from "@/features/customer/queries";
 import { fetchCategories } from "@/features/location/api";
 import { ProductCard } from "@/features/customer/components/ProductCard";
+import { ProductDetailModal } from "@/features/customer/components/ProductDetailModal";
 import { ProductCardSkeletonGrid } from "@/features/customer/components/ProductCardSkeleton";
 import { Pagination } from "@/shared/components/Pagination";
-import { toProductCardView } from "@/features/customer/types";
+import { toProductCardView, type ProductCardView } from "@/features/customer/types";
 import { AnimatedList } from "@/motion/AnimatedList";
 import { FadeIn } from "@/motion/FadeIn";
 
@@ -158,6 +159,17 @@ export function SearchPage({ initialPage = 0 }: SearchPageProps) {
     },
     [locationSelection],
   );
+
+  // Product detail modal state
+  const [selectedProduct, setSelectedProduct] = useState<ProductCardView | null>(null);
+
+  const openProductDetail = useCallback((product: ProductCardView) => {
+    setSelectedProduct(product);
+  }, []);
+
+  const closeProductDetail = useCallback(() => {
+    setSelectedProduct(null);
+  }, []);
 
   const empty = !isPending && !isError && data?.empty;
   const products = data?.content ?? [];
@@ -379,7 +391,7 @@ export function SearchPage({ initialPage = 0 }: SearchPageProps) {
               <>
                 <AnimatedList className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                   {products.map((product) => (
-                    <ProductCard key={product.id} product={toProductCardView(product)} />
+                    <ProductCard key={product.id} product={toProductCardView(product)} onClick={() => openProductDetail(toProductCardView(product))} />
                   ))}
                 </AnimatedList>
 
@@ -392,7 +404,13 @@ export function SearchPage({ initialPage = 0 }: SearchPageProps) {
                 )}
               </>
             )}
-          </section>
+          
+          {/* Product Detail Modal */}
+<ProductDetailModal
+            product={selectedProduct}
+            onClose={closeProductDetail}
+          />
+        </section>
         </>
       )}
     </FadeIn>

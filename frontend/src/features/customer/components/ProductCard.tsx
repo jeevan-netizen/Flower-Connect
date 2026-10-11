@@ -6,6 +6,7 @@ import type { ProductCardView } from "@/features/customer/types";
 
 interface ProductCardProps {
   product: ProductCardView;
+  onClick?: () => void;
 }
 
 const CARD_CLASS = "flex flex-col h-full bg-white rounded-xl border border-slate-200 shadow-card p-4 transition-shadow duration-micro ease-standard hover:shadow-card-hover";
@@ -26,7 +27,7 @@ const BADGE_CLASS = "inline-flex items-center rounded-full bg-brand-100 px-2.5 p
  * Reuses `formatMoney` from the vendor slice for INR formatting.
  * Uses `AnimatedCard` motion pattern for entry and hover lift.
  */
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, onClick }: ProductCardProps) {
   const reduceMotion = usePrefersReducedMotion();
 
   const ratingLabel = product.avgRating === null
@@ -41,6 +42,13 @@ export function ProductCard({ product }: ProductCardProps) {
     ? `${Math.round(product.distanceKm * 1000)} m`
     : `${product.distanceKm.toFixed(1)} km`;
 
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (onClick && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
   return (
     <motion.article
       className={CARD_CLASS}
@@ -49,6 +57,11 @@ export function ProductCard({ product }: ProductCardProps) {
       animate="visible"
       whileHover={reduceMotion ? undefined : "hover"}
       whileTap={reduceMotion ? undefined : { scale: distances.press }}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      tabIndex={onClick ? 0 : undefined}
+      role={onClick ? "button" : "article"}
+      aria-label={onClick ? `View details for ${product.name}` : undefined}
     >
       <div className="flex flex-col flex-1">
         <div className="flex items-start justify-between gap-3 mb-3">
