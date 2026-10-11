@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchDiscovery, fetchSearch, type DiscoverRequest, type SearchRequest } from "@/features/customer/api";
-import type { DiscoveryPageResponse, SearchPageResponse } from "@/features/customer/types";
+import { fetchDiscovery, fetchSearch, fetchStorefront, type DiscoverRequest, type SearchRequest, type StorefrontRequest } from "@/features/customer/api";
+import type { DiscoveryPageResponse, SearchPageResponse, StorefrontResponse } from "@/features/customer/types";
 
 /**
  * TanStack Query keys for vendor discovery.
@@ -79,4 +79,43 @@ export function useSearch(params: SearchRequest | null) {
  */
 export function invalidateSearch() {
   // No-op for now — search is read-only in Phase 4.
+}
+
+/**
+ * TanStack Query keys for vendor storefront.
+ *
+ * The key includes the vendorId and pagination parameters so vendor
+ * navigation produces a new cache entry and stale responses from a
+ * previous vendor are never shown.
+ */
+export const storefrontKeys = {
+  all: ["storefront"] as const,
+  detail: (vendorId: number, page?: number, size?: number) => ["storefront", "detail", vendorId, page ?? 0, size ?? 20] as const,
+};
+
+/**
+ * Fetches a vendor's public storefront.
+ *
+ * Returns `undefined` data when `vendorId` is not provided, allowing the
+ * caller to handle invalid route parameters without issuing a request.
+ * 
+ * Does not use placeholderData because a vendor change must never display
+ * one vendor's products under another vendor's profile.
+ */
+export function useStorefront(params: StorefrontRequest | null) {
+  return useQuery<StorefrontResponse, Error>({
+    queryKey: params ? storefrontKeys.detail(params.vendorId, params.page, params.size) : storefrontKeys.all,
+    queryFn: () => fetchStorefront(params!),
+    enabled: params !== null && params.vendorId > 0,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Invalidates all storefront queries (e.g., after a vendor approval change).
+ * Currently unused but available for future mutations.
+ */
+export function invalidateStorefront() {
+  // No-op for now — storefront is read-only in Phase 4.
 }

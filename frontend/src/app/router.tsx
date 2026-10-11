@@ -10,6 +10,7 @@ import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
 import { BrowsePage } from "@/features/customer/pages/BrowsePage";
 import { SearchPage } from "@/features/customer/pages/SearchPage";
+import { StorefrontPage } from "@/features/customer/pages/StorefrontPage";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
 import { ApprovedVendorGate } from "@/features/vendor/components/ApprovedVendorGate";
@@ -111,6 +112,13 @@ export const router = createBrowserRouter([
         // scoped location picker. Anonymous visitors can search freely.
         path: "search",
         element: <SearchPage />,
+      },
+      {
+        // Phase 4.8: Public vendor storefront page. No auth guard — the
+        // storefront endpoint is permitAll() and returns 404 for unknown
+        // or non-approved vendors. Anonymous visitors can view freely.
+        path: "vendors/:vendorId",
+        element: <StorefrontPage />,
       },
       {
         path: "cart",

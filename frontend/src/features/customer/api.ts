@@ -1,5 +1,5 @@
 import api from "@/shared/lib/api";
-import type { DiscoveryPageResponse, SearchPageResponse } from "@/features/customer/types";
+import type { DiscoveryPageResponse, SearchPageResponse, StorefrontResponse } from "@/features/customer/types";
 
 /**
  * Discovery request parameters.
@@ -27,6 +27,18 @@ export interface SearchRequest {
   priceMax?: number;
   sort?: "distance" | "price_asc" | "price_desc" | "name";
   vendorId?: number;
+  page?: number;
+  size?: number;
+}
+
+/**
+ * Storefront request parameters.
+ *
+ * `vendorId` is required by the backend (400 VALIDATION_FAILED when absent or non-positive).
+ * `page` and `size` are optional; backend defaults to page=0, size=20, max 100.
+ */
+export interface StorefrontRequest {
+  vendorId: number;
   page?: number;
   size?: number;
 }
@@ -61,6 +73,26 @@ export async function fetchSearch(
 ): Promise<SearchPageResponse> {
   const response = await api.get<SearchPageResponse>("/search", {
     params,
+  });
+  return response.data;
+}
+
+/**
+ * Calls `GET /api/v1/vendors/{vendorId}/storefront` to fetch a vendor's public storefront.
+ *
+ * Public endpoint: no Authorization header is sent. The backend validates
+ * `vendorId` (must be positive) and returns 404 for unknown or non-approved vendors.
+ * The 404 response does not distinguish between unknown and non-approved vendors.
+ * Zero results returns an empty products page (not an error).
+ */
+export async function fetchStorefront(
+  params: StorefrontRequest,
+): Promise<StorefrontResponse> {
+  const response = await api.get<StorefrontResponse>(`/vendors/${params.vendorId}/storefront`, {
+    params: {
+      page: params.page,
+      size: params.size,
+    },
   });
   return response.data;
 }

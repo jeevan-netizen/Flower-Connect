@@ -4,7 +4,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 4 (Customer addresses, discovery and search) — Tasks 4.1, 4.3, 4.4, 4.5, 4.6 and 4.7 COMPLETE**
+**Phase 4 (Customer addresses, discovery and search) — Tasks 4.1, 4.3, 4.4, 4.5, 4.6, 4.7 and 4.8 COMPLETE**
 
 Task 4.1 (customer address book) is implemented, verified and committed on branch
 `phase-4-discovery-search`: the `addresses` table (V12), entity and repository,
@@ -12,7 +12,7 @@ DTOs and MapStruct mapper, `AddressService` with the one-default-per-customer
 invariant enforced under a pessimistic lock on the caller's own `users` row
 (D-32), and `AddressController` at `/api/v1/addresses` inside a CUSTOMER-only
 namespace. Stage 0's design note (`docs/phase-4-stage-0-design.md`) records the
-decisions carried into the implementation.
+decision carried into the implementation.
 
 Task 4.3 (geo discovery, `GET /api/v1/discover`) is implemented and verified: a
 public `permitAll()` endpoint returning approved, order-accepting vendors within
@@ -58,17 +58,30 @@ on any filter or location change. `useSearch` query uses `placeholderData` for
 smooth pagination. No cart/add-to-cart implementation (Phase 7+). Product images
 render as a generic flower placeholder (D-31, Issue 020).
 
+Task 4.8 (public vendor storefront page) is implemented and verified: a public
+`/vendors/:vendorId` route showing a vendor's profile and ACTIVE product catalogue
+via `GET /api/v1/vendors/{vendorId}/storefront`. Uses the shared root layout and
+`SiteHeader`. No authentication required. Components: `StorefrontPage`,
+`StorefrontProductCard`. Vendor profile section displays business name, logo,
+description, service area, delivery radius, minimum order, prep time, base delivery
+fee, rating/review count, accepting-orders flag, and operating hours. Product
+section shows paginated grid of ACTIVE products with name, category, price, stock
+status, and generic flower placeholder (D-31, Issue 020). All states handled:
+loading skeletons, success, empty catalogue, unavailable storefront (indistinguishable
+404 for unknown/non-approved), API error with retry, pagination. Vendor navigation
+resets pagination and never shows stale data. No cart/add-to-cart (Phase 7+).
+
 ### Next Phase
 
-**Phase 4 remaining tasks 4.8–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
-the customer frontend (4.8–4.9) and Phase 4 verification (4.T).
+**Phase 4 remaining tasks 4.9–4.T** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` —
+the customer frontend (4.9) and Phase 4 verification (4.T).
 
 Stage 1 verification:
 
 | Command | Result |
 |---|---|
-| `./mvnw test` | **584 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4 + 26 for task 4.5 + 19 for task 4.6 + 0 for task 4.7), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
-| `./mvnw verify -Pintegration` | **429 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4 + 15 for task 4.5 + 0 for task 4.6 + 0 for task 4.7), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw test` | **584 unit tests** (508 Phase 3 baseline + 19 for task 4.1 + 10 for task 4.3 + 21 for task 4.4 + 26 for task 4.5 + 19 for task 4.6 + 0 for task 4.7 + 0 for task 4.8), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration` | **429 integration tests** (365 baseline + 25 for task 4.1 + 6 for task 4.3 + 18 for task 4.4 + 15 for task 4.5 + 0 for task 4.6 + 0 for task 4.7 + 0 for task 4.8), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 
 Two defects were found by the new tests and fixed during Stage 1 rather than
 worked around:
