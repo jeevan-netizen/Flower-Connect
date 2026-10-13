@@ -35,6 +35,16 @@ public class ServiceLocation {
     @Column(name = "longitude", precision = 11, scale = 8, nullable = false)
     private BigDecimal longitude;
 
+    /**
+     * The IANA timezone of this service area (decision D-5), used to interpret
+     * {@code VendorHours} open/close times in local time. The server runs in
+     * UTC; slot math converts via {@code Clock.systemUTC().withZone(ZoneId)}.
+     * Defaults to {@code Asia/Kolkata} on the seeded demo rows (set in
+     * {@code V13__create_carts_orders.sql}).
+     */
+    @Column(name = "timezone", length = 64, nullable = false)
+    private String timezone;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

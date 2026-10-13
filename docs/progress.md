@@ -4,7 +4,25 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 4 (Customer addresses, discovery and search) — Stage 1 (task 4.1) COMPLETE**
+**Phase 5 (Cart and checkout) — Stage 1 (domain model) COMPLETE**
+
+Stage 1 implements the Phase 5 data model: the `V13__create_carts_orders.sql`
+Flyway migration (adding `service_locations.timezone` per D-5, and creating
+`carts`, `cart_items`, `orders`, `order_items`, and `order_status_history`),
+the matching JPA entities (`Cart`, `CartItem`, `Order`, `OrderItem`,
+`OrderStatusHistory`) with inner enums `OrderStatus`, `PaymentMethod`,
+`PaymentStatus`, and the corresponding repositories. A `CheckoutProperties`
+configuration class was added for the platform fee, default commission rate,
+min lead time, and max booking horizon (decision B-2, D-5). No services,
+controllers, or DTOs were added in this stage — only the persistent domain
+model and its configuration.
+
+Stage 1 verification:
+
+| Command | Result |
+|---|---|
+| `./mvnw test` | **542 unit tests** (537 Phase 4 baseline + 5 new `CheckoutPropertiesTest`), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration -Dit.test=CartOrderSchemaIT` | **22 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (Flyway applies V13, Hibernate `ddl-auto: validate` passes against the entities, all schema assertions green) |
 
 Task 4.1 (customer address book) is implemented, verified and committed on branch
 `phase-4-discovery-search`: the `addresses` table (V12), entity and repository,
@@ -300,10 +318,21 @@ integration tests**, all green — `BUILD SUCCESS`.
 - [ ] 4.9 Product detail modal (carousel, note)
 - [ ] 4.T Phase 4 verification & RBAC tests
 
+#### Phase 5 — Cart and Checkout
+
+- [x] **5.1 Stage 1 (domain model)**: `V13__create_carts_orders.sql` migration (`service_locations.timezone` column per D-5; `carts`, `cart_items`, `orders`, `order_items`, `order_status_history` tables with exact ENUM lists, FK constraints, unique constraints, indexes); JPA entities (`Cart`, `CartItem`, `Order` with inner enums `OrderStatus`/`PaymentMethod`/`PaymentStatus`, `OrderItem`, `OrderStatusHistory`); repositories (`CartRepository`, `CartItemRepository`, `OrderRepository`, `OrderItemRepository`, `OrderStatusHistoryRepository`); `CheckoutProperties` config class (`app.checkout.platform-fee` default 0.00, `default-commission-rate` default 0.10, `min-lead-time-minutes` default 120, `max-booking-horizon-days` default 7). No services, controllers, or DTOs — only the persistent domain model. Verified: 542 unit tests + 22 `CartOrderSchemaIT` integration tests pass.
+- [ ] 5.2 Cart API (add/view/update/remove items, lazy cart creation, clear on checkout)
+- [ ] 5.3 Checkout quote endpoint (`POST /api/v1/checkout/quote`)
+- [ ] 5.4 Checkout endpoint (`POST /api/v1/checkout` — transactional, idempotent, stock reservation)
+- [ ] 5.5 Delivery slot discovery (`GET /api/v1/vendors/{id}/slots`)
+- [ ] 5.6 Customer cart and checkout UI (cart drawer, 3-step checkout flow)
+- [ ] 5.T Phase 5 verification & RBAC tests
+
 ## Latest Changes
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-13 | Phase 5 Stage 1 (task 5.1): V13 migration with service_locations.timezone + carts/cart_items/orders/order_items/order_status_history tables; Cart/CartItem/Order/OrderItem/OrderStatusHistory entities with OrderStatus/PaymentMethod/PaymentStatus enums; five repositories; CheckoutProperties config class | `backend/src/main/resources/db/migration/V13__create_carts_orders.sql`, `backend/src/main/java/com/flowerconnect/cart/domain/*` (Cart, CartItem), `backend/src/main/java/com/flowerconnect/order/domain/*` (Order, OrderItem, OrderStatusHistory), `backend/src/main/java/com/flowerconnect/cart/repository/*`, `backend/src/main/java/com/flowerconnect/order/repository/*`, `backend/src/main/java/com/flowerconnect/config/CheckoutProperties.java`, `backend/src/main/java/com/flowerconnect/domain/ServiceLocation.java` (+timezone), `backend/src/main/java/com/flowerconnect/FlowerConnectApplication.java` (+registration), `backend/src/main/resources/application.yml` (+checkout props), `backend/src/test/resources/application-test.yml` (+checkout props), `backend/src/test/java/com/flowerconnect/order/CartOrderSchemaIT.java`, `backend/src/test/java/com/flowerconnect/config/CheckoutPropertiesTest.java` |
 | 2026-10-10 | Implement Task 4.3: Geo discovery API (`GET /api/v1/discover`) | DiscoveryResponse DTO, DiscoveryService, DiscoveryController, SecurityConfig update, unit and integration tests |
 | 2026-10-09 | Phase 4 Stage 1 (task 4.1): customer address book — V12 migration, entity/repository, DTOs/MapStruct mapper, service with the one-default-per-customer invariant under a user-row lock (D-32), REST controller at `/api/v1/addresses` in a CUSTOMER-only namespace; two defects fixed during verification (REPEATABLE READ snapshot poisoning of the lock protocol, and the `isDefault` wire name — D-33) | `backend/src/main/java/com/flowerconnect/customer/**` (domain, repository, dto, mapper, service, controller), `backend/src/main/java/com/flowerconnect/repository/UserRepository.java`, `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java`, `backend/src/main/resources/db/migration/V12__create_addresses.sql`, `backend/src/test/java/com/flowerconnect/customer/**` (AddressServiceTest, AddressApiIntegrationTest, AddressConcurrencyIntegrationTest), `docs/decisions.md` (D-32, D-33), `docs/rbac-matrix.md`, `docs/progress.md` |
 | 2026-10-05 | Phase 3 final audit fix (task 3.1): active-only public category read and an all-category admin listing with correct pagination, plus regression coverage at service and HTTP level | `CategoryRepository.java`, `CategoryService.java`, `CategoryController.java`, `CategoryServiceTest.java`, `CategoryApiIntegrationTest.java`, `docs/decisions.md` (D-17, D-18), `docs/known-issues.md` (#021 closed, #025, #026), `docs/progress.md` |

@@ -50,6 +50,11 @@ app:
     max-dimension: 1600
     max-pixels: 40000000
     jpeg-quality: 0.85
+  checkout:
+    platform-fee: 0.00
+    default-commission-rate: 0.10
+    min-lead-time-minutes: 120
+    max-booking-horizon-days: 7
   rate-limit:
     enabled: false
     auth:
