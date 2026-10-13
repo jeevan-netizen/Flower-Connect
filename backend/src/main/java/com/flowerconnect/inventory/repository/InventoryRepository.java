@@ -47,6 +47,13 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long>,
 
     Optional<Inventory> findByProductId(Long productId);
 
+    /**
+     * Batch fetch of inventory rows for several products in one query.
+     * Used by the cart service when it needs availability for every line item
+     * without an N+1 select per product.
+     */
+    List<Inventory> findAllByProductIdIn(List<Long> productIds);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Inventory i WHERE i.product.id = :productId")
     Optional<Inventory> findByProductIdForUpdate(Long productId);
