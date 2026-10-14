@@ -190,6 +190,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case VENDOR_NOT_APPROVED -> HttpStatus.FORBIDDEN;
             case UNSUPPORTED_MEDIA_TYPE -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
             case PAYLOAD_TOO_LARGE -> HttpStatus.REQUEST_ENTITY_TOO_LARGE;
+            case SLOT_FULL -> HttpStatus.CONFLICT;
+            case MINIMUM_ORDER -> HttpStatus.BAD_REQUEST;
         };
     }
 

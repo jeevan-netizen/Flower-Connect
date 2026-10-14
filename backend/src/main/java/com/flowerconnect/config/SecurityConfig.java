@@ -98,6 +98,7 @@ public class SecurityConfig {
                 // silently sharing another role's address book.
                 .requestMatchers("/api/v1/addresses/**").hasRole("CUSTOMER")
                 .requestMatchers("/api/v1/cart/**").hasRole("CUSTOMER")
+                .requestMatchers("/api/v1/checkout/**").hasRole("CUSTOMER")
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/actuator/**").hasRole("ADMIN")

@@ -1,6 +1,7 @@
 package com.flowerconnect.customer.repository;
 
 import com.flowerconnect.customer.domain.Address;
+import com.flowerconnect.domain.ServiceLocation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,10 +53,32 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
                                         @Param("userId") Long userId);
 
     /**
+     * The customer's own address by id with the service location fetched.
+     * Returns empty both when the id does not exist and when it belongs
+     * to another user.
+     */
+    @Query("SELECT a FROM Address a JOIN FETCH a.serviceLocation WHERE a.id = :id AND a.user.id = :userId")
+    Optional<AddressWithLocation> findByIdAndUserIdWithLocation(@Param("id") Long id,
+                                                                 @Param("userId") Long userId);
+
+    /**
      * The customer's oldest remaining address ({@code MIN(id)}). Used to
      * promote a new default when the current default is deleted.
      */
     Optional<Address> findFirstByUserIdOrderByIdAsc(Long userId);
 
     long countByUserId(Long userId);
+
+    /**
+     * Projection interface for address with location data needed by checkout.
+     */
+    interface AddressWithLocation {
+        Long getId();
+        String getLabel();
+        String getLine1();
+        String getLine2();
+        BigDecimal getLatitude();
+        BigDecimal getLongitude();
+        ServiceLocation getServiceLocation();
+    }
 }

@@ -31,5 +31,16 @@ public enum ErrorCode {
      * pixel budget that stops a small archive claiming gigabytes of memory.
      * HTTP 413.
      */
-    PAYLOAD_TOO_LARGE
+    PAYLOAD_TOO_LARGE,
+    /**
+     * The requested delivery slot has reached its {@code max_orders_per_slot}
+     * capacity. HTTP 409, distinct from {@code INSUFFICIENT_STOCK} so a client
+     * can tell "the slot is full" apart from "the vendor ran out of stock".
+     */
+    SLOT_FULL,
+    /**
+     * A shop's subtotal is below the vendor's {@code min_order_amount}.
+     * HTTP 400 because the request is valid but the business rule is not met.
+     */
+    MINIMUM_ORDER
 }

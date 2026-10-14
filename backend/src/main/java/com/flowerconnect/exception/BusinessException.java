@@ -63,6 +63,23 @@ public class BusinessException extends RuntimeException {
     }
 
     /**
+     * The requested delivery slot has reached its {@code max_orders_per_slot}
+     * capacity. Rendered as HTTP 409 with the {@code SLOT_FULL} code.
+     */
+    public static BusinessException slotFull(String message) {
+        return new BusinessException(ErrorCode.SLOT_FULL, message);
+    }
+
+    /**
+     * A shop's subtotal is below the vendor's {@code min_order_amount}.
+     * Rendered as HTTP 400 with the {@code MINIMUM_ORDER} code (a
+     * {@code VALIDATION_FAILED} variant for this specific rule).
+     */
+    public static BusinessException minimumOrder(String message) {
+        return new BusinessException(ErrorCode.MINIMUM_ORDER, message);
+    }
+
+    /**
      * The upload's content is not an accepted image format (plan task 3.8).
      * Rendered as HTTP 415 {@code UNSUPPORTED_MEDIA_TYPE} so a client can tell
      * "wrong format" apart from a malformed request or a broken file.
