@@ -4,7 +4,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 5 (Cart and checkout) — Stage 1 (domain model) + Task 5.2 (cart API) COMPLETE**
+**Phase 5 (Cart and checkout) — Stage 1 (domain model) + Task 5.2 (cart API) + Task 5.3 (checkout quote) COMPLETE**
 
 Stage 1 implements the Phase 5 data model: the `V13__create_carts_orders.sql`
 Flyway migration (adding `service_locations.timezone` per D-5, and creating
@@ -27,11 +27,26 @@ checks at add-time, read-only stock checks with no reservation),
 the `InventoryRepository.findAllByProductIdIn` batch-fetch for the vendor-grouped
 cart response.
 
-Stage 1 + Task 5.2 verification:
+Task 5.3 implements the checkout quote endpoint: `POST /api/v1/checkout/quote`
+reads the authenticated customer's cart, validates address ownership, groups
+items by vendor, and returns a per-shop breakdown with subtotals, delivery fees
+(base + per-km × distance, free above threshold), platform fee (config or
+request override), minimum-order check, distance/radius validation, slot format
+and future-date validation (full slot logic in task 5.5), and per-item stock
+and purchasability checks. Price drift is detected by comparing each cart
+item's `priceSnapshot` against the current `products.base_price`; the response
+includes `hasPriceChanges`, per-item `priceChanged`, and per-shop
+`"price_changed_since_add_to_cart"` warnings so the customer must explicitly
+confirm a changed quote before checkout (task 5.4). The quote is read-only
+(`@Transactional(readOnly = true)`) — no stock reservation, no order creation,
+no cart clearing. 22 service unit tests + 11 controller slice tests = 33 new
+tests.
+
+Stage 1 + Task 5.2 + Task 5.3 verification:
 
 | Command | Result |
 |---|---|
-| `./mvnw test` | **580 unit tests** (537 Phase 4 baseline + 5 `CheckoutPropertiesTest` + 38 new cart tests: `CartServiceTest` 19, `CartControllerTest` 19), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw test` | **613 unit tests** (537 Phase 4 baseline + 5 `CheckoutPropertiesTest` + 38 cart tests + 33 checkout tests), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 | `./mvnw verify -Pintegration -Dit.test=CartOrderSchemaIT` | **22 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (Flyway applies V13, Hibernate `ddl-auto: validate` passes against the entities, all schema assertions green) |
 | `./mvnw verify -Pintegration -Dit.test=CartApiIntegrationTest` | **19 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (RBAC, customer isolation, vendor eligibility, stock checks, lazy-cart, vendor grouping, low-stock detection at the HTTP boundary) |
 
@@ -333,7 +348,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 - [x] **5.1 Stage 1 (domain model)**: `V13__create_carts_orders.sql` migration (`service_locations.timezone` column per D-5; `carts`, `cart_items`, `orders`, `order_items`, `order_status_history` tables with exact ENUM lists, FK constraints, unique constraints, indexes); JPA entities (`Cart`, `CartItem`, `Order` with inner enums `OrderStatus`/`PaymentMethod`/`PaymentStatus`, `OrderItem`, `OrderStatusHistory`); repositories (`CartRepository`, `CartItemRepository`, `OrderRepository`, `OrderItemRepository`, `OrderStatusHistoryRepository`); `CheckoutProperties` config class (`app.checkout.platform-fee` default 0.00, `default-commission-rate` default 0.10, `min-lead-time-minutes` default 120, `max-booking-horizon-days` default 7). No services, controllers, or DTOs — only the persistent domain model. Verified: 542 unit tests + 22 `CartOrderSchemaIT` integration tests pass.
 - [x] **5.2 Cart API** (add/view/update/remove items, lazy cart creation, clear on checkout): `CartService` (lazy cart creation, price snapshots per C-1, customer isolation from JWT subject, vendor eligibility checks at add-time, read-only stock checks with no reservation), `CartController` at `/api/v1/cart` (GET, POST /items, PATCH /items/{id}, DELETE /items/{id}, DELETE), DTOs (`CartResponse`, `CartItemResponse`, `AddCartItemRequest`, `UpdateCartItemRequest`, `CartShopView`), `/api/v1/cart/**` → `hasRole("CUSTOMER")` in `SecurityConfig`, `InventoryRepository.findAllByProductIdIn` batch-fetch. 38 unit tests + 19 integration tests pass.
-- [ ] 5.3 Checkout quote endpoint (`POST /api/v1/checkout/quote`)
+- [x] **5.3 Checkout quote endpoint** (`POST /api/v1/checkout/quote`): `CheckoutService` (read-only quote generation, price drift detection, per-shop validation, BigDecimal arithmetic), `CheckoutController`, DTOs (`CheckoutQuoteRequest`, `CheckoutQuoteResponse`, `CheckoutShopQuote`, `CheckoutItemQuote`), `/api/v1/checkout/**` → `hasRole("CUSTOMER")` in `SecurityConfig`. 22 service unit tests + 11 controller slice tests = 33 new tests pass.
 - [ ] 5.4 Checkout endpoint (`POST /api/v1/checkout` — transactional, idempotent, stock reservation)
 - [ ] 5.5 Delivery slot discovery (`GET /api/v1/vendors/{id}/slots`)
 - [ ] 5.6 Customer cart and checkout UI (cart drawer, 3-step checkout flow)
@@ -343,6 +358,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-14 | Phase 5 Task 5.3: Checkout quote endpoint — `CheckoutService`, `CheckoutController`, DTOs, platform fee override, price drift detection, per-shop validation; all 613 unit tests pass | `backend/src/main/java/com/flowerconnect/checkout/**` (controller, dto, service), `backend/src/test/java/com/flowerconnect/checkout/**` (CheckoutServiceTest, CheckoutControllerTest), `docs/progress.md` |
 | 2026-10-13 | Phase 5 Task 5.2: Customer cart API — `CartService`, `CartController`, DTOs, security rule, inventory batch-fetch; all 580 unit tests + 41 cart integration tests (19 CartApiIntegrationTest + 22 CartOrderSchemaIT) pass | `backend/src/main/java/com/flowerconnect/cart/**` (controller, dto, service), `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java`, `backend/src/main/java/com/flowerconnect/inventory/repository/InventoryRepository.java`, `backend/src/test/java/com/flowerconnect/cart/**` (CartServiceTest, CartControllerTest, CartApiIntegrationTest, CartOrderSchemaIT), `docs/progress.md` |
 | 2026-10-13 | Phase 5 Stage 1 (task 5.1): V13 migration with service_locations.timezone + carts/cart_items/orders/order_items/order_status_history tables; Cart/CartItem/Order/OrderItem/OrderStatusHistory entities with OrderStatus/PaymentMethod/PaymentStatus enums; five repositories; CheckoutProperties config class | `backend/src/main/resources/db/migration/V13__create_carts_orders.sql`, `backend/src/main/java/com/flowerconnect/cart/domain/*` (Cart, CartItem), `backend/src/main/java/com/flowerconnect/order/domain/*` (Order, OrderItem, OrderStatusHistory), `backend/src/main/java/com/flowerconnect/cart/repository/*`, `backend/src/main/java/com/flowerconnect/order/repository/*`, `backend/src/main/java/com/flowerconnect/config/CheckoutProperties.java`, `backend/src/main/java/com/flowerconnect/domain/ServiceLocation.java` (+timezone), `backend/src/main/java/com/flowerconnect/FlowerConnectApplication.java` (+registration), `backend/src/main/resources/application.yml` (+checkout props), `backend/src/test/resources/application-test.yml` (+checkout props), `backend/src/test/java/com/flowerconnect/order/CartOrderSchemaIT.java`, `backend/src/test/java/com/flowerconnect/config/CheckoutPropertiesTest.java` |
 | 2026-10-10 | Implement Task 4.3: Geo discovery API (`GET /api/v1/discover`) | DiscoveryResponse DTO, DiscoveryService, DiscoveryController, SecurityConfig update, unit and integration tests |
