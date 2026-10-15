@@ -55,6 +55,7 @@ app:
     default-commission-rate: 0.10
     min-lead-time-minutes: 120
     max-booking-horizon-days: 7
+    quote-signing-secret: test-secret-key-for-quote-signing-at-least-32-chars-long
   rate-limit:
     enabled: false
     auth:

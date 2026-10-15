@@ -4,7 +4,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 5 (Cart and checkout) — Stage 1 (domain model) + Task 5.2 (cart API) + Task 5.3 (checkout quote) COMPLETE**
+**Phase 5 (Cart and checkout) — Stage 1 (domain model) + Task 5.2 (cart API) + Task 5.3 (checkout quote) + Task 5.4 (checkout endpoint) COMPLETE**
 
 Stage 1 implements the Phase 5 data model: the `V13__create_carts_orders.sql`
 Flyway migration (adding `service_locations.timezone` per D-5, and creating
@@ -42,13 +42,41 @@ confirm a changed quote before checkout (task 5.4). The quote is read-only
 no cart clearing. 22 service unit tests + 11 controller slice tests = 33 new
 tests.
 
-Stage 1 + Task 5.2 + Task 5.3 verification:
+Task 5.4 implements the transactional checkout endpoint: `POST /api/v1/checkout`
+places the order for the customer's cart across all vendors in a single atomic
+`@Transactional` boundary.
+- **Payment & Order Status:** COD only (`PaymentMethod.COD`), initial order status
+  `OrderStatus.PLACED`, initial payment status `PaymentStatus.PENDING`.
+- **Idempotency & Replay:** Migration `V15__add_checkout_idempotency.sql` creates
+  `checkout_idempotency` (`user_id`, `client_order_id`, `checkout_fingerprint`,
+  `created_at`, `completed_at`). Canonical inputs are hashed into an HMAC-SHA256
+  fingerprint. Replay with identical payload returns cached orders with
+  `idempotentReplay=true`. Conflicting payload returns 409 CONFLICT. Pending request
+  returns 409 CONFLICT.
+- **Multi-Vendor Partitioning:** Single-vendor checkouts store the exact `clientOrderId`.
+  Multi-vendor checkouts deterministically derive an RFC 4122 UUID per vendor
+  (`UUID.nameUUIDFromBytes((clientOrderId + ":" + vendorId).getBytes())`) to satisfy
+  the `uq_orders_client_order_id` DB unique constraint while remaining queryable on replay.
+- **Deadlock-Free Locking:** Inventory and VendorProfile rows are locked in deterministic
+  ascending ID order (`findByProductIdForUpdate`, `findByIdForUpdate`).
+- **Stock Reservation & Audit:** `reserved_quantity` is incremented under lock,
+  physical `quantity` untouched, and auditable `StockMovement` of type `RESERVE`
+  appended per order item.
+- **Slot Capacity & Hours:** Checks `orderRepository.countBookedOrdersForSlot` under
+  vendor lock; rejects with 409 `SLOT_FULL` if capacity is reached.
+- **Price Drift Confirmation:** If catalog price drifted since cart addition and
+  `confirmPriceChanges=false`, rejects with 409 CONFLICT. If `confirmPriceChanges=true`,
+  updates cart snapshots and records confirmed catalog prices on orders.
+- **Cart Cleanup:** Entire cart is cleared after order and status history creation.
+
+Phase 5 Stage 1 + Task 5.2 + Task 5.3 + Task 5.4 verification:
 
 | Command | Result |
 |---|---|
-| `./mvnw test` | **613 unit tests** (537 Phase 4 baseline + 5 `CheckoutPropertiesTest` + 38 cart tests + 33 checkout tests), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
-| `./mvnw verify -Pintegration -Dit.test=CartOrderSchemaIT` | **22 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (Flyway applies V13, Hibernate `ddl-auto: validate` passes against the entities, all schema assertions green) |
-| `./mvnw verify -Pintegration -Dit.test=CartApiIntegrationTest` | **19 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (RBAC, customer isolation, vendor eligibility, stock checks, lazy-cart, vendor grouping, low-stock detection at the HTTP boundary) |
+| `./mvnw test` | **647 unit/slice tests** (537 Phase 4 baseline + 15 `CheckoutPropertiesTest` + 38 cart tests + 57 checkout tests), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration -Dit.test=CartOrderSchemaIT` | **22 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (Flyway applies V13 & V15, Hibernate `ddl-auto: validate` passes, all schema assertions green) |
+| `./mvnw verify -Pintegration -Dit.test=CartApiIntegrationTest` | **19 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
+| `./mvnw verify -Pintegration -Dit.test=CheckoutApiIntegrationTest` | **12 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (RBAC, single/multi-vendor happy path, stale quoteHash rejection, foreign address rejection, stock drain rollback, replay caching, payload mismatch conflict, slot capacity, price drift confirmation, strengthened concurrent idempotency with response status/orders/rows/reservation/movement assertions) |
 
 Task 4.1 (customer address book) is implemented, verified and committed on branch
 `phase-4-discovery-search`: the `addresses` table (V12), entity and repository,

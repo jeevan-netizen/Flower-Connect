@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowerconnect.checkout.dto.CheckoutItemQuote;
 import com.flowerconnect.checkout.dto.CheckoutQuoteRequest;
 import com.flowerconnect.checkout.dto.CheckoutQuoteResponse;
+import com.flowerconnect.checkout.dto.CheckoutRequest;
+import com.flowerconnect.checkout.dto.CheckoutResponse;
 import com.flowerconnect.checkout.dto.CheckoutShopQuote;
 import com.flowerconnect.checkout.service.CheckoutService;
 import com.flowerconnect.config.TestClockConfig;
@@ -25,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -212,7 +215,193 @@ class CheckoutControllerTest {
                 .andExpect(jsonPath("$.shops[0].warnings[0]").value("price_changed_since_add_to_cart"));
     }
 
+    // ------------------------------------------------------------- checkout RBAC
+
+    @Test
+    void checkoutRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(checkoutService);
+    }
+
+    @Test
+    @WithMockUser(username = "vendor@test.com", roles = {"FLORIST"})
+    void aFloristCannotPostCheckout() throws Exception {
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(checkoutService);
+    }
+
+    @Test
+    @WithMockUser(username = "admin@test.com", roles = {"ADMIN"})
+    void anAdminCannotPostCheckout() throws Exception {
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(checkoutService);
+    }
+
+    // ------------------------------------------------------------- checkout happy path & validation
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutReturns200() throws Exception {
+        CheckoutResponse response = sampleCheckoutResponse();
+        when(checkoutService.checkout(anyString(), any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(sampleCheckoutRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientOrderId").value(response.getClientOrderId().toString()))
+                .andExpect(jsonPath("$.idempotentReplay").value(false))
+                .andExpect(jsonPath("$.orders").isArray())
+                .andExpect(jsonPath("$.orders[0].orderId").value(101))
+                .andExpect(jsonPath("$.orders[0].status").value("PLACED"))
+                .andExpect(jsonPath("$.total").value(643.0));
+
+        verify(checkoutService).checkout(anyString(), any());
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutRejectsMissingAddressId() throws Exception {
+        String body = "{\"clientOrderId\":\"" + UUID.randomUUID() + "\",\"quoteHash\":\"hash\",\"items\":[{\"vendorId\":1,\"slotStart\":\"2026-10-20T10:00:00\"}]}";
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutRejectsMissingClientOrderId() throws Exception {
+        String body = "{\"addressId\":5,\"quoteHash\":\"hash\",\"items\":[{\"vendorId\":1,\"slotStart\":\"2026-10-20T10:00:00\"}]}";
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutRejectsMissingQuoteHash() throws Exception {
+        String body = "{\"addressId\":5,\"clientOrderId\":\"" + UUID.randomUUID() + "\",\"items\":[{\"vendorId\":1,\"slotStart\":\"2026-10-20T10:00:00\"}]}";
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutRejectsMissingItems() throws Exception {
+        String body = "{\"addressId\":5,\"clientOrderId\":\"" + UUID.randomUUID() + "\",\"quoteHash\":\"hash\"}";
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutHandlesConflictError() throws Exception {
+        doThrow(BusinessException.conflict("Checkout payload does not match original request for this clientOrderId"))
+                .when(checkoutService).checkout(anyString(), any());
+
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(sampleCheckoutRequest())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"));
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutHandlesInsufficientStock() throws Exception {
+        doThrow(BusinessException.insufficientStock("Insufficient stock"))
+                .when(checkoutService).checkout(anyString(), any());
+
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(sampleCheckoutRequest())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INSUFFICIENT_STOCK"));
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutHandlesSlotFull() throws Exception {
+        doThrow(BusinessException.slotFull("Delivery slot is full"))
+                .when(checkoutService).checkout(anyString(), any());
+
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(sampleCheckoutRequest())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SLOT_FULL"));
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutHandlesAddressNotFound() throws Exception {
+        doThrow(BusinessException.notFound("Address not found"))
+                .when(checkoutService).checkout(anyString(), any());
+
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(sampleCheckoutRequest())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
     // ----------------------------------------------------------------- helpers
+
+    private CheckoutRequest sampleCheckoutRequest() {
+        return CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(UUID.randomUUID())
+                .quoteHash("test-quote-hash")
+                .items(List.of(CheckoutRequest.CheckoutItem.builder()
+                        .vendorId(3L)
+                        .slotStart("2026-10-20T10:00:00")
+                        .build()))
+                .build();
+    }
+
+    private CheckoutResponse sampleCheckoutResponse() {
+        return CheckoutResponse.builder()
+                .clientOrderId(UUID.randomUUID())
+                .idempotentReplay(false)
+                .total(new BigDecimal("643.00"))
+                .orders(List.of(CheckoutResponse.OrderSummary.builder()
+                        .orderId(101L)
+                        .vendorId(3L)
+                        .vendorName("Test Florist")
+                        .status("PLACED")
+                        .paymentStatus("PENDING")
+                        .paymentMethod("COD")
+                        .subtotal(new BigDecimal("598.00"))
+                        .deliveryFee(new BigDecimal("45.00"))
+                        .platformFee(BigDecimal.ZERO)
+                        .total(new BigDecimal("643.00"))
+                        .slotStart("2026-10-20T10:00:00")
+                        .slotEnd("2026-10-20T11:00:00")
+                        .items(List.of(CheckoutResponse.OrderItemSummary.builder()
+                                .productId(20L)
+                                .productName("Red Rose Bunch")
+                                .quantity(2)
+                                .priceSnapshot(new BigDecimal("299.00"))
+                                .subtotal(new BigDecimal("598.00"))
+                                .build()))
+                        .build()))
+                .build();
+    }
 
     private CheckoutQuoteRequest sampleRequest() {
         return CheckoutQuoteRequest.builder()

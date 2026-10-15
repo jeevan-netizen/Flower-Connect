@@ -2,6 +2,8 @@ package com.flowerconnect.checkout.controller;
 
 import com.flowerconnect.checkout.dto.CheckoutQuoteRequest;
 import com.flowerconnect.checkout.dto.CheckoutQuoteResponse;
+import com.flowerconnect.checkout.dto.CheckoutRequest;
+import com.flowerconnect.checkout.dto.CheckoutResponse;
 import com.flowerconnect.checkout.service.CheckoutService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -61,6 +63,31 @@ public class CheckoutController {
         CheckoutQuoteResponse response = checkoutService.generateQuote(authentication.getName(), request);
         log.info("Customer {} requested checkout quote for {} shop(s)", authentication.getName(),
                 response.getShops().size());
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Place a checkout order",
+            description = "Validates the caller's cart, re-checks all prices and inventory under lock, " +
+                    "reserves stock, and creates one order per vendor. All-or-nothing: if any vendor " +
+                    "fails validation, the entire checkout is rolled back. Requires a client-provided " +
+                    "idempotency key ({@code clientOrderId}) and the {@code quoteHash} returned by " +
+                    "the quote endpoint to bind the checkout to the exact confirmed quote. Returns " +
+                    "the created orders with their details.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Order placed (or idempotent replay returned)"),
+            @ApiResponse(responseCode = "400", description = "Validation failed (empty cart, invalid address, missing slots, minimum order, missing quoteHash, address outside radius, invalid slot)"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a CUSTOMER account, or vendor not approved"),
+            @ApiResponse(responseCode = "404", description = "Address not found, or product not found"),
+            @ApiResponse(responseCode = "409", description = "Insufficient stock, slot full, quoteHash mismatch (stale quote), or duplicate idempotency key with different payload"),
+    })
+    @PostMapping
+    public ResponseEntity<CheckoutResponse> checkout(
+            Authentication authentication,
+            @Valid @RequestBody CheckoutRequest request) {
+        CheckoutResponse response = checkoutService.checkout(authentication.getName(), request);
+        log.info("Customer {} placed checkout with {} order(s), clientOrderId={}, replay={}",
+                authentication.getName(), response.getOrders().size(), request.getClientOrderId(), response.isIdempotentReplay());
         return ResponseEntity.ok(response);
     }
 }

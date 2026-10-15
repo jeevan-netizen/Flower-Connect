@@ -6,9 +6,12 @@ import com.flowerconnect.cart.repository.CartItemRepository;
 import com.flowerconnect.cart.repository.CartRepository;
 import com.flowerconnect.catalog.domain.Category;
 import com.flowerconnect.catalog.domain.Product;
+import com.flowerconnect.checkout.domain.CheckoutIdempotency;
 import com.flowerconnect.checkout.dto.CheckoutItemQuote;
 import com.flowerconnect.checkout.dto.CheckoutQuoteRequest;
 import com.flowerconnect.checkout.dto.CheckoutQuoteResponse;
+import com.flowerconnect.checkout.dto.CheckoutRequest;
+import com.flowerconnect.checkout.dto.CheckoutResponse;
 import com.flowerconnect.checkout.dto.CheckoutShopQuote;
 import com.flowerconnect.config.CheckoutProperties;
 import com.flowerconnect.domain.Role;
@@ -18,8 +21,12 @@ import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.exception.ErrorCode;
 import com.flowerconnect.inventory.domain.Inventory;
+import com.flowerconnect.inventory.domain.StockMovement;
 import com.flowerconnect.inventory.repository.InventoryRepository;
 import com.flowerconnect.customer.repository.AddressRepository;
+import com.flowerconnect.order.domain.Order;
+import com.flowerconnect.order.domain.OrderItem;
+import com.flowerconnect.order.domain.OrderStatusHistory;
 import com.flowerconnect.repository.ServiceLocationRepository;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
@@ -35,6 +42,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -63,6 +71,18 @@ class CheckoutServiceTest {
     private ServiceLocationRepository serviceLocationRepository;
     @Mock
     private CheckoutProperties checkoutProperties;
+    @Mock
+    private com.flowerconnect.order.repository.OrderRepository orderRepository;
+    @Mock
+    private com.flowerconnect.order.repository.OrderItemRepository orderItemRepository;
+    @Mock
+    private com.flowerconnect.order.repository.OrderStatusHistoryRepository orderStatusHistoryRepository;
+    @Mock
+    private com.flowerconnect.checkout.repository.CheckoutIdempotencyRepository idempotencyRepository;
+    @Mock
+    private com.flowerconnect.inventory.repository.StockMovementRepository stockMovementRepository;
+    @Mock
+    private java.time.Clock clock;
 
     @InjectMocks
     private CheckoutService checkoutService;
@@ -143,6 +163,9 @@ class CheckoutServiceTest {
         when(addressWithLocation.getServiceLocation()).thenReturn(serviceLocation);
 
         when(checkoutProperties.getPlatformFee()).thenReturn(BigDecimal.ZERO);
+        when(checkoutProperties.getQuoteSigningSecret()).thenReturn("test-secret-key-for-quote-signing-at-least-32-chars-long");
+        when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-15T10:00:00Z"));
+        when(clock.getZone()).thenReturn(java.time.ZoneOffset.UTC);
     }
 
     // --------------------------------------------------------------------- generateQuote - empty cart
@@ -443,23 +466,6 @@ class CheckoutServiceTest {
     }
 
     @Test
-    void generateQuoteUsesPlatformFeeFromRequestOverride() {
-        when(checkoutProperties.getPlatformFee()).thenReturn(new BigDecimal("10.00")); // config says 10
-        setupCommonMocks(vendor);
-
-        CheckoutQuoteRequest request = sampleRequest();
-        request.setPlatformFee(new BigDecimal("5.00")); // request overrides to 5
-
-        CheckoutQuoteResponse response = checkoutService.generateQuote("customer@test.com", request);
-
-        CheckoutShopQuote shop = response.getShops().get(0);
-        assertThat(shop.getPlatformFee()).isEqualByComparingTo(new BigDecimal("5.00"));
-        assertThat(shop.getTotal()).isEqualByComparingTo(
-                shop.getSubtotal().add(shop.getDeliveryFee()).add(new BigDecimal("5.00")).setScale(2, RoundingMode.HALF_UP)
-        );
-    }
-
-    @Test
     void generateQuoteGrandTotalIsSumOfShopTotals() {
         // Add a second vendor
         VendorProfile vendor2 = VendorProfile.builder()
@@ -507,6 +513,379 @@ class CheckoutServiceTest {
                 .hasMessageContaining("Slot selection must include exactly one entry per vendor");
     }
 
+    // --------------------------------------------------------------------- checkout tests
+
+    @Test
+    void checkoutSingleVendorSuccess() {
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        CheckoutQuoteResponse quote = checkoutService.generateQuote("customer@test.com", sampleRequest());
+        UUID clientOrderId = UUID.randomUUID();
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(clientOrderId)
+                .quoteHash(quote.getQuoteHash())
+                .items(List.of(CheckoutRequest.CheckoutItem.builder()
+                        .vendorId(3L)
+                        .slotStart("2026-10-20T10:00:00")
+                        .build()))
+                .build();
+
+        CheckoutResponse response = checkoutService.checkout("customer@test.com", request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.isIdempotentReplay()).isFalse();
+        assertThat(response.getClientOrderId()).isEqualTo(clientOrderId);
+        assertThat(response.getOrders()).hasSize(1);
+
+        CheckoutResponse.OrderSummary orderSummary = response.getOrders().get(0);
+        assertThat(orderSummary.getVendorId()).isEqualTo(3L);
+        assertThat(orderSummary.getStatus()).isEqualTo("PLACED");
+        assertThat(orderSummary.getPaymentMethod()).isEqualTo("COD");
+        assertThat(orderSummary.getPaymentStatus()).isEqualTo("PENDING");
+        assertThat(orderSummary.getSubtotal()).isEqualByComparingTo(new BigDecimal("598.00"));
+
+        // Verify inventory reservation
+        assertThat(inventory.getReservedQuantity()).isEqualTo(2);
+
+        // Verify cart items deleted
+        verify(cartItemRepository).deleteAllByCartId(1L);
+
+        // Verify stock movement recorded
+        verify(stockMovementRepository).saveAndFlush(argThat(sm ->
+                sm.getMovementType() == StockMovement.MovementType.RESERVE
+                        && sm.getQuantityDelta() == 2
+                        && "order".equals(sm.getReferenceType())));
+
+        // Verify idempotency record saved (first as pending, then as completed)
+        verify(idempotencyRepository, times(2)).saveAndFlush(any(CheckoutIdempotency.class));
+    }
+
+    @Test
+    void checkoutMultiVendorSuccess() {
+        VendorProfile vendor2 = VendorProfile.builder()
+                .id(4L).user(customer).businessName("Second Florist")
+                .status(VendorProfile.Status.APPROVED).acceptingOrders(true)
+                .serviceLocation(serviceLocation)
+                .latitude(new BigDecimal("12.9400")).longitude(new BigDecimal("77.6300"))
+                .deliveryRadiusKm(new BigDecimal("10.00")).minOrderAmount(new BigDecimal("100.00"))
+                .baseDeliveryFee(new BigDecimal("25.00")).perKmFee(new BigDecimal("4.00"))
+                .prepTimeMinutes(30).slotDurationMinutes(60).maxOrdersPerSlot(10).build();
+
+        Product product2 = Product.builder()
+                .id(21L).vendor(vendor2).name("Tulip Bunch").slug("tulip-bunch")
+                .basePrice(new BigDecimal("150.00")).status(Product.ProductStatus.ACTIVE).build();
+
+        Inventory inventory2 = Inventory.builder()
+                .id(2L).product(product2).quantity(30).reservedQuantity(0).lowStockThreshold(5).build();
+
+        CartItem item2 = CartItem.builder()
+                .id(200L).cart(cart).product(product2).vendorId(4L)
+                .quantity(1).priceSnapshot(new BigDecimal("150.00")).build();
+
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        when(cartItemRepository.findByCartIdOrderByCreatedAtAsc(1L)).thenReturn(List.of(sampleCartItem(), item2));
+        when(vendorProfileRepository.findById(4L)).thenReturn(Optional.of(vendor2));
+        when(vendorProfileRepository.findByIdForUpdate(4L)).thenReturn(Optional.of(vendor2));
+        when(productRepository.findById(21L)).thenReturn(Optional.of(product2));
+        when(inventoryRepository.findByProductId(21L)).thenReturn(Optional.of(inventory2));
+        when(inventoryRepository.findByProductIdForUpdate(21L)).thenReturn(Optional.of(inventory2));
+
+        CheckoutQuoteRequest quoteRequest = sampleRequest();
+        quoteRequest.getItems().add(CheckoutQuoteRequest.QuoteItem.builder()
+                .vendorId(4L).slotStart("2026-10-20T10:00:00").build());
+
+        CheckoutQuoteResponse quote = checkoutService.generateQuote("customer@test.com", quoteRequest);
+        UUID clientOrderId = UUID.randomUUID();
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(clientOrderId)
+                .quoteHash(quote.getQuoteHash())
+                .items(List.of(
+                        CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build(),
+                        CheckoutRequest.CheckoutItem.builder().vendorId(4L).slotStart("2026-10-20T10:00:00").build()
+                ))
+                .build();
+
+        CheckoutResponse response = checkoutService.checkout("customer@test.com", request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getOrders()).hasSize(2);
+        assertThat(inventory.getReservedQuantity()).isEqualTo(2);
+        assertThat(inventory2.getReservedQuantity()).isEqualTo(1);
+        verify(orderRepository, times(2)).saveAndFlush(any(Order.class));
+    }
+
+    @Test
+    void checkoutRejectsNonCustomer() {
+        Role floristRole = Role.builder().id(2L).name("FLORIST").build();
+        User floristUser = User.builder().id(11L).email("florist@test.com").role(floristRole).status(User.Status.ACTIVE).build();
+        when(userRepository.findByEmailWithRole("florist@test.com")).thenReturn(Optional.of(floristUser));
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L).clientOrderId(UUID.randomUUID()).quoteHash("dummy").items(List.of()).build();
+
+        assertThatThrownBy(() -> checkoutService.checkout("florist@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN)
+                .hasMessageContaining("Only customers can checkout");
+    }
+
+    @Test
+    void checkoutRejectsStaleQuoteHash() {
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(UUID.randomUUID())
+                .quoteHash("invalid-hash-that-does-not-match")
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build()))
+                .build();
+
+        assertThatThrownBy(() -> checkoutService.checkout("customer@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT)
+                .hasMessageContaining("Quote confirmation invalid or stale");
+    }
+
+    @Test
+    void checkoutRejectsPriceDriftWithoutConfirmation() {
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        CheckoutQuoteResponse quote = checkoutService.generateQuote("customer@test.com", sampleRequest());
+
+        // Product price changed from 299.00 to 350.00
+        Product updatedProduct = Product.builder()
+                .id(20L).vendor(vendor).name("Red Rose Bunch").slug("red-rose-bunch")
+                .basePrice(new BigDecimal("350.00")).status(Product.ProductStatus.ACTIVE).build();
+        when(productRepository.findById(20L)).thenReturn(Optional.of(updatedProduct));
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(UUID.randomUUID())
+                .quoteHash(quote.getQuoteHash())
+                .confirmPriceChanges(false)
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build()))
+                .build();
+
+        assertThatThrownBy(() -> checkoutService.checkout("customer@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT)
+                .hasMessageContaining("Price has changed for product");
+    }
+
+    @Test
+    void checkoutAcceptsPriceDriftWithConfirmation() {
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        Product updatedProduct = Product.builder()
+                .id(20L).vendor(vendor).name("Red Rose Bunch").slug("red-rose-bunch")
+                .basePrice(new BigDecimal("350.00")).status(Product.ProductStatus.ACTIVE).build();
+        when(productRepository.findById(20L)).thenReturn(Optional.of(updatedProduct));
+
+        CartItem cartItem = sampleCartItem();
+        when(cartItemRepository.findByCartIdOrderByCreatedAtAsc(1L)).thenReturn(List.of(cartItem));
+
+        CheckoutQuoteResponse quote = checkoutService.generateQuote("customer@test.com", sampleRequest());
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(UUID.randomUUID())
+                .quoteHash(quote.getQuoteHash())
+                .confirmPriceChanges(true)
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build()))
+                .build();
+
+        CheckoutResponse response = checkoutService.checkout("customer@test.com", request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getOrders().get(0).getSubtotal()).isEqualByComparingTo(new BigDecimal("700.00"));
+        verify(cartItemRepository).save(cartItem);
+        assertThat(cartItem.getPriceSnapshot()).isEqualByComparingTo(new BigDecimal("350.00"));
+    }
+
+    @Test
+    void checkoutRejectsWhenSlotIsFull() {
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        when(orderRepository.countBookedOrdersForSlot(eq(3L), any(LocalDateTime.class))).thenReturn(10L);
+
+        CheckoutQuoteResponse quote = checkoutService.generateQuote("customer@test.com", sampleRequest());
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(UUID.randomUUID())
+                .quoteHash(quote.getQuoteHash())
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build()))
+                .build();
+
+        assertThatThrownBy(() -> checkoutService.checkout("customer@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SLOT_FULL)
+                .hasMessageContaining("Delivery slot is full");
+    }
+
+    @Test
+    void checkoutRejectsWhenInsufficientStock() {
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        // Inventory has only 1 available, cart needs 2
+        Inventory lowStock = Inventory.builder()
+                .id(1L).product(product).quantity(1).reservedQuantity(0).lowStockThreshold(5).build();
+        when(inventoryRepository.findByProductIdForUpdate(20L)).thenReturn(Optional.of(lowStock));
+
+        CheckoutQuoteResponse quote = checkoutService.generateQuote("customer@test.com", sampleRequest());
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(UUID.randomUUID())
+                .quoteHash(quote.getQuoteHash())
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build()))
+                .build();
+
+        assertThatThrownBy(() -> checkoutService.checkout("customer@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INSUFFICIENT_STOCK)
+                .hasMessageContaining("Only 1 units of Red Rose Bunch are available");
+    }
+
+    @Test
+    void checkoutReplaysCachedResultOnIdenticalClientOrderId() {
+        setupCommonMocks(vendor);
+
+        UUID clientOrderId = UUID.randomUUID();
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(clientOrderId)
+                .quoteHash("matching-quote-hash")
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build()))
+                .build();
+
+        String expectedFingerprint = computeFingerprint(10L, clientOrderId, 5L, request.getItems(), "matching-quote-hash");
+
+        CheckoutIdempotency completedRecord = CheckoutIdempotency.builder()
+                .id(100L)
+                .userId(10L)
+                .clientOrderId(clientOrderId.toString())
+                .checkoutFingerprint(expectedFingerprint)
+                .createdAt(LocalDateTime.parse("2026-10-15T10:00:00"))
+                .completedAt(LocalDateTime.parse("2026-10-15T10:00:01"))
+                .build();
+
+        when(idempotencyRepository.findByUserIdAndClientOrderId(10L, clientOrderId.toString()))
+                .thenReturn(Optional.of(completedRecord));
+
+        Order existingOrder = Order.builder()
+                .id(501L)
+                .user(customer)
+                .vendor(vendor)
+                .clientOrderId(clientOrderId.toString())
+                .status(Order.OrderStatus.PLACED)
+                .paymentMethod(Order.PaymentMethod.COD)
+                .paymentStatus(Order.PaymentStatus.PENDING)
+                .subtotal(new BigDecimal("598.00"))
+                .deliveryFee(new BigDecimal("45.00"))
+                .platformFee(BigDecimal.ZERO)
+                .total(new BigDecimal("643.00"))
+                .slotStart(LocalDateTime.parse("2026-10-20T10:00:00"))
+                .slotEnd(LocalDateTime.parse("2026-10-20T11:00:00"))
+                .build();
+
+        OrderItem existingItem = OrderItem.builder()
+                .id(601L)
+                .order(existingOrder)
+                .product(product)
+                .vendorId(3L)
+                .quantity(2)
+                .priceSnapshot(new BigDecimal("299.00"))
+                .build();
+
+        when(orderRepository.findByUserIdAndClientOrderId(10L, clientOrderId.toString()))
+                .thenReturn(List.of(existingOrder));
+        when(orderItemRepository.findByOrderId(501L)).thenReturn(List.of(existingItem));
+
+        CheckoutResponse response = checkoutService.checkout("customer@test.com", request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.isIdempotentReplay()).isTrue();
+        assertThat(response.getOrders()).hasSize(1);
+        assertThat(response.getOrders().get(0).getOrderId()).isEqualTo(501L);
+        assertThat(response.getTotal()).isEqualByComparingTo(new BigDecimal("643.00"));
+
+        // No new orders created
+        verify(orderRepository, never()).saveAndFlush(any(Order.class));
+    }
+
+    @Test
+    void checkoutRejectsReplayWhenFingerprintDiffers() {
+        setupCommonMocks(vendor);
+
+        UUID clientOrderId = UUID.randomUUID();
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(clientOrderId)
+                .quoteHash("matching-quote-hash")
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build()))
+                .build();
+
+        CheckoutIdempotency completedRecordWithDiffFingerprint = CheckoutIdempotency.builder()
+                .id(100L)
+                .userId(10L)
+                .clientOrderId(clientOrderId.toString())
+                .checkoutFingerprint("DIFFERENT_FINGERPRINT")
+                .createdAt(LocalDateTime.parse("2026-10-15T10:00:00"))
+                .completedAt(LocalDateTime.parse("2026-10-15T10:00:01"))
+                .build();
+
+        when(idempotencyRepository.findByUserIdAndClientOrderId(10L, clientOrderId.toString()))
+                .thenReturn(Optional.of(completedRecordWithDiffFingerprint));
+
+        assertThatThrownBy(() -> checkoutService.checkout("customer@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT)
+                .hasMessageContaining("already completed with a different payload");
+    }
+
+    @Test
+    void checkoutRejectsReplayWhenCheckoutIsPending() {
+        setupCommonMocks(vendor);
+
+        UUID clientOrderId = UUID.randomUUID();
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(clientOrderId)
+                .quoteHash("matching-quote-hash")
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build()))
+                .build();
+
+        CheckoutIdempotency pendingRecord = CheckoutIdempotency.builder()
+                .id(100L)
+                .userId(10L)
+                .clientOrderId(clientOrderId.toString())
+                .checkoutFingerprint("mock-fingerprint")
+                .createdAt(LocalDateTime.parse("2026-10-15T10:00:00"))
+                .completedAt(null)
+                .build();
+
+        when(idempotencyRepository.findByUserIdAndClientOrderId(10L, clientOrderId.toString()))
+                .thenReturn(Optional.of(pendingRecord));
+
+        assertThatThrownBy(() -> checkoutService.checkout("customer@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT)
+                .hasMessageContaining("already in progress");
+    }
+
     // --------------------------------------------------------------------- helpers
 
     private void setupCommonMocks(VendorProfile v) {
@@ -517,6 +896,55 @@ class CheckoutServiceTest {
         when(vendorProfileRepository.findById(v.getId())).thenReturn(Optional.of(v));
         when(productRepository.findById(20L)).thenReturn(Optional.of(product));
         when(inventoryRepository.findByProductId(20L)).thenReturn(Optional.of(inventory));
+    }
+
+    private void setupCheckoutMocks() {
+        when(inventoryRepository.findByProductIdForUpdate(20L)).thenReturn(Optional.of(inventory));
+        when(vendorProfileRepository.findByIdForUpdate(vendor.getId())).thenReturn(Optional.of(vendor));
+        when(orderRepository.countBookedOrdersForSlot(eq(vendor.getId()), any(LocalDateTime.class))).thenReturn(0L);
+        when(idempotencyRepository.findByUserIdAndClientOrderId(eq(10L), anyString())).thenReturn(Optional.empty());
+        when(idempotencyRepository.save(any(CheckoutIdempotency.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(idempotencyRepository.saveAndFlush(any(CheckoutIdempotency.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.saveAndFlush(any(Order.class))).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            o.setId(1001L);
+            return o;
+        });
+        when(orderItemRepository.saveAndFlush(any(OrderItem.class))).thenAnswer(inv -> {
+            OrderItem oi = inv.getArgument(0);
+            oi.setId(2001L);
+            return oi;
+        });
+        when(stockMovementRepository.saveAndFlush(any(StockMovement.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderStatusHistoryRepository.saveAndFlush(any(OrderStatusHistory.class))).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    private String computeFingerprint(Long userId, UUID clientOrderId, Long addressId,
+                                      List<CheckoutRequest.CheckoutItem> items, String quoteHash) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("user:").append(userId).append("|");
+            sb.append("clientOrderId:").append(clientOrderId).append("|");
+            sb.append("address:").append(addressId).append("|");
+            sb.append("quoteHash:").append(quoteHash).append("|");
+            sb.append("items:");
+            List<CheckoutRequest.CheckoutItem> sorted = new ArrayList<>(items);
+            sorted.sort(Comparator.comparing(CheckoutRequest.CheckoutItem::getVendorId));
+            for (CheckoutRequest.CheckoutItem item : sorted) {
+                sb.append(item.getVendorId()).append(":").append(item.getSlotStart()).append(";");
+            }
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(new javax.crypto.spec.SecretKeySpec(
+                    "test-secret-key-for-quote-signing-at-least-32-chars-long".getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] hash = mac.doFinal(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private CartItem sampleCartItem() {
@@ -536,7 +964,6 @@ class CheckoutServiceTest {
                         .vendorId(3L)
                         .slotStart("2026-10-20T10:00:00")
                         .build())))
-                .platformFee(null)
                 .build();
     }
 }

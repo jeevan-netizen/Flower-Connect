@@ -56,6 +56,7 @@ services:
       MAIL_HOST: mailhog
       MAIL_PORT: 1025
       JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_JWT_SECRET_256_BITS}
+      APP_CHECKOUT_QUOTE_SIGNING_SECRET: ${APP_CHECKOUT_QUOTE_SIGNING_SECRET:-dev-only-insecure-default-change-in-production-min-32-chars}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
       # Local-disk upload root. The runtime image runs as a non-root user, so
       # the directory is created in the Dockerfile under /var/lib rather than

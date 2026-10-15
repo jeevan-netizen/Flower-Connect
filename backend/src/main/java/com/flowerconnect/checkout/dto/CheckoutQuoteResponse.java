@@ -12,6 +12,10 @@ import java.util.List;
  * fee, and the grand total. Each shop carries its own warnings (e.g.,
  * price drift) and validation results so the customer can fix one shop
  * without losing the others.
+ *
+ * <p>The {@code quoteHash} is a server-generated fingerprint of all
+ * material quote inputs. The client must echo it back in the checkout
+ * request to prove they are confirming the exact quote they received.
  */
 @Getter
 @Setter
@@ -42,4 +46,13 @@ public class CheckoutQuoteResponse {
      * explicitly confirm the updated totals before proceeding.
      */
     private boolean hasPriceChanges;
+
+    /**
+     * Server-generated fingerprint of the quote. Must be provided in the
+     * checkout request to bind price confirmation to this exact quote.
+     * Computed as a hash of: customer identity, address, cart items
+     * (product IDs, quantities, price snapshots), vendor slot selections,
+     * delivery fees, platform fee, and totals.
+     */
+    private String quoteHash;
 }

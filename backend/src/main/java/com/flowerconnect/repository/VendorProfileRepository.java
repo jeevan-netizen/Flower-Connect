@@ -8,6 +8,10 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +19,10 @@ import java.util.Optional;
 @Repository
 public interface VendorProfileRepository
         extends JpaRepository<VendorProfile, Long>, JpaSpecificationExecutor<VendorProfile> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT vp FROM VendorProfile vp WHERE vp.id = :id")
+    Optional<VendorProfile> findByIdForUpdate(@Param("id") Long id);
 
     @Query("SELECT vp FROM VendorProfile vp JOIN FETCH vp.user u WHERE u.id = :userId")
     Optional<VendorProfile> findByUserId(Long userId);

@@ -64,6 +64,8 @@ app:
     max-dimension: 1600
     max-pixels: 40000000
     jpeg-quality: 0.85
+  checkout:
+    quote-signing-secret: ${APP_CHECKOUT_QUOTE_SIGNING_SECRET}
 
 management:
   endpoints:

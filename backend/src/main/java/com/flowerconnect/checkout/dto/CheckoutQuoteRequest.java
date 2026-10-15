@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -36,12 +35,6 @@ public class CheckoutQuoteRequest {
     @Valid
     @NotNull(message = "items is required")
     private List<QuoteItem> items;
-
-    /**
-     * Optional platform fee override. If absent, the configured default
-     * ({@code app.checkout.platform-fee}) is used.
-     */
-    private BigDecimal platformFee;
 
     @Getter
     @Setter
