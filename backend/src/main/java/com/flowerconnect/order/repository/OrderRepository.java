@@ -31,7 +31,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByUserIdAndClientOrderId(@Param("userId") Long userId,
                                              @Param("clientOrderId") String clientOrderId);
 
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.vendor.id = :vendorId AND o.slotStart = :slotStart AND o.status NOT IN ('CANCELLED', 'REJECTED')")
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.vendor.id = :vendorId AND o.slotStart = :slotStart AND o.status IN ('PLACED', 'CONFIRMED')")
     long countBookedOrdersForSlot(@Param("vendorId") Long vendorId,
                                   @Param("slotStart") java.time.LocalDateTime slotStart);
 }
