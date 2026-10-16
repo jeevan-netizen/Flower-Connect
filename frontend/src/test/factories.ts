@@ -11,6 +11,18 @@ import type {
   VendorProfile,
   VendorStatus,
 } from "@/features/vendor/types";
+import type { CartItem, CartResponse, CartShopView } from "@/features/cart/types";
+import type {
+  AddressResponse,
+  AddressPageResponse,
+  CheckoutQuoteResponse,
+  CheckoutResponse,
+  CheckoutShopQuote,
+  CheckoutItemQuote,
+  OrderSummary,
+  OrderItemSummary,
+  SlotResponse,
+} from "@/features/checkout/types";
 import type { ServiceLocationGroup } from "@/features/location/types";
 import type { AdminRole, AdminUser, UserStatus } from "@/features/admin/types";
 import type { PageResponse } from "@/shared/types";
@@ -240,6 +252,199 @@ export function makeLowStockProduct(overrides: Partial<LowStockProduct> = {}): L
     lowStockThreshold: 4,
     expiryDate: null,
     lowStock: true,
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Cart fixtures (plan task 5.6)                                              */
+/* -------------------------------------------------------------------------- */
+
+export function makeCartItem(overrides: Partial<CartItem> = {}): CartItem {
+  return {
+    id: 1,
+    productId: 101,
+    productName: "Red Rose Bouquet",
+    productSlug: "red-rose-bouquet",
+    vendorId: 7,
+    vendorName: "Petal & Stem",
+    quantity: 2,
+    priceSnapshot: 899,
+    note: null,
+    subtotal: 1798,
+    currentPrice: 899,
+    priceChanged: false,
+    available: 12,
+    purchasable: true,
+    notPurchasableReason: null,
+    createdAt: "2026-10-01T10:00:00",
+    updatedAt: "2026-10-01T10:00:00",
+    ...overrides,
+  };
+}
+
+export function makeCartShopView(overrides: Partial<CartShopView> = {}): CartShopView {
+  return {
+    vendorId: 7,
+    vendorName: "Petal & Stem",
+    itemCount: 2,
+    subtotal: 1798,
+    purchasable: true,
+    ...overrides,
+  };
+}
+
+export function makeCartResponse(overrides: Partial<CartResponse> = {}): CartResponse {
+  return {
+    cartId: 1001,
+    totalItems: 2,
+    subtotal: 1798,
+    shops: [makeCartShopView()],
+    items: [makeCartItem()],
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Address fixtures (plan task 5.6)                                           */
+/* -------------------------------------------------------------------------- */
+
+export function makeAddressResponse(overrides: Partial<AddressResponse> = {}): AddressResponse {
+  return {
+    id: 42,
+    label: "Home",
+    line1: "12 MG Road",
+    line2: "Unit 3",
+    serviceLocationId: 3,
+    city: "Bengaluru",
+    area: "Indiranagar",
+    pincode: "560038",
+    latitude: 12.971199,
+    longitude: 77.640586,
+    defaultAddress: true,
+    createdAt: "2026-09-01T10:00:00",
+    updatedAt: "2026-09-20T08:30:00",
+    ...overrides,
+  };
+}
+
+export function makeAddressPageResponse(overrides: Partial<AddressPageResponse> = {}): AddressPageResponse {
+  return {
+    content: [makeAddressResponse()],
+    page: 0,
+    size: 20,
+    totalElements: 1,
+    totalPages: 1,
+    first: true,
+    last: true,
+    empty: false,
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Checkout fixtures (plan task 5.6)                                          */
+/* -------------------------------------------------------------------------- */
+
+export function makeCheckoutItemQuote(overrides: Partial<CheckoutItemQuote> = {}): CheckoutItemQuote {
+  return {
+    productId: 101,
+    productName: "Red Rose Bouquet",
+    productSlug: "red-rose-bouquet",
+    quantity: 2,
+    priceSnapshot: 899,
+    currentPrice: 899,
+    priceChanged: false,
+    note: null,
+    subtotal: 1798,
+    available: 12,
+    purchasable: true,
+    notPurchasableReason: null,
+    ...overrides,
+  };
+}
+
+export function makeCheckoutShopQuote(overrides: Partial<CheckoutShopQuote> = {}): CheckoutShopQuote {
+  return {
+    vendorId: 7,
+    vendorName: "Petal & Stem",
+    items: [makeCheckoutItemQuote()],
+    subtotal: 1798,
+    deliveryFee: 25,
+    platformFee: 0,
+    minOrderAmount: 300,
+    total: 1823,
+    distanceKm: 3.5,
+    withinRadius: true,
+    minOrderMet: true,
+    slotAvailable: true,
+    warnings: [],
+    errors: [],
+    ...overrides,
+  };
+}
+
+export function makeCheckoutQuoteResponse(overrides: Partial<CheckoutQuoteResponse> = {}): CheckoutQuoteResponse {
+  return {
+    shops: [makeCheckoutShopQuote()],
+    total: 1823,
+    hasErrors: false,
+    hasPriceChanges: false,
+    quoteHash: "abc123def456",
+    ...overrides,
+  };
+}
+
+export function makeOrderItemSummary(overrides: Partial<OrderItemSummary> = {}): OrderItemSummary {
+  return {
+    productId: 101,
+    productName: "Red Rose Bouquet",
+    quantity: 2,
+    priceSnapshot: 899,
+    subtotal: 1798,
+    ...overrides,
+  };
+}
+
+export function makeOrderSummary(overrides: Partial<OrderSummary> = {}): OrderSummary {
+  return {
+    orderId: 5001,
+    vendorId: 7,
+    vendorName: "Petal & Stem",
+    status: "PLACED",
+    paymentStatus: "PENDING",
+    paymentMethod: "COD",
+    subtotal: 1798,
+    deliveryFee: 25,
+    platformFee: 0,
+    total: 1823,
+    slotStart: "2026-10-03T10:00:00",
+    slotEnd: "2026-10-03T11:00:00",
+    items: [makeOrderItemSummary()],
+    ...overrides,
+  };
+}
+
+export function makeCheckoutResponse(overrides: Partial<CheckoutResponse> = {}): CheckoutResponse {
+  return {
+    clientOrderId: "550e8400-e29b-41d4-a716-446655440000",
+    idempotentReplay: false,
+    orders: [makeOrderSummary()],
+    total: 1823,
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Slot fixtures (plan task 5.6)                                              */
+/* -------------------------------------------------------------------------- */
+
+export function makeSlotResponse(overrides: Partial<SlotResponse> = {}): SlotResponse {
+  return {
+    slotStart: "2026-10-03T10:00:00",
+    slotEnd: "2026-10-03T11:00:00",
+    weekday: "SATURDAY",
+    available: true,
     ...overrides,
   };
 }

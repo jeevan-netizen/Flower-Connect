@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { useCart, clearCartCache } from "@/features/cart/queries";
 import { clearVendorCache } from "@/features/vendor/queries";
 import { clearAdminCache } from "@/features/admin/queries";
 import { LocationMenu } from "@/features/location/components/LocationMenu";
@@ -16,6 +17,9 @@ const VENDOR_ROLE = "FLORIST";
 
 /** Seeded role name for administrators (`roles` row 3, V3__seed_roles.sql). */
 const ADMIN_ROLE = "ADMIN";
+
+/** Seeded role name for customers (V3__seed_roles.sql). */
+const CUSTOMER_ROLE = "CUSTOMER";
 
 /**
  * Header link treatment on the dark landing surface: 15px, weight 500, blush on
@@ -110,6 +114,7 @@ export function SiteHeader() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuthStore();
+  const { data: cart } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
   const panelId = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -142,6 +147,7 @@ export function SiteHeader() {
     // profile, user list or vendor list.
     clearVendorCache(queryClient);
     clearAdminCache(queryClient);
+    clearCartCache(queryClient);
     logout();
     setMenuOpen(false);
     navigate("/", { replace: true });
@@ -165,9 +171,21 @@ export function SiteHeader() {
 
       {isAuthenticated ? (
         <>
-          <Link className={NAV_LINK} to="/cart">
-            Cart
-          </Link>
+          {user?.role === CUSTOMER_ROLE && (
+            <>
+              <Link
+                className={NAV_LINK}
+                to="/cart"
+              >
+                Cart
+                {cart?.totalItems && (
+                  <span className="ml-1 inline-flex items-center justify-center min-w-[1.5rem] h-[1.5rem] rounded-full bg-bolder-rose px-[6px] text-[10px] font-bold text-bolder-bg">
+                    {cart.totalItems}
+                  </span>
+                )}
+              </Link>
+            </>
+          )}
           {user?.role === VENDOR_ROLE && (
             <Link className={NAV_LINK} to="/vendor">
               Vendor

@@ -18,15 +18,17 @@ import { VendorHoursPage } from "@/features/vendor/pages/VendorHoursPage";
 import { VendorCatalogPage } from "@/features/vendor/pages/VendorCatalogPage";
 import { VendorProductFormPage } from "@/features/vendor/pages/VendorProductFormPage";
 import { VendorInventoryPage } from "@/features/vendor/pages/VendorInventoryPage";
+import { CartPage } from "@/features/cart/pages/CartPage";
+import { CheckoutPage } from "@/features/checkout/pages/CheckoutPage";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
 import { AdminUsersPage } from "@/features/admin/pages/AdminUsersPage";
 
-/**
- * Application role for a vendor. The plan calls this role "VENDOR"; the seeded
- * role is FLORIST and is not renamed (docs/decisions.md, D-11).
- */
+/** Seeded role name for customers (V3__seed_roles.sql). */
+const CUSTOMER_ROLE = "CUSTOMER";
+
+/** Seeded role name for vendors. The plan calls this role "VENDOR"; the seeded role is FLORIST and is not renamed (docs/decisions.md, D-11). */
 const VENDOR_ROLE = "FLORIST";
 
 /** Seeded role name for administrators (`roles` row 3, V3__seed_roles.sql). */
@@ -107,9 +109,17 @@ export const router = createBrowserRouter([
       {
         path: "cart",
         element: (
-          <RequireAuth>
-            <Placeholder title="Cart" />
-          </RequireAuth>
+          <ProtectedRoute roles={[CUSTOMER_ROLE]}>
+            <CartPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "checkout",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE]}>
+            <CheckoutPage />
+          </ProtectedRoute>
         ),
       },
       {
