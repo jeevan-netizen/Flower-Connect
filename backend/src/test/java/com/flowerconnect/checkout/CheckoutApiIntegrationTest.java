@@ -29,7 +29,10 @@ import com.flowerconnect.repository.VendorProfileRepository;
 import com.flowerconnect.security.dto.AuthResponse;
 import com.flowerconnect.security.dto.LoginRequest;
 import com.flowerconnect.test.AbstractIntegrationTest;
+import com.flowerconnect.test.MutableClock;
+import com.flowerconnect.vendor.dto.VendorHoursRequest;
 import com.flowerconnect.vendor.dto.VendorRegisterRequest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +45,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,7 +92,13 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "password123";
     private static final String KORAMANGALA_PINCODE = "560034";
-    private static final String SLOT = "2030-01-01T10:00:00";
+    // Fixed instant: Wednesday, October 21, 2026, 04:00:00 UTC = 09:30:00 IST
+    private static final Instant PINNED_INSTANT = Instant.parse("2026-10-21T04:00:00Z");
+    // Wednesday 12:00:00 IST = 06:30:00 UTC (150m ahead > 120m lead time, 60m duration ends at 13:00 < 18:00)
+    private static final String SLOT = "2026-10-21T06:30:00";
+
+    @Autowired private MutableClock clock;
+    private Instant originalInstant;
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
@@ -106,11 +121,21 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        originalInstant = clock.instant();
+        clock.setInstant(PINNED_INSTANT);
+
         locationId = serviceLocationRepository.findByPincode(KORAMANGALA_PINCODE)
                 .orElseThrow().getId();
         rosesCategoryId = categoryRepository.findBySlug("roses").orElseThrow().getId();
         User admin = createUser(uniqueEmail(), "ADMIN");
         adminToken = tokenFor(admin);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (originalInstant != null) {
+            clock.setInstant(originalInstant);
+        }
     }
 
     // ================================================================ RBAC matrix
@@ -629,6 +654,282 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(reserveCountAfterReplay).isEqualTo(1);
     }
 
+    @Test
+    void checkoutRejectsFullSlotWith409AndRollsBackSideEffects() throws Exception {
+        Vendor vendor = registerVendor(VendorProfile.Status.APPROVED);
+        setVendorMaxOrdersPerSlot(vendor.profileId(), 1);
+
+        Long productId = createActiveProduct(vendor, "Slot Full Rose " + UUID.randomUUID());
+        stockIn(vendor, productId, 20, "initial");
+
+        // Customer 1 books the only slot capacity
+        User customer1 = createUser(uniqueEmail(), "CUSTOMER");
+        String customer1Token = tokenFor(customer1);
+        Long addressId1 = createAddress(customer1, locationId);
+        addToCart(customer1Token, productId, 1);
+        JsonNode quote1 = requestQuote(customer1Token, addressId1, vendor, productId);
+        String quoteHash1 = quote1.get("quoteHash").asText();
+        checkout(customer1Token, addressId1, vendor, productId, quoteHash1, UUID.randomUUID());
+
+        // Verify slot is now occupied
+        LocalDateTime slotStartUtc = LocalDateTime.parse(SLOT);
+        assertThat(orderRepository.countBookedOrdersForSlot(vendor.profileId(), slotStartUtc)).isEqualTo(1);
+
+        // Customer 2 attempts to checkout the same slot
+        User customer2 = createUser(uniqueEmail(), "CUSTOMER");
+        String customer2Token = tokenFor(customer2);
+        Long addressId2 = createAddress(customer2, locationId);
+        addToCart(customer2Token, productId, 1);
+        JsonNode quote2 = requestQuote(customer2Token, addressId2, vendor, productId);
+        // Quote reports slot unavailable and hasErrors=true
+        assertThat(quote2.get("hasErrors").asBoolean()).isTrue();
+        assertThat(quote2.get("shops").get(0).get("slotAvailable").asBoolean()).isFalse();
+
+        // Customer 2 checkout attempt
+        UUID clientOrderId2 = UUID.randomUUID();
+        String checkoutBody = objectMapper.writeValueAsString(
+                buildCheckoutRequest(addressId2, vendor, productId, quote2.get("quoteHash").asText(), clientOrderId2));
+
+        mockMvc.perform(post("/api/v1/checkout")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(customer2Token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(checkoutBody))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SLOT_FULL"));
+
+        // Verify no side effects for customer 2:
+        // 1. Exactly 1 order in DB (only customer 1's order)
+        assertThat(orderRepository.countBookedOrdersForSlot(vendor.profileId(), slotStartUtc)).isEqualTo(1);
+        assertThat(orderRepository.findByUserIdAndClientOrderId(customer2.getId(), clientOrderId2.toString())).isEmpty();
+
+        // 2. Customer 2's cart is intact
+        JsonNode cart2 = getCart(customer2Token);
+        assertThat(cart2.get("totalItems").asInt()).isEqualTo(1);
+
+        // 3. Inventory reserved quantity is only 1 (from customer 1)
+        Inventory inventory = inventoryRepository.findByProductId(productId).orElseThrow();
+        assertThat(inventory.getReservedQuantity()).isEqualTo(1);
+
+        // 4. Exactly 1 RESERVE stock movement (customer 1)
+        List<StockMovement> movements = stockMovementRepository.findByProductIdOrderByCreatedAtDescIdDesc(productId);
+        long reserveMovements = movements.stream().filter(m -> m.getMovementType() == StockMovement.MovementType.RESERVE).count();
+        assertThat(reserveMovements).isEqualTo(1);
+    }
+
+    @Test
+    void checkoutConcurrentDistinctCustomersLastUnitStockRace() throws Exception {
+        Vendor vendor = registerVendor(VendorProfile.Status.APPROVED);
+        Long productId = createActiveProduct(vendor, "Stock Race Rose " + UUID.randomUUID());
+        // Exactly 1 physical unit in stock
+        stockIn(vendor, productId, 1, "last-unit-initial");
+
+        int customersCount = 5;
+        String[] customerTokens = new String[customersCount];
+        Long[] customerIds = new Long[customersCount];
+        String[] quoteHashes = new String[customersCount];
+        UUID[] clientOrderIds = new UUID[customersCount];
+        Long[] addressIds = new Long[customersCount];
+
+        for (int i = 0; i < customersCount; i++) {
+            User c = createUser(uniqueEmail(), "CUSTOMER");
+            customerIds[i] = c.getId();
+            customerTokens[i] = tokenFor(c);
+            addressIds[i] = createAddress(c, locationId);
+            addToCart(customerTokens[i], productId, 1);
+
+            JsonNode quote = requestQuote(customerTokens[i], addressIds[i], vendor, productId);
+            assertThat(quote.get("hasErrors").asBoolean()).isFalse();
+            quoteHashes[i] = quote.get("quoteHash").asText();
+            clientOrderIds[i] = UUID.randomUUID();
+        }
+
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(customersCount);
+        ExecutorService executor = Executors.newFixedThreadPool(customersCount);
+
+        int[] statuses = new int[customersCount];
+        String[] errorCodes = new String[customersCount];
+
+        for (int i = 0; i < customersCount; i++) {
+            final int idx = i;
+            executor.submit(() -> {
+                try {
+                    start.await();
+                    String requestBody = objectMapper.writeValueAsString(
+                            buildCheckoutRequest(addressIds[idx], vendor, productId, quoteHashes[idx], clientOrderIds[idx]));
+                    MvcResult res = mockMvc.perform(post("/api/v1/checkout")
+                                    .header(HttpHeaders.AUTHORIZATION, bearer(customerTokens[idx]))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(requestBody))
+                            .andReturn();
+                    statuses[idx] = res.getResponse().getStatus();
+                    if (statuses[idx] != 200) {
+                        JsonNode json = objectMapper.readTree(res.getResponse().getContentAsString());
+                        errorCodes[idx] = json.has("code") ? json.get("code").asText() : "";
+                    }
+                } catch (Exception e) {
+                    statuses[idx] = 500;
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        start.countDown();
+        done.await();
+        executor.shutdown();
+
+        // Exactly one HTTP 200, exactly four HTTP 409 INSUFFICIENT_STOCK
+        int successCount = 0;
+        int conflictCount = 0;
+        int winnerIndex = -1;
+
+        for (int i = 0; i < customersCount; i++) {
+            if (statuses[i] == 200) {
+                successCount++;
+                winnerIndex = i;
+            } else if (statuses[i] == 409) {
+                conflictCount++;
+                assertThat(errorCodes[i]).isEqualTo("INSUFFICIENT_STOCK");
+            }
+        }
+
+        assertThat(successCount).isEqualTo(1);
+        assertThat(conflictCount).isEqualTo(4);
+
+        // Verify winner and losers state
+        for (int i = 0; i < customersCount; i++) {
+            JsonNode cart = getCart(customerTokens[i]);
+            if (i == winnerIndex) {
+                assertThat(cart.get("totalItems").asInt()).isEqualTo(0);
+                assertThat(orderRepository.findByUserIdAndClientOrderId(customerIds[i], clientOrderIds[i].toString())).hasSize(1);
+            } else {
+                assertThat(cart.get("totalItems").asInt()).isEqualTo(1);
+                assertThat(orderRepository.findByUserIdAndClientOrderId(customerIds[i], clientOrderIds[i].toString())).isEmpty();
+            }
+        }
+
+        // Persisted inventory: 1 physical, 1 reserved
+        Inventory inventory = inventoryRepository.findByProductId(productId).orElseThrow();
+        assertThat(inventory.getQuantity()).isEqualTo(1);
+        assertThat(inventory.getReservedQuantity()).isEqualTo(1);
+
+        // Stock movement: exactly 1 RESERVE movement
+        List<StockMovement> movements = stockMovementRepository.findByProductIdOrderByCreatedAtDescIdDesc(productId);
+        long reserveMovements = movements.stream().filter(m -> m.getMovementType() == StockMovement.MovementType.RESERVE).count();
+        assertThat(reserveMovements).isEqualTo(1);
+    }
+
+    @Test
+    void checkoutConcurrentDistinctCustomersSlotCapacityRace() throws Exception {
+        Vendor vendor = registerVendor(VendorProfile.Status.APPROVED);
+        // Slot capacity is exactly 1
+        setVendorMaxOrdersPerSlot(vendor.profileId(), 1);
+
+        Long productId = createActiveProduct(vendor, "Slot Race Rose " + UUID.randomUUID());
+        // Plenty of inventory so stock is not the constraint
+        stockIn(vendor, productId, 50, "plenty-of-stock");
+
+        int customersCount = 5;
+        String[] customerTokens = new String[customersCount];
+        Long[] customerIds = new Long[customersCount];
+        String[] quoteHashes = new String[customersCount];
+        UUID[] clientOrderIds = new UUID[customersCount];
+        Long[] addressIds = new Long[customersCount];
+
+        for (int i = 0; i < customersCount; i++) {
+            User c = createUser(uniqueEmail(), "CUSTOMER");
+            customerIds[i] = c.getId();
+            customerTokens[i] = tokenFor(c);
+            addressIds[i] = createAddress(c, locationId);
+            addToCart(customerTokens[i], productId, 1);
+
+            JsonNode quote = requestQuote(customerTokens[i], addressIds[i], vendor, productId);
+            assertThat(quote.get("hasErrors").asBoolean()).isFalse();
+            quoteHashes[i] = quote.get("quoteHash").asText();
+            clientOrderIds[i] = UUID.randomUUID();
+        }
+
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(customersCount);
+        ExecutorService executor = Executors.newFixedThreadPool(customersCount);
+
+        int[] statuses = new int[customersCount];
+        String[] errorCodes = new String[customersCount];
+
+        for (int i = 0; i < customersCount; i++) {
+            final int idx = i;
+            executor.submit(() -> {
+                try {
+                    start.await();
+                    String requestBody = objectMapper.writeValueAsString(
+                            buildCheckoutRequest(addressIds[idx], vendor, productId, quoteHashes[idx], clientOrderIds[idx]));
+                    MvcResult res = mockMvc.perform(post("/api/v1/checkout")
+                                    .header(HttpHeaders.AUTHORIZATION, bearer(customerTokens[idx]))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(requestBody))
+                            .andReturn();
+                    statuses[idx] = res.getResponse().getStatus();
+                    if (statuses[idx] != 200) {
+                        JsonNode json = objectMapper.readTree(res.getResponse().getContentAsString());
+                        errorCodes[idx] = json.has("code") ? json.get("code").asText() : "";
+                    }
+                } catch (Exception e) {
+                    statuses[idx] = 500;
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        start.countDown();
+        done.await();
+        executor.shutdown();
+
+        // Exactly one HTTP 200, exactly four HTTP 409 SLOT_FULL
+        int successCount = 0;
+        int conflictCount = 0;
+        int winnerIndex = -1;
+
+        for (int i = 0; i < customersCount; i++) {
+            if (statuses[i] == 200) {
+                successCount++;
+                winnerIndex = i;
+            } else if (statuses[i] == 409) {
+                conflictCount++;
+                assertThat(errorCodes[i]).isEqualTo("SLOT_FULL");
+            }
+        }
+
+        assertThat(successCount).isEqualTo(1);
+        assertThat(conflictCount).isEqualTo(4);
+
+        // Exactly 1 order occupying the slot in DB
+        LocalDateTime slotStartUtc = LocalDateTime.parse(SLOT);
+        assertThat(orderRepository.countBookedOrdersForSlot(vendor.profileId(), slotStartUtc)).isEqualTo(1);
+
+        // Verify winner and losers state
+        for (int i = 0; i < customersCount; i++) {
+            JsonNode cart = getCart(customerTokens[i]);
+            if (i == winnerIndex) {
+                assertThat(cart.get("totalItems").asInt()).isEqualTo(0);
+                assertThat(orderRepository.findByUserIdAndClientOrderId(customerIds[i], clientOrderIds[i].toString())).hasSize(1);
+            } else {
+                assertThat(cart.get("totalItems").asInt()).isEqualTo(1);
+                assertThat(orderRepository.findByUserIdAndClientOrderId(customerIds[i], clientOrderIds[i].toString())).isEmpty();
+            }
+        }
+
+        // Only 1 unit reserved (for the winner)
+        Inventory inventory = inventoryRepository.findByProductId(productId).orElseThrow();
+        assertThat(inventory.getReservedQuantity()).isEqualTo(1);
+
+        // Exactly 1 RESERVE stock movement
+        List<StockMovement> movements = stockMovementRepository.findByProductIdOrderByCreatedAtDescIdDesc(productId);
+        long reserveMovements = movements.stream().filter(m -> m.getMovementType() == StockMovement.MovementType.RESERVE).count();
+        assertThat(reserveMovements).isEqualTo(1);
+    }
+
     // ================================================================ helpers
 
     private record Vendor(String email, String token, Long profileId) {}
@@ -785,7 +1086,23 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
         r.setSlotDurationMinutes(60);
         r.setMaxOrdersPerSlot(10);
         r.setAcceptingOrders(true);
+
+        List<VendorHoursRequest> hoursList = Arrays.stream(DayOfWeek.values())
+                .map(dow -> VendorHoursRequest.builder()
+                        .weekday(dow)
+                        .openTime(LocalTime.of(9, 0))
+                        .closeTime(LocalTime.of(18, 0))
+                        .closed(false)
+                        .build())
+                .toList();
+        r.setHours(hoursList);
         return r;
+    }
+
+    private void setVendorMaxOrdersPerSlot(Long profileId, int maxOrders) {
+        VendorProfile vp = vendorProfileRepository.findById(profileId).orElseThrow();
+        vp.setMaxOrdersPerSlot(maxOrders);
+        vendorProfileRepository.saveAndFlush(vp);
     }
 
     private static String bearer(String token) {

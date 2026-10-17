@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { CheckoutPage } from "@/features/checkout/pages/CheckoutPage";
+import { CheckoutPage, getBrowserLocalDate } from "@/features/checkout/pages/CheckoutPage";
 import { renderWithProviders } from "@/test/render";
 import {
   makeCartItem,
@@ -458,5 +458,29 @@ beforeEach(() => {
 
     expect(screen.getByText("Petal & Stem")).toBeInTheDocument();
     expect(screen.getByText("Blossom & Co")).toBeInTheDocument();
+  });
+
+  it("derives the date picker min from the browser-local date in YYYY-MM-DD format", async () => {
+    const user = userEvent.setup();
+    primeCart();
+    primeAddresses();
+    primeSlots({ "7": [makeSlotResponse()] });
+
+    renderCheckout();
+
+    await screen.findByRole("heading", { name: "Delivery address" });
+    await user.click(screen.getByRole("radio", { name: /Home/ }));
+    await user.click(screen.getByRole("button", { name: /choose delivery slots/i }));
+
+    await waitFor(() => expect(screen.getByText("Petal & Stem")).toBeInTheDocument());
+
+    const dateInput = screen.getByLabelText(/deliver on/i);
+    const expectedMin = getBrowserLocalDate();
+    expect(dateInput).toHaveAttribute("min", expectedMin);
+    expect(expectedMin).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    // Verify browser local date formatter helper with fixed local dates
+    const sampleDate = new Date(2026, 9, 21, 14, 30);
+    expect(getBrowserLocalDate(sampleDate)).toBe("2026-10-21");
   });
 });

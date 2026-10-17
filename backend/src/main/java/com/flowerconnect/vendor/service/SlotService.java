@@ -88,136 +88,83 @@ public class SlotService {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Invalid timezone configuration for vendor");
         }
         
+        // Get current time in vendor's timezone
+        Instant instant = clock.instant();
+        ZonedDateTime nowInTz = instant.atZone(zoneId);
+        LocalDate today = nowInTz.toLocalDate();
+
         // Use today if date is null
         if (date == null) {
-            date = LocalDate.now(zoneId);
+            date = today;
         }
-        
+
         // Check if date is in the past
-        LocalDate today = LocalDate.now(zoneId);
         if (date.isBefore(today)) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Date cannot be in the past");
         }
-        
+
         // Check if date is beyond the booking horizon
         if (date.isAfter(today.plusDays(maxBookingHorizonDays))) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Date is beyond the booking horizon");
         }
-        
+
         // Get vendor hours for the day of week
         DayOfWeek dayOfWeek = date.getDayOfWeek();
         Optional<VendorHours> optionalVendorHours = vendorHoursRepository.findByVendorProfileIdAndWeekday(vendorId, dayOfWeek);
-        
+
         // If vendor is closed on this day, return empty list
         if (optionalVendorHours.isEmpty() || optionalVendorHours.get().isClosed()) {
             return new ArrayList<>();
         }
         VendorHours vendorHours = optionalVendorHours.get();
-        
-        // Get current time in vendor's timezone
-        Instant instant = clock.instant();
-        ZonedDateTime nowInTz = instant.atZone(zoneId);
-        
-        // Determine effective open window: [max(now_in_tz, open_time) + prepTime, close_time]
+
         LocalTime openTime = vendorHours.getOpenTime();
         LocalTime closeTime = vendorHours.getCloseTime();
-        int prepTimeMinutes = vendor.getPrepTimeMinutes();
-        int slotDurationMinutes = vendor.getSlotDurationMinutes();
-        
-        // Convert to minutes since midnight for easier calculations
-        long openTimeMinutes = openTime.toSecondOfDay() / 60;
-        long closeTimeMinutes = closeTime.toSecondOfDay() / 60;
-        long nowTimeMinutes = nowInTz.toLocalTime().toSecondOfDay() / 60;
-        
-        boolean isOvernight = closeTimeMinutes < openTimeMinutes;
-        
-        // For overnight hours, adjust close time to be on the next day
-        long adjustedCloseTimeMinutes = isOvernight ? closeTimeMinutes + 24 * 60 : closeTimeMinutes;
-        
-        // Calculate window start: max(now_in_tz, open_time) + prepTime
-        long baseTimeMinutes = Math.max(nowTimeMinutes, openTimeMinutes);
-        long windowStartTimeMinutes = baseTimeMinutes + prepTimeMinutes;
-        
-        // Check if window start is after close time (adjusted for overnight)
-        if (windowStartTimeMinutes >= adjustedCloseTimeMinutes) {
-            // No slots today, try next day
-            return getAvailableSlots(vendorId, addressId, date.plusDays(1), email);
+        if (openTime == null || closeTime == null) {
+            return new ArrayList<>();
         }
-        
-        // Generate candidate slots
+
+        int slotDurationMinutes = vendor.getSlotDurationMinutes();
+        if (slotDurationMinutes <= 0) {
+            return new ArrayList<>();
+        }
+
+        // If today and operating hours have already passed, return empty list (no cross-day recursion)
+        if (date.isEqual(today) && !nowInTz.toLocalTime().isBefore(closeTime)) {
+            return new ArrayList<>();
+        }
+
+        // Generate candidate slots on the operating grid starting strictly at openTime
         List<SlotResponse> slots = new ArrayList<>();
-        long slotStartTimeMinutes = windowStartTimeMinutes;
-        
-        while (true) {
-            long slotEndTimeMinutes = slotStartTimeMinutes + slotDurationMinutes;
-            
-            // Check if slot would exceed close time
-            if (slotEndTimeMinutes > adjustedCloseTimeMinutes) {
-                break; // Slot would exceed close time
-            }
-            
-            // Convert back to LocalTime for slot start and end
-            LocalTime slotStartTime = LocalTime.ofSecondOfDay(slotStartTimeMinutes * 60);
-            LocalTime slotEndTime = LocalTime.ofSecondOfDay(slotEndTimeMinutes * 60);
-            
-            // Determine the actual date for this slot (important for overnight hours)
-            LocalTime slotStartLocalTime = slotStartTime;
-            LocalDate slotStartDate = date;
-            if (isOvernight && slotStartTimeMinutes >= 24 * 60) {
-                // This slot start time is actually on the next day
-                slotStartLocalTime = slotStartTime.minusHours(24);
-                slotStartDate = date.plusDays(1);
-            }
-            
-            LocalTime slotEndLocalTime = slotEndTime;
-            LocalDate slotEndDate = date;
-            if (isOvernight && slotEndTimeMinutes >= 24 * 60) {
-                // This slot end time is actually on the next day
-                slotEndLocalTime = slotEndTime.minusHours(24);
-                slotEndDate = date.plusDays(1);
-            }
-            
-            // Create slot start and end times as LocalDateTime in vendor timezone
-            LocalDateTime slotStartLdt = LocalDateTime.of(slotStartDate, slotStartLocalTime);
-            LocalDateTime slotEndLdt = LocalDateTime.of(slotEndDate, slotEndLocalTime);
-            
-            // Convert to UTC for storage/comparison with orders
+        LocalTime candidateStart = openTime;
+        ZonedDateTime leadTimeLimit = nowInTz.plusMinutes(minLeadTimeMinutes);
+
+        while (candidateStart.plusMinutes(slotDurationMinutes).compareTo(closeTime) <= 0) {
+            LocalTime candidateEnd = candidateStart.plusMinutes(slotDurationMinutes);
+
+            LocalDateTime slotStartLdt = LocalDateTime.of(date, candidateStart);
+            LocalDateTime slotEndLdt = LocalDateTime.of(date, candidateEnd);
+
             ZonedDateTime slotStartZdt = slotStartLdt.atZone(zoneId);
             ZonedDateTime slotEndZdt = slotEndLdt.atZone(zoneId);
+
             LocalDateTime slotStartUtc = slotStartZdt.withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
             LocalDateTime slotEndUtc = slotEndZdt.withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
-            
-            // Check if slot is beyond horizon (from now in vendor timezone)
-            ZonedDateTime horizonLimit = nowInTz.plusDays(maxBookingHorizonDays);
-            if (slotStartZdt.isAfter(horizonLimit)) {
-                break; // Slot is beyond booking horizon
-            }
-            
-            // Apply lead-time floor: exclude slots starting within minLeadTimeMinutes of "now"
-            ZonedDateTime leadTimeLimit = nowInTz.plusMinutes(minLeadTimeMinutes);
+
             boolean withinLeadTime = slotStartZdt.isBefore(leadTimeLimit);
-            
-            // Check capacity: count existing orders for this vendor+slot
-            // Only PLACED and CONFIRMED orders count as booked per design
-            long bookedCount = orderRepository.countBookedOrdersForSlot(
-                    vendorId, slotStartUtc);
-            
+            long bookedCount = orderRepository.countBookedOrdersForSlot(vendorId, slotStartUtc);
             boolean available = bookedCount < vendor.getMaxOrdersPerSlot() && !withinLeadTime;
-            
-            // Create slot response
-            SlotResponse slot = SlotResponse.builder()
+
+            slots.add(SlotResponse.builder()
                     .slotStart(slotStartUtc)
                     .slotEnd(slotEndUtc)
                     .weekday(dayOfWeek)
                     .available(available)
-                    .build();
-            
-            slots.add(slot);
-            
-            // Move to next slot
-            slotStartTimeMinutes += slotDurationMinutes;
+                    .build());
+
+            candidateStart = candidateStart.plusMinutes(slotDurationMinutes);
         }
-        
+
         return slots;
     }
 }

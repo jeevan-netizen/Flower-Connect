@@ -42,7 +42,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -83,6 +83,8 @@ class CheckoutServiceTest {
     private com.flowerconnect.inventory.repository.StockMovementRepository stockMovementRepository;
     @Mock
     private java.time.Clock clock;
+    @Mock
+    private SlotValidationService slotValidationService;
 
     @InjectMocks
     private CheckoutService checkoutService;
@@ -166,6 +168,17 @@ class CheckoutServiceTest {
         when(checkoutProperties.getQuoteSigningSecret()).thenReturn("test-secret-key-for-quote-signing-at-least-32-chars-long");
         when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-15T10:00:00Z"));
         when(clock.getZone()).thenReturn(java.time.ZoneOffset.UTC);
+
+        SlotValidationService.ValidatedSlot defaultSlot = new SlotValidationService.ValidatedSlot(
+                LocalDateTime.parse("2026-10-20T10:00:00"),
+                LocalDateTime.parse("2026-10-20T11:00:00"),
+                LocalDateTime.parse("2026-10-20T10:00:00").atZone(ZoneId.of("Asia/Kolkata"))
+        );
+        when(slotValidationService.parseAndNormalize(anyString())).thenAnswer(inv -> {
+            String str = inv.getArgument(0);
+            return LocalDateTime.parse(str.replace("Z", ""));
+        });
+        when(slotValidationService.validateSlot(any(VendorProfile.class), anyString())).thenReturn(defaultSlot);
     }
 
     // --------------------------------------------------------------------- generateQuote - empty cart
@@ -307,6 +320,9 @@ class CheckoutServiceTest {
     @Test
     void generateQuoteFlagsInvalidSlotFormat() {
         setupCommonMocks(vendor);
+        when(slotValidationService.validateSlot(any(), eq("not-a-date")))
+                .thenThrow(BusinessException.badRequest("Invalid slotStart format (expected ISO-8601)"));
+
         CheckoutQuoteRequest request = sampleRequest();
         request.getItems().get(0).setSlotStart("not-a-date");
 
@@ -321,6 +337,9 @@ class CheckoutServiceTest {
     @Test
     void generateQuoteFlagsPastSlot() {
         setupCommonMocks(vendor);
+        when(slotValidationService.validateSlot(any(), eq("2020-01-01T10:00:00")))
+                .thenThrow(BusinessException.badRequest("Selected slot is in the past"));
+
         CheckoutQuoteRequest request = sampleRequest();
         request.getItems().get(0).setSlotStart("2020-01-01T10:00:00");
 

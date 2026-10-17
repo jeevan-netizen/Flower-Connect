@@ -360,6 +360,75 @@ class CheckoutControllerTest {
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutAcceptsCanonicalAndOffsetAwareTimestamps() throws Exception {
+        CheckoutResponse response = sampleCheckoutResponse();
+        when(checkoutService.checkout(anyString(), any())).thenReturn(response);
+
+        // Canonical UTC
+        CheckoutRequest reqCanonical = sampleCheckoutRequest();
+        reqCanonical.getItems().get(0).setSlotStart("2026-10-22T03:30:00");
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reqCanonical)))
+                .andExpect(status().isOk());
+
+        // Offset-aware
+        CheckoutRequest reqOffset = sampleCheckoutRequest();
+        reqOffset.getItems().get(0).setSlotStart("2026-10-22T09:00:00+05:30");
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reqOffset)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutRejectsMalformedTimestamp() throws Exception {
+        doThrow(BusinessException.badRequest("Invalid slotStart format (expected ISO-8601)"))
+                .when(checkoutService).checkout(anyString(), any());
+
+        CheckoutRequest request = sampleCheckoutRequest();
+        request.getItems().get(0).setSlotStart("2026-10-22");
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Invalid slotStart format (expected ISO-8601)"));
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void checkoutRejectsMissingSlotStart() throws Exception {
+        String body = "{\"addressId\":5,\"clientOrderId\":\"" + UUID.randomUUID() + "\",\"quoteHash\":\"hash\",\"items\":[{\"vendorId\":1}]}";
+        mockMvc.perform(post("/api/v1/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @WithMockUser(username = "customer@test.com", roles = {"CUSTOMER"})
+    void quoteReturns200WithSlotUnavailableWhenSlotValidationFails() throws Exception {
+        CheckoutQuoteResponse response = sampleQuote();
+        response.setHasErrors(true);
+        CheckoutShopQuote shop = response.getShops().get(0);
+        shop.setSlotAvailable(false);
+        shop.setErrors(List.of("Selected slot violates minimum lead time"));
+        when(checkoutService.generateQuote(anyString(), any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/checkout/quote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(sampleRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasErrors").value(true))
+                .andExpect(jsonPath("$.shops[0].slotAvailable").value(false))
+                .andExpect(jsonPath("$.shops[0].errors[0]").value("Selected slot violates minimum lead time"));
+    }
+
     // ----------------------------------------------------------------- helpers
 
     private CheckoutRequest sampleCheckoutRequest() {

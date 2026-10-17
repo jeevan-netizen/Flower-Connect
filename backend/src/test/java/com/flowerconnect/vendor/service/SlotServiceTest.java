@@ -32,7 +32,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import org.mockito.quality.Strictness;
+import org.mockito.junit.jupiter.MockitoSettings;
+
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @ActiveProfiles("test")
 class SlotServiceTest {
 
@@ -54,6 +58,9 @@ class SlotServiceTest {
     @Mock
     private AddressService addressService;
 
+    @Mock
+    private Clock clock;
+
     // Configuration values from application-test.yml
     private int minLeadTimeMinutes = 120; // 2 hours
     private int maxBookingHorizonDays = 7; // 1 week
@@ -65,6 +72,7 @@ class SlotServiceTest {
     private ServiceLocation testServiceLocation;
     private VendorHours testVendorHours;
     private User testUser;
+    private static final LocalDate TEST_TODAY = LocalDate.of(2026, 10, 21);
 
     @BeforeEach
     void setUp() {
@@ -102,7 +110,7 @@ class SlotServiceTest {
         
         // Set up vendor hours for today - morning
         // Open at 9:00, close at 17:00
-        DayOfWeek testDayOfWeek = LocalDate.now().getDayOfWeek();
+        DayOfWeek testDayOfWeek = TEST_TODAY.getDayOfWeek();
         testVendorHours = VendorHours.builder()
                 .id(1L)
                 .vendorProfile(testVendor)
@@ -111,6 +119,11 @@ class SlotServiceTest {
                 .closeTime(LocalTime.of(17, 0)) // 5:00 PM
                 .closed(false)
                 .build();
+
+        when(clock.instant()).thenReturn(Instant.parse("2026-10-21T04:00:00Z"));
+        when(clock.getZone()).thenReturn(ZoneId.of("Asia/Kolkata"));
+        setPrivateField(slotService, "minLeadTimeMinutes", 120);
+        setPrivateField(slotService, "maxBookingHorizonDays", 7);
     }
 
     @Test
@@ -126,7 +139,7 @@ class SlotServiceTest {
                 .build();
 
         // Set up fixed clock to return 10:00 AM today in the vendor's timezone
-        LocalDate fixedDate = LocalDate.now();
+        LocalDate fixedDate = TEST_TODAY;
         LocalTime fixedTime = LocalTime.of(10, 0); // 10:00 AM
         ZoneId zoneId = ZoneId.of("Asia/Kolkata");
         LocalDateTime fixedDateTime = LocalDateTime.of(fixedDate, fixedTime);
@@ -155,7 +168,7 @@ class SlotServiceTest {
         
         // Act
         List<SlotResponse> slots = slotServiceWithFixedClock.getAvailableSlots(
-                1L, 1L, LocalDate.now(), "test@example.com");
+                1L, 1L, TEST_TODAY, "test@example.com");
          
         // Assert
         assertFalse(slots.isEmpty(), "Should have slots available when vendor is open and outside lead time");
@@ -203,7 +216,7 @@ class SlotServiceTest {
         
         // Act
         List<SlotResponse> slots = slotService.getAvailableSlots(
-                1L, 1L, LocalDate.now(), "test@example.com");
+                1L, 1L, TEST_TODAY, "test@example.com");
         
         // Assert
         assertTrue(slots.isEmpty(), "Should have no slots when vendor is closed");
@@ -216,7 +229,7 @@ class SlotServiceTest {
         
         // Act & Assert
         assertThrows(BusinessException.class, () -> {
-            slotService.getAvailableSlots(999L, 1L, LocalDate.now(), "test@example.com");
+            slotService.getAvailableSlots(999L, 1L, TEST_TODAY, "test@example.com");
         });
     }
 
@@ -242,7 +255,7 @@ class SlotServiceTest {
         
         // Act & Assert
         assertThrows(BusinessException.class, () -> {
-            slotService.getAvailableSlots(1L, 1L, LocalDate.now(), "test@example.com");
+            slotService.getAvailableSlots(1L, 1L, TEST_TODAY, "test@example.com");
         });
     }
 
@@ -268,7 +281,7 @@ class SlotServiceTest {
         
         // Act & Assert
         assertThrows(BusinessException.class, () -> {
-            slotService.getAvailableSlots(1L, 1L, LocalDate.now(), "test@example.com");
+            slotService.getAvailableSlots(1L, 1L, TEST_TODAY, "test@example.com");
         });
     }
 
@@ -283,7 +296,7 @@ class SlotServiceTest {
         
         // Act & Assert
         assertThrows(BusinessException.class, () -> {
-            slotService.getAvailableSlots(1L, 1L, LocalDate.now(), "test@example.com");
+            slotService.getAvailableSlots(1L, 1L, TEST_TODAY, "test@example.com");
         });
     }
 
@@ -291,7 +304,7 @@ class SlotServiceTest {
     void testDateBeyondHorizon() {
         // Arrange
         // Set up fixed clock to return 10:00 AM today in the vendor's timezone
-        LocalDate fixedDate = LocalDate.now();
+        LocalDate fixedDate = TEST_TODAY;
         LocalTime fixedTime = LocalTime.of(10, 0); // 10:00 AM
         ZoneId zoneId = ZoneId.of("Asia/Kolkata");
         LocalDateTime fixedDateTime = LocalDateTime.of(fixedDate, fixedTime);
@@ -307,7 +320,7 @@ class SlotServiceTest {
         setPrivateField(slotServiceWithFixedClock, "minLeadTimeMinutes", 120); // 2 hours
         setPrivateField(slotServiceWithFixedClock, "maxBookingHorizonDays", 7); // 1 week
         
-        LocalDate futureDate = LocalDate.now().plusDays(8); // Beyond horizon of 7 days
+        LocalDate futureDate = TEST_TODAY.plusDays(8); // Beyond horizon of 7 days
         
         // Act & Assert
         assertThrows(BusinessException.class, () -> {
@@ -336,7 +349,178 @@ class SlotServiceTest {
         
         // Act & Assert
         assertThrows(BusinessException.class, () -> {
-            slotService.getAvailableSlots(1L, 1L, LocalDate.now(), "test@example.com");
+            slotService.getAvailableSlots(1L, 1L, TEST_TODAY, "test@example.com");
         });
+    }
+
+    @Test
+    void testBeforeOpeningGridStartsAtOpeningAndLeadTimeInvalidSlotsUnavailable() {
+        // Vendor opens 09:00, closes 18:00, 60m duration
+        // Current time: 08:30 IST on Wednesday (before opening)
+        // Lead time: 120m -> leadTimeLimit is 10:30 IST
+        LocalDate testDate = LocalDate.of(2026, 10, 21); // Wednesday
+        LocalTime testTime = LocalTime.of(8, 30);
+        ZoneId zoneId = ZoneId.of("Asia/Kolkata");
+        Clock fixedClock = Clock.fixed(LocalDateTime.of(testDate, testTime).atZone(zoneId).toInstant(), zoneId);
+
+        SlotService service = new SlotService(
+                vendorProfileRepository, serviceLocationRepository, vendorHoursRepository,
+                orderRepository, userRepository, addressService, fixedClock);
+        setPrivateField(service, "minLeadTimeMinutes", 120);
+        setPrivateField(service, "maxBookingHorizonDays", 7);
+
+        VendorHours hours = VendorHours.builder()
+                .id(1L)
+                .vendorProfile(testVendor)
+                .weekday(DayOfWeek.WEDNESDAY)
+                .openTime(LocalTime.of(9, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .closed(false)
+                .build();
+
+        when(vendorProfileRepository.findById(1L)).thenReturn(Optional.of(testVendor));
+        when(vendorHoursRepository.findByVendorProfileIdAndWeekday(1L, DayOfWeek.WEDNESDAY))
+                .thenReturn(Optional.of(hours));
+        when(addressService.getById("test@example.com", 1L)).thenReturn(AddressResponse.builder().build());
+        when(userRepository.findByEmailWithRole("test@example.com")).thenReturn(Optional.of(testUser));
+        when(orderRepository.countBookedOrdersForSlot(anyLong(), any())).thenReturn(0L);
+
+        List<SlotResponse> slots = service.getAvailableSlots(1L, 1L, testDate, "test@example.com");
+
+        // 09:00 to 18:00 in 60m steps -> 9 slots
+        assertEquals(9, slots.size());
+        // First slot starts at opening time: 09:00 IST = 03:30 UTC
+        assertEquals(LocalDateTime.of(2026, 10, 21, 3, 30), slots.get(0).getSlotStart());
+        // Lead time limit is 10:30 IST:
+        // 09:00 IST (< 10:30) -> available: false
+        assertFalse(slots.get(0).isAvailable(), "Slot 09:00-10:00 should be unavailable due to lead time");
+        // 10:00 IST (< 10:30) -> available: false
+        assertFalse(slots.get(1).isAvailable(), "Slot 10:00-11:00 should be unavailable due to lead time");
+        // 11:00 IST (>= 10:30) -> available: true
+        assertTrue(slots.get(2).isAvailable(), "Slot 11:00-12:00 should be available");
+    }
+
+    @Test
+    void testAfterClosingReturnsEmptyAndNoCrossDayRecursion() {
+        // Vendor opens 09:00, closes 18:00
+        // Current time: 18:30 IST on Wednesday (after closing)
+        LocalDate testDate = LocalDate.of(2026, 10, 21); // Wednesday
+        LocalTime testTime = LocalTime.of(18, 30);
+        ZoneId zoneId = ZoneId.of("Asia/Kolkata");
+        Clock fixedClock = Clock.fixed(LocalDateTime.of(testDate, testTime).atZone(zoneId).toInstant(), zoneId);
+
+        SlotService service = new SlotService(
+                vendorProfileRepository, serviceLocationRepository, vendorHoursRepository,
+                orderRepository, userRepository, addressService, fixedClock);
+        setPrivateField(service, "minLeadTimeMinutes", 120);
+        setPrivateField(service, "maxBookingHorizonDays", 7);
+
+        VendorHours hours = VendorHours.builder()
+                .id(1L)
+                .vendorProfile(testVendor)
+                .weekday(DayOfWeek.WEDNESDAY)
+                .openTime(LocalTime.of(9, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .closed(false)
+                .build();
+
+        when(vendorProfileRepository.findById(1L)).thenReturn(Optional.of(testVendor));
+        when(vendorHoursRepository.findByVendorProfileIdAndWeekday(1L, DayOfWeek.WEDNESDAY))
+                .thenReturn(Optional.of(hours));
+        when(addressService.getById("test@example.com", 1L)).thenReturn(AddressResponse.builder().build());
+        when(userRepository.findByEmailWithRole("test@example.com")).thenReturn(Optional.of(testUser));
+
+        List<SlotResponse> slots = service.getAvailableSlots(1L, 1L, testDate, "test@example.com");
+
+        assertTrue(slots.isEmpty(), "Should return empty list after closing on the requested day without cross-day recursion");
+    }
+
+    @Test
+    void testFutureDateGeneratesFullOperatingGridNotClampedToClock() {
+        // Current time: 14:00 IST on Wednesday
+        // Requested date: Thursday (future date)
+        LocalDate today = LocalDate.of(2026, 10, 21);
+        LocalDate tomorrow = today.plusDays(1);
+        LocalTime testTime = LocalTime.of(14, 0);
+        ZoneId zoneId = ZoneId.of("Asia/Kolkata");
+        Clock fixedClock = Clock.fixed(LocalDateTime.of(today, testTime).atZone(zoneId).toInstant(), zoneId);
+
+        SlotService service = new SlotService(
+                vendorProfileRepository, serviceLocationRepository, vendorHoursRepository,
+                orderRepository, userRepository, addressService, fixedClock);
+        setPrivateField(service, "minLeadTimeMinutes", 120);
+        setPrivateField(service, "maxBookingHorizonDays", 7);
+
+        VendorHours hours = VendorHours.builder()
+                .id(1L)
+                .vendorProfile(testVendor)
+                .weekday(DayOfWeek.THURSDAY)
+                .openTime(LocalTime.of(9, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .closed(false)
+                .build();
+
+        when(vendorProfileRepository.findById(1L)).thenReturn(Optional.of(testVendor));
+        when(vendorHoursRepository.findByVendorProfileIdAndWeekday(1L, DayOfWeek.THURSDAY))
+                .thenReturn(Optional.of(hours));
+        when(addressService.getById("test@example.com", 1L)).thenReturn(AddressResponse.builder().build());
+        when(userRepository.findByEmailWithRole("test@example.com")).thenReturn(Optional.of(testUser));
+        when(orderRepository.countBookedOrdersForSlot(anyLong(), any())).thenReturn(0L);
+
+        List<SlotResponse> slots = service.getAvailableSlots(1L, 1L, tomorrow, "test@example.com");
+
+        // Full grid 09:00 to 18:00 (9 slots) not clamped to 14:00!
+        assertEquals(9, slots.size());
+        assertEquals(LocalDateTime.of(2026, 10, 22, 3, 30), slots.get(0).getSlotStart()); // 09:00 IST = 03:30 UTC
+        assertTrue(slots.stream().allMatch(SlotResponse::isAvailable), "All future slots outside lead time should be available");
+    }
+
+    @Test
+    void testCapacityExhaustedSlotsAreMarkedUnavailable() {
+        // Current time: 09:00 IST on Wednesday
+        LocalDate testDate = LocalDate.of(2026, 10, 21);
+        LocalTime testTime = LocalTime.of(9, 0);
+        ZoneId zoneId = ZoneId.of("Asia/Kolkata");
+        Clock fixedClock = Clock.fixed(LocalDateTime.of(testDate, testTime).atZone(zoneId).toInstant(), zoneId);
+
+        SlotService service = new SlotService(
+                vendorProfileRepository, serviceLocationRepository, vendorHoursRepository,
+                orderRepository, userRepository, addressService, fixedClock);
+        setPrivateField(service, "minLeadTimeMinutes", 120);
+        setPrivateField(service, "maxBookingHorizonDays", 7);
+
+        VendorHours hours = VendorHours.builder()
+                .id(1L)
+                .vendorProfile(testVendor)
+                .weekday(DayOfWeek.WEDNESDAY)
+                .openTime(LocalTime.of(9, 0))
+                .closeTime(LocalTime.of(18, 0))
+                .closed(false)
+                .build();
+
+        // maxOrdersPerSlot = 2
+        when(vendorProfileRepository.findById(1L)).thenReturn(Optional.of(testVendor));
+        when(vendorHoursRepository.findByVendorProfileIdAndWeekday(1L, DayOfWeek.WEDNESDAY))
+                .thenReturn(Optional.of(hours));
+        when(addressService.getById("test@example.com", 1L)).thenReturn(AddressResponse.builder().build());
+        when(userRepository.findByEmailWithRole("test@example.com")).thenReturn(Optional.of(testUser));
+
+        // Slot 12:00 IST = 06:30 UTC has 2 booked orders (full!)
+        LocalDateTime slot12Utc = LocalDateTime.of(2026, 10, 21, 6, 30);
+        // Slot 13:00 IST = 07:30 UTC has 1 booked order (available!)
+        LocalDateTime slot13Utc = LocalDateTime.of(2026, 10, 21, 7, 30);
+
+        // Default zero booked orders, except slot12 is full and slot13 has 1
+        when(orderRepository.countBookedOrdersForSlot(anyLong(), any())).thenReturn(0L);
+        when(orderRepository.countBookedOrdersForSlot(eq(1L), eq(slot12Utc))).thenReturn(2L);
+        when(orderRepository.countBookedOrdersForSlot(eq(1L), eq(slot13Utc))).thenReturn(1L);
+
+        List<SlotResponse> slots = service.getAvailableSlots(1L, 1L, testDate, "test@example.com");
+
+        SlotResponse slot12 = slots.stream().filter(s -> s.getSlotStart().equals(slot12Utc)).findFirst().orElseThrow();
+        assertFalse(slot12.isAvailable(), "Capacity-exhausted slot should be marked unavailable");
+
+        SlotResponse slot13 = slots.stream().filter(s -> s.getSlotStart().equals(slot13Utc)).findFirst().orElseThrow();
+        assertTrue(slot13.isAvailable(), "Slot with remaining capacity should be marked available");
     }
 }

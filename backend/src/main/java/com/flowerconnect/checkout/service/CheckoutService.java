@@ -97,6 +97,7 @@ public class CheckoutService {
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final CheckoutIdempotencyRepository idempotencyRepository;
     private final Clock clock;
+    private final SlotValidationService slotValidationService;
 
     private static final BigDecimal EARTH_RADIUS_KM = new BigDecimal("6371");
     private static final int SCALE_2 = 2;
@@ -355,7 +356,7 @@ public class CheckoutService {
      * @return the created orders or the idempotent replay result
      * @throws BusinessException for validation errors, conflicts, or insufficient stock
      */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public CheckoutResponse checkout(String customerEmail, CheckoutRequest request) {
         User user = requireUser(customerEmail);
 
@@ -404,6 +405,11 @@ public class CheckoutService {
             throw BusinessException.badRequest("Slot selection must include exactly one entry per vendor in the cart");
         }
 
+        // Validate slotStart format upfront for all items
+        for (CheckoutRequest.CheckoutItem item : request.getItems()) {
+            slotValidationService.parseAndNormalize(item.getSlotStart());
+        }
+
         // 7. Resolve platform fee from configuration (client cannot override)
         BigDecimal platformFee = checkoutProperties.getPlatformFee();
 
@@ -433,6 +439,12 @@ public class CheckoutService {
             VendorProfile vendor = vendorProfileRepository.findByIdForUpdate(vendorId)
                     .orElseThrow(() -> BusinessException.notFound("Vendor not found"));
             lockedVendors.put(vendorId, vendor);
+        }
+
+        // Validate slot rules for all vendors under lock before verifying quote hash
+        for (CheckoutRequest.CheckoutItem checkoutItem : request.getItems()) {
+            VendorProfile vendor = lockedVendors.get(checkoutItem.getVendorId());
+            slotValidationService.validateSlot(vendor, checkoutItem.getSlotStart());
         }
 
         // 10. Check price changes under lock (reject unconfirmed changes before verifying quote hash)
@@ -486,19 +498,10 @@ public class CheckoutService {
             List<CartItem> vendorItems = itemsByVendor.get(vendorId);
             VendorProfile vendor = lockedVendors.get(vendorId);
 
-            // Parse slot time
-            LocalDateTime slotStart;
-            try {
-                slotStart = LocalDateTime.parse(checkoutItem.getSlotStart());
-            } catch (Exception e) {
-                throw BusinessException.badRequest("Invalid slotStart format (expected ISO-8601)");
-            }
-            LocalDateTime slotEnd = slotStart.plusMinutes(vendor.getSlotDurationMinutes());
-
-            // Slot time validation
-            if (slotStart.isBefore(now)) {
-                throw BusinessException.badRequest("Selected slot is in the past");
-            }
+            // Validate slot under vendor lock using shared SlotValidationService
+            SlotValidationService.ValidatedSlot validatedSlot = slotValidationService.validateSlot(vendor, checkoutItem.getSlotStart());
+            LocalDateTime slotStart = validatedSlot.slotStartUtc();
+            LocalDateTime slotEnd = validatedSlot.slotEndUtc();
 
             // Slot capacity check under vendor lock
             long bookedInSlot = orderRepository.countBookedOrdersForSlot(vendor.getId(), slotStart);
@@ -849,20 +852,18 @@ public class CheckoutService {
             errors.add("Subtotal below vendor's minimum order of " + vendor.getMinOrderAmount());
         }
 
-        // ---- Slot validation (placeholder - full implementation in task 5.5) ----
-        // For now, we validate that the slot string is parseable
+        // ---- Slot validation ----
         boolean slotAvailable = true;
         try {
-            LocalDateTime slotStart = LocalDateTime.parse(slotStartStr);
-            // Basic sanity: slot must be in the future
-            if (slotStart.isBefore(LocalDateTime.now())) {
+            SlotValidationService.ValidatedSlot validatedSlot = slotValidationService.validateSlot(vendor, slotStartStr);
+            long bookedInSlot = orderRepository.countBookedOrdersForSlot(vendor.getId(), validatedSlot.slotStartUtc());
+            if (bookedInSlot >= vendor.getMaxOrdersPerSlot()) {
                 slotAvailable = false;
-                errors.add("Selected slot is in the past");
+                errors.add("Delivery slot is full for vendor: " + vendor.getBusinessName());
             }
-            // TODO: Full slot validation against vendor hours, lead time, horizon, capacity (task 5.5)
-        } catch (Exception e) {
+        } catch (BusinessException e) {
             slotAvailable = false;
-            errors.add("Invalid slotStart format (expected ISO-8601)");
+            errors.add(e.getMessage());
         }
 
         // ---- Shop total ----

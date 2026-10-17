@@ -37,11 +37,15 @@ import { FOCUS_RING, FIELD_TRANSITION, PRESSABLE } from "@/motion/pressable";
 import { FlowerLoader } from "@/motion/FlowerLoader";
 import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
 
-/** Tomorrow's date as `yyyy-MM-dd`, the default first selectable delivery day. */
-function defaultDeliveryDate(): string {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return tomorrow.toISOString().slice(0, 10);
+/**
+ * Browser-local date as `YYYY-MM-DD`.
+ * Used for the date picker's `min` attribute (UI convenience, not authoritative validation).
+ */
+export function getBrowserLocalDate(now: Date = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function CheckoutPage() {
@@ -58,7 +62,7 @@ export function CheckoutPage() {
 
   const [step, setStep] = useState<CheckoutStep>("address");
   const [addressId, setAddressId] = useState<number | null>(null);
-  const [deliveryDate, setDeliveryDate] = useState(defaultDeliveryDate());
+  const [deliveryDate, setDeliveryDate] = useState(getBrowserLocalDate());
   const [slotSelections, setSlotSelections] = useState<Record<number, string>>({});
   const [quoteData, setQuoteData] = useState<CheckoutQuoteResponse | null>(null);
   const [confirmPriceChanges, setConfirmPriceChanges] = useState(false);
@@ -424,12 +428,13 @@ function SlotStep({
       <fieldset className="border-0 p-0 m-0">
         <legend className="text-sm font-semibold text-slate-900 mb-4">Delivery date</legend>
         <div className="flex items-center gap-3 mb-6">
-          <label className="text-sm text-slate-600">Deliver on</label>
+          <label htmlFor="delivery-date" className="text-sm text-slate-600">Deliver on</label>
           <input
+            id="delivery-date"
             type="date"
             value={deliveryDate}
             onChange={(e) => onDateChange(e.target.value)}
-            min={defaultDeliveryDate()}
+            min={getBrowserLocalDate()}
             className={`rounded-sm border border-glass-border bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-brand-500 focus:ring-brand-500 ${FIELD_TRANSITION}`}
           />
         </div>
