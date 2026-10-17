@@ -381,8 +381,8 @@ function SlotRow({
   const selected = slotSelections[vendorId];
 
   return (
-    <div key={vendorId} className="border border-glass-border rounded-lg p-4">
-      <p className="text-sm font-semibold text-slate-900">{vendorName}</p>
+    <fieldset key={vendorId} className="border border-glass-border rounded-lg p-4 m-0">
+      <legend className="text-sm font-semibold text-slate-900">{vendorName}</legend>
       {slotsPending && (
         <p className="mt-2 text-xs text-slate-500">Loading slots for {deliveryDate}...</p>
       )}
@@ -390,26 +390,38 @@ function SlotRow({
         <p className="mt-2 text-xs text-red-700">No available slots on {deliveryDate} for this shop.</p>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
-        {availableSlots.map((slot) => (
-          <button
-            key={`${vendorId}-${slot.slotStart}`}
-            type="button"
-            role="radio"
-            aria-checked={selected === slot.slotStart}
-            onClick={() => onSlotChange(vendorId, slot.slotStart)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${selected === slot.slotStart
-              ? "bg-brand-600 border-brand-600 text-white"
-              : "border-glass-border bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            {formatSlotTime(slot.slotStart)} — {formatSlotTime(slot.slotEnd)}
-          </button>
-        ))}
+        {availableSlots.map((slot) => {
+          const isSelected = selected === slot.slotStart;
+          return (
+            <label
+              key={`${vendorId}-${slot.slotStart}`}
+              className="relative cursor-pointer"
+            >
+              <input
+                type="radio"
+                name={`slot-${vendorId}`}
+                value={slot.slotStart}
+                checked={isSelected}
+                onChange={() => onSlotChange(vendorId, slot.slotStart)}
+                className="peer sr-only"
+              />
+              <span
+                className={`inline-block px-3 py-1.5 text-xs font-medium rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 peer-focus-visible:ring-offset-2 ${
+                  isSelected
+                    ? "bg-brand-600 border-brand-600 text-white"
+                    : "border-glass-border bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {formatSlotTime(slot.slotStart)} — {formatSlotTime(slot.slotEnd)}
+              </span>
+            </label>
+          );
+        })}
       </div>
       {!selected && !slotsPending && availableSlots.length > 0 && (
         <p className="mt-2 text-xs text-slate-500">Select a delivery window.</p>
       )}
-    </div>
+    </fieldset>
   );
 }
 
@@ -708,27 +720,34 @@ function CheckoutStepper({ step }: { step: CheckoutStep }) {
   const current = steps.indexOf(step);
 
   return (
-    <div className="flex items-center gap-1 text-xs">
-      {steps.map((name, i) => (
-        <div key={name} className="flex items-center gap-2">
-          <div
-            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${i <= current
-              ? "bg-brand-600 text-white"
-              : "border border-glass-border bg-white text-slate-400"
-          }`}
+    <nav aria-label="Checkout progress">
+      <ol className="flex items-center gap-1 text-xs list-none p-0 m-0">
+        {steps.map((name, i) => (
+          <li
+            key={name}
+            aria-current={i === current ? "step" : undefined}
+            className="flex items-center gap-2"
           >
-            {i + 1}
-          </div>
-          {i < steps.length - 1 && (
             <div
-              className={`h-0.5 w-4 ${i < current ? "bg-brand-600" : "bg-slate-200"}`}
-            />
-          )}
-          <span className={`font-medium ${i <= current ? "text-slate-900" : "text-slate-400"}`}>
-            {name === "address" ? "Address" : name === "slots" ? "Slots" : name === "review" ? "Review" : "Done"}
-          </span>
-        </div>
-      ))}
-    </div>
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${i <= current
+                ? "bg-brand-600 text-white"
+                : "border border-glass-border bg-white text-slate-400"
+              }`}
+            >
+              {i + 1}
+            </div>
+            {i < steps.length - 1 && (
+              <div
+                aria-hidden="true"
+                className={`h-0.5 w-4 ${i < current ? "bg-brand-600" : "bg-slate-200"}`}
+              />
+            )}
+            <span className={`font-medium ${i <= current ? "text-slate-900" : "text-slate-400"}`}>
+              {name === "address" ? "Address" : name === "slots" ? "Slots" : name === "review" ? "Review" : "Done"}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </nav>
   );
 }

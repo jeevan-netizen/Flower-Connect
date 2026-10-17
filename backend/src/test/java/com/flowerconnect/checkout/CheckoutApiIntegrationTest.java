@@ -317,6 +317,59 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
                 .ifPresent(rec -> assertThat(rec.getCompletedAt()).isNull());
     }
 
+    @Test
+    void checkoutRejectsSlotInsideMinimumLeadTimeWithRollback() throws Exception {
+        Vendor vendor = registerVendor(VendorProfile.Status.APPROVED);
+        Long productId = createActiveProduct(vendor, "Lead Time Rose " + UUID.randomUUID());
+        stockIn(vendor, productId, 20, "initial");
+
+        User customer = createUser(uniqueEmail(), "CUSTOMER");
+        String customerToken = tokenFor(customer);
+        Long addressId = createAddress(customer, locationId);
+
+        addToCart(customerToken, productId, 2);
+
+        // PINNED_INSTANT is 2026-10-21T04:00:00Z (09:30:00 IST)
+        // Minimum lead time is 120 minutes -> threshold is 11:30:00 IST (06:00:00 UTC)
+        // A slot starting at 10:00:00 IST (04:30:00 UTC) is only 30m ahead -> inside 120m lead time!
+        String invalidSlot = "2026-10-21T04:30:00";
+        UUID clientOrderId = UUID.randomUUID();
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(addressId)
+                .clientOrderId(clientOrderId)
+                .quoteHash("dummy-quote-hash")
+                .items(List.of(CheckoutRequest.CheckoutItem.builder()
+                        .vendorId(vendor.profileId())
+                        .slotStart(invalidSlot)
+                        .build()))
+                .build();
+
+        mockMvc.perform(post("/api/v1/checkout")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(customerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Selected slot violates minimum lead time"));
+
+        // Assert 1: Zero orders created in database
+        Long userId = customer.getId();
+        assertThat(orderRepository.findByUserIdAndClientOrderId(userId, clientOrderId.toString())).isEmpty();
+
+        // Assert 2: Inventory reservation remains 0 (unchanged)
+        Inventory inv = inventoryRepository.findByProductId(productId).orElseThrow();
+        assertThat(inv.getReservedQuantity()).isEqualTo(0);
+
+        // Assert 3: No RESERVE stock movements created
+        List<StockMovement> movements = stockMovementRepository.findByProductIdOrderByCreatedAtDescIdDesc(productId);
+        assertThat(movements.stream().filter(m -> m.getMovementType() == StockMovement.MovementType.RESERVE)).isEmpty();
+
+        // Assert 4: Cart items are retained (not cleared)
+        JsonNode cart = getCart(customerToken);
+        assertThat(cart.get("totalItems").asInt()).isEqualTo(1);
+    }
+
     // ================================================================ idempotency
 
     @Test

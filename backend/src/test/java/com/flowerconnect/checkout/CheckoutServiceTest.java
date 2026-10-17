@@ -176,6 +176,9 @@ class CheckoutServiceTest {
         );
         when(slotValidationService.parseAndNormalize(anyString())).thenAnswer(inv -> {
             String str = inv.getArgument(0);
+            if (str == null || str.isBlank()) {
+                return LocalDateTime.parse("2026-10-20T10:00:00");
+            }
             return LocalDateTime.parse(str.replace("Z", ""));
         });
         when(slotValidationService.validateSlot(any(VendorProfile.class), anyString())).thenReturn(defaultSlot);
@@ -903,6 +906,86 @@ class CheckoutServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT)
                 .hasMessageContaining("already in progress");
+    }
+
+    @Test
+    void checkoutRejectsSlotViolatingLeadTimeWithoutSideEffects() {
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        when(slotValidationService.validateSlot(any(VendorProfile.class), anyString()))
+                .thenThrow(BusinessException.badRequest("Selected slot violates minimum lead time"));
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(UUID.randomUUID())
+                .quoteHash("dummy-hash")
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-20T10:00:00").build()))
+                .build();
+
+        assertThatThrownBy(() -> checkoutService.checkout("customer@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_FAILED)
+                .hasMessageContaining("Selected slot violates minimum lead time");
+
+        // Verify all mutations and side effects are prevented
+        verify(orderRepository, never()).save(any());
+        verify(orderRepository, never()).saveAndFlush(any());
+        verify(orderItemRepository, never()).save(any());
+        verify(orderItemRepository, never()).saveAndFlush(any());
+        verify(cartItemRepository, never()).deleteAllByCartId(any());
+        verify(stockMovementRepository, never()).save(any());
+        verify(stockMovementRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void checkoutRejectsSlotBeyondHorizonWithoutSideEffects() {
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        when(slotValidationService.validateSlot(any(VendorProfile.class), anyString()))
+                .thenThrow(BusinessException.badRequest("Date is beyond the booking horizon"));
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(UUID.randomUUID())
+                .quoteHash("dummy-hash")
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("2026-10-30T10:00:00").build()))
+                .build();
+
+        assertThatThrownBy(() -> checkoutService.checkout("customer@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_FAILED)
+                .hasMessageContaining("Date is beyond the booking horizon");
+
+        verify(orderRepository, never()).saveAndFlush(any());
+        verify(cartItemRepository, never()).deleteAllByCartId(any());
+        verify(stockMovementRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void checkoutRejectsMalformedSlotStartWithoutSideEffects() {
+        setupCommonMocks(vendor);
+        setupCheckoutMocks();
+
+        doThrow(BusinessException.badRequest("Invalid slotStart format (expected ISO-8601)"))
+                .when(slotValidationService).parseAndNormalize(anyString());
+
+        CheckoutRequest request = CheckoutRequest.builder()
+                .addressId(5L)
+                .clientOrderId(UUID.randomUUID())
+                .quoteHash("dummy-hash")
+                .items(List.of(CheckoutRequest.CheckoutItem.builder().vendorId(3L).slotStart("malformed-timestamp").build()))
+                .build();
+
+        assertThatThrownBy(() -> checkoutService.checkout("customer@test.com", request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_FAILED)
+                .hasMessageContaining("Invalid slotStart format (expected ISO-8601)");
+
+        verify(orderRepository, never()).saveAndFlush(any());
+        verify(cartItemRepository, never()).deleteAllByCartId(any());
+        verify(stockMovementRepository, never()).saveAndFlush(any());
     }
 
     // --------------------------------------------------------------------- helpers

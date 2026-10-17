@@ -257,3 +257,56 @@ The endpoint filters to `vendor_profiles.status = APPROVED` AND `accepting_order
 computes Haversine distance from the given service location, and includes only vendors
 within their `delivery_radius_km`. Response includes `distanceKm` and `estimatedDeliveryFee`
 (`baseDeliveryFee + perKmFee × distanceKm`), plus `freeDeliveryAbove` as informational.
+
+---
+
+## 5 — Cart and Checkout (`/api/v1/cart`, `/api/v1/checkout`, `/api/v1/vendors/{id}/slots`)
+
+### Security Configuration Rules
+
+Phase 5 introduces three protected route namespaces configured in `SecurityConfig.java`:
+
+1. `/api/v1/cart/**` → `hasRole("CUSTOMER")`
+2. `/api/v1/checkout/**` → `hasRole("CUSTOMER")`
+3. `GET /api/v1/vendors/**/slots` → `hasRole("CUSTOMER")` (placed before the general `/api/v1/vendors/**` → `hasRole("FLORIST")` rule)
+
+All Phase 5 endpoints require authentication with `ROLE_CUSTOMER`. Unauthenticated requests yield `401 Unauthorized`. Requests from other authenticated roles (`ROLE_FLORIST`, `ROLE_ADMIN`) yield `403 Forbidden` at the URL security filter layer.
+
+### Customer Resource Isolation Model
+
+- **Cart isolation**: Customer cart operations resolve the customer's cart exclusively from the authenticated JWT subject (`SecurityContextHolder` principal email via `CartService.getCartForCustomer(email)`). Customers cannot name another customer's cart ID in any path parameter. Item modifications (`PATCH`, `DELETE /api/v1/cart/items/{id}`) verify that `{id}` belongs to the caller's cart; an item ID belonging to another user's cart is rejected with 404 (information-hiding, identical to non-existent items).
+- **Checkout isolation**: Checkout quote and execution resolve cart items, customer profile, and saved delivery addresses by the authenticated customer's email. Foreign address references are rejected with validation/not-found errors.
+- **Slot discovery**: Slot queries require customer authentication and validate delivery address ownership against the calling customer.
+
+### Phase 5 Authorization Matrix
+
+| Method | Path | 401 | 403 role | 403 foreign / gating | 404 | 2xx | Summary verification |
+|---|---|---|---|---|---|---|---|
+| GET | `/api/v1/cart` | 401 | 403 | n/a (isolated by principal) | n/a (lazy init) | 200 | **Verified** (`CartControllerTest`, `CartApiIntegrationTest`) |
+| POST | `/api/v1/cart/items` | 401 | 403 | n/a (isolated by principal) | 404 (product) | 201 | **Verified** (`CartControllerTest`, `CartApiIntegrationTest`) |
+| PATCH | `/api/v1/cart/items/{id}` | 401 | 403 | 404 (foreign item hidden) | 404 | 200 | **Verified** (`CartControllerTest`, `CartApiIntegrationTest`) |
+| DELETE | `/api/v1/cart/items/{id}` | 401 | 403 | 404 (foreign item hidden) | 404 | 204 | **Verified** (`CartControllerTest`, `CartApiIntegrationTest`) |
+| DELETE | `/api/v1/cart` | 401 | 403 | n/a (isolated by principal) | n/a | 204 | **Verified** (`CartControllerTest`, `CartApiIntegrationTest`) |
+| POST | `/api/v1/checkout/quote` | 401 | 403 | 400 (foreign address rejected) | 400 (validation) | 200 | **Verified** (`CheckoutControllerTest`) |
+| POST | `/api/v1/checkout` | 401 | 403 | 400 (foreign address rejected) | 400 (validation) | 201 | **Verified** (`CheckoutControllerTest`, `CheckoutApiIntegrationTest`) |
+| GET | `/api/v1/vendors/{id}/slots` | 401 | 403 | ⬜ PENDING (unit tested) | ⬜ PENDING (unit tested) | 200 | **Partial test verified** (Auth/role slice verified; vendor gating and foreign address HTTP status PENDING) |
+
+### Evidence Breakdown
+
+| Assertion | Route | Test | Level | Status |
+|---|---|---|---|---|
+| 401 unauthenticated | `/api/v1/cart/**` | `CartControllerTest.getCartRequiresAuthentication` | Controller slice | Verified |
+| 403 wrong role (FLORIST) | `/api/v1/cart/**` | `CartControllerTest.aFloristCannotAccessTheCart` | Controller slice | Verified |
+| 403 wrong role (ADMIN) | `/api/v1/cart/**` | `CartControllerTest.anAdminCannotAccessTheCart` | Controller slice | Verified |
+| 200 customer access | `/api/v1/cart` | `CartApiIntegrationTest.getCartReturnsEmptyWhenNoCartExists` | Integration | Verified |
+| 401 unauthenticated | `/api/v1/checkout/**` | `CheckoutControllerTest.quoteRequiresAuthentication` | Controller slice | Verified |
+| 403 wrong role (FLORIST) | `/api/v1/checkout/**` | `CheckoutControllerTest.aFloristCannotUseCheckout` | Controller slice | Verified |
+| 403 wrong role (ADMIN) | `/api/v1/checkout/**` | `CheckoutControllerTest.anAdminCannotUseCheckout` | Controller slice | Verified |
+| 401 unauthenticated | `/api/v1/checkout` | `CheckoutApiIntegrationTest.checkoutRejectsUnauthenticated` | Integration | Verified |
+| 403 wrong role (FLORIST) | `/api/v1/checkout` | `CheckoutApiIntegrationTest.checkoutRejectsFlorist` | Integration | Verified |
+| 401 unauthenticated | `/api/v1/vendors/{id}/slots` | `SlotControllerTest.getAvailableSlotsRequiresAuthentication` | Controller slice | Verified |
+| 403 wrong role (FLORIST) | `/api/v1/vendors/{id}/slots` | `SlotControllerTest.aFloristCannotAccessSlots` | Controller slice | Verified |
+| 403 wrong role (ADMIN) | `/api/v1/vendors/{id}/slots` | `SlotControllerTest.anAdminCannotAccessSlots` | Controller slice | Verified |
+| 200 customer access | `/api/v1/vendors/{id}/slots` | `SlotControllerTest.getAvailableSlotsReturnsTheResponse` | Controller slice | Verified |
+| Vendor approval gating | `/api/v1/vendors/{id}/slots` | `SlotServiceTest.testVendorNotApproved` | Service unit | ⬜ PENDING HTTP verification |
+| Foreign address gating | `/api/v1/vendors/{id}/slots` | `SlotServiceTest.testAddressNotFound` | Service unit | ⬜ PENDING HTTP verification |

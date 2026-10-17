@@ -239,6 +239,110 @@ class SlotValidationServiceTest {
         }
 
         @Test
+        @DisplayName("Rejects eighth vendor-local calendar date even when fewer than 192 elapsed hours have passed")
+        void rejectsEighthCalendarDateEvenWhenFewerThanEightFull24HourPeriodsElapsed() {
+            // Clock anchor: Wednesday 2026-10-21 20:00:00 IST = 14:30:00 UTC
+            Instant anchorInstant = Instant.parse("2026-10-21T14:30:00Z");
+            Clock lateClock = Clock.fixed(anchorInstant, ZoneOffset.UTC);
+            SlotValidationService customService = new SlotValidationService(lateClock, vendorHoursRepository);
+            ReflectionTestUtils.setField(customService, "minLeadTimeMinutes", 120);
+            ReflectionTestUtils.setField(customService, "maxBookingHorizonDays", 7);
+
+            // Vendor local date is 2026-10-21 (Wednesday).
+            // Max allowed calendar date: 2026-10-21 + 7 days = 2026-10-28 (Wednesday).
+            // Day 8: Thursday 2026-10-29.
+            // Slot at 09:00:00 IST on Day 8: 2026-10-29 09:00:00 IST = 2026-10-29 03:30:00 UTC.
+            Instant slotInstant = Instant.parse("2026-10-29T03:30:00Z");
+
+            // Verify elapsed duration is strictly LESS than 192 hours (8 * 24 hours):
+            // Oct 21 14:30 UTC to Oct 29 03:30 UTC = 181 hours
+            long elapsedHours = Duration.between(anchorInstant, slotInstant).toHours();
+            assertThat(elapsedHours).isEqualTo(181L).isLessThan(192L);
+
+            // Mock Wednesday vendor hours for Day 7 validation (Thursday hours are not needed because Day 8 is rejected at horizon check)
+            VendorHours hoursWed = VendorHours.builder()
+                    .vendorProfile(vendor)
+                    .weekday(DayOfWeek.WEDNESDAY)
+                    .openTime(LocalTime.of(9, 0))
+                    .closeTime(LocalTime.of(18, 0))
+                    .closed(false)
+                    .build();
+            when(vendorHoursRepository.findByVendorProfileIdAndWeekday(eq(10L), eq(DayOfWeek.WEDNESDAY)))
+                    .thenReturn(Optional.of(hoursWed));
+
+            // Day 7 slot: 2026-10-28 17:00 IST = 11:30 UTC -> valid (within horizon and operating hours)
+            SlotValidationService.ValidatedSlot validatedDay7 = customService.validateSlot(vendor, "2026-10-28T11:30:00Z");
+            assertThat(validatedDay7.slotStartUtc()).isEqualTo(LocalDateTime.of(2026, 10, 28, 11, 30, 0));
+
+            // Day 8 slot: rejected because calendar date 2026-10-29 is after 2026-10-28, despite elapsed hours < 192
+            assertThatThrownBy(() -> customService.validateSlot(vendor, "2026-10-29T03:30:00Z"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_FAILED)
+                    .hasMessage("Date is beyond the booking horizon");
+        }
+
+        @Test
+        @DisplayName("Verifies calendar-date boundary near vendor-local midnight")
+        void verifiesCalendarDateBoundaryNearLocalMidnight() {
+            // Case 1: Just before local midnight in Asia/Kolkata
+            // 2026-10-21 23:45:00 IST = 2026-10-21 18:15:00 UTC
+            Instant preMidnightInstant = Instant.parse("2026-10-21T18:15:00Z");
+            Clock preMidnightClock = Clock.fixed(preMidnightInstant, ZoneOffset.UTC);
+            SlotValidationService preMidnightService = new SlotValidationService(preMidnightClock, vendorHoursRepository);
+            ReflectionTestUtils.setField(preMidnightService, "minLeadTimeMinutes", 120);
+            ReflectionTestUtils.setField(preMidnightService, "maxBookingHorizonDays", 7);
+
+            VendorHours hoursWed = VendorHours.builder()
+                    .vendorProfile(vendor)
+                    .weekday(DayOfWeek.WEDNESDAY)
+                    .openTime(LocalTime.of(9, 0))
+                    .closeTime(LocalTime.of(18, 0))
+                    .closed(false)
+                    .build();
+            VendorHours hoursThu = VendorHours.builder()
+                    .vendorProfile(vendor)
+                    .weekday(DayOfWeek.THURSDAY)
+                    .openTime(LocalTime.of(9, 0))
+                    .closeTime(LocalTime.of(18, 0))
+                    .closed(false)
+                    .build();
+            when(vendorHoursRepository.findByVendorProfileIdAndWeekday(eq(10L), eq(DayOfWeek.WEDNESDAY)))
+                    .thenReturn(Optional.of(hoursWed));
+            when(vendorHoursRepository.findByVendorProfileIdAndWeekday(eq(10L), eq(DayOfWeek.THURSDAY)))
+                    .thenReturn(Optional.of(hoursThu));
+
+            // Pre-midnight: local date is 2026-10-21, max horizon is 2026-10-28
+            // Slot on Day 7: 2026-10-28 10:00 IST = 04:30 UTC -> valid
+            SlotValidationService.ValidatedSlot day7 = preMidnightService.validateSlot(vendor, "2026-10-28T04:30:00Z");
+            assertThat(day7.slotStartUtc()).isEqualTo(LocalDateTime.of(2026, 10, 28, 4, 30, 0));
+
+            // Slot on Day 8: 2026-10-29 10:00 IST = 04:30 UTC -> rejected (only 178h 15m elapsed)
+            assertThatThrownBy(() -> preMidnightService.validateSlot(vendor, "2026-10-29T04:30:00Z"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_FAILED)
+                    .hasMessage("Date is beyond the booking horizon");
+
+            // Case 2: Just after local midnight in Asia/Kolkata
+            // 2026-10-22 00:15:00 IST = 2026-10-21 18:45:00 UTC (UTC date is STILL 2026-10-21!)
+            Instant postMidnightInstant = Instant.parse("2026-10-21T18:45:00Z");
+            Clock postMidnightClock = Clock.fixed(postMidnightInstant, ZoneOffset.UTC);
+            SlotValidationService postMidnightService = new SlotValidationService(postMidnightClock, vendorHoursRepository);
+            ReflectionTestUtils.setField(postMidnightService, "minLeadTimeMinutes", 120);
+            ReflectionTestUtils.setField(postMidnightService, "maxBookingHorizonDays", 7);
+
+            // Post-midnight: vendor local date is 2026-10-22, so max horizon is 2026-10-22 + 7 = 2026-10-29
+            // The exact same slot (2026-10-29 10:00 IST = 04:30 UTC) is now Day 7 -> valid!
+            SlotValidationService.ValidatedSlot day7PostMidnight = postMidnightService.validateSlot(vendor, "2026-10-29T04:30:00Z");
+            assertThat(day7PostMidnight.slotStartUtc()).isEqualTo(LocalDateTime.of(2026, 10, 29, 4, 30, 0));
+
+            // Day 8 from Thursday perspective: Friday 2026-10-30 10:00 IST = 04:30 UTC -> rejected
+            assertThatThrownBy(() -> postMidnightService.validateSlot(vendor, "2026-10-30T04:30:00Z"))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VALIDATION_FAILED)
+                    .hasMessage("Date is beyond the booking horizon");
+        }
+
+        @Test
         @DisplayName("Rejects closed vendor day")
         void rejectsClosedVendorDay() {
             VendorHours closedHours = VendorHours.builder()

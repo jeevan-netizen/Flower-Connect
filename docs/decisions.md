@@ -1820,3 +1820,37 @@ The discovery endpoint is similar to locations/categories in that it serves refe
 - The discovery query does not consider vendor prep time, slot availability, or max orders per slot � those are order-time concerns.
 - If no approved vendors exist, or max radius is null, an empty page is returned immediately without a bounding-box query.
 
+---
+
+## D-35: Full-page cart route accepted over slide-out drawer for multi-vendor layout
+
+### Context
+
+The original project plan (`docs/FlowerConnect_Implementation_Plan_v2.2.md`, task 5.6) specified a slide-out cart drawer:
+`| 5.6 | Cart UI | Slide-out drawer grouped by shop, quantity stepper, price breakdown |`
+
+However, the Phase 5 Stage 0 design specification (`docs/phase-5-stage-0-design.md`, §6.2 and lines 522–530) explicitly allowed:
+`CartPage.tsx # full-page cart (optional; drawer may suffice)`
+
+In commit `deccca3`, the cart frontend was implemented as a standalone full-page view mounted directly at `/cart` (`src/features/cart/pages/CartPage.tsx`), without introducing a slide-out drawer component (`CartDrawer.tsx`).
+
+### Rationale
+
+In a hyperlocal multi-vendor marketplace, cart items from different florists have distinct delivery fees, distance constraints, minimum order requirements, and price-drift warnings. In a 360px–420px slide-out drawer, this multi-vendor information density causes vertical crowding and makes per-vendor subtotals and item adjustments difficult to review. A dedicated full-page cart view at `/cart` provides the horizontal and vertical space necessary to cleanly separate vendor sections, display price drift and unpurchasability reasons, and summarize multi-vendor totals before checkout.
+
+### Decision
+
+- **Full-page cart accepted**: `CartPage.tsx` mounted at `/cart` is accepted as the canonical customer cart implementation for Phase 5.
+- **Drawer requirement waived**: A slide-out drawer (`CartDrawer.tsx`) is not required for Phase 5 completion. If a slide-out drawer is introduced in a future phase, it will serve as an optional quick-access preview linking directly to `/cart`.
+- **Functional acceptance criteria confirmed**: Inspection of `CartPage.tsx` confirms all functional criteria of task 5.6 are satisfied:
+  - Vendor grouping: Items grouped by vendor with per-shop headers and vendor subtotals.
+  - Quantity controls: Stepper bounded between 1 and `CART_MAX_QUANTITY` (10), with delete/remove button.
+  - Price drift detection: Visual badge and line-item indication when catalog price differs from cart snapshot.
+  - Unpurchasable item handling: Reason displayed and "Proceed to checkout" button disabled when any item is not purchasable.
+  - Breakdown and summary: Cart subtotal, shop subtotals, and CTA navigating to `/checkout`.
+
+### Consequences
+
+- Eliminates redundant drawer component scaffolding, focus trapping, and synchronized state management across drawer and page.
+- Routing to `/cart` remains direct and consistent across navigation headers.
+- Task 5.6 acceptance criteria are met and the task can be marked complete in project tracking.
