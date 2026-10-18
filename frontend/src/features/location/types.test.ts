@@ -123,6 +123,7 @@ describe("isSelectedLocation", () => {
 
   it("rejects a row whose id is missing, the obsolete-schema case", () => {
     const { id, ...obsolete } = valid;
+    void id;
     expect(isSelectedLocation(obsolete)).toBe(false);
   });
 });
