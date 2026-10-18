@@ -530,4 +530,218 @@ beforeEach(() => {
     expect(await screen.findByText(/no available slots on/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /review order/i })).toBeDisabled();
   });
+
+  it("surfaces a failed quote read with a retry option on the slots step and recovers on retry", async () => {
+    const user = userEvent.setup();
+    primeCart();
+    primeAddresses();
+    primeSlots({
+      "7": [
+        makeSlotResponse({ slotStart: "2026-10-03T10:00:00", slotEnd: "2026-10-03T11:00:00" }),
+        makeSlotResponse({ slotStart: "2026-10-03T11:00:00", slotEnd: "2026-10-03T12:00:00" }),
+      ],
+    });
+    mockFetchCheckoutQuote.mockRejectedValueOnce(apiError(500, { message: "Quote service unavailable" }));
+
+    renderCheckout();
+
+    // Step 1: address
+    await screen.findByRole("heading", { name: "Delivery address" });
+    await user.click(screen.getByRole("radio", { name: /Home/ }));
+    await user.click(screen.getByRole("button", { name: /choose delivery slots/i }));
+
+    // Step 2: slots
+    await waitFor(() => expect(screen.getByText("Petal & Stem")).toBeInTheDocument());
+    await user.click(screen.getByRole("radio", { name: /10:00 AM — 11:00 AM/i }));
+
+    // Initiate quote, which fails
+    await user.click(screen.getByRole("button", { name: /review order/i }));
+
+    // Remains on slots step and shows accessible alert
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Quote service unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Delivery slots" })).toBeInTheDocument();
+    expect(mockPlaceCheckout).not.toHaveBeenCalled();
+
+    // Changing relevant delivery slot input clears the stale quote error
+    await user.click(screen.getByRole("radio", { name: /11:00 AM — 12:00 PM/i }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    // Re-trigger quote with failure to verify explicit "Try again" action
+    mockFetchCheckoutQuote.mockRejectedValueOnce(apiError(500, { message: "Quote service unavailable again" }));
+    await user.click(screen.getByRole("button", { name: /review order/i }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Quote service unavailable again")).toBeInTheDocument();
+
+    // Changing delivery date input also clears the stale quote error
+    const dateInput = screen.getByLabelText(/deliver on/i);
+    await user.clear(dateInput);
+    await user.type(dateInput, "2026-11-01");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    // Trigger failure once more to test Try again button recovery
+    mockFetchCheckoutQuote.mockRejectedValueOnce(apiError(500, { message: "Quote service down" }));
+    await user.click(screen.getByRole("button", { name: /review order/i }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Quote service down")).toBeInTheDocument();
+
+    // Resolve subsequent quote call and click "Try again"
+    mockFetchCheckoutQuote.mockResolvedValueOnce(makeCheckoutQuoteResponse());
+    const retryButton = screen.getByRole("button", { name: /try again/i });
+    await user.click(retryButton);
+
+    // Recovers successfully and advances to review step without placing order
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Review order" })).toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(mockPlaceCheckout).not.toHaveBeenCalled();
+  });
+
+  it("disables review button and displays loading state while quote generation is pending", async () => {
+    const user = userEvent.setup();
+    primeCart();
+    primeAddresses();
+    primeSlots({ "7": [makeSlotResponse()] });
+
+    let resolveQuote: (value: unknown) => void = () => {};
+    const quotePromise = new Promise<unknown>((resolve) => {
+      resolveQuote = resolve;
+    });
+    mockFetchCheckoutQuote.mockReturnValue(quotePromise);
+
+    renderCheckout();
+
+    await screen.findByRole("heading", { name: "Delivery address" });
+    await user.click(screen.getByRole("radio", { name: /Home/ }));
+    await user.click(screen.getByRole("button", { name: /choose delivery slots/i }));
+
+    await waitFor(() => expect(screen.getByText("Petal & Stem")).toBeInTheDocument());
+    await user.click(screen.getByRole("radio", { name: /10:00 AM — 11:00 AM/i }));
+
+    const reviewButton = screen.getByRole("button", { name: /review order/i });
+    await user.click(reviewButton);
+
+    // Button transitions to loading label and is disabled
+    const pendingButton = screen.getByRole("button", { name: /preparing quote\.\.\./i });
+    expect(pendingButton).toBeInTheDocument();
+    expect(pendingButton).toBeDisabled();
+
+    // Duplicate clicks while pending must not trigger additional quote calls
+    await user.click(pendingButton);
+    expect(mockFetchCheckoutQuote).toHaveBeenCalledTimes(1);
+
+    // Resolve the quote and confirm it transitions cleanly to the review step
+    resolveQuote(makeCheckoutQuoteResponse());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Review order" })).toBeInTheDocument());
+  });
+
+  it("discards stale in-flight quote responses when slot selections change before resolution", async () => {
+    const user = userEvent.setup();
+    primeCart();
+    primeAddresses();
+    primeSlots({
+      "7": [
+        makeSlotResponse({ slotStart: "2026-10-03T10:00:00", slotEnd: "2026-10-03T11:00:00" }),
+        makeSlotResponse({ slotStart: "2026-10-03T11:00:00", slotEnd: "2026-10-03T12:00:00" }),
+      ],
+    });
+
+    let resolveFirstQuote: (value: unknown) => void = () => {};
+    const firstQuotePromise = new Promise<unknown>((resolve) => {
+      resolveFirstQuote = resolve;
+    });
+    mockFetchCheckoutQuote.mockReturnValueOnce(firstQuotePromise);
+
+    renderCheckout();
+
+    await screen.findByRole("heading", { name: "Delivery address" });
+    await user.click(screen.getByRole("radio", { name: /Home/ }));
+    await user.click(screen.getByRole("button", { name: /choose delivery slots/i }));
+
+    await waitFor(() => expect(screen.getByText("Petal & Stem")).toBeInTheDocument());
+
+    // 1. Start quote request with slot A (10:00 AM)
+    await user.click(screen.getByRole("radio", { name: /10:00 AM — 11:00 AM/i }));
+    await user.click(screen.getByRole("button", { name: /review order/i }));
+
+    expect(mockFetchCheckoutQuote).toHaveBeenCalledTimes(1);
+    expect(mockFetchCheckoutQuote).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        items: [{ vendorId: 7, slotStart: "2026-10-03T10:00:00" }],
+      }),
+    );
+
+    // 2. Change to slot B (11:00 AM) while first request is pending
+    await user.click(screen.getByRole("radio", { name: /11:00 AM — 12:00 PM/i }));
+
+    // 3. Resolve old request with a quote
+    resolveFirstQuote(makeCheckoutQuoteResponse({ quoteHash: "stale-10am-hash" }));
+
+    // 4. Verify UI remains on delivery-slots step and does not display stale quote
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /review order/i })).toBeEnabled();
+    });
+    expect(screen.getByRole("heading", { name: "Delivery slots" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Review order" })).not.toBeInTheDocument();
+
+    // 5. Request a new quote and verify request uses slot B and advances to review
+    mockFetchCheckoutQuote.mockResolvedValueOnce(makeCheckoutQuoteResponse({ quoteHash: "fresh-11am-hash" }));
+    await user.click(screen.getByRole("button", { name: /review order/i }));
+
+    expect(mockFetchCheckoutQuote).toHaveBeenCalledTimes(2);
+    expect(mockFetchCheckoutQuote).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        items: [{ vendorId: 7, slotStart: "2026-10-03T11:00:00" }],
+      }),
+    );
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Review order" })).toBeInTheDocument());
+  });
+
+  it("discards stale in-flight quote rejections when selections change before failure occurs", async () => {
+    const user = userEvent.setup();
+    primeCart();
+    primeAddresses();
+    primeSlots({
+      "7": [
+        makeSlotResponse({ slotStart: "2026-10-03T10:00:00", slotEnd: "2026-10-03T11:00:00" }),
+        makeSlotResponse({ slotStart: "2026-10-03T11:00:00", slotEnd: "2026-10-03T12:00:00" }),
+      ],
+    });
+
+    let rejectFirstQuote: (error: unknown) => void = () => {};
+    const firstQuotePromise = new Promise<unknown>((_, reject) => {
+      rejectFirstQuote = reject;
+    });
+    mockFetchCheckoutQuote.mockReturnValueOnce(firstQuotePromise);
+
+    renderCheckout();
+
+    await screen.findByRole("heading", { name: "Delivery address" });
+    await user.click(screen.getByRole("radio", { name: /Home/ }));
+    await user.click(screen.getByRole("button", { name: /choose delivery slots/i }));
+
+    await waitFor(() => expect(screen.getByText("Petal & Stem")).toBeInTheDocument());
+
+    // 1. Select slot A and trigger quote
+    await user.click(screen.getByRole("radio", { name: /10:00 AM — 11:00 AM/i }));
+    await user.click(screen.getByRole("button", { name: /review order/i }));
+
+    // 2. Change to slot B while request is pending
+    await user.click(screen.getByRole("radio", { name: /11:00 AM — 12:00 PM/i }));
+
+    // 3. Reject old request with an error
+    rejectFirstQuote(apiError(500, { message: "Stale quote failure" }));
+
+    // 4. Verify no error alert is displayed on slots step
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /review order/i })).toBeEnabled();
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("Stale quote failure")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Delivery slots" })).toBeInTheDocument();
+
+    // 5. Subsequent quote request succeeds and advances to review
+    mockFetchCheckoutQuote.mockResolvedValueOnce(makeCheckoutQuoteResponse());
+    await user.click(screen.getByRole("button", { name: /review order/i }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Review order" })).toBeInTheDocument());
+  });
 });

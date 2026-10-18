@@ -65,6 +65,8 @@ export function CheckoutPage() {
   const [deliveryDate, setDeliveryDate] = useState(getBrowserLocalDate());
   const [slotSelections, setSlotSelections] = useState<Record<number, string>>({});
   const [quoteData, setQuoteData] = useState<CheckoutQuoteResponse | null>(null);
+  const [quoteError, setQuoteError] = useState<unknown>(null);
+  const quoteRequestIdRef = useRef(0);
   const [confirmPriceChanges, setConfirmPriceChanges] = useState(false);
   const [orderResult, setOrderResult] = useState<CheckoutResponse | null>(null);
   const [placing, setPlacing] = useState(false);
@@ -84,7 +86,11 @@ export function CheckoutPage() {
   const allSlotsSelected = vendors.every((vendor) => Boolean(slotSelections[vendor.vendorId]));
 
   const handleQuote = useCallback(async () => {
+    if (quote.isPending) return;
     if (!addressId || !allSlotsSelected) return;
+
+    const requestId = ++quoteRequestIdRef.current;
+    setQuoteError(null);
 
     const items: { vendorId: number; slotStart: string }[] = vendors.map((vendor) => ({
       vendorId: vendor.vendorId,
@@ -93,23 +99,46 @@ export function CheckoutPage() {
 
     try {
       const result = await quote.mutateAsync({ addressId, items });
+      if (quoteRequestIdRef.current !== requestId) return;
       setQuoteData(result);
       setStep("review");
-    } catch {
+    } catch (error) {
+      if (quoteRequestIdRef.current !== requestId) return;
       setQuoteData(null);
+      setQuoteError(error);
     }
   }, [addressId, allSlotsSelected, vendors, slotSelections, quote]);
 
-  /** Picking a new address or slot invalidates the quote so stale prices/totals are never confirmed. */
+  /** Picking a new address, date, or slot invalidates the quote and clears stale quote errors. */
   const onAddressChange = useCallback((id: number | null) => {
+    quoteRequestIdRef.current += 1;
     setAddressId(id);
     setQuoteData(null);
-  }, []);
+    setQuoteError(null);
+    if (!quote.isPending) {
+      quote.reset();
+    }
+  }, [quote]);
 
   const onSlotChange = useCallback((vendorId: number, slotStart: string) => {
+    quoteRequestIdRef.current += 1;
     setSlotSelections((prev) => ({ ...prev, [vendorId]: slotStart }));
     setQuoteData(null);
-  }, []);
+    setQuoteError(null);
+    if (!quote.isPending) {
+      quote.reset();
+    }
+  }, [quote]);
+
+  const onDateChange = useCallback((date: string) => {
+    quoteRequestIdRef.current += 1;
+    setDeliveryDate(date);
+    setQuoteData(null);
+    setQuoteError(null);
+    if (!quote.isPending) {
+      quote.reset();
+    }
+  }, [quote]);
 
   const handlePlaceOrder = useCallback(async () => {
     if (placingRef.current) return;
@@ -214,9 +243,12 @@ export function CheckoutPage() {
           deliveryDate={deliveryDate}
           slotSelections={slotSelections}
           onSlotChange={onSlotChange}
-          onDateChange={setDeliveryDate}
+          onDateChange={onDateChange}
           allSlotsSelected={allSlotsSelected}
           onProceed={handleQuote}
+          isPending={quote.isPending}
+          error={quoteError}
+          onRetry={handleQuote}
         />
       )}
 
@@ -224,7 +256,7 @@ export function CheckoutPage() {
         <ReviewStep
           quote={quoteData}
           isPending={quote.isPending}
-          error={quote.error}
+          error={quoteError}
           placementError={placementError}
           allPurchasable={allPurchasable}
           confirmPriceChanges={confirmPriceChanges}
@@ -354,6 +386,9 @@ interface SlotStepProps {
   onDateChange: (date: string) => void;
   allSlotsSelected: boolean;
   onProceed: () => void;
+  isPending?: boolean;
+  error?: unknown;
+  onRetry?: () => void;
 }
 
 /** One vendor's slot picker. Calls `useSlots` directly so hook order is stable per instance. */
@@ -434,6 +469,9 @@ function SlotStep({
   onDateChange,
   allSlotsSelected,
   onProceed,
+  isPending = false,
+  error,
+  onRetry,
 }: SlotStepProps) {
   return (
     <Card>
@@ -466,14 +504,20 @@ function SlotStep({
         ))}
       </div>
 
+      {error ? (
+        <div className="mt-6">
+          <VendorErrorState error={error} onRetry={onRetry} />
+        </div>
+      ) : null}
+
       <div className="mt-6 flex justify-end">
         <button
           type="button"
-          disabled={!allSlotsSelected}
+          disabled={!allSlotsSelected || isPending}
           onClick={onProceed}
           className={`rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
         >
-          Review order
+          {isPending ? "Preparing quote..." : "Review order"}
         </button>
       </div>
     </Card>
