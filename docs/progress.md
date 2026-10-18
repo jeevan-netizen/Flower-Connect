@@ -4,7 +4,7 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 5 (Cart and checkout) — Stage 1 (domain model) + Tasks 5.2–5.6 COMPLETE (5.T verification pending)**
+**Phase 5 (Cart and checkout) — Stage 1 (domain model) + Tasks 5.2–5.T COMPLETE**
 
 Stage 1 implements the Phase 5 data model: the `V13__create_carts_orders.sql`
 Flyway migration (adding `service_locations.timezone` per D-5, and creating
@@ -77,6 +77,21 @@ Phase 5 Stage 1 + Task 5.2 + Task 5.3 + Task 5.4 verification:
 | `./mvnw verify -Pintegration -Dit.test=CartOrderSchemaIT` | **22 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (Flyway applies V13 & V15, Hibernate `ddl-auto: validate` passes, all schema assertions green) |
 | `./mvnw verify -Pintegration -Dit.test=CartApiIntegrationTest` | **19 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 | `./mvnw verify -Pintegration -Dit.test=CheckoutApiIntegrationTest` | **12 integration tests**, 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` (RBAC, single/multi-vendor happy path, stale quoteHash rejection, foreign address rejection, stock drain rollback, replay caching, payload mismatch conflict, slot capacity, price drift confirmation, strengthened concurrent idempotency with response status/orders/rows/reservation/movement assertions) |
+
+Tasks 5.6 and 5.T implement customer cart/checkout UI and frontend verification:
+- `CartPage.tsx` verified across 12 tests: vendor grouping, unpurchasable blocking, price drift alerts, order totals, upper bound at `CART_MAX_QUANTITY` (99), and row controls disabled during in-flight mutations (premature synchronous `onAdjustingChange(false)` calls removed so mutation `.finally()` manages adjusting state).
+- `CheckoutPage.tsx` verified across 15 tests: four-step stepper, address selection, empty address guidance blocking progression, native-radio slot picker, date-picker min date, slot unselected blocking, zero available slots messaging, price drift confirmation, and confirmation step.
+- Documented clarifications / non-blocking gaps:
+  - Upper bound: UI enforces `CART_MAX_QUANTITY` (99) per `types.ts:66` rather than 10.
+  - Progression gating: Delivery warnings for out-of-radius (`withinRadius`) and minimum order unmet (`minOrderMet`) render warning banners but do not gate `canProceed` (requires product decision/clarification).
+  - Quote retry: Quote failure in `handleQuote` remains on the slots step, so `ReviewStep` quote error retry is unreachable via UI.
+
+| Frontend Command | Result |
+|---|---|
+| `npm run test -- CartPage.test.tsx CheckoutPage.test.tsx` | **27 unit tests** (12 CartPage + 15 CheckoutPage), 0 failures — `PASS` |
+| `npm run test` | **587 tests across 53 test files**, 0 failures — `PASS` |
+| `npm run typecheck` | `tsc -b` clean — exit code 0 |
+| `npm run build` | `tsc -b && vite build` clean — exit code 0 |
 
 Task 4.1 (customer address book) is implemented, verified and committed on branch
 `phase-4-discovery-search`: the `addresses` table (V12), entity and repository,
@@ -379,13 +394,14 @@ integration tests**, all green — `BUILD SUCCESS`.
 - [x] **5.3 Checkout quote endpoint** (`POST /api/v1/checkout/quote`): `CheckoutService` (read-only quote generation, price drift detection, per-shop validation, BigDecimal arithmetic), `CheckoutController`, DTOs (`CheckoutQuoteRequest`, `CheckoutQuoteResponse`, `CheckoutShopQuote`, `CheckoutItemQuote`), `/api/v1/checkout/**` → `hasRole("CUSTOMER")` in `SecurityConfig`. 22 service unit tests + 11 controller slice tests = 33 new tests pass.
 - [x] **5.4 Checkout endpoint** (`POST /api/v1/checkout` — transactional, idempotent, stock reservation): `CheckoutService`, `CheckoutController`, DTOs, `checkout_idempotency` table via `V15` migration, deterministic vendor order partitioning, ASC ID locking, stock reservation with `StockMovement`, slot capacity enforcement, price drift confirmation. Verified: 57 unit/slice tests + 16 `CheckoutApiIntegrationTest` pass.
 - [x] **5.5 Delivery slot discovery** (`GET /api/v1/vendors/{id}/slots`): `SlotService`, `SlotController`, `SlotValidationService`, DTOs, vendor timezone-aware calculation, lead-time and booking horizon filtering, operating hours checks, slot capacity verification under vendor lock. Verified: 11 `SlotControllerTest` slice tests + 14 `SlotServiceTest` unit tests + 17 `SlotValidationServiceTest` unit tests pass.
-- [x] **5.6 Customer cart and checkout UI**: full-page `CartPage` (vendor grouping, quantity stepper [1..10], price drift alerts, unpurchasable item blocking, order totals) per D-35 deviation; four-step `CheckoutPage` (Address, Slots, Review, and Confirmation) with native-radio slot picker and progress stepper navigation semantics. Verified: 10 `CartPage.test.tsx` tests + 12 `CheckoutPage.test.tsx` tests pass.
-- [ ] 5.T Phase 5 verification & RBAC tests
+- [x] **5.6 Customer cart and checkout UI**: full-page `CartPage` (vendor grouping, quantity stepper [1..CART_MAX_QUANTITY=99], price drift alerts, unpurchasable item blocking, order totals) per D-35 deviation; four-step `CheckoutPage` (Address, Slots, Review, and Confirmation) with native-radio slot picker and progress stepper navigation semantics. Verified: 12 `CartPage.test.tsx` tests + 15 `CheckoutPage.test.tsx` tests pass.
+- [x] **5.T Phase 5 verification & RBAC tests**: frontend edge cases verified with 5 new tests across `CartPage.test.tsx` (12 tests total: quantity upper bound at 99, controls disabled during in-flight mutations) and `CheckoutPage.test.tsx` (15 tests total: empty address book guidance, unselected slot blocking, zero available slots messaging); fixed synchronous adjusting state reset defect in `CartPage.tsx`; all 587 frontend tests passing, build clean, RBAC matrix documented in `docs/rbac-matrix.md`.
 
 ## Latest Changes
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-18 | Phase 5 Task 5.T: Frontend cart & checkout edge cases verified (5 new tests across CartPage and CheckoutPage); fixed synchronous adjusting reset in CartPage.tsx; all 587 frontend tests pass | `frontend/src/features/cart/pages/CartPage.tsx`, `frontend/src/features/cart/pages/CartPage.test.tsx`, `frontend/src/features/checkout/pages/CheckoutPage.test.tsx`, `docs/progress.md` |
 | 2026-10-17 | Phase 5 Stage 4: Checkout accessibility refactor (native-radio slot picker with fieldset/legend, four-step stepper navigation semantics with `aria-current="step"`); full-page cart deviation recorded (D-35); Phase 5 RBAC matrix documented | `frontend/src/features/checkout/pages/CheckoutPage.tsx`, `docs/decisions.md`, `docs/progress.md`, `docs/rbac-matrix.md` |
 | 2026-10-14 | Phase 5 Task 5.3: Checkout quote endpoint — `CheckoutService`, `CheckoutController`, DTOs, platform fee override, price drift detection, per-shop validation; all 613 unit tests pass | `backend/src/main/java/com/flowerconnect/checkout/**` (controller, dto, service), `backend/src/test/java/com/flowerconnect/checkout/**` (CheckoutServiceTest, CheckoutControllerTest), `docs/progress.md` |
 | 2026-10-13 | Phase 5 Task 5.2: Customer cart API — `CartService`, `CartController`, DTOs, security rule, inventory batch-fetch; all 580 unit tests + 41 cart integration tests (19 CartApiIntegrationTest + 22 CartOrderSchemaIT) pass | `backend/src/main/java/com/flowerconnect/cart/**` (controller, dto, service), `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java`, `backend/src/main/java/com/flowerconnect/inventory/repository/InventoryRepository.java`, `backend/src/test/java/com/flowerconnect/cart/**` (CartServiceTest, CartControllerTest, CartApiIntegrationTest, CartOrderSchemaIT), `docs/progress.md` |

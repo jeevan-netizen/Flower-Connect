@@ -5,7 +5,7 @@ import { CartPage } from "@/features/cart/pages/CartPage";
 import { renderWithProviders } from "@/test/render";
 import { makeCartResponse, makeCartItem, makeCartShopView } from "@/test/factories";
 import { apiError } from "@/test/api-errors";
-import type { CartResponse } from "@/features/cart/types";
+import { CART_MAX_QUANTITY, type CartResponse } from "@/features/cart/types";
 
 const mockFetchCart = vi.hoisted(() => vi.fn());
 const mockUpdateCartItem = vi.hoisted(() => vi.fn());
@@ -185,5 +185,63 @@ describe("CartPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /try again/i }));
 
     expect(await screen.findByText("Red Rose Bouquet")).toBeInTheDocument();
+  });
+
+  it("does not increase above the upper bound", async () => {
+    const user = userEvent.setup();
+    primeCart(
+      makeCartResponse({
+        items: [makeCartItem({ id: 1, quantity: CART_MAX_QUANTITY })],
+      }),
+    );
+
+    renderCart();
+
+    await screen.findByText("Red Rose Bouquet");
+    const increase = screen.getByRole("button", {
+      name: /increase red rose bouquet quantity/i,
+    });
+    expect(increase).toBeDisabled();
+    await user.click(increase);
+    expect(mockUpdateCartItem).not.toHaveBeenCalled();
+  });
+
+  it("disables item controls during an in-flight mutation", async () => {
+    const user = userEvent.setup();
+    let resolveUpdate: (value: CartResponse) => void = () => {};
+    mockUpdateCartItem.mockImplementation(
+      () =>
+        new Promise<CartResponse>((resolve) => {
+          resolveUpdate = resolve;
+        }),
+    );
+
+    primeCart(makeCartResponse({ items: [makeCartItem({ id: 1, quantity: 2 })] }));
+    renderCart();
+
+    await screen.findByText("Red Rose Bouquet");
+    const increase = screen.getByRole("button", {
+      name: /increase red rose bouquet quantity/i,
+    });
+    const reduce = screen.getByRole("button", {
+      name: /reduce red rose bouquet quantity/i,
+    });
+    const remove = screen.getByRole("button", {
+      name: /remove red rose bouquet from cart/i,
+    });
+
+    await user.click(increase);
+
+    expect(increase).toBeDisabled();
+    expect(reduce).toBeDisabled();
+    expect(remove).toBeDisabled();
+
+    resolveUpdate(makeCartResponse());
+
+    await waitFor(() => {
+      expect(increase).not.toBeDisabled();
+      expect(reduce).not.toBeDisabled();
+      expect(remove).not.toBeDisabled();
+    });
   });
 });

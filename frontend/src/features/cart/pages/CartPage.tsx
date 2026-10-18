@@ -190,7 +190,6 @@ function CartItem({ item, shopPurchasable, isAdjusting, onAdjustingChange, onQua
             onClick={() => {
               onAdjustingChange(true);
               onQuantityChange(item.id, item.quantity - QUANTITY_STEP);
-              onAdjustingChange(false);
             }}
             className={`rounded-l-sm p-1.5 text-slate-600 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
             aria-label={`Reduce ${item.productName} quantity`}
@@ -204,7 +203,6 @@ function CartItem({ item, shopPurchasable, isAdjusting, onAdjustingChange, onQua
             onClick={() => {
               onAdjustingChange(true);
               onQuantityChange(item.id, item.quantity + QUANTITY_STEP);
-              onAdjustingChange(false);
             }}
             className={`rounded-r-sm p-1.5 text-slate-600 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
             aria-label={`Increase ${item.productName} quantity`}
@@ -219,7 +217,6 @@ function CartItem({ item, shopPurchasable, isAdjusting, onAdjustingChange, onQua
           onClick={() => {
             onAdjustingChange(true);
             onRemove(item.id);
-            onAdjustingChange(false);
           }}
           className={`text-xs font-medium text-red-700 hover:bg-red-50 ${PRESSABLE} ${FOCUS_RING} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           aria-label={`Remove ${item.productName} from cart`}

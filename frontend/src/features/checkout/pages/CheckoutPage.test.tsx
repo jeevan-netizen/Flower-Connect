@@ -483,4 +483,51 @@ beforeEach(() => {
     const sampleDate = new Date(2026, 9, 21, 14, 30);
     expect(getBrowserLocalDate(sampleDate)).toBe("2026-10-21");
   });
+
+  it("renders guidance and blocks progression when no addresses are saved", async () => {
+    primeCart();
+
+    renderCheckout();
+
+    expect(await screen.findByText("You have no saved addresses yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /choose delivery slots/i })).not.toBeInTheDocument();
+  });
+
+  it("disables proceeding to review when delivery slots are not selected", async () => {
+    const user = userEvent.setup();
+    primeCart();
+    primeAddresses();
+    primeSlots({ "7": [makeSlotResponse()] });
+
+    renderCheckout();
+
+    await screen.findByRole("heading", { name: "Delivery address" });
+    await user.click(screen.getByRole("radio", { name: /Home/ }));
+    await user.click(screen.getByRole("button", { name: /choose delivery slots/i }));
+
+    await waitFor(() => expect(screen.getByText("Petal & Stem")).toBeInTheDocument());
+
+    const reviewButton = screen.getByRole("button", { name: /review order/i });
+    expect(reviewButton).toBeDisabled();
+    await user.click(reviewButton);
+    expect(mockFetchCheckoutQuote).not.toHaveBeenCalled();
+  });
+
+  it("shows an empty message and prevents proceeding when no slots are available", async () => {
+    const user = userEvent.setup();
+    primeCart();
+    primeAddresses();
+    mockFetchSlots.mockResolvedValue([]);
+
+    renderCheckout();
+
+    await screen.findByRole("heading", { name: "Delivery address" });
+    await user.click(screen.getByRole("radio", { name: /Home/ }));
+    await user.click(screen.getByRole("button", { name: /choose delivery slots/i }));
+
+    await waitFor(() => expect(screen.getByText("Petal & Stem")).toBeInTheDocument());
+
+    expect(await screen.findByText(/no available slots on/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /review order/i })).toBeDisabled();
+  });
 });
