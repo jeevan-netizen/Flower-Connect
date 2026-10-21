@@ -79,11 +79,11 @@ app:
     min-lead-time-minutes: 120
     max-booking-horizon-days: 7
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,info,metrics
   endpoint:
     health:
       show-details: always
