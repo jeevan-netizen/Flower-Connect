@@ -12,6 +12,7 @@ tsconfig.tsbuildinfo
 # Environment
 .env
 .env.local
+.env.e2e
 
 # IDE
 .idea/
