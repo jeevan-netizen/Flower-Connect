@@ -5,16 +5,21 @@ import { createMemoryRouter, RouterProvider, type RouteObject } from "react-rout
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createTestQueryClient } from "@/test/render";
 import {
+  makeCartResponse,
+  makeDiscoveryVendor,
   makeInventory,
   makePage,
   makeProduct,
+  makePublicProduct,
   makeServiceLocations,
+  makeStorefront,
   makeVendorProfile,
 } from "@/test/factories";
 // `vi.mock` is hoisted above these, so the router, guard and pages all bind to
 // the mocked store and the mocked vendor API client.
 import { router as appRouter } from "@/app/router";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
+import { useLocationStore } from "@/features/location/stores/location-store";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import type { UserResponse } from "@/features/auth/types";
@@ -32,6 +37,12 @@ const mockFetchAdminVendors = vi.hoisted(() => vi.fn());
 const mockFetchAdminUsers = vi.hoisted(() => vi.fn());
 const mockFetchServiceLocations = vi.hoisted(() => vi.fn());
 const mockRegisterVendor = vi.hoisted(() => vi.fn());
+const mockFetchDiscovery = vi.hoisted(() => vi.fn());
+const mockFetchSearch = vi.hoisted(() => vi.fn());
+const mockFetchStorefront = vi.hoisted(() => vi.fn());
+const mockFetchPublicProduct = vi.hoisted(() => vi.fn());
+const mockFetchCustomerCategories = vi.hoisted(() => vi.fn());
+const mockFetchCart = vi.hoisted(() => vi.fn());
 const mockState = vi.hoisted(() => ({
   isAuthenticated: true,
   hasLoadedInitial: true,
@@ -80,6 +91,19 @@ vi.mock("@/features/vendor-registration/api", () => ({
   registerVendor: mockRegisterVendor,
 }));
 
+/**
+ * The customer catalogue API is stubbed as a whole, for the same reason the
+ * vendor one is: the catalogue pages bind every client at module load, so a
+ * partial stub would fail on the import rather than on the assertion.
+ */
+vi.mock("@/features/customer/api", () => ({
+  fetchDiscovery: mockFetchDiscovery,
+  fetchSearch: mockFetchSearch,
+  fetchStorefront: mockFetchStorefront,
+  fetchPublicProduct: mockFetchPublicProduct,
+  fetchCategories: mockFetchCustomerCategories,
+}));
+
 vi.mock("@/features/admin/api", () => ({
   fetchAdminVendors: mockFetchAdminVendors,
   fetchAdminUsers: mockFetchAdminUsers,
@@ -88,6 +112,19 @@ vi.mock("@/features/admin/api", () => ({
   suspendVendor: vi.fn(),
   reinstateVendor: vi.fn(),
   updateUserStatus: vi.fn(),
+}));
+
+/**
+ * The cart API is stubbed because the shell's cart badge reads it on every
+ * page, and because the cart route itself has to render for the guard to be
+ * observable.
+ */
+vi.mock("@/features/cart/api", () => ({
+  fetchCart: mockFetchCart,
+  addCartItem: vi.fn(),
+  updateCartItem: vi.fn(),
+  deleteCartItem: vi.fn(),
+  clearCart: vi.fn(),
 }));
 
 vi.mock("@/features/auth/stores/auth-store", () => ({
@@ -145,6 +182,11 @@ describe("application router", () => {
     // The shell's location control mounts on every page, so the shared
     // locations fetch must resolve wherever the router renders.
     mockFetchServiceLocations.mockResolvedValue(makeServiceLocations());
+    mockFetchDiscovery.mockResolvedValue(makePage([makeDiscoveryVendor()]));
+    mockFetchSearch.mockResolvedValue(makePage([makePublicProduct()]));
+    mockFetchStorefront.mockResolvedValue(makeStorefront());
+    mockFetchPublicProduct.mockResolvedValue(makePublicProduct());
+    mockFetchCustomerCategories.mockResolvedValue(makePage([]));
   });
 
   it("keeps every pre-existing customer route", () => {
@@ -325,7 +367,183 @@ describe("application router", () => {
     renderAt("/browse");
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Browse" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Browse florists" })).toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * The customer catalogue routes (plan tasks 4.6, 4.7, 4.8, 4.9).
+ *
+ * Browsing is public: the catalogue endpoints are `permitAll` and the
+ * visibility rules are enforced server-side. Only the cart needs an account,
+ * so these routes must not send an anonymous visitor to the login page — and
+ * the cart and checkout must still send one.
+ */
+describe("customer catalogue routes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Sibling suite: set up every piece of shared state this one relies on.
+    mockState.isAuthenticated = true;
+    mockState.hasLoadedInitial = true;
+    mockState.user = { ...florist(), role: "CUSTOMER" };
+    sessionStorage.clear();
+    useLocationStore.setState({ selected: null });
+    mockFetchServiceLocations.mockResolvedValue(makeServiceLocations());
+    mockFetchDiscovery.mockResolvedValue(makePage([makeDiscoveryVendor()]));
+    mockFetchSearch.mockResolvedValue(makePage([makePublicProduct()]));
+    mockFetchStorefront.mockResolvedValue(makeStorefront());
+    mockFetchPublicProduct.mockResolvedValue(makePublicProduct());
+    mockFetchCustomerCategories.mockResolvedValue(makePage([]));
+    mockFetchCart.mockResolvedValue(makeCartResponse());
+  });
+
+  it("registers the four customer catalogue paths", () => {
+    const paths = appRouter.routes
+      .flatMap((route) => route.children ?? [])
+      .map((child) => child.path);
+
+    expect(paths).toEqual(
+      expect.arrayContaining(["browse", "search", "vendors/:vendorId"]),
+    );
+  });
+
+  it("nests the product detail under its florist's storefront", () => {
+    const storefrontRoute = appRouter.routes
+      .flatMap((route) => route.children ?? [])
+      .find((child) => child.path === "vendors/:vendorId") as RouteObject | undefined;
+
+    expect(storefrontRoute?.children?.map((child) => child.path)).toEqual([
+      undefined,
+      "products/:productId",
+    ]);
+  });
+
+  it("nests the product detail under the search surface too", () => {
+    const searchRoute = appRouter.routes
+      .flatMap((route) => route.children ?? [])
+      .find((child) => child.path === "search") as RouteObject | undefined;
+
+    expect(searchRoute?.children?.map((child) => child.path)).toEqual([
+      undefined,
+      "products/:productId",
+    ]);
+  });
+
+  it("gives the two product routes distinct ids", () => {
+    // React Router requires route ids to be globally unique within a data
+    // router, and throws on a collision when the router is created. Distinct
+    // ids are also how each surface recognises that its product child matched.
+    const children = appRouter.routes.flatMap((route) => route.children ?? []);
+    const storefrontRoute = children.find(
+      (child) => child.path === "vendors/:vendorId",
+    ) as RouteObject | undefined;
+    const searchRoute = children.find(
+      (child) => child.path === "search",
+    ) as RouteObject | undefined;
+
+    const storefrontProduct = storefrontRoute?.children?.find(
+      (child) => child.path === "products/:productId",
+    );
+    const searchProduct = searchRoute?.children?.find(
+      (child) => child.path === "products/:productId",
+    );
+
+    expect(storefrontProduct?.id).toBe("storefront-product");
+    expect(searchProduct?.id).toBe("search-product");
+    expect(storefrontProduct?.id).not.toBe(searchProduct?.id);
+  });
+
+  it("serves the browse page to an anonymous visitor", async () => {
+    mockState.isAuthenticated = false;
+    mockState.user = null;
+
+    renderAt("/browse");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Browse florists" })).toBeInTheDocument();
+    });
+    // Not the login page: browsing does not need an account.
+    expect(screen.queryByRole("heading", { name: /welcome back/i })).not.toBeInTheDocument();
+  });
+
+  it("serves the search page to an anonymous visitor", async () => {
+    mockState.isAuthenticated = false;
+    mockState.user = null;
+
+    renderAt("/search");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Search products" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("heading", { name: /welcome back/i })).not.toBeInTheDocument();
+  });
+
+  it("serves a florist's storefront to an anonymous visitor", async () => {
+    mockState.isAuthenticated = false;
+    mockState.user = null;
+
+    renderAt("/vendors/7");
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Petal & Stem", level: 1 }),
+      ).toBeInTheDocument();
+    });
+    expect(mockFetchStorefront).toHaveBeenCalledWith(7, 0, 20, expect.anything());
+  });
+
+  it("serves a product to an anonymous visitor", async () => {
+    mockState.isAuthenticated = false;
+    mockState.user = null;
+    // The product endpoint requires a delivery area, so one is chosen here.
+    useLocationStore.setState({
+      selected: {
+        id: 4,
+        city: "Bengaluru",
+        area: "Koramangala",
+        pincode: "560034",
+        latitude: 12.9352,
+        longitude: 77.6245,
+      },
+    });
+
+    renderAt("/vendors/7/products/1001");
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Red Rose Bouquet", level: 1 }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("still sends an anonymous visitor away from the cart", async () => {
+    mockState.isAuthenticated = false;
+    mockState.user = null;
+
+    renderAt("/cart");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
+    });
+  });
+
+  it("still sends an anonymous visitor away from checkout", async () => {
+    mockState.isAuthenticated = false;
+    mockState.user = null;
+
+    renderAt("/checkout");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
+    });
+  });
+
+  it("keeps the cart reachable for a signed-in customer", async () => {
+    renderAt("/cart");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /your cart/i })).toBeInTheDocument();
     });
   });
 });

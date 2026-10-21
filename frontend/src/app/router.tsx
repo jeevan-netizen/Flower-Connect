@@ -20,6 +20,11 @@ import { VendorProductFormPage } from "@/features/vendor/pages/VendorProductForm
 import { VendorInventoryPage } from "@/features/vendor/pages/VendorInventoryPage";
 import { CartPage } from "@/features/cart/pages/CartPage";
 import { CheckoutPage } from "@/features/checkout/pages/CheckoutPage";
+import { BrowsePage } from "@/features/customer/pages/BrowsePage";
+import { SearchPage } from "@/features/customer/pages/SearchPage";
+import { VendorStorefrontPage } from "@/features/customer/pages/VendorStorefrontPage";
+import { ProductDetailPage } from "@/features/customer/pages/ProductDetailPage";
+import { PRODUCT_ROUTE_IDS } from "@/features/customer/navigation";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
@@ -99,12 +104,41 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       {
+        // Public customer discovery (plan tasks 4.6, 4.7). Browsing is open
+        // to everyone: the catalogue endpoints are `permitAll`, and the
+        // visibility rules — active products, available stock, approved and
+        // accepting florists, delivery radius — are enforced server-side per
+        // request. Signing in is only needed to add something to a cart.
         path: "browse",
-        element: (
-          <RequireAuth>
-            <Placeholder title="Browse" />
-          </RequireAuth>
-        ),
+        element: <BrowsePage />,
+      },
+      {
+        // The search surface is also the layout for its product-detail child,
+        // so a product opened from the results renders over them with the
+        // results still behind it. The child's route id is what the search
+        // page uses to recognise that its product route matched.
+        path: "search",
+        element: <SearchPage />,
+        children: [
+          // The search content is rendered by the layout itself, so the index
+          // route contributes nothing.
+          { index: true, element: null },
+          { path: "products/:productId", id: PRODUCT_ROUTE_IDS.search, element: <ProductDetailPage /> },
+        ],
+      },
+      {
+        // A florist's public storefront (plan tasks 4.8, 4.9). The route is
+        // also the layout for its product-detail child, so a product opened
+        // from here renders over the storefront with the shop still behind it;
+        // a product URL reached directly renders on its own.
+        path: "vendors/:vendorId",
+        element: <VendorStorefrontPage />,
+        children: [
+          // The storefront content is rendered by the layout itself, so the
+          // index route contributes nothing.
+          { index: true, element: null },
+          { path: "products/:productId", id: PRODUCT_ROUTE_IDS.storefront, element: <ProductDetailPage /> },
+        ],
       },
       {
         path: "cart",
