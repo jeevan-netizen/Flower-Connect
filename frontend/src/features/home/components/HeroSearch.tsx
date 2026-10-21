@@ -24,9 +24,10 @@ const BROWSE_PATH = "/browse";
  * Submitting still navigates to the existing `/browse` route. The selection is
  * not carried in the URL: the session store is the single source, and a
  * duplicate `?locationId=` parameter would be a second copy of the same state
- * that can disagree with it. `/browse` sits behind `RequireAuth`, so an
- * anonymous visitor is sent to the login page by the existing guard — that is
- * the route's behaviour, not this component's.
+ * that can disagree with it. `/browse` is public since plan task 4.6, so an
+ * anonymous visitor reaches the catalogue; if no area is chosen yet, the browse
+ * page shows the location picker rather than a list of florists that might not
+ * deliver to them.
  *
  * The three data states (loading, failed, empty) render as one muted line under
  * the pill and leave the rest of the hero — heading, copy, calls to action —

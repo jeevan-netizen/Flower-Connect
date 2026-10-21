@@ -25,6 +25,13 @@ import type {
 } from "@/features/checkout/types";
 import type { ServiceLocationGroup } from "@/features/location/types";
 import type { AdminRole, AdminUser, UserStatus } from "@/features/admin/types";
+import type {
+  DiscoveryVendor,
+  PublicProduct,
+  PublicProductImage,
+  Storefront,
+  StorefrontHour,
+} from "@/features/customer/types";
 import type { PageResponse } from "@/shared/types";
 
 /**
@@ -445,6 +452,106 @@ export function makeSlotResponse(overrides: Partial<SlotResponse> = {}): SlotRes
     slotEnd: "2026-10-03T11:00:00",
     weekday: "SATURDAY",
     available: true,
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Customer catalogue fixtures (plan tasks 4.6, 4.7, 4.8, 4.9)                */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Shaped exactly like the public backend DTOs.
+ *
+ * The public product carries no `status`, no audit timestamps and — the point
+ * of the whole exercise — no image `storageKey`, so a fixture that included
+ * one would be shaped unlike anything the server sends.
+ */
+export function makePublicProductImage(
+  overrides: Partial<PublicProductImage> = {},
+): PublicProductImage {
+  return {
+    id: 501,
+    originalFilename: "bouquet.jpg",
+    mimeType: "image/jpeg",
+    fileSize: 84_231,
+    sortOrder: 0,
+    primary: true,
+    ...overrides,
+  };
+}
+
+export function makePublicProduct(overrides: Partial<PublicProduct> = {}): PublicProduct {
+  return {
+    id: 1001,
+    vendorId: 7,
+    vendorName: "Petal & Stem",
+    categoryId: 1,
+    categoryName: "Roses",
+    name: "Red Rose Bouquet",
+    slug: "red-rose-bouquet",
+    description: "A dozen deep red roses.",
+    basePrice: 899,
+    available: 12,
+    images: [makePublicProductImage()],
+    ...overrides,
+  };
+}
+
+export function makeDiscoveryVendor(
+  overrides: Partial<DiscoveryVendor> = {},
+): DiscoveryVendor {
+  return {
+    id: 7,
+    businessName: "Petal & Stem",
+    description: "Seasonal bouquets",
+    city: "Bengaluru",
+    area: "Koramangala",
+    pincode: "560034",
+    deliveryRadiusKm: 5,
+    minOrderAmount: 300,
+    baseDeliveryFee: 25,
+    perKmFee: 5,
+    freeDeliveryAbove: 1000,
+    prepTimeMinutes: 30,
+    avgRating: 4.5,
+    reviewCount: 12,
+    acceptingOrders: true,
+    distanceKm: 2.4,
+    estimatedDeliveryFee: 37,
+    ...overrides,
+  };
+}
+
+export function makeStorefrontHour(overrides: Partial<StorefrontHour> = {}): StorefrontHour {
+  return {
+    weekday: "MONDAY",
+    openTime: "09:00:00",
+    closeTime: "18:00:00",
+    closed: false,
+    ...overrides,
+  };
+}
+
+export function makeStorefront(overrides: Partial<Storefront> = {}): Storefront {
+  return {
+    id: 7,
+    businessName: "Petal & Stem",
+    description: "Seasonal bouquets",
+    city: "Bengaluru",
+    area: "Koramangala",
+    pincode: "560034",
+    deliveryRadiusKm: 5,
+    minOrderAmount: 300,
+    baseDeliveryFee: 25,
+    perKmFee: 5,
+    freeDeliveryAbove: 1000,
+    prepTimeMinutes: 30,
+    avgRating: 4.5,
+    reviewCount: 12,
+    acceptingOrders: true,
+    hours: [makeStorefrontHour()],
+    products: makePage([makePublicProduct()]),
     ...overrides,
   };
 }

@@ -253,7 +253,7 @@ export function SiteHeader() {
           coordinated with the navigation panel — opening one closes the other,
           because both are anchored full-width to this header.
         */}
-        <div className="flex items-center gap-4 lg:gap-6">
+        <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
           <LocationMenu onOpen={() => setMenuOpen(false)} />
           {isWide ? (
             renderLinks("flex items-center gap-6 lg:gap-9")
