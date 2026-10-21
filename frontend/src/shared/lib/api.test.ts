@@ -255,4 +255,46 @@ describe("Axios API Interceptor", () => {
     expect(error.response?.status).toBe(403);
     expect(adapter).toHaveBeenCalledTimes(1);
   });
+
+  it("should not attempt a refresh when there is no session to refresh", async () => {
+    // No access token means no session. The refresh credential is an HttpOnly
+    // cookie this code cannot see, so a refresh is genuinely impossible: it
+    // would come back 400, and the logout that follows it would come back 400
+    // as well. The original 401 is the honest answer.
+    mockGetState.mockReturnValue({ ...defaultState(), accessToken: null });
+
+    const adapter = vi.fn().mockImplementation((config: InternalAxiosRequestConfig) => {
+      return Promise.reject(make401Error(config));
+    });
+
+    api.defaults.adapter = adapter as AxiosAdapter;
+
+    const error = (await api.get("/cart").catch((e: unknown) => e)) as AxiosError;
+
+    expect(error.response?.status).toBe(401);
+    // One request, and it is the cart — no refresh, no logout behind it.
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect((adapter.mock.calls[0][0] as InternalAxiosRequestConfig).url).toBe("/cart");
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it("should leave a 401 on a public endpoint alone", async () => {
+    // A rejected login is the login form's error to show, not a session to
+    // renew. The public-endpoint exclusion runs first, so the error reaches
+    // the caller unchanged and no refresh is attempted.
+    const adapter = vi.fn().mockImplementation((config: InternalAxiosRequestConfig) => {
+      return Promise.reject(make401Error(config));
+    });
+
+    api.defaults.adapter = adapter as AxiosAdapter;
+
+    const error = (await api
+      .post("/auth/login", { email: "user@test.com", password: "wrong" })
+      .catch((e: unknown) => e)) as AxiosError;
+
+    expect(error.response?.status).toBe(401);
+    expect(error.response?.data).toEqual({ message: "Unauthorized" });
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
 });

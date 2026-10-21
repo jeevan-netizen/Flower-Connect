@@ -28,11 +28,25 @@ export const cartKeys = {
   detail: ["cart", "detail"] as const,
 };
 
-/** `GET /api/v1/cart` — the customer's own cart. */
-export function useCart() {
+/**
+ * `GET /api/v1/cart` — the customer's own cart.
+ *
+ * The cart is a CUSTOMER-only resource, so a caller that is not a customer has
+ * no business asking for it. The `enabled` option carries that decision:
+ * an anonymous visitor's 401 is read by the axios interceptor as an expired
+ * access token, which starts a refresh and then a logout that can neither
+ * succeed, so a request that is guaranteed to fail is not worth making.
+ *
+ * The default is `true` so the cart and checkout pages — which already sit
+ * behind a CUSTOMER-only route guard — keep their existing behaviour. The
+ * header, which is on every route and belongs to every visitor, passes the
+ * condition under which it actually renders the cart.
+ */
+export function useCart(options: { enabled?: boolean } = {}) {
   return useQuery<CartResponse>({
     queryKey: cartKeys.detail,
     queryFn: fetchCart,
+    enabled: options.enabled ?? true,
   });
 }
 

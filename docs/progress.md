@@ -108,6 +108,93 @@ Stage 1 verification:
 | `./mvnw test` | **527 unit tests** (508 Phase 3 baseline + 19 new), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 | `./mvnw verify -Pintegration` | **390 integration tests** (365 baseline + 25 new), 0 failures / 0 errors / 0 skipped — `BUILD SUCCESS` |
 
+### D-1 — Anonymous cart-query authentication error cascade (fixed and deployed)
+
+The shared header queried the customer cart for **every** visitor, including anonymous
+ones. `GET /api/v1/cart` is CUSTOMER-only, so an anonymous page load answered 401 — and
+the axios interceptor reads *any* 401 from a non-public endpoint as an expired access
+token, so it started a refresh (`POST /api/v1/auth/refresh` -> 400 "Refresh token is
+required") and then a logout (`POST /api/v1/auth/logout` -> 400). One pointless request
+became three failing requests and three console errors, on every public route. The same
+query also raised a 403 for a florist and an admin, who have no cart either.
+
+The fix is three small changes and no backend change:
+- `useCart()` gained an optional `{ enabled?: boolean }` that defaults to `true`, so
+  `CartPage` and `CheckoutPage` — already behind a CUSTOMER-only route guard — are
+  unchanged.
+- The header passes `enabled: isAuthenticated && user?.role === CUSTOMER_ROLE`, the same
+  condition under which the cart link is already rendered, so the query and the link
+  cannot disagree.
+- The response interceptor reads the auth store before refreshing: with no access token
+  there is no session to renew, and the refresh credential is an HttpOnly cookie the
+  frontend cannot inspect, so the original error is rejected instead. The refresh and
+  retry path for a session whose access token *has* expired is unchanged.
+
+Recorded as **D-41** in `docs/decisions.md`.
+
+| Command | Result |
+|---|---|
+| `npm run test -- api.test.ts SiteHeader.test.tsx CartPage.test.tsx CheckoutPage.test.tsx` | **56 tests** (9 api + 16 SiteHeader + 12 CartPage + 19 CheckoutPage), 0 failures — `PASS` |
+| `npm run test` | **736 tests across 65 test files**, 0 failures — `PASS` |
+| `npm run typecheck` | `tsc -b` clean — exit code 0 |
+| `npm run lint` | `eslint` clean — exit code 0 |
+| `npm run build` | `tsc -b && vite build` clean — exit code 0 |
+
+Browser-verified through the Playwright MCP tools against a local Vite dev server running
+the **modified source** on port 5175, with the `/api` proxy reaching the unchanged backend
+on 8080: `/`, `/browse`, `/search`, `/login`, `/register` and `/vendor/register` each
+issued **zero** requests to `/api/v1/cart`, `/api/v1/auth/refresh` and
+`/api/v1/auth/logout`, with zero console errors. The same audit against the then-running
+Docker frontend reproduced the original cascade exactly (2/2/2 and six console errors per
+route), so the measurement is sensitive to the defect.
+
+**Deployed to the development stack on 2026-10-21.** The frontend image was rebuilt from
+the working tree (`docker compose build frontend`) and only the frontend container was
+recreated (`docker compose up -d --no-deps --force-recreate frontend`); the backend, MySQL
+and MailHog were not rebuilt, restarted or recreated.
+
+| Item | Value |
+|---|---|
+| Frontend image | `sha256:a049c351bba39fcbba32791fb5e2c104b2a0a15944ed55319c71fe1b7dea3e58` |
+| Previous image | `sha256:f15135c911ee169dfbd47b1398d4e5cdb06bb9f83b2aa211b39b3d3f1b456072` — no longer inspectable, see the rollback limitation below |
+| Frontend container | recreated, `Up (healthy)`, image healthcheck passing |
+| Backend / MySQL / MailHog | unchanged, `Up (healthy)` throughout |
+| Served bundle | `/assets/index-D2HE6egY.js` (was `/assets/index-UjrXHmrw.js`) |
+
+Playwright MCP verification of the **deployed** build, with the per-route request and
+console evidence reset to a fresh tab before each navigation:
+
+| Route | `/api/v1/cart` | `/api/v1/auth/refresh` | `/api/v1/auth/logout` | Console errors | Public API requests |
+|---|---:|---:|---:|---:|---|
+| `/` | 0 | 0 | 0 | 0 | `GET /api/v1/locations` 200 |
+| `/browse` | 0 | 0 | 0 | 0 | `GET /api/v1/locations` 200 |
+| `/search` | 0 | 0 | 0 | 0 | `GET /api/v1/locations` 200, `GET /api/v1/categories` 200 |
+| `/login` | 0 | 0 | 0 | 0 | `GET /api/v1/locations` 200 |
+| `/register` | 0 | 0 | 0 | 0 | `GET /api/v1/locations` 200 |
+| `/vendor/register` | 0 | 0 | 0 | 0 | `GET /api/v1/locations` 200 |
+
+Every capture was non-empty, the pre-navigation request count was 0 on every route (which
+is what shows the reset isolated each route rather than reusing a cumulative log), and
+each public page rendered its normal content. The same audit against the pre-deployment
+bundle reproduced the original cascade exactly (2/2/2 and six console errors per route).
+
+Two limitations are recorded rather than worked around:
+- The **signed-in customer flow was not browser-verified** — no approved customer
+  credentials are available (`.env` is read-protected and demo seeding is disabled). The
+  available coverage is the new `SiteHeader` test (a customer enables the cart query) and
+  the unchanged `CartPage`/`CheckoutPage` suites. No browser verification is claimed for
+  the signed-in flow.
+- **The previous frontend image is no longer inspectable, so the tag-based rollback no
+  longer works.** This Docker uses the containerd snapshotter, and the rebuild's retag
+  garbage-collected the old manifest: `docker image inspect
+  sha256:f15135c911ee…` returns "No such image" and no dangling image remains, so
+  `docker tag sha256:f15135c911ee… flowerconnect-frontend:latest` would fail. Restoring
+  the previous build would require rebuilding the pre-fix frontend from the committed
+  source in a separate temporary context. No rollback was needed — the deployment
+  succeeded — and that rebuild has not been attempted.
+
+The D-1 source and documentation changes remain **uncommitted** in the working tree.
+
 ### Next Phase
 
 **Phase 6 — Order management** per `docs/FlowerConnect_Implementation_Plan_v2.2.md` §7
@@ -172,6 +259,15 @@ approved scope:
   store. Changing that key affects navigation and animation behaviour across the whole
   application, so it is recorded here as a separate frontend consideration that needs its
   own assessment — not as a defect in the customer catalogue.
+
+One limitation of the D-1 verification is recorded here rather than worked around,
+because it needs its own approved scope:
+
+- **The signed-in customer flow was not browser-verified.** No approved customer
+  credentials are available (`.env` is read-protected and demo seeding is disabled), so
+  the D-1 fix is verified for anonymous visitors in a real browser — on the deployed
+  Docker build since 2026-10-21 — and in *source* for a signed-in customer, by the new
+  `SiteHeader` test and by the unchanged `CartPage` and `CheckoutPage` suites.
 
 The per-task history below is unchanged.
 
@@ -420,6 +516,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-21 | D-1 fix deployed to the development frontend: the shared header no longer queries the customer cart for anonymous visitors, and the axios interceptor no longer starts a futile refresh/logout when there is no access token — `useCart()` gained an optional `enabled` flag (default `true`), the header gates on `isAuthenticated && user?.role === "CUSTOMER"`, and the interceptor rejects a 401 when no session exists. 736 frontend tests pass; typecheck, lint and build clean; the frontend image `sha256:a049c351bba3…` was rebuilt from the working tree and only the frontend container recreated, with all four services healthy; the six public routes were re-verified through Playwright MCP against the deployed build with zero cart/refresh/logout requests and zero console errors (D-41) | `frontend/src/features/cart/queries.ts`, `frontend/src/app/components/SiteHeader.tsx`, `frontend/src/shared/lib/api.ts`, `frontend/src/app/components/SiteHeader.test.tsx`, `frontend/src/shared/lib/api.test.ts`, `docs/progress.md`, `docs/decisions.md` |
 | 2026-10-20 | Gate E final verification: D-37's browser-verification statements corrected to record the real-Chromium outcome and the stubbed catalogue responses, and two follow-ups recorded — the `docs/decisions.md` encoding and the root route-transition remount | `docs/decisions.md`, `docs/progress.md` |
 | 2026-10-19 | Gate E remediation: the product detail is an explicit overlay of its parent surface (D-37), the product route is nested under the search surface as well as the storefront, the search filters moved to an in-memory store so they survive the route remount, and the quantity bound, primary-image selection and malformed-id guards were added; Stage 1 documentation corrections for the Phase 4 notes and D-36–D-40 | `frontend/src/features/customer/**` (navigation.ts and stores/search-store.ts new; ProductDetailPage, VendorStorefrontPage, SearchPage, ProductCard, ProductGrid, queries.ts), `frontend/src/app/router.tsx`, `frontend/src/app/router.test.tsx`, `docs/progress.md`, `docs/decisions.md`, `docs/rbac-matrix.md` |
 | 2026-10-18 | Phase 5 Task 5.T: Frontend cart & checkout edge cases verified (5 new tests across CartPage and CheckoutPage); fixed synchronous adjusting reset in CartPage.tsx; all 587 frontend tests pass | `frontend/src/features/cart/pages/CartPage.tsx`, `frontend/src/features/cart/pages/CartPage.test.tsx`, `frontend/src/features/checkout/pages/CheckoutPage.test.tsx`, `docs/progress.md` |

@@ -8,6 +8,7 @@ import { WIDE_HEADER_QUERY } from "@/app/hooks/useMediaQuery";
 import { useLocationStore } from "@/features/location/stores/location-store";
 import type { ServiceLocationGroup } from "@/features/location/types";
 import type { UserResponse } from "@/features/auth/types";
+import { makeCartResponse } from "@/test/factories";
 
 /**
  * The header's two navigation renderings.
@@ -59,6 +60,22 @@ vi.mock("@/features/location/queries", () => ({
 vi.mock("@/features/vendor/queries", () => ({ clearVendorCache: vi.fn() }));
 vi.mock("@/features/admin/queries", () => ({ clearAdminCache: vi.fn() }));
 
+/**
+ * The header reads the customer's cart so it can show the item count. The cart
+ * is a CUSTOMER-only resource, and the query is gated on the same condition
+ * the cart link is rendered under — so these cases assert which requests the
+ * header is allowed to make, not how the query is configured.
+ */
+const mockFetchCart = vi.hoisted(() => vi.fn());
+
+vi.mock("@/features/cart/api", () => ({
+  fetchCart: mockFetchCart,
+  addCartItem: vi.fn(),
+  updateCartItem: vi.fn(),
+  deleteCartItem: vi.fn(),
+  clearCart: vi.fn(),
+}));
+
 const { SiteHeader } = await import("@/app/components/SiteHeader");
 
 /** Report a viewport narrower than the header's breakpoint. */
@@ -84,6 +101,14 @@ function florist(): UserResponse {
     role: "FLORIST",
     createdAt: "2026-09-01",
   };
+}
+
+function admin(): UserResponse {
+  return { ...florist(), id: 2, email: "admin@example.com", role: "ADMIN" };
+}
+
+function customer(): UserResponse {
+  return { ...florist(), id: 3, email: "buyer@example.com", role: "CUSTOMER" };
 }
 
 function renderAt(path = "/") {
@@ -120,6 +145,8 @@ describe("SiteHeader navigation", () => {
     mockState.isAuthenticated = false;
     mockState.user = null;
     mockState.logout.mockClear();
+    mockFetchCart.mockReset();
+    mockFetchCart.mockResolvedValue(makeCartResponse());
     vi.unstubAllGlobals();
     // The location control's session store is real here; every test starts with
     // no location chosen and a clean storage.
@@ -201,7 +228,9 @@ describe("SiteHeader navigation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /open menu/i }));
 
-    expect(screen.getByRole("link", { name: "Cart" })).toHaveAttribute("href", "/cart");
+    // The link carries the item count in a badge, so its accessible name is
+    // "Cart" for an empty cart and "Cart 2" for a cart with two items.
+    expect(screen.getByRole("link", { name: /^Cart/ })).toHaveAttribute("href", "/cart");
     expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Vendor" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Register" })).not.toBeInTheDocument();
@@ -229,6 +258,42 @@ describe("SiteHeader navigation", () => {
     await userEvent.click(screen.getByRole("button", { name: /log out/i }));
 
     expect(mockState.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not ask for the customer cart as an anonymous visitor", () => {
+    renderAt();
+
+    // The cart is a CUSTOMER-only resource. A signed-out visitor asking for it
+    // gets a 401, and the interceptor reads that 401 as an expired access
+    // token — so the request would drag a refresh and a logout behind it that
+    // can neither succeed.
+    expect(mockFetchCart).not.toHaveBeenCalled();
+  });
+
+  it("asks for the customer cart when a customer is signed in", async () => {
+    mockState.isAuthenticated = true;
+    mockState.user = customer();
+    renderAt();
+
+    await waitFor(() => {
+      expect(mockFetchCart).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not ask for the customer cart for a florist", () => {
+    mockState.isAuthenticated = true;
+    mockState.user = florist();
+    renderAt();
+
+    expect(mockFetchCart).not.toHaveBeenCalled();
+  });
+
+  it("does not ask for the customer cart for an admin", () => {
+    mockState.isAuthenticated = true;
+    mockState.user = admin();
+    renderAt();
+
+    expect(mockFetchCart).not.toHaveBeenCalled();
   });
 
   it("names the breakpoint the bar and the stylesheet share", () => {

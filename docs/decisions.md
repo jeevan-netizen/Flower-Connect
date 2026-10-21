@@ -382,6 +382,7 @@ of a constraint name.
 | D-38 | Location-gated catalogue surfaces versus the storefront's non-blocking area advisory | Decision | Accepted | Phase 4 (tasks 4.6–4.9) |
 | D-39 | Customer price bounds are two labelled number inputs, not a range slider | Decision | Accepted | Phase 4 (task 4.7) |
 | D-40 | An anonymous add-to-cart redirects to login and does not persist a pending add | Decision | Accepted | Phase 4 (task 4.9) |
+| D-41 | The customer cart is fetched only for a customer, and a 401 without a session does not trigger a refresh | Decision | Accepted | Phase 5 (task 5.T, defect D-1) |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -2017,3 +2018,60 @@ The tempting implementation is to remember the intended add and replay it after 
 - The customer presses the button twice after signing in. That is the cost of never putting an item in a cart they did not confirm.
 - Nothing about the add is written to storage, so there is no stale queue to expire or to replay against a changed catalogue.
 - The existing cart implementation is untouched: the customer frontend reuses the cart mutation and the existing `["cart"]` query invalidation rather than introducing a second path.
+
+## D-41: The customer cart is fetched only for a customer, and a 401 without a session does not trigger a refresh
+
+**Status:** Accepted
+**Date:** Phase 5 (task 5.T, defect D-1)
+
+### Context
+
+The app shell's `SiteHeader` is on every route, and it read the customer cart
+unconditionally so it could show the item count. `/api/v1/cart/**` is CUSTOMER-only, so
+an anonymous visitor's read answered 401.
+
+That 401 was not inert. The axios response interceptor treats *any* 401 from a
+non-public endpoint as an expired access token, so it called `POST /api/v1/auth/refresh`.
+The refresh credential is an HttpOnly cookie, which the frontend cannot inspect, so with
+no session the request came back 400 "Refresh token is required" - and the interceptor's
+error handler then called `logout()`, whose own `POST /api/v1/auth/logout` came back 400
+as well. One request the app had no use for became three failing requests and three
+console errors, on every public page, for every visitor who had not signed in.
+
+The same query also raised a 403 for a florist and an admin, who have no cart either.
+
+### Decision
+
+- **The header fetches the cart only for an authenticated customer.** The condition is
+  `isAuthenticated && user?.role === "CUSTOMER"` - the same one under which the cart link
+  is already rendered, so the query and the link cannot disagree.
+- **`useCart()` gained an optional `{ enabled?: boolean }` that defaults to `true`.**
+  `CartPage` and `CheckoutPage` call it unchanged and keep their behaviour; they already
+  sit behind a CUSTOMER-only route guard, so a gate inside `useCart()` would have added
+  nothing but a coupling to the auth store.
+- **A 401 with no access token is rejected without refreshing or logging out.** The
+  interceptor reads the auth store first, and the store's own `refresh()` already draws
+  the same line: a session needs an access token to be worth renewing. The refresh
+  credential being an HttpOnly cookie means the frontend cannot tell whether a refresh
+  would succeed - it can only tell whether there is a session to refresh.
+- **The refresh path for a session with an access token is unchanged.** An expired access
+  token still triggers a refresh and a retry of the original request, and a failed refresh
+  still logs the session out.
+- **No backend contract changed.** `/api/v1/cart/**` keeps its `hasRole("CUSTOMER")`
+  rule, and the refresh and logout endpoints keep their current status codes.
+
+### Consequences
+
+- An anonymous visitor, a florist and an admin now issue no cart request at all, so the
+  public pages are free of the 401 -> 400 -> 400 cascade and of its console noise.
+- A future caller of `useCart()` can still forget the gate; the `enabled` option is the
+  mechanism for that, and the cart and checkout pages are the reason it defaults to
+  `true`.
+- A signed-in user whose refresh cookie has gone still gets one 400 from the refresh and
+  one 400 from the logout. That is the server reporting that the token is required, and
+  it is deliberately left alone.
+- The fix is verified in source, and since the 2026-10-21 deployment it is also verified
+  in the running Docker frontend: the six public routes were re-checked in a real browser
+  against the deployed build, with zero cart, refresh or logout requests and zero console
+  errors. The signed-in customer flow remains unverified in a browser, because no approved
+  test credentials are available; the unit and integration suites remain its coverage.

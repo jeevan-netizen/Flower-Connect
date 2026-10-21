@@ -114,7 +114,15 @@ export function SiteHeader() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const { isAuthenticated, user, logout } = useAuthStore();
-  const { data: cart } = useCart();
+  // The cart link below is rendered only for a customer, so the cart is
+  // fetched only for a customer. An anonymous visitor, a florist and an admin
+  // would each get a refusal the app has no use for — a 401 for the first two
+  // and a 403 for the third — and a 401 additionally starts a refresh and a
+  // logout that can neither succeed. The query and the link are now gated by
+  // the same condition, so they cannot disagree.
+  const { data: cart } = useCart({
+    enabled: isAuthenticated && user?.role === CUSTOMER_ROLE,
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const panelId = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);

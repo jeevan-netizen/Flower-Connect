@@ -78,6 +78,18 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // A 401 means "your access token expired" only when there is a session to
+    // refresh. The refresh credential is an HttpOnly cookie, which this code
+    // cannot see, so with no access token a refresh is genuinely impossible:
+    // the request comes back 400, and the logout that follows the failed
+    // refresh comes back 400 as well. The store's own `refresh()` already
+    // draws exactly this line — an interceptor that skipped it would turn one
+    // futile request into three.
+    const { accessToken } = useAuthStore.getState();
+    if (!accessToken) {
+      return Promise.reject(error);
+    }
+
     config.__isRetry = true;
     const newToken = await attemptRefresh();
 
