@@ -81,6 +81,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/locations/**").permitAll()
                 .requestMatchers("/api/v1/discover/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/search/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/categories").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs").permitAll()
@@ -99,8 +100,20 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/addresses/**").hasRole("CUSTOMER")
                 .requestMatchers("/api/v1/cart/**").hasRole("CUSTOMER")
                  .requestMatchers("/api/v1/checkout/**").hasRole("CUSTOMER")
-                 // Slot discovery endpoint - CUSTOMER only with address ownership and vendor approval checks in handler
-                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/**/slots").hasRole("CUSTOMER")
+                 // Slot discovery endpoint - CUSTOMER only with address ownership and vendor approval checks in handler.
+                 // The path must be written in the same shape as the controller's own mapping
+                 // (SlotController: @RequestMapping("/api/v1/vendors") + @GetMapping("/{vendorId}/slots")).
+                 // It was previously "/api/v1/vendors/**/slots", which Spring's PathPattern syntax
+                 // rejects: "**" is only allowed as the last element of a pattern. Evaluating that rule
+                 // threw PatternParseException inside the authorization filter, before the dispatcher,
+                 // and the request was answered with a container-generated HTML 500 instead of the
+                 // application's error envelope. See SecurityMatcherIntegrationTest.
+                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/slots").hasRole("CUSTOMER")
+                // Public customer discovery: storefront and product detail are readable
+                // anonymously; authorization/visibility is enforced per handler.
+                // These exceptions must precede the /api/v1/vendors/** FLORIST rule.
+                .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{id}/storefront").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/products/{id}").permitAll()
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/actuator/**").hasRole("ADMIN")

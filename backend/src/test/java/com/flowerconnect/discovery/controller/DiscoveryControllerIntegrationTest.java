@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.UUID;
 
 import java.util.Random;
+import java.util.ArrayList;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -113,6 +114,88 @@ class DiscoveryControllerIntegrationTest extends AbstractIntegrationTest {
         return vendorProfileRepository.saveAndFlush(profile);
     }
 
+    /**
+     * Walks every page of the discovery results for the given locationId and returns
+     * all vendor IDs found. This keeps assertions independent of how many rows other
+     * integration tests have left in the shared Testcontainers database.
+     */
+    private java.util.List<Integer> discoverAllVendorIds(Long locationId, int size) throws Exception {
+        java.util.List<Integer> ids = new java.util.ArrayList<>();
+        // First request to get totalPages
+        String firstPageBody = mockMvc.perform(get("/api/v1/discover")
+                        .param("locationId", locationId.toString())
+                        .param("page", "0")
+                        .param("size", String.valueOf(size))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        int totalPages = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(firstPageBody).get("totalPages").asInt();
+
+        // Extract IDs from first page
+        for (com.fasterxml.jackson.databind.JsonNode node :
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree(firstPageBody).get("content")) {
+            ids.add(node.get("id").asInt());
+        }
+
+        // Fetch remaining pages
+        for (int page = 1; page < totalPages; page++) {
+            String body = mockMvc.perform(get("/api/v1/discover")
+                            .param("locationId", locationId.toString())
+                            .param("page", String.valueOf(page))
+                            .param("size", String.valueOf(size))
+                            .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            for (com.fasterxml.jackson.databind.JsonNode node :
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).get("content")) {
+                ids.add(node.get("id").asInt());
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * Walks every page of the discovery results and returns the full vendor objects
+     * (id and distanceKm) for assertions on ordering and distance.
+     */
+    private java.util.List<com.fasterxml.jackson.databind.JsonNode> discoverAllVendors(Long locationId, int size) throws Exception {
+        java.util.List<com.fasterxml.jackson.databind.JsonNode> vendors = new java.util.ArrayList<>();
+        String firstPageBody = mockMvc.perform(get("/api/v1/discover")
+                        .param("locationId", locationId.toString())
+                        .param("page", "0")
+                        .param("size", String.valueOf(size))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        int totalPages = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(firstPageBody).get("totalPages").asInt();
+
+        for (com.fasterxml.jackson.databind.JsonNode node :
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree(firstPageBody).get("content")) {
+            vendors.add(node);
+        }
+
+        for (int page = 1; page < totalPages; page++) {
+            String body = mockMvc.perform(get("/api/v1/discover")
+                            .param("locationId", locationId.toString())
+                            .param("page", String.valueOf(page))
+                            .param("size", String.valueOf(size))
+                            .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            for (com.fasterxml.jackson.databind.JsonNode node :
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).get("content")) {
+                vendors.add(node);
+            }
+        }
+        return vendors;
+    }
+
     @Test
     void discoverReturnsVendorsWithinRadius() throws Exception {
         // Given: a service location (Koramangala) and two vendors:
@@ -136,18 +219,31 @@ class DiscoveryControllerIntegrationTest extends AbstractIntegrationTest {
 
         // When: we call the discovery endpoint for the origin location with large page size
         // Use size=100 to ensure our vendor appears in results despite shared DB having many vendors
-        ResultActions result = mockMvc.perform(get("/api/v1/discover")
-                .param("locationId", koramangalaId.toString())
-                .param("page", "0")
-                .param("size", "100")
-                .accept(MediaType.APPLICATION_JSON));
+        // Walk all pages to find our vendors (shared DB may have many vendors from other tests)
+        java.util.List<com.fasterxml.jackson.databind.JsonNode> allVendors = discoverAllVendors(koramangalaId, 100);
 
         // Then: vendor A should be present with distance 0, vendor B should be excluded (out of radius)
-        result.andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isArray())
-                .andExpect(jsonPath("$.content[*].id", org.hamcrest.Matchers.hasItem(vendorA.getId().intValue())))
-                .andExpect(jsonPath("$.content[?(@.id==" + vendorA.getId() + ")].distanceKm").value(0.0))
-                .andExpect(jsonPath("$.content[*].id", org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(vendorB.getId().intValue()))));
+        boolean foundA = false;
+        for (com.fasterxml.jackson.databind.JsonNode v : allVendors) {
+            if (v.get("id").asInt() == vendorA.getId().intValue()) {
+                foundA = true;
+                // Verify distance is 0
+                double distance = v.get("distanceKm").asDouble();
+                org.junit.jupiter.api.Assertions.assertEquals(0.0, distance, 0.001,
+                        "Vendor A should have distance 0.0, got " + distance);
+                break;
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(foundA, "Vendor A should be in discovery results");
+
+        boolean foundB = false;
+        for (com.fasterxml.jackson.databind.JsonNode v : allVendors) {
+            if (v.get("id").asInt() == vendorB.getId().intValue()) {
+                foundB = true;
+                break;
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertFalse(foundB, "Vendor B should NOT be in discovery results (out of radius)");
 
         // Clean up
         vendorProfileRepository.delete(vendorA);
@@ -305,38 +401,51 @@ class DiscoveryControllerIntegrationTest extends AbstractIntegrationTest {
         vendorC.setLongitude(origin.getLongitude());
         vendorProfileRepository.saveAndFlush(vendorC);
 
-        // When: call discovery with large page size to include our vendors despite shared DB
-        ResultActions result = mockMvc.perform(get("/api/v1/discover")
-                .param("locationId", koramangalaId.toString())
-                .param("size", "100")
-                .accept(MediaType.APPLICATION_JSON));
+        // When: call discovery with large page size, walk all pages
+        java.util.List<com.fasterxml.jackson.databind.JsonNode> allVendors = discoverAllVendors(koramangalaId, 100);
 
         // Then: we should get our three vendors in the correct order (A, B, C by distance)
         // Other vendors from shared DB may appear, but our three should be in the right relative order
-        result.andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isArray())
-                // Verify all three of our vendors are in results
-                .andExpect(jsonPath("$.content[*].id", org.hamcrest.Matchers.hasItem(vendorA.getId().intValue())))
-                .andExpect(jsonPath("$.content[*].id", org.hamcrest.Matchers.hasItem(vendorB.getId().intValue())))
-                .andExpect(jsonPath("$.content[*].id", org.hamcrest.Matchers.hasItem(vendorC.getId().intValue())))
-                // Verify A appears before B, and B appears before C in the result array
-                // and that their distances are correct (using custom assertion on raw JSON)
-                .andExpect(result1 -> {
-                    String content = result1.getResponse().getContentAsString();
-                    int indexA = content.indexOf("\"id\":" + vendorA.getId());
-                    int indexB = content.indexOf("\"id\":" + vendorB.getId());
-                    int indexC = content.indexOf("\"id\":" + vendorC.getId());
-                    org.junit.jupiter.api.Assertions.assertTrue(indexA >= 0 && indexB >= 0 && indexC >= 0,
-                            "All three vendors should be in results");
-                    org.junit.jupiter.api.Assertions.assertTrue(indexA < indexB && indexB < indexC,
-                            "Vendors should be sorted by distance: A (0km) < B (1km) < C (2km)");
-                    // Also verify distances in the JSON
-                    org.junit.jupiter.api.Assertions.assertTrue(content.contains("\"distanceKm\":0.0"),
-                            "Vendor A should have distance 0.0");
-                    // Note: B and C distances are approximate (~1.0, ~2.0), exact values depend on Haversine
-                });
+        // Extract our three vendors from the full result
+        com.fasterxml.jackson.databind.JsonNode vA = null, vB = null, vC = null;
+        for (com.fasterxml.jackson.databind.JsonNode v : allVendors) {
+            int id = v.get("id").asInt();
+            if (id == vendorA.getId().intValue()) vA = v;
+            else if (id == vendorB.getId().intValue()) vB = v;
+            else if (id == vendorC.getId().intValue()) vC = v;
+        }
 
-        // Clean up
+        org.junit.jupiter.api.Assertions.assertNotNull(vA, "Vendor A should be in results");
+        org.junit.jupiter.api.Assertions.assertNotNull(vB, "Vendor B should be in results");
+        org.junit.jupiter.api.Assertions.assertNotNull(vC, "Vendor C should be in results");
+
+        // Verify distances
+        double distA = vA.get("distanceKm").asDouble();
+        double distB = vB.get("distanceKm").asDouble();
+        double distC = vC.get("distanceKm").asDouble();
+
+        org.junit.jupiter.api.Assertions.assertEquals(0.0, distA, 0.001,
+                "Vendor A should have distance ~0.0, got " + distA);
+        org.junit.jupiter.api.Assertions.assertTrue(distB < distC,
+                "Vendor B (1km) should be closer than Vendor C (2km), got " + distB + " vs " + distC);
+        org.junit.jupiter.api.Assertions.assertTrue(distA < distB,
+                "Vendor A (0km) should be closer than Vendor B (1km), got " + distA + " vs " + distB);
+
+        // Verify ordering in the full result list
+        int indexA = -1, indexB = -1, indexC = -1;
+        for (int i = 0; i < allVendors.size(); i++) {
+            int id = allVendors.get(i).get("id").asInt();
+            if (id == vendorA.getId().intValue()) indexA = i;
+            else if (id == vendorB.getId().intValue()) indexB = i;
+            else if (id == vendorC.getId().intValue()) indexC = i;
+        }
+
+        org.junit.jupiter.api.Assertions.assertTrue(indexA >= 0 && indexB >= 0 && indexC >= 0,
+                "All three vendors should be in results");
+        org.junit.jupiter.api.Assertions.assertTrue(indexA < indexB && indexB < indexC,
+                "Vendors should be sorted by distance: A (0km) < B (1km) < C (2km). Indices: A=" + indexA + ", B=" + indexB + ", C=" + indexC);
+
+// Clean up
         vendorProfileRepository.delete(vendorA);
         vendorProfileRepository.delete(vendorB);
         vendorProfileRepository.delete(vendorC);

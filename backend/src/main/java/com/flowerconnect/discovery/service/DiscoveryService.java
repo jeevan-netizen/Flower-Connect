@@ -6,6 +6,7 @@ import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.exception.ErrorCode;
 import com.flowerconnect.geo.dto.PageResponse;
+import com.flowerconnect.geo.service.GeoService;
 import com.flowerconnect.repository.ServiceLocationRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,12 +46,10 @@ public class DiscoveryService {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
-    private static final int EARTH_RADIUS_KM = 6371;
-    private static final BigDecimal KM_PER_DEGREE_LAT = new BigDecimal("111.0");
-    private static final BigDecimal KM_PER_DEGREE_LNG_AT_EQUATOR = new BigDecimal("111.32");
 
     private final VendorProfileRepository vendorProfileRepository;
     private final ServiceLocationRepository serviceLocationRepository;
+    private final GeoService geoService;
 
     /**
      * Returns approved, accepting vendors within their delivery radius of the
@@ -79,20 +78,14 @@ public class DiscoveryService {
             return emptyPage(safePage, safeSize);
         }
 
-        double latDelta = maxRadius.doubleValue() / 111.0;
-        double lngDelta = maxRadius.doubleValue() / (111.32 * Math.cos(Math.toRadians(originLat.doubleValue())));
-
-        BigDecimal minLat = originLat.subtract(BigDecimal.valueOf(latDelta));
-        BigDecimal maxLat = originLat.add(BigDecimal.valueOf(latDelta));
-        BigDecimal minLng = originLng.subtract(BigDecimal.valueOf(lngDelta));
-        BigDecimal maxLng = originLng.add(BigDecimal.valueOf(lngDelta));
+        GeoService.BoundingBox box = geoService.computeBoundingBox(originLat, originLng, maxRadius);
 
         List<VendorProfile> candidates = vendorProfileRepository.findApprovedAcceptingInBoundingBox(
-                minLat, maxLat, minLng, maxLng);
+                box.minLat(), box.maxLat(), box.minLng(), box.maxLng());
 
         List<DiscoveryResponse> results = new ArrayList<>();
         for (VendorProfile vp : candidates) {
-            BigDecimal distance = haversineKm(originLat, originLng, vp.getLatitude(), vp.getLongitude());
+            BigDecimal distance = geoService.haversineKm(originLat, originLng, vp.getLatitude(), vp.getLongitude());
             BigDecimal radius = vp.getDeliveryRadiusKm();
             if (distance.compareTo(radius) <= 0) {
                 results.add(mapToResponse(vp, distance, originLat, originLng));
@@ -166,32 +159,5 @@ public class DiscoveryService {
                 .distanceKm(distanceKm.setScale(2, RoundingMode.HALF_UP))
                 .estimatedDeliveryFee(estimatedFee)
                 .build();
-    }
-
-    /**
-     * Haversine formula: distance in kilometres between two lat/lng points.
-     *
-     * <p>Formula: 2 * R * asin(sqrt(sin^2((lat2-lat1)/2) + cos(lat1)*cos(lat2)*sin^2((lng2-lng1)/2)))
-     * where R = 6371 km (Earth's mean radius).
-     */
-    private BigDecimal haversineKm(BigDecimal lat1, BigDecimal lng1, BigDecimal lat2, BigDecimal lng2) {
-        double lat1Rad = Math.toRadians(lat1.doubleValue());
-        double lng1Rad = Math.toRadians(lng1.doubleValue());
-        double lat2Rad = Math.toRadians(lat2.doubleValue());
-        double lng2Rad = Math.toRadians(lng2.doubleValue());
-
-        double dLat = lat2Rad - lat1Rad;
-        double dLng = lng2Rad - lng1Rad;
-
-        double sinDLat = Math.sin(dLat / 2);
-        double sinDLng = Math.sin(dLng / 2);
-
-        double a = sinDLat * sinDLat +
-                Math.cos(lat1Rad) * Math.cos(lat2Rad) * sinDLng * sinDLng;
-
-        double c = 2 * Math.asin(Math.min(1.0, Math.sqrt(a)));
-        double distance = EARTH_RADIUS_KM * c;
-
-        return BigDecimal.valueOf(distance).setScale(4, RoundingMode.HALF_UP);
     }
 }

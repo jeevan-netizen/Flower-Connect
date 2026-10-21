@@ -5,6 +5,7 @@ import com.flowerconnect.domain.ServiceLocation;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.geo.dto.PageResponse;
+import com.flowerconnect.geo.service.GeoService;
 import com.flowerconnect.repository.ServiceLocationRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,8 @@ class DiscoveryServiceTest {
 
     @BeforeEach
     void setUp() {
-        discoveryService = new DiscoveryService(vendorProfileRepository, serviceLocationRepository);
+        discoveryService = new DiscoveryService(vendorProfileRepository, serviceLocationRepository,
+                new GeoService());
 
         originLocation = ServiceLocation.builder()
                 .id(1L)
