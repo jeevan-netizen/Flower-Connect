@@ -375,6 +375,13 @@ of a constraint name.
 | D-31 | Product images are listed as metadata because no route serves the bytes | Decision | Accepted | Phase 3g |
 | D-32 | The default-address lock is the first read in the transaction | Decision | Accepted | Phase 4 (task 4.1) |
 | D-33 | Boolean DTO properties are named after the state, not the question | Decision | Accepted | Phase 4 (task 4.1) |
+| D-34 | Geo discovery API is public and uses bounding-box + Haversine | Decision | Accepted | Phase 4 (task 4.3) |
+| D-35 | Full-page cart route accepted over slide-out drawer for multi-vendor layout | Decision | Accepted | Phase 5 (task 5.6) |
+| D-36 | The customer catalogue's product detail is an overlay over its parent surface, and standalone on direct entry | Decision | Accepted | Phase 4 (task 4.9) |
+| D-37 | The overlay is distinguished by explicit navigation state and a per-page-load token | Decision | Accepted | Phase 4 (task 4.9), implemented |
+| D-38 | Location-gated catalogue surfaces versus the storefront's non-blocking area advisory | Decision | Accepted | Phase 4 (tasks 4.6–4.9) |
+| D-39 | Customer price bounds are two labelled number inputs, not a range slider | Decision | Accepted | Phase 4 (task 4.7) |
+| D-40 | An anonymous add-to-cart redirects to login and does not persist a pending add | Decision | Accepted | Phase 4 (task 4.9) |
 
 ## D-13: Approval gating is per-handler, not per-namespace
 
@@ -1854,3 +1861,159 @@ In a hyperlocal multi-vendor marketplace, cart items from different florists hav
 - Eliminates redundant drawer component scaffolding, focus trapping, and synchronized state management across drawer and page.
 - Routing to `/cart` remains direct and consistent across navigation headers.
 - Task 5.6 acceptance criteria are met and the task can be marked complete in project tracking.
+
+---
+
+## D-36: The customer catalogue's product detail is an overlay over its parent surface, and standalone on direct entry
+
+**Status:** Accepted
+**Date:** Phase 4 (task 4.9)
+
+### Context
+
+Plan task 4.9 describes a "Product detail modal". A modal that is not a route has no URL, and a product page that cannot be linked, refreshed or reached from a shared message is not a page at all — so the product detail is a **route**, and the overlay is a *presentation of that route* rather than a separate screen.
+
+The route has to be nested somewhere. Nesting it under the florist's storefront (`/vendors/{vendorId}/products/{productId}`) is what lets the shop stay on screen behind the product, which is the point of an overlay: the customer sees the product in the context of the shop it belongs to.
+
+### Decision
+
+- The product route is nested under the storefront route.
+- A product reached **from within the app** renders as a panel **over** the storefront, with the shop still behind it and a close control; the storefront's own content is unchanged and remains visible.
+- A product reached **directly** — a typed URL, a pasted link, a shared message — renders on its own, with the storefront not shown.
+- The two presentations are mutually exclusive for one URL. There is no state in which the product is both an overlay and alone.
+- Every ineligibility — unknown, inactive, sold out, an unapproved or non-accepting florist, or a florist outside the delivery radius — is the **same** non-disclosing 404, so the overlay never reveals whether a product exists.
+
+### Consequences
+
+- The surface behind the overlay is a **live page**, not a static backdrop: it stays in the DOM and stays keyboard-reachable. The overlay declares `aria-modal="true"`, which on its own implements **neither** focus management nor a focus trap. This is a recorded limitation, deferred rather than fixed — see the 4.9 entry in `docs/progress.md`.
+- D-36 fixes **what** the two presentations are. **How** the frontend chooses between them is a separate question, and the rule that shipped with Gate E is being replaced — see D-37.
+- The product is reachable from the search results as well as from a storefront. What that means for the search context is part of D-37.
+
+---
+
+## D-37: The overlay is distinguished by explicit navigation state and a per-page-load token
+
+**Status:** Accepted
+**Date:** Phase 4 (task 4.9) — implemented and verified in the Gate E remediation
+
+> **Implemented and verified.** The mechanism below is what shipped; the
+> coverage named under "Verification" is what the automated suite actually
+> asserts. The browser-level behaviour was then checked separately, in a real
+> Chromium browser, and is recorded under "Verification" below.
+
+### Context
+
+D-36 fixes the two presentations but not the rule that chooses between them. The Gate E implementation inferred the choice from `useNavigationType()` alone: a PUSH renders the overlay, a POP renders the standalone page. Inferring a presentation from a navigation type is fragile in three specific ways.
+
+First, **dismissal and history**. The close control and the Escape key both navigate to the storefront, which **pushes** a history entry. The browser Back button then returns to the product URL with a POP navigation, so the product renders standalone — with no shop behind it and, under that implementation, no close control either.
+
+Second, **the search context**. The product route was nested under the storefront alone, so a product opened from the search results left the search page entirely: the customer landed on a shop they did not open, and the search filters and page number — which were local to the search page — were lost. The app shell keys its route-transition wrapper by the full pathname, so every pathname change remounts the routed subtree. The results survive only because the query cache is held above the router; the filters that select them do not.
+
+Third, **a refresh**. React Router keeps navigation state in the history entry, and the browser preserves that state across a same-document reload, so a marker written in one page load can still be present in the next one. A rule that reads a marker alone therefore cannot distinguish "the customer opened this from the shop" from "the customer reloaded this page".
+
+### Decision
+
+- **The overlay is marked, not inferred.** A product link carries explicit React Router navigation state identifying it as an overlay, together with a **token** identifying the current JavaScript page load. The token is generated once per page load, held in memory only, never persisted and never sent to the server. A marker is honoured only when its token matches the current page load, which is what makes a reload render the standalone page rather than reconstruct an overlay.
+- **Ordinary links carry no marker.** React Router writes navigation state only when a link supplies it, so no other route in the app can be mistaken for an overlay.
+- **The product route is nested under the search surface as well as the storefront**, giving two public product URLs — `/vendors/{vendorId}/products/{productId}` and `/search/products/{productId}` — that render the same product component. A product opened from the search results therefore keeps the results behind it.
+- **Each surface recognises its own product child by an explicit route id** (`storefront-product`, `search-product`), read through `useMatches()`. The ids must be **distinct**: React Router requires route ids to be globally unique within a data router and throws on a collision when the router is created. The same ids let a surface tell a matched product child from any other child, which `useOutlet()` cannot do — it returns `null` both when no child matched and when the matched index child has no element.
+- **The search filters and page live in an in-memory store**, not in component state, so they survive the remount that opening a product causes. The store is not persisted: a full reload starts from the defaults, which is the correct reading of "this application session".
+- **Dismissal pops the in-app predecessor.** The close control and the Escape key return to the surface the product was opened from, without pushing a duplicate background entry. The predecessor's existence is guaranteed by the marker — the marker is written only by a link that pushes an entry — so no history-index guess is needed. A `window.history.state.idx` guard was considered and rejected: it reads the *browser's* history, whereas the tests run a memory router with an in-memory history, so it would take the wrong branch under test.
+- **A standalone product page offers a return path** back to the surface it belongs to, and never calls `navigate(-1)`.
+
+### Consequences
+
+- The overlay/standalone distinction becomes **explicit**, so Forward within a page load restores the overlay rather than silently degrading it to the standalone page, and a reload degrades to standalone on purpose.
+- The product route gains a second public URL form. Both render the same component; the difference is which surface is behind it.
+- The search page's filter state moves out of the component, which makes it survive navigation and makes returning to the search restore the last filters. The existing "clear filters" action keeps its meaning.
+- A surface no longer fetches what it is not going to show: a standalone product entry issues no storefront request, and a standalone search-parented product issues no search request.
+- The surfaces require a **data router**, because `useMatches()` is a data-router API. The application already uses `createBrowserRouter`; the tests use `createMemoryRouter`.
+- The mechanism is verifiable **except** for one thing. A test that presents a stale token proves only the marker-comparison logic; it does not prove that a browser reload produces a stale token, because the repository has no browser-test infrastructure and adding one is out of scope. The browser-level refresh behaviour is therefore a **manual check**, and this decision must not be read as claiming it is automated.
+
+### Verification
+
+Automated — asserted by the frontend suite (128 customer tests across 12 files; 730 frontend tests across 65 files; typecheck, lint and build all clean):
+
+- Overlay open, close, Escape, Back and Forward from the storefront, and the same from the search surface.
+- Closing pops the in-app predecessor rather than pushing a duplicate background entry.
+- Search filters and page preserved across the product round-trip and across a remount of the page, including a check that the request that follows carries the preserved filters rather than the defaults.
+- Direct entry, and a marker whose token belongs to another page load, both render the standalone page with a return path.
+- The storefront query is not issued for a standalone product entry, and the search query is not issued for a standalone search-parented product.
+- A malformed florist id and a malformed product id each issue no request and render the non-disclosing unavailable state.
+- The two product route ids are distinct, and the router is created without an id collision.
+
+**Browser-level behaviour: checked in a real browser, not by an automated test.** The four frontend navigation checks — refreshing a product URL that was opened as an overlay, refreshing a directly opened standalone product URL, Back and Forward through an overlay opened from the search results and from a storefront, and keyboard traversal through the overlay — were exercised in a real Chromium browser after the automated suite passed. The catalogue API responses were **stubbed in the browser**, because the backend instance available at the time could not serve the uncommitted public-catalogue endpoints. The checks therefore establish the **frontend** navigation, reload and history behaviour; they do **not** establish end-to-end catalogue integration against the real backend or MySQL, which remains unverified. The keyboard traversal confirmed the recorded limitation: focus can leave the overlay, and no focus trap is implemented. The stale-token test still covers only the marker comparison, so the automated suite does not on its own prove these browser results.
+
+---
+
+## D-38: Location-gated catalogue surfaces versus the storefront's non-blocking area advisory
+
+**Status:** Accepted
+**Date:** Phase 4 (tasks 4.6–4.9)
+
+### Context
+
+The catalogue endpoints do not all take a delivery area. `GET /api/v1/discover` and `GET /api/v1/search` require `locationId` (D-34, and the search contract from the same phase), and `GET /api/v1/products/{id}` takes one to decide whether the product is deliverable. `GET /api/v1/vendors/{id}/storefront` takes none: the customer has already chosen that florist, and the endpoint applies no delivery-radius filter.
+
+A single rule — "the customer area gates everything" — would therefore contradict the storefront endpoint's own contract and would hide a shop the backend is happy to serve.
+
+### Decision
+
+- **The location-required surfaces gate on a delivery area.** Until the customer chooses one, the browse page, the search page and the product detail show the location prompt and issue **no location-dependent request**; the query stays disabled rather than being sent with a missing id.
+- **The storefront's area is a non-blocking advisory.** A storefront renders in full whether or not an area is chosen, and the missing area is stated alongside it. The shop is not hidden, because the backend is not hiding it either.
+- The distinction follows the **backend's** contract rather than a UI preference: it is a gate where the query needs a parameter, and an advisory where it does not.
+
+### Consequences
+
+- The customer can read a shop they may not be served by, and the interface says so rather than refusing to show it.
+- The location selection is held for the session (D-34, task 4.2), so the prompt appears once per tab rather than once per page.
+- "No location-dependent request" is a property the tests assert, not an accident of the query being disabled.
+
+---
+
+## D-39: Customer price bounds are two labelled number inputs, not a range slider
+
+**Status:** Accepted
+**Date:** Phase 4 (task 4.7)
+
+### Context
+
+Plan task 4.7 lists "price slider" among the search controls. A two-handle range slider has no native accessible semantics, cannot be typed into, and is awkward to operate with a screen reader or with a keyboard alone. The backend's contract, by contrast, is two independent decimal bounds — `priceMin` and `priceMax` — with `priceMin > priceMax` refused as a validation error.
+
+### Decision
+
+- The price bounds are **two labelled number inputs** — "Minimum price" and "Maximum price" — that mirror the backend's `priceMin` and `priceMax` exactly.
+- A minimum greater than the maximum is refused **before** the request is issued, with the error shown against both fields.
+- The slider is a documented deviation from the plan's wording, not an omission.
+
+### Consequences
+
+- The controls are precise, typeable and keyboard-friendly, and they map one-to-one onto the query parameters.
+- The plan's wording and the implementation differ on this one control, which is why the deviation is recorded here rather than left implicit.
+- The bound values themselves are unchanged; only the input control differs.
+
+---
+
+## D-40: An anonymous add-to-cart redirects to login and does not persist a pending add
+
+**Status:** Accepted
+**Date:** Phase 4 (task 4.9)
+
+### Context
+
+The catalogue is public; the cart is not. `POST /api/v1/cart/**` requires the `CUSTOMER` role, so an anonymous visitor cannot add anything. The customer frontend nonetheless offers the control, because hiding it would hide the fact that the catalogue leads to a cart.
+
+The tempting implementation is to remember the intended add and replay it after the customer signs in. That replay has a problem: the product's price, its stock and the customer's own intention may all have changed by the time the customer returns from the login page, and a cart the customer never confirmed is a surprise rather than a convenience.
+
+### Decision
+
+- An anonymous visitor's add-to-cart **navigates to the login page**, carrying the current path in the router's `from` state — the convention the route guard and the login page already use — so the customer returns to where they were.
+- **No pending add is persisted.** The add is not queued, not stored and not replayed. The customer returns to the product and presses the button again.
+- A signed-in customer who is not a `CUSTOMER` sees the control **disabled**, with the reason stated.
+- The backend remains the authority on authorization, pricing, stock and cart validation. The frontend sends only the product id, the quantity and the optional gift note, and the price snapshot is taken server-side (decision C-1).
+
+### Consequences
+
+- The customer presses the button twice after signing in. That is the cost of never putting an item in a cart they did not confirm.
+- Nothing about the add is written to storage, so there is no stale queue to expire or to replay against a changed catalogue.
+- The existing cart implementation is untouched: the customer frontend reuses the cart mutation and the existing `["cart"]` query invalidation rather than introducing a second path.

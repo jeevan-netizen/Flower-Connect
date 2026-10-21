@@ -253,6 +253,19 @@ Verified by `DiscoveryControllerIntegrationTest`:
 | Sorts by distance then id | `discoverSortsByDistanceThenId` |
 | Empty when no approved vendors | `discoverReturnsEmptyWhenNoApprovedVendors` |
 
+**Qualification on the two membership rows.** `discoverReturnsVendorsWithinRadius` and
+`discoverSortsByDistanceThenId` are the tests cited above, and **both currently fail** on
+their `hasItem` **membership** assertion. The shared singleton Testcontainers database
+accumulates ≥100 approved in-radius vendors across the failsafe run, so the vendors the
+test created fall onto a later page of the `size=100` response. The **ordering** and
+**distance** assertions in `discoverSortsByDistanceThenId` were **never reached**, so this
+failure does **not** establish that the server's distance ordering or its radius filtering
+is incorrect — the discovery API is **not** shown to be broken. The failures are not
+reproducible in isolation, because the accumulation comes from the whole failsafe run.
+Gate C's three new **non-transactional** integration-test classes add vendor-creating
+fixtures to the same shared database and are a **plausible contributor, not proven
+causation**. A separate backend test-isolation follow-up is open.
+
 The endpoint filters to `vendor_profiles.status = APPROVED` AND `accepting_orders = true`,
 computes Haversine distance from the given service location, and includes only vendors
 within their `delivery_radius_km`. Response includes `distanceKm` and `estimatedDeliveryFee`
