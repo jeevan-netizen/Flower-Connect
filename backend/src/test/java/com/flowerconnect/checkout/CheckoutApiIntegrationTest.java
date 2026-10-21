@@ -46,10 +46,13 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -92,13 +95,8 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "password123";
     private static final String KORAMANGALA_PINCODE = "560034";
-    // Fixed instant: Wednesday, October 21, 2026, 04:00:00 UTC = 09:30:00 IST
-    private static final Instant PINNED_INSTANT = Instant.parse("2026-10-21T04:00:00Z");
     // Wednesday 12:00:00 IST = 06:30:00 UTC (150m ahead > 120m lead time, 60m duration ends at 13:00 < 18:00)
-    private static final String SLOT = "2026-10-21T06:30:00";
-
-    @Autowired private MutableClock clock;
-    private Instant originalInstant;
+    private static final String SLOT = "2026-10-22T06:30:00";
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
@@ -121,9 +119,6 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        originalInstant = clock.instant();
-        clock.setInstant(PINNED_INSTANT);
-
         locationId = serviceLocationRepository.findByPincode(KORAMANGALA_PINCODE)
                 .orElseThrow().getId();
         rosesCategoryId = categoryRepository.findBySlug("roses").orElseThrow().getId();
@@ -133,9 +128,8 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        if (originalInstant != null) {
-            clock.setInstant(originalInstant);
-        }
+        // No clock state to restore: JWT issuance uses real system time,
+        // consistent with JJWT expiration validation.
     }
 
     // ================================================================ RBAC matrix
@@ -329,10 +323,11 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
 
         addToCart(customerToken, productId, 2);
 
-        // PINNED_INSTANT is 2026-10-21T04:00:00Z (09:30:00 IST)
-        // Minimum lead time is 120 minutes -> threshold is 11:30:00 IST (06:00:00 UTC)
-        // A slot starting at 10:00:00 IST (04:30:00 UTC) is only 30m ahead -> inside 120m lead time!
-        String invalidSlot = "2026-10-21T04:30:00";
+        // Slot starting 60 minutes from now is in the future but within the
+        // 120-minute minimum lead time -> violates lead time.
+        String invalidSlot = Instant.now().plus(Duration.ofMinutes(60))
+                .atZone(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
         UUID clientOrderId = UUID.randomUUID();
 
         CheckoutRequest request = CheckoutRequest.builder()
