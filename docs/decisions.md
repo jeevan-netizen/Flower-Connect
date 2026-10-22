@@ -2206,3 +2206,43 @@ only actor information that is safe for a customer to see.
   without learning internal pricing or other customers' data.
 - A future decision is needed before any of these read-only fields become
   mutable or before commission/settlement data is exposed to customers.
+
+## D-46: Auto-reject threshold stored in platform_config, not hard-coded
+
+**Status:** Accepted
+**Date:** Phase 6 (Stage 4, task 6.5)
+
+### Context
+
+Task 6.5 requires the auto-reject threshold (minutes after which an unaccepted
+`PLACED` order is auto-cancelled) to be configurable. The plan places this
+setting in `platform_config` (plan section 9, phases 6–10), but Phase 6
+precedes Phase 10, so no `platform_config` table existed and `CheckoutProperties`
+explicitly defers runtime settings to Phase 10.
+
+### Decision
+
+- Additive migration `V18__create_platform_config_table.sql` creates a generic
+  key/value `platform_config` table (`config_key`, `config_value`, `description`)
+  and seeds `auto_reject_minutes = 60`. The generic shape lets Phase 10 add
+  commission, platform-fee and timeout rows without another migration.
+- `AutoRejectService` reads the threshold from `platform_config` at job run time.
+  If the row is missing, the documented default (60 minutes) is used and a
+  warning is logged — auto-reject is never silently disabled. A non-integer
+  value fails fast at service startup (`IllegalStateException`).
+- The scheduler cadence (`app.auto-reject-cron`, default hourly) and batch bound
+  (`app.auto-reject-batch-size`, default 100) come from `AppProperties`, following
+  the `expirySweepCron`/`expirySweepMaxRows` pattern. The age threshold itself
+  always comes from the database.
+- `platform_config` is not exposed through a runtime configuration API in Phase 6;
+  that arrives with Phase 10.
+
+### Consequences
+
+- `V18` is additive; no applied migration is edited (ADR-002/D-9). V16/V17 are
+  untouched.
+- Phase 10 can extend `platform_config` with commission and platform-fee rows
+  without a new migration.
+- The auto-reject job is disabled in the test profile
+  (`app.auto-reject-cron: "-"`) and driven directly with the `MutableClock` bean,
+  following the `InventoryExpiryScheduler` precedent.

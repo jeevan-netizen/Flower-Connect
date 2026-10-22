@@ -40,6 +40,9 @@ app:
   # of a test and mutate rows the test is asserting on. The expiry sweep is driven directly
   # with the MutableClock bean in InventoryExpiryIntegrationTest instead.
   expiry-sweep-cron: "-"
+  # Disabled for the same reason; the auto-reject job is driven directly with the
+  # MutableClock bean in AutoRejectIntegrationTest instead.
+  auto-reject-cron: "-"
   storage:
     # Overridden per test class that exercises the filesystem
     # (ProductImageIntegrationTest points this at target/test-uploads).

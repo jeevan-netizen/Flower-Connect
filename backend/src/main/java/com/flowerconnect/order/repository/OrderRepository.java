@@ -94,4 +94,17 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * a today's summary (counts by status, totals, expected COD cash).
      */
     List<Order> findByVendorIdAndCreatedAtBetween(Long vendorId, LocalDateTime from, LocalDateTime to);
+
+    // ------------------------------------------------------------------
+    // Phase 6: auto-reject job (task 6.5)
+    // ------------------------------------------------------------------
+
+    /**
+     * PLACED orders created strictly before {@code before}, oldest first.
+     * Used by the auto-reject job to select candidates whose age exceeds the
+     * configured threshold. Bounded by the caller's {@code Pageable} so one
+     * run never holds more than {@code autoRejectBatchSize} order locks.
+     */
+    Page<Order> findByStatusAndCreatedAtBefore(Order.OrderStatus status, LocalDateTime before,
+                                               Pageable pageable);
 }
