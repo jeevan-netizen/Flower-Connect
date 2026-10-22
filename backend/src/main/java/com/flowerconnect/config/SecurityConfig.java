@@ -100,6 +100,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/addresses/**").hasRole("CUSTOMER")
                 .requestMatchers("/api/v1/cart/**").hasRole("CUSTOMER")
                  .requestMatchers("/api/v1/checkout/**").hasRole("CUSTOMER")
+                 // Customer order history and detail (plan Phase 6, task 6.3):
+                 // only the authenticated customer's own orders, newest first.
+                 .requestMatchers("/api/v1/orders/**").hasRole("CUSTOMER")
                  // Slot discovery endpoint - CUSTOMER only with address ownership and vendor approval checks in handler.
                  // The path must be written in the same shape as the controller's own mapping
                  // (SlotController: @RequestMapping("/api/v1/vendors") + @GetMapping("/{vendorId}/slots")).

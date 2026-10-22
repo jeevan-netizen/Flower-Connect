@@ -28,6 +28,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     /**
+     * One page of the customer's orders in a single status, newest first.
+     */
+    Page<Order> findByUserIdAndStatusOrderByCreatedAtDesc(Long userId, Order.OrderStatus status,
+                                                          Pageable pageable);
+
+    /**
      * Finds all orders for a user with the given clientOrderId.
      * Used to build the idempotent replay response after the idempotency
      * table confirms the checkout was already completed.

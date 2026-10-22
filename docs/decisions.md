@@ -2166,3 +2166,43 @@ Stock side effects are delegated to `OrderStateMachine` ? `InventoryService` und
 - A suspended vendor can still accept/reject/prepare/deliver their existing orders (D-6 honored), but cannot create new orders or touch catalog/inventory (those routes carry `@RequiresApprovedVendor`).
 - Forgetting `@RequiresApprovedVendor` on a future catalog/inventory/order-creation route fails open — the main review checklist item for vendor features.
 - `V17` is additive; `V16` is not edited (ADR-002/D-9). The Phase 5 checkout history row keeps a null `actor_type`, compatible with the ENUM column.
+
+## D-45: Customer order response exposes only safe, customer-visible fields
+
+**Status:** Accepted
+**Date:** Phase 6 (Stage 3, task 6.3)
+
+### Context
+
+Task 6.3 adds `GET /api/v1/orders` and `GET /api/v1/orders/{id}` for the
+authenticated customer. The `Order` entity carries several internal fields
+(`commissionRate`, `clientOrderId`, the `user`/`vendor` relations, timestamps)
+that must not be leaked to the customer, and the status timeline must show
+only actor information that is safe for a customer to see.
+
+### Decision
+
+- The detail response (`CustomerOrderResponse`) exposes: order status, payment
+  method/status, vendor name (`businessName`), address snapshot, delivery slot,
+  per-item snapshots (product name, captured price, quantity, item subtotal),
+  the BigDecimal fee breakdown (subtotal/delivery fee/platform fee/total),
+  created/updated timestamps, and the chronological status timeline.
+- The timeline (`CustomerOrderTimelineEntry`) exposes `fromStatus`,
+  `toStatus`, `actorType` and, for a named user, `actorName` (the display
+  name). Actor email, id and any internal reason beyond the stored `reason`
+  are deliberately omitted.
+- Internal fields such as `commissionRate`, `clientOrderId`, credentials and
+  unrelated user data are never exposed. The list response
+  (`CustomerOrderListItem`) is deliberately light (id, status, payment
+  method/status, vendor name, total, createdAt, slot) so the full item
+  snapshots and timeline are reserved for the detail endpoint.
+- These endpoints are read-only: they never change order status. Every status
+  change continues to go through `OrderStateMachine` (D-42).
+
+### Consequences
+
+- The customer can reconcile an order against what they agreed to pay at
+  checkout (price snapshots) and watch its progress through the timeline,
+  without learning internal pricing or other customers' data.
+- A future decision is needed before any of these read-only fields become
+  mutable or before commission/settlement data is exposed to customers.
