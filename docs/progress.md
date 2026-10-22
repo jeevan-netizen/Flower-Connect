@@ -216,8 +216,25 @@ complete.
   reason validation, history/Clock fields, event publication, COD collection on
   delivery, and stock delegation.
 
-Remaining Phase 6 work: vendor/customer order endpoints (6.2–6.4), the auto-reject
-job (6.5), and frontend orders UI (6.T).
+- [x] **6.2–6.4 — Vendor order action endpoints, list and summary** (Stage 2):
+  `GET|POST /api/v1/vendor/orders/{orderId}/accept|reject|prepare|out-for-delivery|delivered`,
+  `GET /api/v1/vendor/orders` (paginated, optional `status`/`fromDate`/`toDate` filters)
+  and `GET /api/v1/vendor/orders/summary` (today's summary in the vendor's timezone).
+  Backed by `VendorOrderService` (ownership resolution, delegation to
+  `OrderStateMachine`, listing, summary), `VendorOrderController`, and DTOs in
+  `com.flowerconnect.vendor.dto`. Security: `/api/v1/vendor/**` → `hasRole("FLORIST")`
+  in `SecurityConfig`; per-handler ownership (missing order 404, foreign order 403).
+  Deliberately **no** `@RequiresApprovedVendor`, per D-6, so a suspended vendor can
+  still process existing in-flight orders. Stock side effects via
+  `OrderStateMachine` → `InventoryService` under the order-first, then
+  ascending-product-id inventory lock order. Additive `V17` migration aligns the
+  committed `V16` `actor_type` column (`VARCHAR`) with the `ActorType` entity enum
+  (native MySQL `ENUM`) so `ddl-auto: validate` passes. Verified with
+  `VendorOrderControllerTest` (12 slice tests) and `VendorOrderIntegrationTest`
+  (15 integration tests against real MySQL), all green.
+
+Remaining Phase 6 work: the auto-reject job (6.5), customer order endpoints, and the
+frontend orders UI (6.T).
 
 
 Two defects were found by the new tests and fixed during Stage 1 rather than
@@ -533,6 +550,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-22 | Phase 6 Stage 2 (tasks 6.2–6.4): vendor order action endpoints (accept/reject/prepare/out-for-delivery/delivered), paginated vendor order list with status/date filters, and today's summary under `/api/v1/vendor/orders`; `VendorOrderService`, `VendorOrderController`, DTOs in `com.flowerconnect.vendor.dto`; `/api/v1/vendor/**` → `hasRole("FLORIST")` in `SecurityConfig`; no `@RequiresApprovedVendor` per D-6; stock side effects via `OrderStateMachine` → `InventoryService`; additive `V17` migration aligns committed `V16` `actor_type` (`VARCHAR`) with the `ActorType` entity enum (`ENUM`) so `ddl-auto: validate` passes. `VendorOrderControllerTest` (12 slice tests) + `VendorOrderIntegrationTest` (15 integration tests vs real MySQL): all green. Full backend unit suite: 1096 tests, 0 failures, BUILD SUCCESS. | `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java`, `backend/src/main/java/com/flowerconnect/order/repository/OrderRepository.java`, `backend/src/main/java/com/flowerconnect/vendor/controller/VendorOrderController.java`, `backend/src/main/java/com/flowerconnect/vendor/service/VendorOrderService.java`, `backend/src/main/java/com/flowerconnect/vendor/dto/VendorOrderResponse.java`, `backend/src/main/java/com/flowerconnect/vendor/dto/VendorOrderPageResponse.java`, `backend/src/main/java/com/flowerconnect/vendor/dto/VendorOrderSummaryResponse.java`, `backend/src/main/java/com/flowerconnect/vendor/dto/VendorOrderRejectRequest.java`, `backend/src/main/resources/db/migration/V17__alter_order_status_history_actor_type_to_enum.sql`, `backend/src/test/java/com/flowerconnect/vendor/controller/VendorOrderControllerTest.java`, `backend/src/test/java/com/flowerconnect/vendor/VendorOrderIntegrationTest.java`, `docs/progress.md`, `docs/decisions.md`, `docs/known-issues.md` |
 | 2026-10-21 | Phase 6 Stage 1 (task 6.1): order state machine — `OrderStateMachine` is the sole service for changing order status, encoding the full plan section 6.1 transition table (including `PENDING_PAYMENT` and Phase 8-reserved transitions), writing one `order_status_history` row per transition from the injected `Clock`, publishing scalar-only domain events after commit, and delegating stock side effects to `InventoryService` under the order-then-inventory ascending-product-id lock order. Additive `V16__add_order_status_history_actor_type.sql` migration. `OrderStateMachineTest` exhaustive table-driven + focused tests: 333 tests, 0 failures. Full backend unit suite: 1084 tests, 0 failures, BUILD SUCCESS. | `backend/src/main/java/com/flowerconnect/order/service/OrderStateMachine.java`, `backend/src/main/java/com/flowerconnect/order/domain/ActorType.java`, `backend/src/main/java/com/flowerconnect/order/domain/OrderStatusHistory.java`, `backend/src/main/java/com/flowerconnect/order/event/OrderStatusChanged.java`, `backend/src/main/java/com/flowerconnect/order/event/OrderCancelled.java`, `backend/src/main/java/com/flowerconnect/order/event/OrderDelivered.java`, `backend/src/main/java/com/flowerconnect/order/repository/OrderRepository.java`, `backend/src/main/java/com/flowerconnect/inventory/service/InventoryService.java`, `backend/src/main/java/com/flowerconnect/inventory/domain/StockDelta.java`, `backend/src/main/resources/db/migration/V16__add_order_status_history_actor_type.sql`, `backend/src/test/java/com/flowerconnect/order/service/OrderStateMachineTest.java`, `docs/progress.md`, `docs/decisions.md` |
 | 2026-10-21 | D-1 fix deployed to the development frontend: the shared header no longer queries the customer cart for anonymous visitors, and the axios interceptor no longer starts a futile refresh/logout when there is no access token — `useCart()` gained an optional `enabled` flag (default `true`), the header gates on `isAuthenticated && user?.role === "CUSTOMER"`, and the interceptor rejects a 401 when no session exists. 736 frontend tests pass; typecheck, lint and build clean; the frontend image `sha256:a049c351bba3…` was rebuilt from the working tree and only the frontend container recreated, with all four services healthy; the six public routes were re-verified through Playwright MCP against the deployed build with zero cart/refresh/logout requests and zero console errors (D-41) | `frontend/src/features/cart/queries.ts`, `frontend/src/app/components/SiteHeader.tsx`, `frontend/src/shared/lib/api.ts`, `frontend/src/app/components/SiteHeader.test.tsx`, `frontend/src/shared/lib/api.test.ts`, `docs/progress.md`, `docs/decisions.md` |
 | 2026-10-20 | Gate E final verification: D-37's browser-verification statements corrected to record the real-Chromium outcome and the stubbed catalogue responses, and two follow-ups recorded — the `docs/decisions.md` encoding and the root route-transition remount | `docs/decisions.md`, `docs/progress.md` |

@@ -2136,3 +2136,33 @@ Auto-reject configuration (platform_config table), order endpoint security,
 customer/admin cancellation endpoints, CancellationService, Phase 7
 payments/expiry, Phase 9 notifications and Phase 10 commission/ledger work are
 deliberately out of scope for Stage 1.
+
+## D-43: Vendor order endpoints use the FLORIST namespace without approval gating
+
+**Status:** Accepted
+**Date:** Phase 6 (Stage 2, task 6.2–6.4)
+
+### Context
+
+Stage 2 exposes the vendor order action endpoints (accept/reject/prepare/out-for-delivery/delivered), the paginated vendor order list, and today's summary. The plan's vendor routes live under `/api/v1/vendors/**` (plural), already mapped to `hasRole("FLORIST")` in `SecurityConfig`, and D-13 places `@RequiresApprovedVendor` per handler on catalog/inventory/order-creation routes. Stage 1's `OrderStateMachine` (D-42) is the sole status-transition service and defers "order endpoint security" to later stages.
+
+Two questions had to be settled before writing the endpoints.
+
+First, the URL namespace. The plan prose names `/api/v1/vendor/products` (singular) in one place, but the codebase and `SecurityConfig` use `/api/v1/vendors/**` (plural). Introducing a second near-identical prefix risks attaching a rule to the wrong one. Stage 2 therefore uses `/api/v1/vendor/orders` (singular) for the order endpoints — a distinct, deliberate namespace — and adds a matching `SecurityConfig` rule `.requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")`.
+
+Second, whether `@RequiresApprovedVendor` applies. D-6 draws a clear line: a suspended vendor is hidden from discovery and blocked from new catalog/inventory/order work, but must still process their own existing in-flight orders to completion. Applying `@RequiresApprovedVendor` to the order-action endpoints would break that guarantee (a suspended vendor could not accept or deliver an in-flight order). So the order endpoints carry the FLORIST namespace rule plus per-handler ownership (missing order 404, foreign order 403) but deliberately **not** `@RequiresApprovedVendor`.
+
+Stock side effects are delegated to `OrderStateMachine` ? `InventoryService` under the agreed lock order: the order row is locked first, then inventory rows in ascending product id.
+
+### Decision
+
+- Vendor order endpoints live under `/api/v1/vendor/orders` (singular): `POST /{orderId}/accept|reject|prepare|out-for-delivery|delivered`, `GET /` (paginated, optional `status`/`fromDate`/`toDate`), `GET /summary` (today's summary in the vendor's timezone).
+- Each endpoint resolves the caller's vendor profile from the JWT subject, enforces ownership (404 missing, 403 foreign), and delegates the transition to `OrderStateMachine`.
+- The namespace rule is `hasRole("FLORIST")`; `@RequiresApprovedVendor` is deliberately omitted per D-6.
+- Additive migration `V17__alter_order_status_history_actor_type_to_enum.sql` converts the committed `V16` `order_status_history.actor_type` column from `VARCHAR(16)` to native MySQL `ENUM('CUSTOMER','VENDOR','ADMIN','SYSTEM')` to match the `ActorType` entity mapping (`@Enumerated(EnumType.STRING)`) and satisfy `ddl-auto: validate` (D-20).
+
+### Consequences
+
+- A suspended vendor can still accept/reject/prepare/deliver their existing orders (D-6 honored), but cannot create new orders or touch catalog/inventory (those routes carry `@RequiresApprovedVendor`).
+- Forgetting `@RequiresApprovedVendor` on a future catalog/inventory/order-creation route fails open — the main review checklist item for vendor features.
+- `V17` is additive; `V16` is not edited (ADR-002/D-9). The Phase 5 checkout history row keeps a null `actor_type`, compatible with the ENUM column.
