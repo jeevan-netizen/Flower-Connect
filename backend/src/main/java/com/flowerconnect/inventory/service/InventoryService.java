@@ -7,6 +7,7 @@ import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.inventory.domain.Inventory;
+import com.flowerconnect.inventory.domain.StockDelta;
 import com.flowerconnect.inventory.domain.StockMovement;
 import com.flowerconnect.inventory.domain.StockMovement.MovementType;
 import com.flowerconnect.inventory.dto.ExpiryDateRequest;
@@ -34,6 +35,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Vendor inventory operations (plan task 3.6).
@@ -324,6 +329,54 @@ public class InventoryService {
     }
 
     // ------------------------------------------------------------------
+    // Order state machine stock side effects (plan Phase 6, task 6.1)
+    // ------------------------------------------------------------------
+
+    /**
+     * Commits reserved stock for a vendor accepting an order
+     * ({@code PLACED &#8594; CONFIRMED}): for every item,
+     * {@code quantity -= q} and {@code reserved_quantity -= q} with a
+     * {@code SALE_ONLINE} movement. Re-checks {@code quantity >= q} under
+     * the lock and refuses with 409 if stock was written off or adjusted
+     * since checkout. Inventory rows are locked in ascending product-id
+     * order to avoid deadlocks.
+     */
+    @Transactional
+    public void commitReservedStock(List<StockDelta> deltas, User actor) {
+        Map<Long, Inventory> locked = lockInventoriesAscending(deltas);
+        validateQuantityAboveReserved(locked, deltas);
+        applyStockChanges(locked, deltas, MovementType.SALE_ONLINE, actor,
+                "Order accepted - reserved stock committed");
+    }
+
+    /**
+     * Releases reserved stock for an order cancelled or rejected before
+     * acceptance ({@code PLACED &#8594; CANCELLED / REJECTED}): for every
+     * item, {@code reserved_quantity -= q} with a {@code RELEASE}
+     * movement. {@code quantity} is unchanged.
+     */
+    @Transactional
+    public void releaseReservedStock(List<StockDelta> deltas, User actor) {
+        Map<Long, Inventory> locked = lockInventoriesAscending(deltas);
+        validateReservedAboveDelta(locked, deltas);
+        applyStockChanges(locked, deltas, MovementType.RELEASE, actor,
+                "Order cancelled/rejected - reservation released");
+    }
+
+    /**
+     * Restocks a cancelled accepted order
+     * ({@code CONFIRMED &#8594; CANCELLED}): for every item,
+     * {@code quantity += q} with a {@code RESTOCK} movement.
+     * {@code reserved_quantity} is unchanged.
+     */
+    @Transactional
+    public void restockCancelledOrder(List<StockDelta> deltas, User actor) {
+        Map<Long, Inventory> locked = lockInventoriesAscending(deltas);
+        applyStockChanges(locked, deltas, MovementType.RESTOCK, actor,
+                "Order cancelled - stock restocked");
+    }
+
+    // ------------------------------------------------------------------
     // Validation
     // ------------------------------------------------------------------
 
@@ -424,6 +477,96 @@ public class InventoryService {
     private Inventory requireLockedInventory(Product product) {
         return inventoryRepository.findByProductIdForUpdate(product.getId())
                 .orElseThrow(() -> BusinessException.notFound("Inventory not found"));
+    }
+
+    /**
+     * Locks the distinct product ids in the deltas in ascending order, exactly
+     * as plan section 6.2 requires of every stock writer, so concurrent state
+     * machine transitions on the same products serialise instead of deadlocking.
+     */
+    private Map<Long, Inventory> lockInventoriesAscending(List<StockDelta> deltas) {
+        List<Long> productIds = deltas.stream()
+                .map(StockDelta::productId)
+                .distinct()
+                .sorted()
+                .toList();
+        Map<Long, Inventory> locked = new LinkedHashMap<>(productIds.size());
+        for (Long productId : productIds) {
+            locked.put(productId, requireLockedInventoryById(productId));
+        }
+        return locked;
+    }
+
+    private Inventory requireLockedInventoryById(Long productId) {
+        return inventoryRepository.findByProductIdForUpdate(productId)
+                .orElseThrow(() -> BusinessException.notFound("Inventory not found for product " + productId));
+    }
+
+    private void validateQuantityAboveReserved(Map<Long, Inventory> locked, List<StockDelta> deltas) {
+        for (StockDelta delta : deltas) {
+            Inventory inventory = locked.get(delta.productId());
+            if (inventory.getQuantity() < delta.quantity()) {
+                Product product = requireProduct(delta.productId());
+                throw BusinessException.insufficientStock(
+                        "Cannot accept order for product '" + product.getName() +
+                                "': " + inventory.getQuantity() + " unit(s) on hand, " +
+                                delta.quantity() + " required");
+            }
+        }
+    }
+
+    private void validateReservedAboveDelta(Map<Long, Inventory> locked, List<StockDelta> deltas) {
+        for (StockDelta delta : deltas) {
+            Inventory inventory = locked.get(delta.productId());
+            if (inventory.getReservedQuantity() < delta.quantity()) {
+                Product product = requireProduct(delta.productId());
+                throw BusinessException.insufficientStock(
+                        "Cannot release reservation for product '" + product.getName() +
+                                "': only " + inventory.getReservedQuantity() + " unit(s) reserved, " +
+                                delta.quantity() + " requested");
+            }
+        }
+    }
+
+    private void applyStockChanges(Map<Long, Inventory> locked, List<StockDelta> deltas,
+                                   StockMovement.MovementType type, User actor, String reason) {
+        for (StockDelta delta : deltas) {
+            Inventory inventory = locked.get(delta.productId());
+            Product product = requireProduct(delta.productId());
+
+            switch (type) {
+                case SALE_ONLINE -> {
+                    inventory.setQuantity(inventory.getQuantity() - delta.quantity());
+                    inventory.setReservedQuantity(inventory.getReservedQuantity() - delta.quantity());
+                }
+                case RELEASE -> inventory.setReservedQuantity(inventory.getReservedQuantity() - delta.quantity());
+                case RESTOCK -> inventory.setQuantity(inventory.getQuantity() + delta.quantity());
+                default -> throw new IllegalArgumentException(
+                        "Unsupported order stock movement type: " + type);
+            }
+            inventoryRepository.saveAndFlush(inventory);
+
+            stockMovementRepository.save(StockMovement.builder()
+                    .product(product)
+                    .movementType(type)
+                    .quantityDelta(deltaFor(type, delta.quantity()))
+                    .reason(reason)
+                    .actor(actor)
+                    .build());
+        }
+    }
+
+    private Product requireProduct(Long productId) {
+        return productRepository.findById(productId)
+                .orElseThrow(() -> BusinessException.notFound("Product not found: " + productId));
+    }
+
+    private int deltaFor(StockMovement.MovementType type, int quantity) {
+        return switch (type) {
+            case SALE_ONLINE, RELEASE -> -quantity;
+            case RESTOCK -> quantity;
+            default -> quantity;
+        };
     }
 
     private static int clampSize(int size) {

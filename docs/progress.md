@@ -203,6 +203,23 @@ actions, the customer and vendor order APIs, the auto-reject job, and the custom
 orders UI and vendor order board. Phase 4 (4.1–4.T) and Phase 5 (5.1–5.T) are
 complete.
 
+- [x] **6.1 — Order state machine** (Stage 1): `OrderStateMachine` is the sole service
+  for changing order status, encoding the full section 6.1 transition table
+  (including `PENDING_PAYMENT` transitions reserved for Phase 7 and customer/admin
+  cancellation transitions reserved for Phase 8), writing one `order_status_history`
+  row per transition from the injected `Clock`, publishing scalar-only domain events
+  after commit, and delegating stock side effects to `InventoryService` under the
+  agreed order-then-inventory ascending-product-id lock order. Additive Flyway
+  migration `V16__add_order_status_history_actor_type.sql` records `actor_type` on
+  the history row. Verified with an exhaustive table-driven `OrderStateMachineTest`
+  covering every `(from, to, actor)` combination (333 tests) plus focused tests for
+  reason validation, history/Clock fields, event publication, COD collection on
+  delivery, and stock delegation.
+
+Remaining Phase 6 work: vendor/customer order endpoints (6.2–6.4), the auto-reject
+job (6.5), and frontend orders UI (6.T).
+
+
 Two defects were found by the new tests and fixed during Stage 1 rather than
 worked around:
 
@@ -516,6 +533,7 @@ integration tests**, all green — `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-21 | Phase 6 Stage 1 (task 6.1): order state machine — `OrderStateMachine` is the sole service for changing order status, encoding the full plan section 6.1 transition table (including `PENDING_PAYMENT` and Phase 8-reserved transitions), writing one `order_status_history` row per transition from the injected `Clock`, publishing scalar-only domain events after commit, and delegating stock side effects to `InventoryService` under the order-then-inventory ascending-product-id lock order. Additive `V16__add_order_status_history_actor_type.sql` migration. `OrderStateMachineTest` exhaustive table-driven + focused tests: 333 tests, 0 failures. Full backend unit suite: 1084 tests, 0 failures, BUILD SUCCESS. | `backend/src/main/java/com/flowerconnect/order/service/OrderStateMachine.java`, `backend/src/main/java/com/flowerconnect/order/domain/ActorType.java`, `backend/src/main/java/com/flowerconnect/order/domain/OrderStatusHistory.java`, `backend/src/main/java/com/flowerconnect/order/event/OrderStatusChanged.java`, `backend/src/main/java/com/flowerconnect/order/event/OrderCancelled.java`, `backend/src/main/java/com/flowerconnect/order/event/OrderDelivered.java`, `backend/src/main/java/com/flowerconnect/order/repository/OrderRepository.java`, `backend/src/main/java/com/flowerconnect/inventory/service/InventoryService.java`, `backend/src/main/java/com/flowerconnect/inventory/domain/StockDelta.java`, `backend/src/main/resources/db/migration/V16__add_order_status_history_actor_type.sql`, `backend/src/test/java/com/flowerconnect/order/service/OrderStateMachineTest.java`, `docs/progress.md`, `docs/decisions.md` |
 | 2026-10-21 | D-1 fix deployed to the development frontend: the shared header no longer queries the customer cart for anonymous visitors, and the axios interceptor no longer starts a futile refresh/logout when there is no access token — `useCart()` gained an optional `enabled` flag (default `true`), the header gates on `isAuthenticated && user?.role === "CUSTOMER"`, and the interceptor rejects a 401 when no session exists. 736 frontend tests pass; typecheck, lint and build clean; the frontend image `sha256:a049c351bba3…` was rebuilt from the working tree and only the frontend container recreated, with all four services healthy; the six public routes were re-verified through Playwright MCP against the deployed build with zero cart/refresh/logout requests and zero console errors (D-41) | `frontend/src/features/cart/queries.ts`, `frontend/src/app/components/SiteHeader.tsx`, `frontend/src/shared/lib/api.ts`, `frontend/src/app/components/SiteHeader.test.tsx`, `frontend/src/shared/lib/api.test.ts`, `docs/progress.md`, `docs/decisions.md` |
 | 2026-10-20 | Gate E final verification: D-37's browser-verification statements corrected to record the real-Chromium outcome and the stubbed catalogue responses, and two follow-ups recorded — the `docs/decisions.md` encoding and the root route-transition remount | `docs/decisions.md`, `docs/progress.md` |
 | 2026-10-19 | Gate E remediation: the product detail is an explicit overlay of its parent surface (D-37), the product route is nested under the search surface as well as the storefront, the search filters moved to an in-memory store so they survive the route remount, and the quantity bound, primary-image selection and malformed-id guards were added; Stage 1 documentation corrections for the Phase 4 notes and D-36–D-40 | `frontend/src/features/customer/**` (navigation.ts and stores/search-store.ts new; ProductDetailPage, VendorStorefrontPage, SearchPage, ProductCard, ProductGrid, queries.ts), `frontend/src/app/router.tsx`, `frontend/src/app/router.test.tsx`, `docs/progress.md`, `docs/decisions.md`, `docs/rbac-matrix.md` |

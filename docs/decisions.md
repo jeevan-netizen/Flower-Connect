@@ -2075,3 +2075,64 @@ The same query also raised a 403 for a florist and an admin, who have no cart ei
   against the deployed build, with zero cart, refresh or logout requests and zero console
   errors. The signed-in customer flow remains unverified in a browser, because no approved
   test credentials are available; the unit and integration suites remain its coverage.
+## D-42: Order state machine owns every order status transition
+
+**Status:** Accepted
+**Date:** Phase 6 (task 6.1)
+
+### Context
+
+Plan section 6.1 requires a single service for changing order status, validated
+against the full state-machine table (illegal transition -> 409), with one
+order_status_history row per transition. Phase 5 wrote only the initial
+checkout row (rom_status = null, 	o_status = PLACED) and left every
+subsequent transition to Phase 6. No order endpoints exist yet; Stage 1 implements
+and unit-tests the state machine only.
+
+### Decision
+
+- OrderStateMachine (com.flowerconnect.order.service) is the sole service
+  for changing Order#status. No other class may set it.
+- Public API: 	ransition(orderId, toStatus, actorType, actorUserId, reason),
+  where ctorType is CUSTOMER, VENDOR, ADMIN or SYSTEM and
+  ctorUserId is populated for named users and null for SYSTEM.
+- The entire section 6.1 (from, to, actor) table is encoded as one immutable
+  map (TRANSITIONS). PENDING_PAYMENT transitions are included even though
+  online payment is unreachable until Phase 7; customer/admin cancellation
+  transitions are included even though their endpoints are reserved for Phase 8.
+- DELIVERED, CANCELLED and REJECTED are terminal. A reason is required for
+  vendor reject, vendor cancel and admin cancel.
+- Every successful transition locks the order row first (indByIdForUpdate),
+  re-checks the current status under that lock, writes exactly one
+  order_status_history row (from/to, actor type, actor user id, reason,
+  timestamp from the injected Clock), updates the order, and publishes
+  scalar-only OrderStatusChanged plus OrderCancelled (cancellations) or
+  OrderDelivered (delivery) after the transaction commits.
+- Stock side effects go through InventoryService (commitReservedStock,
+  eleaseReservedStock, estockCancelledOrder), with inventory rows locked
+  in ascending product-id order after the order lock:
+  PLACED -> CONFIRMED commits reserved stock (quantity -= q,
+  eserved_quantity -= q, SALE_ONLINE) and re-checks quantity >= q (409
+  otherwise); PLACED -> REJECTED/CANCELLED releases the reservation
+  (RELEASE); CONFIRMED -> CANCELLED restocks (RESTOCK); cancellations from
+  PREPARING/OUT_FOR_DELIVERY do not restock; OUT_FOR_DELIVERY -> DELIVERED
+  sets payment_status = COLLECTED for COD.
+- order_status_history gains a nullable ctor_type VARCHAR(16) column via
+  additive migration V16__add_order_status_history_actor_type.sql; the Phase 5
+  checkout row keeps a null ctor_type, so no second transition is created and
+  no applied migration is edited.
+
+### Concurrency
+
+Lock order is order row first, then inventory rows in ascending product id.
+Vendor accept/reject, auto-reject and duplicate actions all re-check the order
+status under the lock, so a repeated or conflicting transition returns 409 and
+REJECTED/CANCELLED orders free their slot capacity automatically (Phase 5
+counts only PLACED and CONFIRMED).
+
+### Deferred
+
+Auto-reject configuration (platform_config table), order endpoint security,
+customer/admin cancellation endpoints, CancellationService, Phase 7
+payments/expiry, Phase 9 notifications and Phase 10 commission/ledger work are
+deliberately out of scope for Stage 1.
