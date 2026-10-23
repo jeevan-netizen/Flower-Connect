@@ -1,8 +1,7 @@
 import { useLocation, Outlet, RouterProvider, createBrowserRouter } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { AnimatedPage } from "@/motion/AnimatedPage";
-import { FadeIn } from "@/motion/FadeIn";
-import { useInitAuth, RequireAuth, RequireUnauth } from "@/features/auth/hooks/useAuth";
+import { useInitAuth, RequireUnauth } from "@/features/auth/hooks/useAuth";
 import { SiteHeader } from "@/app/components/SiteHeader";
 import { HomePage } from "@/features/home/pages/HomePage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
@@ -18,12 +17,15 @@ import { VendorHoursPage } from "@/features/vendor/pages/VendorHoursPage";
 import { VendorCatalogPage } from "@/features/vendor/pages/VendorCatalogPage";
 import { VendorProductFormPage } from "@/features/vendor/pages/VendorProductFormPage";
 import { VendorInventoryPage } from "@/features/vendor/pages/VendorInventoryPage";
+import { VendorOrderBoardPage } from "@/features/vendor/orders/pages/VendorOrderBoardPage";
 import { CartPage } from "@/features/cart/pages/CartPage";
 import { CheckoutPage } from "@/features/checkout/pages/CheckoutPage";
 import { BrowsePage } from "@/features/customer/pages/BrowsePage";
 import { SearchPage } from "@/features/customer/pages/SearchPage";
 import { VendorStorefrontPage } from "@/features/customer/pages/VendorStorefrontPage";
 import { ProductDetailPage } from "@/features/customer/pages/ProductDetailPage";
+import { OrderHistoryPage } from "@/features/customer/orders/pages/OrderHistoryPage";
+import { OrderDetailPage } from "@/features/customer/orders/pages/OrderDetailPage";
 import { PRODUCT_ROUTE_IDS } from "@/features/customer/navigation";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
@@ -71,15 +73,6 @@ function Layout() {
         &copy; 2026 FlowerConnect
       </footer>
     </div>
-  );
-}
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <FadeIn className="max-w-7xl mx-auto px-4 py-12">
-      <h2 className="text-2xl font-semibold">{title}</h2>
-      <p className="mt-2 text-slate-600">Phase 0 placeholder page.</p>
-    </FadeIn>
   );
 }
 
@@ -159,9 +152,17 @@ export const router = createBrowserRouter([
       {
         path: "orders",
         element: (
-          <RequireAuth>
-            <Placeholder title="Orders" />
-          </RequireAuth>
+          <ProtectedRoute roles={[CUSTOMER_ROLE]}>
+            <OrderHistoryPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "orders/:orderId",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE]}>
+            <OrderDetailPage />
+          </ProtectedRoute>
         ),
       },
       { path: "login", element: <RequireUnauth><LoginPage /></RequireUnauth> },
@@ -200,6 +201,11 @@ export const router = createBrowserRouter([
           { path: "catalog/new", element: gated(<VendorProductFormPage />) },
           { path: "catalog/:productId", element: gated(<VendorProductFormPage />) },
           { path: "inventory", element: gated(<VendorInventoryPage />) },
+          // Phase 6 vendor order board (task 6.7). Orders are the vendor's own
+          // existing in-flight orders, so a suspended vendor can still reach it
+          // — the backend enforces FLORIST role plus per-order ownership, but
+          // deliberately not @RequiresApprovedVendor (D-6 / D-43).
+          { path: "orders", element: <VendorOrderBoardPage /> },
         ],
       },
       {

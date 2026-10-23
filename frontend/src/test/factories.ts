@@ -11,6 +11,11 @@ import type {
   VendorProfile,
   VendorStatus,
 } from "@/features/vendor/types";
+import type {
+  VendorOrderResponse,
+  VendorOrderPageResponse,
+  VendorOrderSummaryResponse,
+} from "@/features/vendor/orders/types";
 import type { CartItem, CartResponse, CartShopView } from "@/features/cart/types";
 import type {
   AddressResponse,
@@ -32,6 +37,16 @@ import type {
   Storefront,
   StorefrontHour,
 } from "@/features/customer/types";
+import type {
+  CustomerOrderItemResponse,
+  CustomerOrderListItem,
+  CustomerOrderPageResponse,
+  CustomerOrderResponse,
+  CustomerOrderTimelineEntry,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from "@/features/customer/orders/types";
 import type { PageResponse } from "@/shared/types";
 
 /**
@@ -552,6 +567,161 @@ export function makeStorefront(overrides: Partial<Storefront> = {}): Storefront 
     acceptingOrders: true,
     hours: [makeStorefrontHour()],
     products: makePage([makePublicProduct()]),
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Customer order fixtures (plan Phase 6, task 6.6)                           */
+/* -------------------------------------------------------------------------- */
+
+export function makeCustomerOrderListItem(
+  overrides: Partial<CustomerOrderListItem> = {},
+): CustomerOrderListItem {
+  return {
+    id: 5001,
+    status: "PLACED" as OrderStatus,
+    paymentMethod: "COD" as PaymentMethod,
+    paymentStatus: "PENDING" as PaymentStatus,
+    vendorName: "Petal & Stem",
+    total: 1823,
+    createdAt: "2026-10-01T10:00:00",
+    slotStart: "2026-10-03T10:00:00",
+    slotEnd: "2026-10-03T11:00:00",
+    ...overrides,
+  };
+}
+
+export function makeCustomerOrderPageResponse(
+  overrides: Partial<CustomerOrderPageResponse> = {},
+): CustomerOrderPageResponse {
+  return {
+    content: [makeCustomerOrderListItem()],
+    page: 0,
+    size: 20,
+    totalElements: 1,
+    totalPages: 1,
+    first: true,
+    last: true,
+    empty: false,
+    ...overrides,
+  };
+}
+
+export function makeCustomerOrderItemResponse(
+  overrides: Partial<CustomerOrderItemResponse> = {},
+): CustomerOrderItemResponse {
+  return {
+    productName: "Red Rose Bouquet",
+    quantity: 2,
+    priceSnapshot: 899,
+    subtotal: 1798,
+    note: null,
+    ...overrides,
+  };
+}
+
+export function makeCustomerOrderTimelineEntry(
+  overrides: Partial<CustomerOrderTimelineEntry> = {},
+): CustomerOrderTimelineEntry {
+  return {
+    fromStatus: null,
+    toStatus: "PLACED" as OrderStatus,
+    actorType: "SYSTEM",
+    actorName: null,
+    reason: null,
+    createdAt: "2026-10-01T10:00:00",
+    ...overrides,
+  };
+}
+
+export function makeCustomerOrderResponse(
+  overrides: Partial<CustomerOrderResponse> = {},
+): CustomerOrderResponse {
+  return {
+    id: 5001,
+    status: "PLACED" as OrderStatus,
+    paymentMethod: "COD" as PaymentMethod,
+    paymentStatus: "PENDING" as PaymentStatus,
+    vendorName: "Petal & Stem",
+    subtotal: 1798,
+    deliveryFee: 25,
+    platformFee: 0,
+    total: 1823,
+    createdAt: "2026-10-01T10:00:00",
+    updatedAt: "2026-10-01T10:00:00",
+    deliveryAddressLine1: "12 MG Road",
+    deliveryAddressLine2: "Unit 3",
+    deliveryLatitude: 12.971199,
+    deliveryLongitude: 77.640586,
+    slotStart: "2026-10-03T10:00:00",
+    slotEnd: "2026-10-03T11:00:00",
+    note: null,
+    items: [makeCustomerOrderItemResponse()],
+    timeline: [makeCustomerOrderTimelineEntry()],
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Vendor order fixtures (plan Phase 6, tasks 6.2-6.4)                        */
+/* -------------------------------------------------------------------------- */
+
+export function makeVendorOrderResponse(
+  overrides: Partial<{
+    id: number;
+    status: OrderStatus;
+    paymentStatus: string;
+    total: number;
+    createdAt: string;
+    slotStart: string | null;
+    slotEnd: string | null;
+    deliveryAddressLine1: string;
+    deliveryAddressLine2: string | null;
+    note: string | null;
+  }> = {},
+): VendorOrderResponse {
+  return {
+    id: 5001,
+    status: "PLACED" as OrderStatus,
+    paymentStatus: "PENDING",
+    total: 1823,
+    createdAt: "2026-10-01T10:00:00",
+    slotStart: "2026-10-03T10:00:00",
+    slotEnd: "2026-10-03T11:00:00",
+    deliveryAddressLine1: "12 MG Road",
+    deliveryAddressLine2: "Unit 3",
+    note: null,
+    ...overrides,
+  };
+}
+
+export function makeVendorOrderPageResponse(
+  overrides: Partial<VendorOrderPageResponse> = {},
+): VendorOrderPageResponse {
+  const content = overrides.content ?? [makeVendorOrderResponse()];
+  return {
+    content,
+    page: 0,
+    size: 20,
+    totalElements: content.length,
+    totalPages: 1,
+    first: true,
+    last: true,
+    empty: content.length === 0,
+    ...overrides,
+  };
+}
+
+export function makeVendorOrderSummaryResponse(
+  overrides: Partial<VendorOrderSummaryResponse> = {},
+): VendorOrderSummaryResponse {
+  return {
+    today: "2026-10-02",
+    ordersByStatus: { PLACED: 1 } as Record<OrderStatus, number>,
+    todayOrderCount: 1,
+    todayTotalValue: 1823,
+    expectedCodCash: 1823,
     ...overrides,
   };
 }
