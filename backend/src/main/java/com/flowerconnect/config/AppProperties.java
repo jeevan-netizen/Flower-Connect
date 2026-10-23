@@ -16,6 +16,15 @@ public class AppProperties {
     private String autoRejectCron = "0 0 * * * ?";
     private int autoRejectBatchSize = 100;
 
+    /**
+     * Time-to-live (minutes) for a simulated online payment intent. After the
+     * TTL elapses the intent expires and the pending order can no longer be
+     * resumed through {@code POST /api/v1/payments/{orderId}/resume}.
+     * Override with {@code APP_PAYMENT_INTENT_TTL_MINUTES} or
+     * {@code app.payment-intent-ttl-minutes}.
+     */
+    private int intentTtlMinutes = 30;
+
     public String getBaseUrl() {
         return baseUrl;
     }
@@ -103,5 +112,13 @@ public class AppProperties {
 
     public void setAutoRejectBatchSize(int autoRejectBatchSize) {
         this.autoRejectBatchSize = autoRejectBatchSize;
+    }
+
+    public int getIntentTtlMinutes() {
+        return intentTtlMinutes;
+    }
+
+    public void setIntentTtlMinutes(int intentTtlMinutes) {
+        this.intentTtlMinutes = intentTtlMinutes;
     }
 }

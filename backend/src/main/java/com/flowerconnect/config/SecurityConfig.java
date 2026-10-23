@@ -100,6 +100,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/addresses/**").hasRole("CUSTOMER")
                 .requestMatchers("/api/v1/cart/**").hasRole("CUSTOMER")
                  .requestMatchers("/api/v1/checkout/**").hasRole("CUSTOMER")
+                 // Customer payments (Phase 7, task 7.4): fetch/resume payment
+                 // state for the authenticated customer's own orders/groups.
+                 .requestMatchers("/api/v1/payments/**").hasRole("CUSTOMER")
                  // Customer order history and detail (plan Phase 6, task 6.3):
                  // only the authenticated customer's own orders, newest first.
                  .requestMatchers("/api/v1/orders/**").hasRole("CUSTOMER")

@@ -68,6 +68,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByVendorIdOrderByCreatedAtDesc(Long vendorId, Pageable pageable);
 
     /**
+     * One page of the vendor's own orders excluding {@link OrderStatus#PENDING_PAYMENT},
+     * newest first. Orders that are still awaiting payment are not yet
+     * actionable by the vendor and are hidden from vendor lists, board queries
+     * and summaries until payment succeeds and the order transitions to
+     * {@code PLACED} (Phase 7, task 7.4).
+     */
+    Page<Order> findByVendorIdAndStatusNotOrderByCreatedAtDesc(Long vendorId, OrderStatus status,
+                                                               Pageable pageable);
+
+    /**
      * One page of the vendor's orders in a single status, newest first.
      */
     Page<Order> findByVendorIdAndStatusOrderByCreatedAtDesc(Long vendorId, OrderStatus status,

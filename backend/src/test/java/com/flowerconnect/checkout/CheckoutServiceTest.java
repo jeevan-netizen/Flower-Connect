@@ -1047,6 +1047,7 @@ class CheckoutServiceTest {
             sb.append("clientOrderId:").append(clientOrderId).append("|");
             sb.append("address:").append(addressId).append("|");
             sb.append("quoteHash:").append(quoteHash).append("|");
+            sb.append("paymentMethod:COD|");
             sb.append("items:");
             List<CheckoutRequest.CheckoutItem> sorted = new ArrayList<>(items);
             sorted.sort(Comparator.comparing(CheckoutRequest.CheckoutItem::getVendorId));

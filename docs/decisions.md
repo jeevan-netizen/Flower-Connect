@@ -2274,3 +2274,30 @@ Phase 7 introduces payments for checkout. Stage 1 supports cash-on-delivery (COD
 - `V19` is additive; no applied migration is edited (ADR-002/D-9).
 - `PENDING_PAYMENT` consuming slot capacity means an order awaiting payment blocks a slot until it transitions out, which is intentional (prevents slot hoarding while still reserving capacity).
 
+## D-48: Online checkout creates shared simulated payment intent and PENDING_PAYMENT orders
+
+**Status:** Accepted
+**Date:** Phase 7 Stage 2 (task 7.4 part 1)
+
+### Context
+
+Stage 1 of Phase 7 supports COD only. Stage 2 part 1 introduces online checkout without a real payment gateway — the intent is simulated so the frontend can exercise the resume/pay flow end to end in tests. Decisions to settle: where the intent lives, how a shared intent groups multiple orders, how resume transitions work, and RBAC for payment endpoints.
+
+### Decision
+
+- **`PaymentIntent` is a separate entity** (`com.flowerconnect.payment.domain.PaymentIntent`, `IntentStatus` CREATED/PAID/EXPIRED/FAILED) with a `payment_intents` table created by additive migration `V20`. One intent per payment group, keyed by `payment_group_id` (VARCHAR(36), unique).
+- **Online checkout creates one shared intent + one `PENDING` payment per order.** All orders in a multi-vendor checkout share the same `payment_group_id` and the same intent reference (`intent_sim_<uuid>`). Orders start `PENDING_PAYMENT`; stock is reserved via `RESERVE` movement but quantity is untouched. Intent expires after `app.intentTtlMinutes` (default 30).
+- **`resumePayment` transitions `PENDING_PAYMENT -> PLACED` exclusively through `OrderStateMachine`** (ActorType.SYSTEM, SideEffect.NONE since stock already reserved), then syncs `payments.status` to PAID, `orders.payment_status` to PAID, and intent status to PAID — all in one transaction. Expired intent (past `expiresAt`) is rejected with 409.
+- **`fetchPaymentState` and `fetchGroupState` are read-only views** scoped to the owning customer. RBAC: `/api/v1/payments/**` ? `hasRole("CUSTOMER")`. Florist and admin are 403; unauthenticated is 401.
+- **`OrderStateMachine` dependency on `PaymentService` is broken via `ObjectProvider`** (circular dependency: `PaymentService ? OrderStateMachine ? PaymentService`). `OrderStateMachineProvider.getObject()` resolves lazily at call time.
+- **`PENDING_PAYMENT` is excluded from vendor order list and summary** (`VendorOrderService`) since it's not yet an actionable order — the customer hasn't paid yet.
+- **`created_at`/`updated_at` on `PaymentIntent` use `@CreationTimestamp`/`@UpdateTimestamp`** (Hibernate) so manually created intents in tests persist correctly.
+
+### Consequences
+
+- COD path is unchanged from Stage 1; `paymentMethod` defaults to COD in `CheckoutRequest`/`CheckoutQuoteRequest`.
+- No external gateway, no card data, no secrets stored — the simulated intent is test-only scaffolding for Stage 2 part 1. A real online provider (intent creation, webhooks, capture) is deferred to a later Phase 7 step.
+- `V20` is additive; no applied migration is edited (ADR-002/D-9).
+- 7 integration tests + 17 unit tests + 9 slice RBAC tests all green; full backend unit suite 1133 tests pass.
+
+

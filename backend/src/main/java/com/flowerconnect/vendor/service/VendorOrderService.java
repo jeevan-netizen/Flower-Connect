@@ -144,7 +144,12 @@ public class VendorOrderService {
         VendorProfile profile = requireOwnProfile(authenticatedEmail);
         Long vendorId = profile.getId();
         Page<Order> page;
-        if (status != null && from != null && to != null) {
+        // PENDING_PAYMENT orders are not yet actionable by the vendor: they
+        // await payment and are hidden from vendor lists/summaries until the
+        // customer pays and the order transitions to PLACED (task 7.4).
+        if (status == OrderStatus.PENDING_PAYMENT) {
+            page = Page.empty(pageable);
+        } else if (status != null && from != null && to != null) {
             page = orderRepository.findByVendorIdAndStatusAndCreatedAtBetweenOrderByCreatedAtDesc(
                     vendorId, status, from, to, pageable);
         } else if (status != null) {
@@ -153,7 +158,8 @@ public class VendorOrderService {
             page = orderRepository.findByVendorIdAndCreatedAtBetweenOrderByCreatedAtDesc(
                     vendorId, from, to, pageable);
         } else {
-            page = orderRepository.findByVendorIdOrderByCreatedAtDesc(vendorId, pageable);
+            page = orderRepository.findByVendorIdAndStatusNotOrderByCreatedAtDesc(
+                    vendorId, OrderStatus.PENDING_PAYMENT, pageable);
         }
         return toPageResponse(page);
     }
@@ -219,6 +225,11 @@ public class VendorOrderService {
         BigDecimal todayTotalValue = BigDecimal.ZERO;
         BigDecimal expectedCodCash = BigDecimal.ZERO;
         for (Order order : orders) {
+            // PENDING_PAYMENT orders await payment and are hidden from the
+            // vendor summary until paid (task 7.4).
+            if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+                continue;
+            }
             counts.merge(order.getStatus(), 1L, Long::sum);
             if (order.getStatus() != OrderStatus.CANCELLED && order.getStatus() != OrderStatus.REJECTED) {
                 todayTotalValue = todayTotalValue.add(order.getTotal());
