@@ -88,7 +88,7 @@ describe("VendorLayout", () => {
 
     await screen.findByRole("navigation", { name: /vendor/i });
 
-    ["Orders", "Payments", "Delivery tracking"].forEach((label) => {
+    ["Payments", "Delivery tracking"].forEach((label) => {
       expect(screen.queryByRole("link", { name: new RegExp(label, "i") })).not.toBeInTheDocument();
     });
   });

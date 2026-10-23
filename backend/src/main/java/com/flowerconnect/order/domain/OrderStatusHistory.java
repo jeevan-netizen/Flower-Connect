@@ -17,9 +17,10 @@ import java.time.LocalDateTime;
  * never updated or deleted, so there is no {@code updatedAt}.
  *
  * <p>{@code from_status} and {@code to_status} use the exact same MySQL ENUM
- * value list and ordering as {@code orders.status} (D-20). In Phase 5 only the
- * initial ({@code fromStatus = null}, {@code toStatus = PLACED}) row is
- * written. Phase 6 extends the write path to every subsequent transition.
+ * value list and ordering as {@code orders.status} (D-20). {@code actor_type}
+ * records whether the transition was driven by {@code CUSTOMER},
+ * {@code VENDOR}, {@code ADMIN} or {@code SYSTEM}; {@code actor_user_id} is
+ * populated when the actor is a named user and left null for {@code SYSTEM}.
  */
 @Entity
 @Table(name = "order_status_history")
@@ -52,6 +53,10 @@ public class OrderStatusHistory {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "actor_user_id")
     private User actor;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "actor_type", length = 16)
+    private ActorType actorType;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

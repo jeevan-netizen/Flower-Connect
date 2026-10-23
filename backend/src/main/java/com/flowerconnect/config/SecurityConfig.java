@@ -100,6 +100,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/addresses/**").hasRole("CUSTOMER")
                 .requestMatchers("/api/v1/cart/**").hasRole("CUSTOMER")
                  .requestMatchers("/api/v1/checkout/**").hasRole("CUSTOMER")
+                 // Customer order history and detail (plan Phase 6, task 6.3):
+                 // only the authenticated customer's own orders, newest first.
+                 .requestMatchers("/api/v1/orders/**").hasRole("CUSTOMER")
                  // Slot discovery endpoint - CUSTOMER only with address ownership and vendor approval checks in handler.
                  // The path must be written in the same shape as the controller's own mapping
                  // (SlotController: @RequestMapping("/api/v1/vendors") + @GetMapping("/{vendorId}/slots")).
@@ -109,6 +112,11 @@ public class SecurityConfig {
                  // and the request was answered with a container-generated HTML 500 instead of the
                  // application's error envelope. See SecurityMatcherIntegrationTest.
                  .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/slots").hasRole("CUSTOMER")
+                 // Phase 6 vendor order API (task 6.2/6.4): the order action, list and summary
+                 // routes live under the singular /api/v1/vendor/ base, so they need their own
+                 // FLORIST rule alongside the plural /api/v1/vendors/** namespace used by the
+                 // catalog, inventory, profile and slots routes.
+                 .requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")
                 // Public customer discovery: storefront and product detail are readable
                 // anonymously; authorization/visibility is enforced per handler.
                 // These exceptions must precede the /api/v1/vendors/** FLORIST rule.

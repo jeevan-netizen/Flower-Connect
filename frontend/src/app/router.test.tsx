@@ -6,6 +6,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createTestQueryClient } from "@/test/render";
 import {
   makeCartResponse,
+  makeCustomerOrderPageResponse,
+  makeCustomerOrderResponse,
   makeDiscoveryVendor,
   makeInventory,
   makePage,
@@ -127,6 +129,15 @@ vi.mock("@/features/cart/api", () => ({
   clearCart: vi.fn(),
 }));
 
+/**
+ * The orders API is stubbed because the customer orders page reads it on every
+ * visit, and the route must render for the guard to be observable.
+ */
+vi.mock("@/features/customer/orders/api", () => ({
+  fetchOrders: vi.fn().mockResolvedValue(makeCustomerOrderPageResponse()),
+  fetchOrder: vi.fn().mockResolvedValue(makeCustomerOrderResponse()),
+}));
+
 vi.mock("@/features/auth/stores/auth-store", () => ({
   useAuthStore: (selector?: (s: typeof mockState) => unknown) => {
     const state = {
@@ -222,6 +233,7 @@ describe("application router", () => {
       "catalog/new",
       "catalog/:productId",
       "inventory",
+      "orders",
     ]);
   });
 
@@ -348,7 +360,7 @@ describe("application router", () => {
     renderAt("/orders");
 
     await waitFor(() => {
-      expect(screen.getByRole("heading", { name: "Orders" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Your orders" })).toBeInTheDocument();
     });
     // A customer never sees the vendor entry point in the customer navigation.
     expect(screen.queryByRole("link", { name: "Vendor" })).not.toBeInTheDocument();
