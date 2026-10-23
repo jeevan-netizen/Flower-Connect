@@ -2246,3 +2246,31 @@ explicitly defers runtime settings to Phase 10.
 - The auto-reject job is disabled in the test profile
   (`app.auto-reject-cron: "-"`) and driven directly with the `MutableClock` bean,
   following the `InventoryExpiryScheduler` precedent.
+## D-47: COD-only payments model for Phase 7 Stage 1
+
+**Status:** Accepted
+**Date:** Phase 7 (task 7.1-7.2)
+
+### Context
+
+Phase 7 introduces payments for checkout. Stage 1 supports cash-on-delivery (COD) only; online payment (intents, webhooks, capture, refund) is deferred to a later Phase 7 step. The decisions to settle: where payment status lives, who writes it, how COD collection works at delivery, and what happens to payment status when an order is rejected or cancelled before delivery.
+
+### Decision
+
+- **`PaymentService` is the sole writer of payment status.** No controller, repository, or state-machine code writes `orders.payment_status` or `payments.status` directly; all payment transitions go through `PaymentService`.
+- **`PaymentGateway` abstraction with a `CodPaymentProvider` implementation.** The COD provider makes no external call and no network request; it only persists a `PENDING` payment record during checkout. A later online phase adds provider implementations for intent creation, confirmation, webhook handling, capture and refund.
+- **One `payments` row per order (1:1).** `payments.order_id` is unique. The row holds method, provider, amount, status and nullable `collected_at`; a nullable `payment_group_id` is reserved for the later shared online payment intent.
+- **Additive `V19` migration** creates `payments` and `payment_events`, backfills one payment row per existing order (preserving existing `payment_status`, including `COLLECTED`), and adds `idx_osh_to_status_created_at` so the auto-reject age query can measure age from entry into `PLACED`.
+- **Option B for pre-delivery transitions:** a COD order that is rejected or cancelled before delivery keeps both `payments.status` and `orders.payment_status` at `PENDING` --- no collection was attempted, so `PaymentService` makes no change. This avoids writing a payment status that must later be reversed.
+- **`collectPayment` transitions `PENDING -> COLLECTED` at delivery.** It updates `payments.status`, `orders.payment_status` and stamps `collected_at` from the injected `Clock` in one transaction, and rejects non-COD orders and non-pending payments with 409 `CONFLICT`.
+- **`PENDING_PAYMENT` counts toward slot capacity** (`countBookedOrdersForSlot` includes `PLACED`, `CONFIRMED`, `PENDING_PAYMENT`) so an order awaiting payment still occupies a slot.
+- **Auto-reject age is measured from the `PLACED` history entry** (`order_status_history.to_status = PLACED`), not `orders.created_at`, via the new `findPlacedStaleBefore` query, so an order that sat in `PENDING_PAYMENT` before becoming `PLACED` starts its auto-reject clock at the `PLACED` transition.
+- **No real online provider, webhook, refund or capture; no card data or secrets stored.** All of that is deferred to a later Phase 7 step.
+
+### Consequences
+
+- Payment status is consistent between `payments` and `orders` because `PaymentService` updates both in one transaction.
+- Reject/cancel before delivery is safe under Option B: the payment stays `PENDING` and can be collected later if the order is reinstated, or left as-is if the order is terminal.
+- `V19` is additive; no applied migration is edited (ADR-002/D-9).
+- `PENDING_PAYMENT` consuming slot capacity means an order awaiting payment blocks a slot until it transitions out, which is intentional (prevents slot hoarding while still reserving capacity).
+

@@ -11,6 +11,7 @@ import com.flowerconnect.order.event.OrderStatusChanged;
 import com.flowerconnect.order.repository.OrderItemRepository;
 import com.flowerconnect.order.repository.OrderRepository;
 import com.flowerconnect.order.repository.OrderStatusHistoryRepository;
+import com.flowerconnect.payment.service.PaymentService;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.inventory.domain.StockDelta;
 import com.flowerconnect.inventory.service.InventoryService;
@@ -54,6 +55,7 @@ public class OrderStateMachine {
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final InventoryService inventoryService;
     private final UserRepository userRepository;
+    private final PaymentService paymentService;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -169,10 +171,13 @@ public class OrderStateMachine {
         // 6. Stock side effects under inventory locks (ascending product id).
         applyStockSideEffects(order, transition.sideEffect(), actor);
 
-        // 7. Delivery: record COD collection.
+        // 7. Delivery: record COD collection through PaymentService, which
+        //    updates payments.status and orders.payment_status together and
+        //    stamps collected_at from the injected Clock. Replaces the
+        //    direct payment_status write that previously lived here.
         if (transition.sideEffect() == SideEffect.DELIVER &&
                 order.getPaymentMethod() == Order.PaymentMethod.COD) {
-            order.setPaymentStatus(Order.PaymentStatus.COLLECTED);
+            paymentService.collectPayment(order.getId());
         }
 
         // 8. Update the order status.

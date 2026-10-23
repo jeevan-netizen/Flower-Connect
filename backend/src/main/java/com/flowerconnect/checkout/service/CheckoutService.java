@@ -31,6 +31,7 @@ import com.flowerconnect.order.domain.OrderStatusHistory;
 import com.flowerconnect.order.repository.OrderItemRepository;
 import com.flowerconnect.order.repository.OrderRepository;
 import com.flowerconnect.order.repository.OrderStatusHistoryRepository;
+import com.flowerconnect.payment.service.PaymentService;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
 import lombok.RequiredArgsConstructor;
@@ -96,6 +97,7 @@ public class CheckoutService {
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final CheckoutIdempotencyRepository idempotencyRepository;
+    private final PaymentService paymentService;
     private final Clock clock;
     private final SlotValidationService slotValidationService;
 
@@ -590,6 +592,11 @@ public class CheckoutService {
                     .slotEnd(slotEnd)
                     .build();
             orderRepository.saveAndFlush(order);
+
+            // Create one COD payment row per order inside the checkout
+            // transaction; any failure rolls back orders, payments and
+            // reservations together.
+            paymentService.createCodPayment(order, order.getTotal());
 
             // Create order items and append StockMovement for each
             List<CheckoutResponse.OrderItemSummary> orderItemSummaries = new ArrayList<>();

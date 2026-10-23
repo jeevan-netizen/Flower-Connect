@@ -32,6 +32,7 @@ import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
 import com.flowerconnect.catalog.repository.CategoryRepository;
 import com.flowerconnect.catalog.repository.ProductRepository;
+import com.flowerconnect.payment.domain.Payment;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -85,6 +86,8 @@ class CheckoutServiceTest {
     private java.time.Clock clock;
     @Mock
     private SlotValidationService slotValidationService;
+    @Mock
+    private com.flowerconnect.payment.service.PaymentService paymentService;
 
     @InjectMocks
     private CheckoutService checkoutService;
@@ -575,6 +578,9 @@ class CheckoutServiceTest {
         // Verify cart items deleted
         verify(cartItemRepository).deleteAllByCartId(1L);
 
+        // Verify COD payment row created
+        verify(paymentService).createCodPayment(any(Order.class), any(BigDecimal.class));
+
         // Verify stock movement recorded
         verify(stockMovementRepository).saveAndFlush(argThat(sm ->
                 sm.getMovementType() == StockMovement.MovementType.RESERVE
@@ -1019,6 +1025,18 @@ class CheckoutServiceTest {
         });
         when(stockMovementRepository.saveAndFlush(any(StockMovement.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderStatusHistoryRepository.saveAndFlush(any(OrderStatusHistory.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentService.createCodPayment(any(Order.class), any(BigDecimal.class)))
+                .thenAnswer(inv -> {
+                    Order o = inv.getArgument(0);
+                    return Payment.builder()
+                            .id(3001L)
+                            .order(o)
+                            .method(com.flowerconnect.payment.domain.Payment.PaymentMethod.COD)
+                            .provider("cod")
+                            .amount(o.getTotal())
+                            .status(com.flowerconnect.payment.domain.Payment.PaymentStatus.PENDING)
+                            .build();
+                });
     }
 
     private String computeFingerprint(Long userId, UUID clientOrderId, Long addressId,
