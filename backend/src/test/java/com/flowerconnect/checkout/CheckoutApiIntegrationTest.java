@@ -51,7 +51,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
@@ -95,8 +97,25 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "password123";
     private static final String KORAMANGALA_PINCODE = "560034";
-    // Wednesday 12:00:00 IST = 06:30:00 UTC (150m ahead > 120m lead time, 60m duration ends at 13:00 < 18:00)
-    private static final String SLOT = "2026-10-22T06:30:00";
+    // A future delivery slot, expressed as a naive UTC datetime string (matches
+    // the format parsed by SlotValidationService.parseAndNormalize). Computed
+    // once when the test class loads so it stays valid as the calendar date rolls:
+    // Koramangala (pincode 560034) is Asia/Kolkata, vendor hours are 09:00-18:00
+    // IST with a 60-minute slot duration, so 12:00 IST is grid-aligned and within
+    // operating hours. If today's 12:00 slot is already within the minimum lead
+    // time, tomorrow's 12:00 IST is used instead.
+    private static final String SLOT = futureSlotStart();
+
+    private static String futureSlotStart() {
+        ZoneId vendorZone = ZoneId.of("Asia/Kolkata");
+        ZonedDateTime now = ZonedDateTime.now(vendorZone);
+        ZonedDateTime candidate = ZonedDateTime.of(now.toLocalDate(), LocalTime.of(12, 0), vendorZone);
+        if (candidate.isBefore(now.plusMinutes(120))) {
+            candidate = ZonedDateTime.of(now.toLocalDate().plusDays(1), LocalTime.of(12, 0), vendorZone);
+        }
+        return candidate.withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime()
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"));
+    }
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
@@ -112,6 +131,7 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
     @Autowired private CheckoutIdempotencyRepository idempotencyRepository;
     @Autowired private AddressRepository addressRepository;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private MutableClock mutableClock;
 
     private Long locationId;
     private Long rosesCategoryId;
@@ -119,6 +139,13 @@ class CheckoutApiIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Reset the shared MutableClock to real time so slot validation is
+        // deterministic regardless of state leaked by prior test classes that run
+        // in the same cached Spring context. JWT validation uses the real system
+        // clock, so the clock must not be pinned to a fixed past date (that would
+        // expire issued tokens against the real clock and yield 401).
+        mutableClock.setInstant(Instant.now());
+
         locationId = serviceLocationRepository.findByPincode(KORAMANGALA_PINCODE)
                 .orElseThrow().getId();
         rosesCategoryId = categoryRepository.findBySlug("roses").orElseThrow().getId();

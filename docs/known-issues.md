@@ -346,6 +346,8 @@ These cost real debugging time and will recur if forgotten:
   the foreign key the test meant to exercise. Supplying valid times restored the
   original intent.
 
+| 025 | Dev / Docker | **Backend Docker image can be out of date with source.** The `flowerconnect-backend` image (created 3 days ago) did not include Stage 4 backend changes (`VendorOrderController`, `VendorOrderService`, etc.), causing `GET|POST /api/v1/vendor/orders/**` to return 404 "No static resource" at runtime. Rebuilding the image (`docker compose build backend`) and recreating the container resolved it. Always rebuild backend image after backend changes before browser verification. | Open | Run `docker compose build backend && docker compose up -d --no-deps --force-recreate backend` after backend changes. |
+
 ## Deprecation Notices
 
 _None._

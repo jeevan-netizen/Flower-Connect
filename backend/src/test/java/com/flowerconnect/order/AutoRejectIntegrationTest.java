@@ -110,6 +110,14 @@ class AutoRejectIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         clock.setInstant(NOW);
+        // Reset the shared platform_config threshold so the 60-minute cutoff is
+        // deterministic regardless of state leaked by prior test classes that run
+        // in the same cached Spring context.
+        PlatformConfig row = platformConfigRepository.findByConfigKey("auto_reject_minutes")
+                .orElseThrow(() -> new IllegalStateException("platform_config auto_reject_minutes row missing"));
+        row.setConfigValue("60");
+        platformConfigRepository.saveAndFlush(row);
+
         locationId = serviceLocationRepository.findByPincode("560034").orElseThrow().getId();
         categoryId = categoryRepository.findBySlug("roses").orElseThrow().getId();
 
@@ -298,6 +306,15 @@ class AutoRejectIntegrationTest extends AbstractIntegrationTest {
     @Test
     void batchBoundsAreRespected() {
         appProperties.setAutoRejectBatchSize(3);
+        // Isolate against PLACED orders left by prior tests in the shared test
+        // database, so this run's batch is deterministic: only this test's own
+        // orders are candidates and exactly `batchSize` of them may be cancelled.
+        LocalDateTime cutoff = LocalDateTime.ofInstant(
+                clock.instant().minusSeconds(60L * 60), clock.getZone());
+        jdbcTemplate.update(
+                "DELETE FROM orders WHERE status = 'PLACED' AND created_at < ?",
+                java.sql.Timestamp.valueOf(cutoff));
+
         List<Order> orders = List.of(
                 createPlacedOrder(LocalDateTime.of(2026, 10, 20, 10, 59)),
                 createPlacedOrder(LocalDateTime.of(2026, 10, 20, 10, 58)),
