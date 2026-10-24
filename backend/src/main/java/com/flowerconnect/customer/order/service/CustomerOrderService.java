@@ -17,6 +17,7 @@ import com.flowerconnect.order.domain.OrderStatusHistory;
 import com.flowerconnect.order.repository.OrderItemRepository;
 import com.flowerconnect.order.repository.OrderRepository;
 import com.flowerconnect.order.repository.OrderStatusHistoryRepository;
+import com.flowerconnect.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -57,6 +59,7 @@ public class CustomerOrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final UserRepository userRepository;
+    private final PaymentRepository paymentRepository;
 
     /**
      * One page of the authenticated customer's own orders, newest first,
@@ -149,6 +152,9 @@ public class CustomerOrderService {
                 order.getId()).stream()
                 .map(this::toTimelineEntry)
                 .toList();
+        LocalDateTime refundedAt = paymentRepository.findByOrderId(order.getId())
+                .map(p -> p.getRefundedAt())
+                .orElse(null);
         return CustomerOrderResponse.builder()
                 .id(order.getId())
                 .status(order.getStatus())
@@ -168,6 +174,7 @@ public class CustomerOrderService {
                 .slotStart(order.getSlotStart())
                 .slotEnd(order.getSlotEnd())
                 .note(order.getNote())
+                .refundedAt(refundedAt)
                 .items(items)
                 .timeline(timeline)
                 .build();

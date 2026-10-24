@@ -13,12 +13,17 @@ import com.flowerconnect.payment.domain.PaymentIntent.IntentStatus;
 import com.flowerconnect.payment.dto.PaymentGroupStateResponse;
 import com.flowerconnect.payment.dto.PaymentResumeResponse;
 import com.flowerconnect.payment.dto.PaymentStateResponse;
+import com.flowerconnect.payment.dto.RefundQueueItem;
 import com.flowerconnect.payment.gateway.PaymentGateway;
 import com.flowerconnect.payment.repository.PaymentEventRepository;
 import com.flowerconnect.payment.repository.PaymentIntentRepository;
 import com.flowerconnect.payment.repository.PaymentRepository;
+import com.flowerconnect.domain.AuditLog;
+import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.exception.ErrorCode;
+import com.flowerconnect.repository.AuditLogRepository;
+import com.flowerconnect.repository.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -28,6 +33,8 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,6 +82,8 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final ObjectProvider<OrderStateMachine> orderStateMachineProvider;
     private final java.time.Clock clock;
+    private final AuditLogRepository auditLogRepository;
+    private final UserRepository userRepository;
 
     @Autowired
     public PaymentService(
@@ -84,7 +93,9 @@ public class PaymentService {
             PaymentEventRepository paymentEventRepository,
             OrderRepository orderRepository,
             ObjectProvider<OrderStateMachine> orderStateMachineProvider,
-            java.time.Clock clock) {
+            java.time.Clock clock,
+            AuditLogRepository auditLogRepository,
+            UserRepository userRepository) {
         this.paymentGateway = paymentGateway;
         this.paymentRepository = paymentRepository;
         this.paymentIntentRepository = paymentIntentRepository;
@@ -92,6 +103,8 @@ public class PaymentService {
         this.orderRepository = orderRepository;
         this.orderStateMachineProvider = orderStateMachineProvider;
         this.clock = clock;
+        this.auditLogRepository = auditLogRepository;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -175,6 +188,76 @@ public class PaymentService {
         orderRepository.saveAndFlush(order);
 
         log.info("Marked payment for order {} refund-pending", orderId);
+        return payment;
+    }
+
+    /**
+     * Marks a {@code REFUND_PENDING} online order's payment as refunded
+     * ({@code payments.status} and {@code orders.payment_status} move
+     * {@code REFUND_PENDING &#8594; REFUNDED}) and stamps {@code refunded_at}
+     * from the injected clock. No money is moved in v1: this records that an
+     * admin has completed the refund (see the admin refund queue,
+     * {@code /api/v1/admin/refunds}).
+     *
+     * <p>State rules:
+     * <ul>
+     *   <li>Only {@code REFUND_PENDING} may be marked refunded.</li>
+     *   <li>Already {@code REFUNDED} returns the current result idempotently.</li>
+     *   <li>Any other state returns 409 {@code CONFLICT}.</li>
+     * </ul>
+     *
+     * @param orderId the order whose payment to mark refunded
+     * @param adminEmail the authenticated admin's email (ownership/actor)
+     * @param referenceNote non-blank, length-limited reference note (e.g. gateway refund id)
+     * @return the updated payment record
+     * @throws BusinessException 404 if missing, 409 if wrong state or blank note
+     */
+    @Transactional
+    public Payment markRefunded(Long orderId, String adminEmail, String referenceNote) {
+        if (referenceNote == null || referenceNote.trim().isEmpty()) {
+            throw BusinessException.badRequest("Reference note is required");
+        }
+        if (referenceNote.length() > 500) {
+            throw BusinessException.badRequest("Reference note must be 500 characters or fewer");
+        }
+
+        User actor = requireActor(adminEmail);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
+        Payment payment = paymentRepository.findByOrderIdForUpdate(orderId)
+                .orElseThrow(() -> BusinessException.notFound("Payment not found for order: " + orderId));
+
+        Payment.PaymentStatus before = payment.getStatus();
+        if (before == Payment.PaymentStatus.REFUNDED) {
+            // Idempotent: already refunded, return current state without change.
+            log.info("Payment for order {} already refunded (idempotent)", orderId);
+            return payment;
+        }
+        if (before != Payment.PaymentStatus.REFUND_PENDING) {
+            throw BusinessException.conflict(
+                    "Payment for order " + orderId + " is " + before
+                            + "; only REFUND_PENDING can be marked refunded");
+        }
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        payment.setStatus(Payment.PaymentStatus.REFUNDED);
+        payment.setRefundedAt(now);
+        order.setPaymentStatus(Order.PaymentStatus.REFUNDED);
+
+        paymentRepository.saveAndFlush(payment);
+        orderRepository.saveAndFlush(order);
+
+        auditLogRepository.save(AuditLog.builder()
+                .actor(actor)
+                .actionType("PAYMENT_REFUNDED")
+                .entityType("PAYMENT")
+                .entityId(payment.getId())
+                .reason("Order " + orderId + ": REFUND_PENDING -> REFUNDED (reference: "
+                        + referenceNote + ")")
+                .build());
+
+        log.info("Marked payment for order {} refunded at {} (reference: {})",
+                orderId, now, referenceNote);
         return payment;
     }
 
@@ -520,6 +603,36 @@ public class PaymentService {
             throw BusinessException.forbidden(
                     "Order " + order.getId() + " belongs to another customer");
         }
+    }
+
+    private User requireActor(String adminEmail) {
+        return userRepository.findByEmailWithRole(adminEmail)
+                .orElseThrow(() -> new IllegalStateException("Authenticated admin not found"));
+    }
+
+    /**
+     * One page of payments matching the given status and optional filters,
+     * mapped to {@link RefundQueueItem} for the admin refund queue.
+     */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<RefundQueueItem> listRefundPayments(
+            com.flowerconnect.payment.domain.Payment.PaymentStatus status,
+            Long vendorId, java.time.LocalDateTime fromDate, java.time.LocalDateTime toDate,
+            org.springframework.data.domain.Pageable pageable) {
+        return paymentRepository.findByStatus(status, vendorId, fromDate, toDate, pageable)
+                .map(payment -> {
+                    Order order = payment.getOrder();
+                    return RefundQueueItem.builder()
+                            .orderId(order.getId())
+                            .vendorName(order.getVendor().getBusinessName())
+                            .paymentMethod(Order.PaymentMethod.valueOf(payment.getMethod().name()))
+                            .paymentStatus(Order.PaymentStatus.valueOf(payment.getStatus().name()))
+                            .orderStatus(order.getStatus())
+                            .amount(payment.getAmount())
+                            .createdAt(payment.getCreatedAt())
+                            .customerEmail(order.getUser().getEmail())
+                            .build();
+                });
     }
 
     private PaymentStateResponse toPaymentStateResponse(Order order, Payment payment, PaymentIntent intent) {

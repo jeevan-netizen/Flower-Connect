@@ -134,8 +134,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{id}/storefront").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/products/{id}").permitAll()
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
-                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                .requestMatchers("/actuator/**").hasRole("ADMIN")
+                 // Phase 8 refund queue (task 8.3): admin-only listing of
+                 // REFUND_PENDING payments and mark-refunded endpoint.
+                 .requestMatchers("/api/v1/admin/refunds/**").hasRole("ADMIN")
+                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex

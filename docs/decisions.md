@@ -2466,3 +2466,42 @@ Add `PaymentService.markRefundPending(Long orderId)` that transitions both `paym
 - Refund state managed by `PaymentService` (sole writer of payment status per D-47).
 - Admin refund queue (Stage 2) will use this to mark REFUNDED.
 - No money moved in v1; admin manually processes refund or gateway refund if 7.4 exists.
+
+
+## D-55: Admin refund queue and mark-refunded endpoint (Phase 8 Stage 2, task 8.3)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 2
+
+### Context
+
+Plan 8.3 requires an admin-only refund queue listing REFUND_PENDING payments and an endpoint to mark a refund complete. Section 6.1 says "refund if already paid" for cancellations/refunds. PaymentService is the sole writer of payment status (D-47, D-54). The admin needs to review pending refunds and mark them as completed, with audit trail.
+
+### Decision
+
+- **GET /api/v1/admin/refunds** -- paginated refund queue listing payments with payment_status = REFUND_PENDING. Supports optional vendorId, fromDate, toDate filters. Returns only fields needed to review: orderId, vendorName, paymentMethod, paymentStatus, orderStatus, amount, createdAt, customerEmail. No internal or unrelated customer data exposed. /api/v1/admin/refunds/** mapped to hasRole("ADMIN") in SecurityConfig, placed before the broad /api/v1/admin/** rule.
+
+- **POST /api/v1/admin/refunds/{orderId}/mark** -- marks a REFUND_PENDING payment as REFUNDED. Requires a non-blank, length-limited (<= 500 chars) referenceNote in the request body. Returns RefundMarkedResponse with orderId, paymentStatus, refundedAt, referenceNote.
+
+- **PaymentService.markRefunded(Long orderId, String adminEmail, String referenceNote)** is the sole writer of payment status for refunds. Validates:
+  - Reference note non-blank and <= 500 chars (400 otherwise).
+  - Order exists (404 otherwise), payment exists (404 otherwise).
+  - Only REFUND_PENDING can be marked refunded; any other state returns 409 CONFLICT.
+  - Already REFUNDED returns the current result idempotently (no duplicate refundedAt update).
+  - Transitions both payments.status and orders.payment_status to REFUNDED in one transaction.
+  - Stamps refundedAt from the injected Clock.
+  - Writes one audit_log row: actor, action PAYMENT_REFUNDED, entity type PAYMENT, entity id (payment id), reason with before/after values and reference note.
+
+- **Customer order detail** exposes refundedAt and paymentStatus from payment data via CustomerOrderResponse. Internal fields (commission, etc.) not exposed.
+
+- **refundedAt column** added to payments table via additive migration V21__add_refunded_at_to_payments.sql. No commission, ledger, settlement, or dispute logic in this stage.
+
+### Consequences
+
+- Refund state is consistent between payments and orders because PaymentService updates both in one transaction.
+- Idempotent mark-refunded prevents duplicate processing; already-refunded payments return current state.
+- Audit trail records who marked what refund and when, with before/after status.
+- Customer can see refund state and timestamp on their order detail page.
+- No money is moved in v1; admin manually processes the refund externally.
+- Disputes, dispute UI, ledger entries, and settlement logic belong to later Phase 8 stages.
+
