@@ -2363,3 +2363,31 @@ The backend Stage 3 (webhook + simulator) is complete. The frontend needs to int
 - Full frontend suite: lint, typecheck, tests, build all clean. Backend unit suite: 1157 tests, 0 failures.
 
 
+## D-51: Reservation expiry job cancels stale `PENDING_PAYMENT` orders and releases stock (Phase 7 task 7.5)
+
+**Status:** Accepted
+**Date:** Phase 7 Stage 3.5 (task 7.5)
+
+### Context
+
+Online orders sit in `PENDING_PAYMENT` while the customer completes payment through the simulated gateway (task 7.4). If the intent expires before the customer pays, the order must be cancelled and its reserved stock released, otherwise reservations can leak forever. Decisions to settle: where the threshold lives, who writes the cancellation, how stock is released, and how failures in one candidate affect the batch.
+
+### Decision
+
+- **`PaymentExpiryService` is the sole owner of payment expiry.** It selects `PENDING_PAYMENT` orders whose `created_at` is strictly older than the configured threshold (`app.payment-expiry-minutes`, default 30) and cancels each through `OrderStateMachine.transition` (`PENDING_PAYMENT -> CANCELLED`, actor `SYSTEM`, reason `PAYMENT_EXPIRED_NO_RESPONSE`). The state machine's `SideEffect.RELEASE` delegates stock release to `InventoryService.releaseReservedStock`, which decrements `reserved_quantity` without touching `quantity` and appends exactly one `stock_movements` row of type `RELEASE`.
+
+- **Each candidate is processed in its own `REQUIRES_NEW` transaction.** One failing order (e.g. insufficient reserved quantity for the release) never rolls back or blocks another candidate. The state machine locks the order row and re-checks its status under the lock, so a customer who resumed the order first leaves it `PLACED` and the expiry is skipped; an already-cancelled order is skipped without a duplicate history row or stock movement.
+
+- **The threshold comes from `AppProperties`, not `platform_config`.** `paymentExpiryMinutes` (default 30) is a simple configuration property because payment expiry is only relevant when online payment exists and does not need the generic key/value table. The cron (`paymentExpiryCron`, default every minute) and batch bound (`paymentExpiryBatchSize`, default 100) follow the same pattern as `autoRejectCron`/`autoRejectBatchSize`.
+
+- **The scheduler is a thin component** (`PaymentExpiryScheduler`) that owns only the cron and delegates all business logic to `PaymentExpiryService`. The cron is disabled in the test profile (`payment-expiry-cron: "-"`) so a scheduled run cannot fire mid-test; the service is driven directly with the injected `Clock` instead.
+
+- **Tests:** `PaymentExpiryServiceTest` (2 unit tests for configuration reading) and `PaymentExpiryIntegrationTest` (13 integration tests vs real MySQL covering cutoff boundary, only `PENDING_PAYMENT` orders changed, reservation released without changing quantity, one history row with `SYSTEM` actor, rerun idempotency, customer resume wins race, one failing order does not block batch, batch bounds, threshold from `AppProperties`).
+
+### Consequences
+
+- Payment-expiry writes go through the same ownership boundaries as all other order status changes: `OrderStateMachine` is the sole writer of `Order#status`, `InventoryService` is the sole writer of stock levels and movements.
+- No new migration: the `orders`, `order_status_history`, `inventory`, and `stock_movements` tables already exist and support `PENDING_PAYMENT` and the `RELEASE` movement type.
+- Full backend unit suite: 1159 tests, 0 failures (2 new unit tests from `PaymentExpiryServiceTest`).
+
+
