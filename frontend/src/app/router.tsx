@@ -18,6 +18,7 @@ import { VendorCatalogPage } from "@/features/vendor/pages/VendorCatalogPage";
 import { VendorProductFormPage } from "@/features/vendor/pages/VendorProductFormPage";
 import { VendorInventoryPage } from "@/features/vendor/pages/VendorInventoryPage";
 import { VendorOrderBoardPage } from "@/features/vendor/orders/pages/VendorOrderBoardPage";
+import { VendorDisputesPage } from "@/features/vendor/disputes/pages/VendorDisputesPage";
 import { CartPage } from "@/features/cart/pages/CartPage";
 import { CheckoutPage } from "@/features/checkout/pages/CheckoutPage";
 import { BrowsePage } from "@/features/customer/pages/BrowsePage";
@@ -26,10 +27,12 @@ import { VendorStorefrontPage } from "@/features/customer/pages/VendorStorefront
 import { ProductDetailPage } from "@/features/customer/pages/ProductDetailPage";
 import { OrderHistoryPage } from "@/features/customer/orders/pages/OrderHistoryPage";
 import { OrderDetailPage } from "@/features/customer/orders/pages/OrderDetailPage";
+import { RaiseDisputePage, DisputeDetailPage } from "@/features/dispute/pages/DisputePages";
 import { PRODUCT_ROUTE_IDS } from "@/features/customer/navigation";
 import { PaymentStatusPage } from "@/features/payment/pages/PaymentStatusPage";
 import { AdminRefundsPage } from "@/features/admin/pages/AdminRefundsPage";
 import { AdminOrderLookupPage } from "@/features/admin/pages/AdminOrderLookupPage";
+import { AdminDisputesPage } from "@/features/admin/pages/AdminDisputesPage";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
@@ -176,6 +179,22 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      {
+        path: "orders/:orderId/dispute",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE]}>
+            <RaiseDisputePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "disputes/:disputeId",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE]}>
+            <DisputeDetailPage />
+          </ProtectedRoute>
+        ),
+      },
       { path: "login", element: <RequireUnauth><LoginPage /></RequireUnauth> },
       { path: "register", element: <RequireUnauth><RegisterPage /></RequireUnauth> },
       {
@@ -217,6 +236,7 @@ export const router = createBrowserRouter([
           // — the backend enforces FLORIST role plus per-order ownership, but
           // deliberately not @RequiresApprovedVendor (D-6 / D-43).
           { path: "orders", element: <VendorOrderBoardPage /> },
+          { path: "disputes", element: <VendorDisputesPage /> },
         ],
       },
       {
@@ -236,6 +256,7 @@ export const router = createBrowserRouter([
           { path: "users", element: <AdminUsersPage /> },
           { path: "refunds", element: <AdminRefundsPage /> },
           { path: "orders/lookup", element: <AdminOrderLookupPage /> },
+          { path: "disputes", element: <AdminDisputesPage /> },
         ],
       },
     ],
