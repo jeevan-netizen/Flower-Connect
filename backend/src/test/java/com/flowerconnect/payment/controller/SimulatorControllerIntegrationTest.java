@@ -6,7 +6,6 @@ import com.flowerconnect.catalog.domain.Product;
 import com.flowerconnect.catalog.domain.Product.ProductStatus;
 import com.flowerconnect.catalog.repository.CategoryRepository;
 import com.flowerconnect.catalog.repository.ProductRepository;
-import com.flowerconnect.catalog.repository.ProductRepository;
 import com.flowerconnect.catalog.service.ProductService;
 import com.flowerconnect.config.TestClockConfig;
 import com.flowerconnect.domain.Role;
