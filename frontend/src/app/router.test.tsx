@@ -594,6 +594,8 @@ describe("admin route protection", () => {
       undefined,
       "vendors",
       "users",
+      "refunds",
+      "orders/lookup",
     ]);
   });
 

@@ -2505,3 +2505,36 @@ Plan 8.3 requires an admin-only refund queue listing REFUND_PENDING payments and
 - No money is moved in v1; admin manually processes the refund externally.
 - Disputes, dispute UI, ledger entries, and settlement logic belong to later Phase 8 stages.
 
+
+## D-56: Cancellation UI patterns (Phase 8 Stage 3, task 8.6)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 3
+
+### Context
+
+Stage 1 and Stage 2 of Phase 8 implemented the backend cancellation endpoint (`POST /api/v1/orders/{id}/cancel` for CUSTOMER/VENDOR/ADMIN), the admin refund queue (`GET /api/v1/admin/refunds`), and the mark-refunded endpoint (`POST /api/v1/admin/refunds/{orderId}/mark`). Stage 3 adds the frontend UI for these features across three screens: customer order detail, vendor order board, and admin refunds page.
+
+Three things needed settling:
+
+**Why a customer's reason is optional but a vendor's and admin's are required.** The backend state machine enforces this: CUSTOMER cancellation of PLACED/CONFIRMED does not require a reason, while VENDOR cancellation of CONFIRMED/PREPARING and ADMIN cancellation of any non-terminal state does. The frontend mirrors the backend rather than duplicating the rule — each dialog's `requiresReason` flag drives both the rendered reason box and the zod resolver, so they cannot disagree (following D-30's precedent).
+
+**Conditional dialog rendering to avoid framer-motion role conflicts.** Both `RejectReasonDialog` and `CancelReasonDialog` use `motion.div` with `animate={open ? "visible" : "hidden"}`. When always rendered (even with `open={false}`), testing-library's `findByRole("dialog")` cannot reliably resolve which dialog matches, causing flaky timeouts. Dialogs are therefore conditionally rendered (`{cancelTarget && <CancelReasonDialog ... />}`) so only the open dialog exists in the DOM.
+
+**Dialog state reset on unmount.** When a dialog unmounts (cancel target set to null), its internal reason state resets to empty. This is intentional — each dialog instance starts fresh, so a vendor who opens cancel, types a reason, cancels, then reopens sees an empty reason field rather than stale text.
+
+### Decision
+
+- **Customer cancel (OrderDetailPage):** Cancel button shows for PLACED/CONFIRMED orders. Reason is optional (sent as `null` when blank). Refund status banner shows `REFUND_PENDING`/`REFUNDED` with `refundedAt` date when applicable.
+- **Vendor cancel (OrderCard + VendorOrderBoardPage):** Cancel button shows for CONFIRMED/PREPARING orders. Reason is required. Double-click protection via `isPending` from `useVendorOrderAction`. 409 insufficient-stock errors surface a "reject instead" prompt.
+- **Admin cancel (AdminOrderLookupPage):** Admin can cancel any non-terminal order. Reason is required.
+- **Admin refund queue (AdminRefundsPage):** Paginated listing of `REFUND_PENDING` payments with optional vendor/date filters. Mark-refunded dialog requires a non-blank reference note (<= 500 chars). Idempotent: already-REFUNDED returns current state.
+- **Dialogs render conditionally** based on their open state to avoid framer-motion role resolution conflicts with testing-library.
+- **No disputes UI yet** — deferred to Phase 8 Stage 4+ per plan.
+
+### Consequences
+
+- The cancellation matrix is enforced by the backend; the frontend only offers the buttons the backend allows for each status/role combination.
+- Conditional dialog rendering means `findByRole("dialog")` reliably finds the open dialog.
+- Disputes (customer raises, vendor responds, admin resolves) are deliberately out of scope for Stage 3.
+

@@ -28,6 +28,8 @@ import { OrderHistoryPage } from "@/features/customer/orders/pages/OrderHistoryP
 import { OrderDetailPage } from "@/features/customer/orders/pages/OrderDetailPage";
 import { PRODUCT_ROUTE_IDS } from "@/features/customer/navigation";
 import { PaymentStatusPage } from "@/features/payment/pages/PaymentStatusPage";
+import { AdminRefundsPage } from "@/features/admin/pages/AdminRefundsPage";
+import { AdminOrderLookupPage } from "@/features/admin/pages/AdminOrderLookupPage";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
@@ -232,6 +234,8 @@ export const router = createBrowserRouter([
           { index: true, element: <AdminDashboardPage /> },
           { path: "vendors", element: <AdminVendorsPage /> },
           { path: "users", element: <AdminUsersPage /> },
+          { path: "refunds", element: <AdminRefundsPage /> },
+          { path: "orders/lookup", element: <AdminOrderLookupPage /> },
         ],
       },
     ],

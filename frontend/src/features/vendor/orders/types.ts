@@ -54,8 +54,8 @@ export interface VendorOrderSummaryResponse {
 /** The valid next vendor action for each non-terminal status. */
 export const NEXT_ACTIONS: Record<OrderStatus, VendorOrderAction[]> = {
   PLACED: ["accept", "reject"],
-  CONFIRMED: ["prepare"],
-  PREPARING: ["out-for-delivery"],
+  CONFIRMED: ["prepare", "cancel"],
+  PREPARING: ["out-for-delivery", "cancel"],
   OUT_FOR_DELIVERY: ["delivered"],
   PENDING_PAYMENT: [],
   DELIVERED: [],
@@ -64,12 +64,19 @@ export const NEXT_ACTIONS: Record<OrderStatus, VendorOrderAction[]> = {
   REFUNDED: [],
 };
 
-export type VendorOrderAction = "accept" | "reject" | "prepare" | "out-for-delivery" | "delivered";
+export type VendorOrderAction =
+  | "accept"
+  | "reject"
+  | "cancel"
+  | "prepare"
+  | "out-for-delivery"
+  | "delivered";
 
 /** Labels shown on the board's action buttons. */
 export const VENDOR_ORDER_ACTION_LABELS: Record<VendorOrderAction, string> = {
   accept: "Accept",
   reject: "Reject",
+  cancel: "Cancel",
   prepare: "Mark preparing",
   "out-for-delivery": "Out for delivery",
   delivered: "Mark delivered",
