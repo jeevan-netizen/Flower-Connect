@@ -2,8 +2,10 @@ package com.flowerconnect.payment.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowerconnect.catalog.dto.ProductRequest;
+import com.flowerconnect.catalog.domain.Product;
 import com.flowerconnect.catalog.domain.Product.ProductStatus;
 import com.flowerconnect.catalog.repository.CategoryRepository;
+import com.flowerconnect.catalog.repository.ProductRepository;
 import com.flowerconnect.catalog.repository.ProductRepository;
 import com.flowerconnect.catalog.service.ProductService;
 import com.flowerconnect.config.TestClockConfig;
@@ -14,7 +16,9 @@ import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.inventory.domain.Inventory;
 import com.flowerconnect.inventory.repository.InventoryRepository;
 import com.flowerconnect.order.domain.Order;
+import com.flowerconnect.order.domain.OrderItem;
 import com.flowerconnect.order.domain.Order.OrderStatus;
+import com.flowerconnect.order.repository.OrderItemRepository;
 import com.flowerconnect.order.domain.Order.PaymentMethod;
 import com.flowerconnect.order.domain.Order.PaymentStatus;
 import com.flowerconnect.order.repository.OrderRepository;
@@ -73,9 +77,11 @@ class SimulatorControllerIntegrationTest extends AbstractIntegrationTest {
     @Autowired private VendorProfileRepository vendors;
     @Autowired private ServiceLocationRepository locations;
     @Autowired private CategoryRepository categories;
+    @Autowired private ProductRepository productRepository;
     @Autowired private ProductService products;
     @Autowired private InventoryRepository inventory;
     @Autowired private OrderRepository orders;
+    @Autowired private OrderItemRepository orderItems;
     @Autowired private PaymentRepository payments;
     @Autowired private PaymentIntentRepository intents;
     @Autowired private PasswordEncoder encoder;
@@ -139,6 +145,7 @@ class SimulatorControllerIntegrationTest extends AbstractIntegrationTest {
         User customer = users.findByEmail(customerEmail).orElseThrow();
         Long productId = createProduct("Sim Product", new BigDecimal("149.00"));
         simProductId = productId;
+        Product product = productRepository.findById(productId).orElseThrow();
         Inventory inv = inventory.findByProductId(productId).orElseThrow();
         inv.setQuantity(10);
         inv.setReservedQuantity(1);
@@ -155,6 +162,9 @@ class SimulatorControllerIntegrationTest extends AbstractIntegrationTest {
             .deliveryLongitude(new BigDecimal("77.59"))
             .slotStart(LocalDateTime.now().plusHours(1))
             .clientOrderId(UUID.randomUUID().toString()).build());
+        orderItems.saveAndFlush(OrderItem.builder()
+            .order(order).product(product).vendorId(vendorProfileId)
+            .quantity(1).priceSnapshot(new BigDecimal("149.00")).build());
 
         String groupId = UUID.randomUUID().toString();
         Payment pay = payments.saveAndFlush(Payment.builder()

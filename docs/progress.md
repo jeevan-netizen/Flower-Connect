@@ -4,7 +4,19 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 7 (Payments) — Stage 3 COMPLETE** (tasks 7.1–7.4 part 2)
+**Phase 7 (Payments) — COMPLETE** (final audit, 2026-10-24)
+
+Phase 7 is implemented and verified on branch `phase-7-payments` at commit
+`f0f2b52` plus the final-audit commit. All implementation stages are done:
+Stage 1 COD payments model; Stage 2 online checkout with simulated intent;
+Stage 3 signed webhook + simulated provider; Stage 3.5 reservation expiry job;
+frontend Stage 3 payment UI. Final audit confirmed two simulator integration
+test failures were caused by test setup (missing `order_items` row ? no
+reserved stock to release; unauthenticated simulator route ? 401 not 404),
+not shared database state. Both fixed and pass alone and together.
+
+Verified: backend unit suite 1159 tests + integration suite 571 tests, 0
+failures; frontend lint, typecheck, 782 tests, build all clean.
 
 Stage 1 implements the Phase 5 data model: the `V13__create_carts_orders.sql`
 Flyway migration (adding `service_locations.timezone` per D-5, and creating
@@ -597,6 +609,7 @@ integration tests**, all green â€” `BUILD SUCCESS`.
 
 | Date       | Change                                    | Files affected                                      |
 |------------|-------------------------------------------|-----------------------------------------------------|
+| 2026-10-24 | Phase 7 final audit (`phase-7-payments` at f0f2b52): investigated and fixed two simulator integration-test failures — an `OrderItem`-setup gap in `simulatorFailCancelsGroupAndReleasesReservations` (reservation not released) and security-filter ordering masking the MVC 404 in `simulatorRouteIsNotRegisteredInProd` (root causes were not shared database state). Both tests pass alone and together. Full Phase 7 verification green: backend unit suite 1159 tests + integration suite 571 tests, 0 failures; frontend lint, typecheck, tests (782 passed), build all clean. Payment invariants audited against code evidence. | `SimulatorControllerIntegrationTest.java`, `SimulatorProdAbsenceIntegrationTest.java`, `docs/progress.md` |
 | 2026-10-24 | Phase 7 frontend (task 7.6): payment UI â€” payment-method selector at checkout (COD default; ONLINE offered since 7.4 backend built), `PaymentStatusPage` at `/payment/:paymentGroupId` polling `GET /api/v1/payments/group/{paymentGroupId}` at 8 s (plan §9.4: 5â€“10 s), pausing while tab hidden, stopping at terminal states (`PAID`, `FAILED`, `REFUNDED`), resume action via `POST /api/v1/payments/{orderId}/resume` (refresh only â€” never marks paid; only the verified webhook flow completes payment), payment state on order detail. New `src/features/payment/` slice (types, api, queries), 7 RTL/Vitest tests covering pendingâ†"terminal transitions, polling stop, resume API call, terminal-state UI, error handling with retry. CheckoutPage passes `paymentMethod` and navigates to `/payment/:paymentGroupId` for ONLINE, `/orders` for COD. Router adds `/payment/:paymentGroupId` guarded `CUSTOMER`. Backend unit suite: 1157 tests, 0 failures (AppPropertiesBindingTest fixed to run without a local MySQL account via minimal context + lazy init). Frontend: lint, typecheck, tests, build all clean. | `frontend/src/features/payment/**` (types.ts, api.ts, queries.ts, pages/PaymentStatusPage.tsx, PaymentStatusPage.test.tsx), `frontend/src/features/checkout/pages/CheckoutPage.tsx`, `frontend/src/features/checkout/types.ts`, `frontend/src/features/checkout/pages/CheckoutPage.test.tsx`, `frontend/src/app/router.tsx`, `frontend/src/test/factories.ts`, `backend/src/test/java/com/flowerconnect/config/AppPropertiesBindingTest.java`, `docs/progress.md`, `docs/decisions.md` |
 | 2026-10-24 | Phase 7 Stage 3.5 (task 7.5): reservation expiry job â€” `PaymentExpiryService` cancels `PENDING_PAYMENT` orders older than a configurable number of minutes (`app.payment-expiry-minutes`, default 30) via `OrderStateMachine.transition` (PENDING_PAYMENT â†' CANCELLED, actor SYSTEM), releasing reserved stock through `InventoryService.releaseReservedStock`; `PaymentExpiryScheduler` runs it on configurable cron (`app.payment-expiry-cron`, default every minute, disabled with "-"); each candidate in its own REQUIRES_NEW transaction so one failure never blocks the batch; bounded batch (`app.payment-expiry-batch-size`, default 100). Verified with `PaymentExpiryServiceTest` (2 unit tests) and `PaymentExpiryIntegrationTest` (13 integration tests vs real MySQL, all green). Full backend unit suite: 1159 tests, 0 failures. | `backend/src/main/java/com/flowerconnect/order/service/PaymentExpiryService.java`, `backend/src/main/java/com/flowerconnect/scheduler/PaymentExpiryScheduler.java`, `backend/src/main/java/com/flowerconnect/config/AppProperties.java`, `backend/src/test/resources/application-test.yml`, `backend/src/test/java/com/flowerconnect/order/service/PaymentExpiryServiceTest.java`, `backend/src/test/java/com/flowerconnect/order/PaymentExpiryIntegrationTest.java`, `docs/progress.md`, `docs/decisions.md` |
 |------------|-------------------------------------------|-----------------------------------------------------|
