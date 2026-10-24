@@ -40,6 +40,30 @@ public class CheckoutResponse {
      */
     private BigDecimal total;
 
+    /**
+     * The payment method used for this checkout ({@code COD} or {@code ONLINE}).
+     */
+    private String paymentMethod;
+
+    /**
+     * The payment group id shared by all orders in this checkout ({@code ONLINE}
+     * only; {@code null} for COD). Safe to return to the frontend; it is a
+     * server-generated reference, not a secret.
+     */
+    private String paymentGroupId;
+
+    /**
+     * The payment intent reference ({@code ONLINE} only; {@code null} for COD).
+     * Safe to return to the frontend; used to resume/pay the pending order.
+     */
+    private String intentReference;
+
+    /**
+     * When the payment intent expires ({@code ONLINE} only; {@code null} for
+     * COD). After expiry the order can no longer be resumed via payment.
+     */
+    private String intentExpiresAt;
+
     @Getter
     @Setter
     @NoArgsConstructor

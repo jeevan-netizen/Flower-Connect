@@ -62,6 +62,7 @@ export interface CheckoutRequest {
   clientOrderId: string;
   quoteHash: string;
   confirmPriceChanges: boolean;
+  paymentMethod: "COD" | "ONLINE";
 }
 
 /** Mirrors `CheckoutResponse`. */
@@ -70,6 +71,10 @@ export interface CheckoutResponse {
   idempotentReplay: boolean;
   orders: OrderSummary[];
   total: number;
+  paymentMethod: "COD" | "ONLINE";
+  paymentGroupId: string | null;
+  intentReference: string | null;
+  intentExpiresAt: string | null;
 }
 
 /** Mirrors `OrderSummary`. */

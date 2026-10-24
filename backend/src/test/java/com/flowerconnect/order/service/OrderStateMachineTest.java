@@ -15,6 +15,7 @@ import com.flowerconnect.order.event.OrderStatusChanged;
 import com.flowerconnect.order.repository.OrderItemRepository;
 import com.flowerconnect.order.repository.OrderRepository;
 import com.flowerconnect.order.repository.OrderStatusHistoryRepository;
+import com.flowerconnect.payment.service.PaymentService;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.exception.ErrorCode;
 import com.flowerconnect.inventory.domain.StockDelta;
@@ -81,6 +82,8 @@ class OrderStateMachineTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
     @Mock
+    private PaymentService paymentService;
+    @Mock
     private java.time.Clock clock;
     @Mock
     private Product product;
@@ -137,6 +140,10 @@ class OrderStateMachineTest {
         when(userRepository.findById(11L)).thenReturn(Optional.of(vendorUser));
         when(userRepository.findById(12L)).thenReturn(Optional.of(adminUser));
         when(orderItemRepository.findByOrderId(1L)).thenReturn(List.of(orderItem));
+        when(paymentService.collectPayment(any(Long.class))).thenAnswer(inv -> {
+            order.setPaymentStatus(Order.PaymentStatus.COLLECTED);
+            return null;
+        });
     }
 
     // ------------------------------------------------------------------

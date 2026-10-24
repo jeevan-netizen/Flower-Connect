@@ -2,6 +2,7 @@ package com.flowerconnect.order.repository;
 
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.Order.OrderStatus;
+import com.flowerconnect.order.domain.OrderStatusHistory;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -53,7 +54,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT o FROM Order o WHERE o.id = :orderId")
     Optional<Order> findByIdForUpdate(@Param("orderId") Long orderId);
 
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.vendor.id = :vendorId AND o.slotStart = :slotStart AND o.status IN ('PLACED', 'CONFIRMED')")
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.vendor.id = :vendorId AND o.slotStart = :slotStart AND o.status IN ('PLACED', 'CONFIRMED', 'PENDING_PAYMENT')")
     long countBookedOrdersForSlot(@Param("vendorId") Long vendorId,
                                   @Param("slotStart") java.time.LocalDateTime slotStart);
 
@@ -65,6 +66,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * One page of the authenticated vendor's own orders, newest first.
      */
     Page<Order> findByVendorIdOrderByCreatedAtDesc(Long vendorId, Pageable pageable);
+
+    /**
+     * One page of the vendor's own orders excluding {@link OrderStatus#PENDING_PAYMENT},
+     * newest first. Orders that are still awaiting payment are not yet
+     * actionable by the vendor and are hidden from vendor lists, board queries
+     * and summaries until payment succeeds and the order transitions to
+     * {@code PLACED} (Phase 7, task 7.4).
+     */
+    Page<Order> findByVendorIdAndStatusNotOrderByCreatedAtDesc(Long vendorId, OrderStatus status,
+                                                               Pageable pageable);
 
     /**
      * One page of the vendor's orders in a single status, newest first.
@@ -107,4 +118,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     Page<Order> findByStatusAndCreatedAtBefore(Order.OrderStatus status, LocalDateTime before,
                                                Pageable pageable);
+
+    /**
+     * PLACED orders whose entry into {@code PLACED} (the {@code order_status_history}
+     * row where {@code to_status = PLACED}) is strictly before {@code before},
+     * oldest first. Used by the auto-reject job so age is measured from the
+     * {@code PLACED} transition timestamp rather than {@code orders.created_at}.
+     * Bounded by the caller's {@code Pageable}.
+     */
+    @Query("SELECT DISTINCT o FROM Order o WHERE o.status = 'PLACED' AND o.id IN " +
+            "(SELECT osh.order.id FROM OrderStatusHistory osh " +
+            " WHERE osh.toStatus = 'PLACED' AND osh.createdAt < :before)")
+    Page<Order> findPlacedStaleBefore(@Param("before") LocalDateTime before, Pageable pageable);
 }

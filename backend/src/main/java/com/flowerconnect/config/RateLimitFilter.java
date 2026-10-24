@@ -39,8 +39,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/v1/auth/forgot-password",
-            "/api/v1/auth/reset-password"
+            "/api/v1/auth/reset-password",
+            // Public payment webhook: signature-authenticated, no JWT, so it is
+            // rate-limited by client IP (there is no email in the body).
+            "/api/v1/payments/webhook"
     );
+
+    private static final String WEBHOOK_PATH = "/api/v1/payments/webhook";
 
     private final Cache<String, Bucket> bucketCache;
     private final RateLimitProperties rateLimitProperties;
@@ -75,21 +80,24 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         String email = extractEmailFromBody(body);
         log.info("RateLimitFilter: path={}, extracted email={}", path, email);
-        if (email == null || email.isBlank()) {
+        boolean hasEmail = email != null && !email.isBlank();
+        // Auth endpoints keep their existing behaviour: a body without an
+        // email bypasses rate limiting. The public webhook carries no email,
+        // so it is rate-limited by client IP instead of bypassing.
+        if (!hasEmail && !WEBHOOK_PATH.equals(path)) {
             log.info("RateLimitFilter: email is null/blank, passing through");
             filterChain.doFilter(new CachedBodyRequestWrapper(request, body), response);
             return;
         }
 
-        String normalizedEmail = EmailNormalizer.normalize(email);
-        String hashedEmail = hashEmail(normalizedEmail);
+        String normalizedEmail = hasEmail ? EmailNormalizer.normalize(email) : null;
+        String hashedEmail = hasEmail ? hashEmail(normalizedEmail) : "";
         String ip = getClientIp(request);
         String key = RateLimitConfig.buildKey(path, hashedEmail, ip);
         log.info("RateLimitFilter: bucket key={}", key);
 
         int limit = getLimitForPath(path);
         Bucket bucket = bucketCache.get(key, k -> RateLimitConfig.createBucket(limit, clock));
-
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
         log.info("RateLimitFilter: probe consumed={}, remainingTokens={}", probe.isConsumed(), probe.getRemainingTokens());
         if (probe.isConsumed()) {
@@ -171,6 +179,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             case "/api/v1/auth/register" -> auth.getRegisterRequestsPerHour();
             case "/api/v1/auth/forgot-password" -> auth.getForgotPasswordRequestsPerHour();
             case "/api/v1/auth/reset-password" -> auth.getResetPasswordRequestsPerHour();
+            case WEBHOOK_PATH -> rateLimitProperties.getWebhookRequestsPerHour();
             default -> 5;
         };
     }

@@ -8,6 +8,11 @@ import org.springframework.context.annotation.Configuration;
 public class RateLimitProperties {
 
     private AuthEndpoints auth = new AuthEndpoints();
+    /**
+     * Requests per hour allowed for the public payment webhook, keyed by
+     * client IP (the webhook carries no email to key on).
+     */
+    private int webhookRequestsPerHour = 100;
 
     public AuthEndpoints getAuth() {
         return auth;
@@ -15,6 +20,14 @@ public class RateLimitProperties {
 
     public void setAuth(AuthEndpoints auth) {
         this.auth = auth;
+    }
+
+    public int getWebhookRequestsPerHour() {
+        return webhookRequestsPerHour;
+    }
+
+    public void setWebhookRequestsPerHour(int webhookRequestsPerHour) {
+        this.webhookRequestsPerHour = webhookRequestsPerHour;
     }
 
     public static class AuthEndpoints {

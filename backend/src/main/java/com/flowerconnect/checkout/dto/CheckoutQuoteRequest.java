@@ -7,6 +7,8 @@ import lombok.*;
 
 import java.util.List;
 
+import com.flowerconnect.order.domain.Order.PaymentMethod;
+
 /**
  * Request payload for {@code POST /api/v1/checkout/quote}.
  *
@@ -21,6 +23,14 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class CheckoutQuoteRequest {
+
+    /**
+     * The payment method: {@code COD} (default) or {@code ONLINE}. Any other
+     * value is rejected with 400 {@code VALIDATION_FAILED}. The quote itself
+     * is price-based and payment-method agnostic; this field is carried
+     * through so checkout can bind to the same method.
+     */
+    private PaymentMethod paymentMethod = PaymentMethod.COD;
 
     /**
      * The customer's saved address id (must belong to the caller).

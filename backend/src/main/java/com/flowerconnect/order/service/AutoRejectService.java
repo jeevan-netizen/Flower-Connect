@@ -27,9 +27,16 @@ import java.time.ZoneId;
  *
  * <p>Unaccepted PLACED orders older than a configurable number of minutes are
  * auto-cancelled with the reservation released. The age threshold is read from
- * {@code platform_config} (`auto_reject_minutes` row, seeded at 60 minutes by
+ * {@code platform_config} ({@code auto_reject_minutes} row, seeded at 60 minutes by
  * {@code V18}); if the row is missing the documented default is used and a
  * warning is logged, so auto-reject is never silently disabled.
+ *
+ * <p>Age is measured from the order's entry into {@code PLACED} --- the
+ * {@code order_status_history} row where {@code to_status = PLACED} ---
+ * rather than {@code orders.created_at} (Phase 7 task 7.2 readiness fix).
+ * This matters once Phase 7 online payment lets an order sit in
+ * {@code PENDING_PAYMENT} before being confirmed to {@code PLACED}: the
+ * auto-reject clock starts only when the order actually becomes {@code PLACED}.
  *
  * <p>Each candidate is processed in its own {@link Propagation#REQUIRES_NEW}
  * transaction, so one failing order never rolls back or blocks another. The
@@ -95,7 +102,8 @@ public class AutoRejectService {
     }
 
     /**
-     * Runs the auto-reject job once: selects PLACED orders strictly older than
+     * Runs the auto-reject job once: selects PLACED orders whose entry into
+     * {@code PLACED} (per {@code order_status_history}) is strictly older than
      * the configured threshold and cancels each one through the state machine.
      */
     public void runAutoReject() {
@@ -103,8 +111,8 @@ public class AutoRejectService {
         Instant cutoffInstant = clock.instant().minusSeconds((long) minutes * 60);
         LocalDateTime cutoff = LocalDateTime.ofInstant(cutoffInstant, clock.getZone());
 
-        Page<Order> candidates = orderRepository.findByStatusAndCreatedAtBefore(
-                OrderStatus.PLACED, cutoff,
+        Page<Order> candidates = orderRepository.findPlacedStaleBefore(
+                cutoff,
                 PageRequest.of(0, appProperties.getAutoRejectBatchSize()));
 
         log.info("Auto-reject: {} candidate(s) older than {} minute(s), batch size {}",

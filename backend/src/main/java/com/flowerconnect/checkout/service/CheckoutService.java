@@ -15,6 +15,7 @@ import com.flowerconnect.checkout.dto.CheckoutRequest;
 import com.flowerconnect.checkout.dto.CheckoutResponse;
 import com.flowerconnect.checkout.dto.CheckoutShopQuote;
 import com.flowerconnect.checkout.repository.CheckoutIdempotencyRepository;
+import com.flowerconnect.config.AppProperties;
 import com.flowerconnect.config.CheckoutProperties;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
@@ -24,13 +25,18 @@ import com.flowerconnect.inventory.domain.StockMovement;
 import com.flowerconnect.inventory.repository.InventoryRepository;
 import com.flowerconnect.inventory.repository.StockMovementRepository;
 import com.flowerconnect.customer.repository.AddressRepository;
-import java.time.Clock;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.OrderItem;
 import com.flowerconnect.order.domain.OrderStatusHistory;
 import com.flowerconnect.order.repository.OrderItemRepository;
 import com.flowerconnect.order.repository.OrderRepository;
 import com.flowerconnect.order.repository.OrderStatusHistoryRepository;
+import com.flowerconnect.payment.domain.Payment;
+import com.flowerconnect.payment.domain.PaymentIntent;
+import com.flowerconnect.payment.domain.PaymentIntent.IntentStatus;
+import com.flowerconnect.payment.repository.PaymentIntentRepository;
+import com.flowerconnect.payment.repository.PaymentRepository;
+import com.flowerconnect.payment.service.PaymentService;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +52,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -96,6 +103,10 @@ public class CheckoutService {
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final CheckoutIdempotencyRepository idempotencyRepository;
+    private final PaymentService paymentService;
+    private final PaymentRepository paymentRepository;
+    private final PaymentIntentRepository paymentIntentRepository;
+    private final AppProperties appProperties;
     private final Clock clock;
     private final SlotValidationService slotValidationService;
 
@@ -216,9 +227,10 @@ public class CheckoutService {
      */
     private String computeCheckoutFingerprint(Long userId, UUID clientOrderId, Long addressId,
                                               List<CheckoutRequest.CheckoutItem> checkoutItems,
-                                              String quoteHash) {
+                                              String quoteHash, Order.PaymentMethod paymentMethod) {
         try {
-            String payload = buildCheckoutFingerprintPayload(userId, clientOrderId, addressId, checkoutItems, quoteHash);
+            String payload = buildCheckoutFingerprintPayload(userId, clientOrderId, addressId, checkoutItems, quoteHash,
+                    paymentMethod);
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             SecretKeySpec keySpec = new SecretKeySpec(
                     checkoutProperties.getQuoteSigningSecret().getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);
@@ -236,12 +248,13 @@ public class CheckoutService {
      */
     private String buildCheckoutFingerprintPayload(Long userId, UUID clientOrderId, Long addressId,
                                                    List<CheckoutRequest.CheckoutItem> checkoutItems,
-                                                   String quoteHash) {
+                                                   String quoteHash, Order.PaymentMethod paymentMethod) {
         StringBuilder sb = new StringBuilder();
         sb.append("user:").append(userId).append("|");
         sb.append("clientOrderId:").append(clientOrderId).append("|");
         sb.append("address:").append(addressId).append("|");
         sb.append("quoteHash:").append(quoteHash).append("|");
+        sb.append("paymentMethod:").append(paymentMethod != null ? paymentMethod.name() : "COD").append("|");
         sb.append("items:");
 
         List<CheckoutRequest.CheckoutItem> sortedItems = new ArrayList<>(checkoutItems);
@@ -365,10 +378,15 @@ public class CheckoutService {
             throw BusinessException.forbidden("Only customers can checkout");
         }
 
+        Order.PaymentMethod paymentMethod = request.getPaymentMethod();
+        if (paymentMethod == null) {
+            paymentMethod = Order.PaymentMethod.COD;
+        }
+
         // 1. Compute checkout fingerprint from canonical inputs (before any DB reads)
         String checkoutFingerprint = computeCheckoutFingerprint(
                 user.getId(), request.getClientOrderId(), request.getAddressId(),
-                request.getItems(), request.getQuoteHash());
+                request.getItems(), request.getQuoteHash(), paymentMethod);
 
         // 2. Idempotency check: fetch or create idempotency record
         CheckoutIdempotency idempotencyRecord = handleIdempotency(user.getId(),
@@ -376,7 +394,7 @@ public class CheckoutService {
 
         if (idempotencyRecord.getCompletedAt() != null) {
             // This is a replay of a previously completed checkout
-            return buildIdempotentResponse(user.getId(), request.getClientOrderId(), request.getItems());
+            return buildIdempotentResponse(user.getId(), request.getClientOrderId(), request.getItems(), paymentMethod);
         }
 
         // 3. Load the customer's cart
@@ -493,6 +511,19 @@ public class CheckoutService {
         BigDecimal grandTotal = BigDecimal.ZERO;
         LocalDateTime now = LocalDateTime.now(clock);
 
+        // Pre-compute the payment group and intent reference for ONLINE checkout
+        // (single intent for the combined grand total). The IDs are known up
+        // front so each order's Payment row can link to the group inside the
+        // loop; the intent row itself is written once grandTotal is known.
+        String paymentGroupId = null;
+        String intentReference = null;
+        LocalDateTime intentExpiresAt = null;
+        if (paymentMethod == Order.PaymentMethod.ONLINE) {
+            paymentGroupId = UUID.randomUUID().toString();
+            intentReference = "intent_sim_" + UUID.randomUUID();
+            intentExpiresAt = now.plusMinutes(appProperties.getIntentTtlMinutes());
+        }
+
         for (CheckoutRequest.CheckoutItem checkoutItem : request.getItems()) {
             Long vendorId = checkoutItem.getVendorId();
             List<CartItem> vendorItems = itemsByVendor.get(vendorId);
@@ -503,7 +534,9 @@ public class CheckoutService {
             LocalDateTime slotStart = validatedSlot.slotStartUtc();
             LocalDateTime slotEnd = validatedSlot.slotEndUtc();
 
-            // Slot capacity check under vendor lock
+            // Slot capacity check under vendor lock. PENDING_PAYMENT orders
+            // consume capacity (countBookedOrdersForSlot includes them) so an
+            // unpaid order holds its slot until payment succeeds or is cancelled.
             long bookedInSlot = orderRepository.countBookedOrdersForSlot(vendor.getId(), slotStart);
             if (bookedInSlot >= vendor.getMaxOrdersPerSlot()) {
                 throw BusinessException.slotFull("Delivery slot is full for vendor: " + vendor.getBusinessName());
@@ -545,6 +578,8 @@ public class CheckoutService {
                             "Only %d units of %s are available".formatted(available, product.getName()));
                 }
 
+                // Reserve stock only: quantity is untouched until the vendor
+                // accepts after payment. reserved_quantity grows instead.
                 inventory.setReservedQuantity(inventory.getReservedQuantity() + cartItem.getQuantity());
                 inventoryRepository.saveAndFlush(inventory);
 
@@ -568,13 +603,24 @@ public class CheckoutService {
             // Resolve deterministic clientOrderId for this order
             String orderClientOrderId = resolveOrderClientOrderId(request.getClientOrderId(), vendor.getId(), request.getItems().size());
 
-            // Create order
+            // Create the order. COD orders start PLACED; ONLINE orders start
+            // PENDING_PAYMENT and stay there until the customer resumes/pays.
+            Order.OrderStatus orderStatus;
+            String historyReason;
+            if (paymentMethod == Order.PaymentMethod.ONLINE) {
+                orderStatus = Order.OrderStatus.PENDING_PAYMENT;
+                historyReason = "Order placed (ONLINE) - pending payment";
+            } else {
+                orderStatus = Order.OrderStatus.PLACED;
+                historyReason = "Order placed (COD)";
+            }
+
             Order order = Order.builder()
                     .user(user)
                     .vendor(vendor)
                     .clientOrderId(orderClientOrderId)
-                    .status(Order.OrderStatus.PLACED)
-                    .paymentMethod(Order.PaymentMethod.COD)
+                    .status(orderStatus)
+                    .paymentMethod(paymentMethod)
                     .paymentStatus(Order.PaymentStatus.PENDING)
                     .subtotal(subtotal.setScale(SCALE_2, ROUNDING))
                     .deliveryFee(deliveryFee)
@@ -590,6 +636,26 @@ public class CheckoutService {
                     .slotEnd(slotEnd)
                     .build();
             orderRepository.saveAndFlush(order);
+
+            // Create one payment row per order inside the checkout transaction.
+            // COD: pending COD payment. ONLINE: pending payment linked to the
+            // shared group/intent. Any failure rolls back orders, payments and
+            // reservations together.
+            Payment payment;
+            if (paymentMethod == Order.PaymentMethod.ONLINE) {
+                payment = Payment.builder()
+                        .order(order)
+                        .method(com.flowerconnect.payment.domain.Payment.PaymentMethod.ONLINE)
+                        .provider("simulated")
+                        .providerReference(intentReference)
+                        .amount(order.getTotal())
+                        .status(com.flowerconnect.payment.domain.Payment.PaymentStatus.PENDING)
+                        .paymentGroupId(paymentGroupId)
+                        .build();
+                payment = paymentRepository.saveAndFlush(payment);
+            } else {
+                payment = paymentService.createCodPayment(order, order.getTotal());
+            }
 
             // Create order items and append StockMovement for each
             List<CheckoutResponse.OrderItemSummary> orderItemSummaries = new ArrayList<>();
@@ -628,13 +694,13 @@ public class CheckoutService {
                         .build());
             }
 
-            // Create initial status history
+            // Create initial status history (null -> orderStatus)
             OrderStatusHistory history = OrderStatusHistory.builder()
                     .order(order)
                     .fromStatus(null)
-                    .toStatus(Order.OrderStatus.PLACED)
+                    .toStatus(orderStatus)
                     .actor(user)
-                    .reason("Order placed (COD)")
+                    .reason(historyReason)
                     .build();
             orderStatusHistoryRepository.saveAndFlush(history);
 
@@ -655,6 +721,20 @@ public class CheckoutService {
                     .build());
         }
 
+        // Write the single payment intent for the combined grand total (ONLINE only).
+        // Written after grandTotal is known; all in the same transaction so a
+        // later failure rolls it back along with orders, payments and stock.
+        if (paymentMethod == Order.PaymentMethod.ONLINE) {
+            PaymentIntent intent = PaymentIntent.builder()
+                    .paymentGroupId(paymentGroupId)
+                    .total(grandTotal.setScale(SCALE_2, ROUNDING))
+                    .status(IntentStatus.CREATED)
+                    .providerReference(intentReference)
+                    .expiresAt(intentExpiresAt)
+                    .build();
+            paymentIntentRepository.saveAndFlush(intent);
+        }
+
         // 13. Complete the idempotency record — only set after all orders are written
         idempotencyRecord.setCompletedAt(LocalDateTime.now(clock));
         idempotencyRepository.saveAndFlush(idempotencyRecord);
@@ -662,13 +742,18 @@ public class CheckoutService {
         // 14. Clear the cart
         cartItemRepository.deleteAllByCartId(cart.getId());
 
-        log.info("Customer {} placed checkout with {} order(s), clientOrderId={}", customerEmail, orderSummaries.size(), request.getClientOrderId());
+        log.info("Customer {} placed checkout with {} order(s), clientOrderId={}, method={}",
+                customerEmail, orderSummaries.size(), request.getClientOrderId(), paymentMethod);
 
         return CheckoutResponse.builder()
                 .clientOrderId(request.getClientOrderId())
                 .idempotentReplay(false)
                 .orders(orderSummaries)
                 .total(grandTotal.setScale(SCALE_2, ROUNDING))
+                .paymentMethod(paymentMethod.name())
+                .paymentGroupId(paymentGroupId)
+                .intentReference(intentReference)
+                .intentExpiresAt(intentExpiresAt != null ? intentExpiresAt.toString() : null)
                 .build();
     }
 
@@ -732,7 +817,9 @@ public class CheckoutService {
     /**
      * Builds an idempotent response for a previously completed checkout.
      */
-    private CheckoutResponse buildIdempotentResponse(Long userId, UUID clientOrderId, List<CheckoutRequest.CheckoutItem> items) {
+    private CheckoutResponse buildIdempotentResponse(Long userId, UUID clientOrderId,
+                                                     List<CheckoutRequest.CheckoutItem> items,
+                                                     Order.PaymentMethod paymentMethod) {
         List<Order> existingOrders = orderRepository.findByUserIdAndClientOrderId(userId, clientOrderId.toString());
         if (existingOrders.isEmpty() && items != null) {
             existingOrders = new ArrayList<>();
@@ -743,6 +830,21 @@ public class CheckoutService {
         }
         if (existingOrders.isEmpty()) {
             throw BusinessException.conflict("Duplicate checkout request detected but original orders not found");
+        }
+
+        // For ONLINE replays, recover the shared payment group/intent reference
+        // from the original orders' payment rows so the client can resume.
+        String paymentGroupId = null;
+        String intentReference = null;
+        String intentExpiresAt = null;
+        if (paymentMethod == Order.PaymentMethod.ONLINE && !existingOrders.isEmpty()) {
+            Payment firstPayment = paymentRepository.findByOrderId(existingOrders.get(0).getId())
+                    .orElseThrow(() -> new IllegalStateException("Original ONLINE payment not found"));
+            paymentGroupId = firstPayment.getPaymentGroupId();
+            intentReference = firstPayment.getProviderReference();
+            PaymentIntent intent = paymentIntentRepository.findByPaymentGroupId(paymentGroupId)
+                    .orElseThrow(() -> new IllegalStateException("Original payment intent not found"));
+            intentExpiresAt = intent.getExpiresAt() != null ? intent.getExpiresAt().toString() : null;
         }
 
         List<CheckoutResponse.OrderSummary> summaries = existingOrders.stream()
@@ -785,6 +887,10 @@ public class CheckoutService {
                 .idempotentReplay(true)
                 .orders(summaries)
                 .total(total.setScale(SCALE_2, ROUNDING))
+                .paymentMethod(paymentMethod != null ? paymentMethod.name() : null)
+                .paymentGroupId(paymentGroupId)
+                .intentReference(intentReference)
+                .intentExpiresAt(intentExpiresAt)
                 .build();
     }
 

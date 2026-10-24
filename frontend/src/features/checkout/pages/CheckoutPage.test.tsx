@@ -135,6 +135,7 @@ beforeEach(() => {
       confirmPriceChanges: false,
       items: [{ slotStart: "2026-10-03T10:00:00", vendorId: 7 }],
       quoteHash: "abc123def456",
+      paymentMethod: "COD",
     });
   });
 
@@ -406,6 +407,7 @@ beforeEach(() => {
         { slotStart: "2026-10-03T10:00:00", vendorId: 8 },
       ],
       quoteHash: "abc123def456",
+      paymentMethod: "COD",
     });
   });
 

@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import com.flowerconnect.order.domain.Order.PaymentMethod;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -72,6 +74,13 @@ public class CheckoutRequest {
      * checkout fails with 409 CONFLICT.
      */
     private boolean confirmPriceChanges;
+
+    /**
+     * The payment method: {@code COD} (default) or {@code ONLINE}. Any other
+     * value is rejected with 400 {@code VALIDATION_FAILED}. COD preserves the
+     * existing Stage 1 behavior; ONLINE creates a payment group and intent.
+     */
+    private PaymentMethod paymentMethod = PaymentMethod.COD;
 
     @Getter
     @Setter

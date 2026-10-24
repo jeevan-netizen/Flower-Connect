@@ -188,6 +188,29 @@ class AutoRejectIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void orderJustMovedPendingPaymentToPlacedIsNotImmediatelyAutoRejected() {
+        // An order whose PENDING_PAYMENT -> PLACED transition happened just now:
+        // its PLACED history entry is recent, so it must not be auto-rejected even
+        // though orders.created_at is well past the threshold. Age is measured
+        // from the PLACED entry, not from orders.created_at (Phase 7 task 7.2).
+        Long productId = productWithInventory(10, 5);
+        Order order = createPlacedOrderWithProduct(LocalDateTime.of(2026, 10, 20, 10, 0), productId, 5);
+
+        // Re-stamp the PLACED history entry to "now" (12:00), i.e. just now,
+        // while orders.created_at stays at 10:00 (two hours old).
+        java.time.LocalDateTime nowLdt =
+                java.time.LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+        jdbcTemplate.update(
+                "UPDATE order_status_history SET created_at = ? WHERE order_id = ? AND to_status = 'PLACED'",
+                java.sql.Timestamp.valueOf(nowLdt), order.getId());
+
+        autoRejectService.runAutoReject();
+
+        assertEquals(OrderStatus.PLACED,
+                orderRepository.findById(order.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
     void onlyPlacedOrdersAreChanged() {
         Order placed = createPlacedOrder(LocalDateTime.of(2026, 10, 20, 10, 59));
         Order confirmed = createOrder(LocalDateTime.of(2026, 10, 20, 10, 59), OrderStatus.CONFIRMED);
@@ -241,8 +264,9 @@ class AutoRejectIntegrationTest extends AbstractIntegrationTest {
 
         List<OrderStatusHistory> history = orderStatusHistoryRepository.findByOrderIdOrderByCreatedAtAsc(
                 order.getId());
-        assertEquals(1, history.size());
-        OrderStatusHistory entry = history.get(0);
+        // Seed PLACED row (written at order creation) plus the reject transition row.
+        assertEquals(2, history.size());
+        OrderStatusHistory entry = history.get(1);
         assertEquals(OrderStatus.PLACED, entry.getFromStatus());
         assertEquals(OrderStatus.CANCELLED, entry.getToStatus());
         assertEquals(ActorType.SYSTEM, entry.getActorType());
@@ -264,7 +288,8 @@ class AutoRejectIntegrationTest extends AbstractIntegrationTest {
         assertEquals(OrderStatus.CANCELLED,
                 orderRepository.findById(order.getId()).orElseThrow().getStatus());
         assertEquals(movementsAfterFirst, stockMovementRepository.count());
-        assertEquals(1,
+        // Seed PLACED row plus the single reject transition row; the rerun is a no-op.
+        assertEquals(2,
                 orderStatusHistoryRepository.findByOrderIdOrderByCreatedAtAsc(order.getId()).size());
     }
 
@@ -407,6 +432,16 @@ class AutoRejectIntegrationTest extends AbstractIntegrationTest {
         jdbcTemplate.update(
                 "UPDATE orders SET created_at = ? WHERE id = ?",
                 java.sql.Timestamp.valueOf(createdAtUtc), order.getId());
+
+        // Age is measured from entry into PLACED (the order_status_history row
+        // where to_status = PLACED), not orders.created_at (Phase 7 task 7.2).
+        // Write the PLACED history row with the same timestamp so the
+        // auto-reject age query matches directly-created PLACED orders.
+        jdbcTemplate.update(
+                "INSERT INTO order_status_history (order_id, from_status, to_status, reason, actor_user_id, actor_type, created_at) " +
+                "VALUES (?, NULL, 'PLACED', 'Order placed (checkout)', NULL, 'SYSTEM', ?)",
+                order.getId(), java.sql.Timestamp.valueOf(createdAtUtc));
+
         return order;
     }
 

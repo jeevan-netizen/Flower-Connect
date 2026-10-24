@@ -15,6 +15,40 @@ public class AppProperties {
     private int expirySweepMaxRows = 200;
     private String autoRejectCron = "0 0 * * * ?";
     private int autoRejectBatchSize = 100;
+    private String paymentExpiryCron = "0 * * * * ?";
+    private int paymentExpiryBatchSize = 100;
+    private int paymentExpiryMinutes = 30;
+
+    /**
+     * Time-to-live (minutes) for a simulated online payment intent. After the
+     * TTL elapses the intent expires and the pending order can no longer be
+     * resumed through {@code POST /api/v1/payments/{orderId}/resume}.
+     * Override with {@code APP_PAYMENT_INTENT_TTL_MINUTES} or
+     * {@code app.payment-intent-ttl-minutes}.
+     */
+    private int intentTtlMinutes = 30;
+
+    /**
+     * Shared secret used to verify signatures on the public payment webhook
+     * ({@code POST /api/v1/payments/webhook}). Configured from
+     * {@code APP_WEBHOOK_SECRET} / {@code app.webhook-secret} only; there is no
+     * default. In the {@code prod} profile the startup validator rejects a
+     * missing or shorter-than-32-byte secret.
+     */
+    private String webhookSecret;
+
+    /**
+     * Tolerance window (seconds) for webhook timestamps. Defaults to five
+     * minutes. Override with {@code APP_WEBHOOK_TOLERANCE_SECONDS} or
+     * {@code app.webhook-tolerance-seconds}.
+     */
+    private int webhookToleranceSeconds = 300;
+
+    /**
+     * Maximum webhook request body size (bytes). Override with
+     * {@code APP_WEBHOOK_MAX_BODY_BYTES} or {@code app.webhook-max-body-bytes}.
+     */
+    private int webhookMaxBodyBytes = 65_536;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -103,5 +137,79 @@ public class AppProperties {
 
     public void setAutoRejectBatchSize(int autoRejectBatchSize) {
         this.autoRejectBatchSize = autoRejectBatchSize;
+    }
+
+    /**
+     * Cron expression for the payment-expiry job (plan task 7.5). Defaults to
+     * every minute, so unpaid {@code PENDING_PAYMENT} orders are checked
+     * frequently and reservations cannot leak for long. Override with
+     * {@code APP_PAYMENT_EXPIRY_CRON} or {@code app.payment-expiry-cron}.
+     * Set to {@code -} (Spring's {@code CRON_DISABLED}) to turn the job off.
+     */
+    public String getPaymentExpiryCron() {
+        return paymentExpiryCron;
+    }
+
+    public void setPaymentExpiryCron(String paymentExpiryCron) {
+        this.paymentExpiryCron = paymentExpiryCron;
+    }
+
+    /**
+     * Maximum number of orders one payment-expiry run examines. The run holds
+     * the order row lock per candidate via the state machine, so an unbounded
+     * run over a large backlog would hold many locks. Overflow is left for the
+     * next scheduled run. Override with {@code APP_PAYMENT_EXPIRY_BATCH_SIZE}.
+     */
+    public int getPaymentExpiryBatchSize() {
+        return paymentExpiryBatchSize;
+    }
+
+    public void setPaymentExpiryBatchSize(int paymentExpiryBatchSize) {
+        this.paymentExpiryBatchSize = paymentExpiryBatchSize;
+    }
+
+    /**
+     * Payment-expiry threshold (minutes). A {@code PENDING_PAYMENT} order older
+     * than this is cancelled and its reserved stock released. Override with
+     * {@code APP_PAYMENT_EXPIRY_MINUTES} or {@code app.payment-expiry-minutes}.
+     */
+    public int getPaymentExpiryMinutes() {
+        return paymentExpiryMinutes;
+    }
+
+    public void setPaymentExpiryMinutes(int paymentExpiryMinutes) {
+        this.paymentExpiryMinutes = paymentExpiryMinutes;
+    }
+
+    public int getIntentTtlMinutes() {
+        return intentTtlMinutes;
+    }
+
+    public void setIntentTtlMinutes(int intentTtlMinutes) {
+        this.intentTtlMinutes = intentTtlMinutes;
+    }
+
+    public String getWebhookSecret() {
+        return webhookSecret;
+    }
+
+    public void setWebhookSecret(String webhookSecret) {
+        this.webhookSecret = webhookSecret;
+    }
+
+    public int getWebhookToleranceSeconds() {
+        return webhookToleranceSeconds;
+    }
+
+    public void setWebhookToleranceSeconds(int webhookToleranceSeconds) {
+        this.webhookToleranceSeconds = webhookToleranceSeconds;
+    }
+
+    public int getWebhookMaxBodyBytes() {
+        return webhookMaxBodyBytes;
+    }
+
+    public void setWebhookMaxBodyBytes(int webhookMaxBodyBytes) {
+        this.webhookMaxBodyBytes = webhookMaxBodyBytes;
     }
 }

@@ -2246,3 +2246,148 @@ explicitly defers runtime settings to Phase 10.
 - The auto-reject job is disabled in the test profile
   (`app.auto-reject-cron: "-"`) and driven directly with the `MutableClock` bean,
   following the `InventoryExpiryScheduler` precedent.
+## D-47: COD-only payments model for Phase 7 Stage 1
+
+**Status:** Accepted
+**Date:** Phase 7 (task 7.1-7.2)
+
+### Context
+
+Phase 7 introduces payments for checkout. Stage 1 supports cash-on-delivery (COD) only; online payment (intents, webhooks, capture, refund) is deferred to a later Phase 7 step. The decisions to settle: where payment status lives, who writes it, how COD collection works at delivery, and what happens to payment status when an order is rejected or cancelled before delivery.
+
+### Decision
+
+- **`PaymentService` is the sole writer of payment status.** No controller, repository, or state-machine code writes `orders.payment_status` or `payments.status` directly; all payment transitions go through `PaymentService`.
+- **`PaymentGateway` abstraction with a `CodPaymentProvider` implementation.** The COD provider makes no external call and no network request; it only persists a `PENDING` payment record during checkout. A later online phase adds provider implementations for intent creation, confirmation, webhook handling, capture and refund.
+- **One `payments` row per order (1:1).** `payments.order_id` is unique. The row holds method, provider, amount, status and nullable `collected_at`; a nullable `payment_group_id` is reserved for the later shared online payment intent.
+- **Additive `V19` migration** creates `payments` and `payment_events`, backfills one payment row per existing order (preserving existing `payment_status`, including `COLLECTED`), and adds `idx_osh_to_status_created_at` so the auto-reject age query can measure age from entry into `PLACED`.
+- **Option B for pre-delivery transitions:** a COD order that is rejected or cancelled before delivery keeps both `payments.status` and `orders.payment_status` at `PENDING` --- no collection was attempted, so `PaymentService` makes no change. This avoids writing a payment status that must later be reversed.
+- **`collectPayment` transitions `PENDING -> COLLECTED` at delivery.** It updates `payments.status`, `orders.payment_status` and stamps `collected_at` from the injected `Clock` in one transaction, and rejects non-COD orders and non-pending payments with 409 `CONFLICT`.
+- **`PENDING_PAYMENT` counts toward slot capacity** (`countBookedOrdersForSlot` includes `PLACED`, `CONFIRMED`, `PENDING_PAYMENT`) so an order awaiting payment still occupies a slot.
+- **Auto-reject age is measured from the `PLACED` history entry** (`order_status_history.to_status = PLACED`), not `orders.created_at`, via the new `findPlacedStaleBefore` query, so an order that sat in `PENDING_PAYMENT` before becoming `PLACED` starts its auto-reject clock at the `PLACED` transition.
+- **No real online provider, webhook, refund or capture; no card data or secrets stored.** All of that is deferred to a later Phase 7 step.
+
+### Consequences
+
+- Payment status is consistent between `payments` and `orders` because `PaymentService` updates both in one transaction.
+- Reject/cancel before delivery is safe under Option B: the payment stays `PENDING` and can be collected later if the order is reinstated, or left as-is if the order is terminal.
+- `V19` is additive; no applied migration is edited (ADR-002/D-9).
+- `PENDING_PAYMENT` consuming slot capacity means an order awaiting payment blocks a slot until it transitions out, which is intentional (prevents slot hoarding while still reserving capacity).
+
+## D-48: Online checkout creates shared simulated payment intent and PENDING_PAYMENT orders
+
+**Status:** Accepted
+**Date:** Phase 7 Stage 2 (task 7.4 part 1)
+
+### Context
+
+Stage 1 of Phase 7 supports COD only. Stage 2 part 1 introduces online checkout without a real payment gateway — the intent is simulated so the frontend can exercise the resume/pay flow end to end in tests. Decisions to settle: where the intent lives, how a shared intent groups multiple orders, how resume transitions work, and RBAC for payment endpoints.
+
+### Decision
+
+- **`PaymentIntent` is a separate entity** (`com.flowerconnect.payment.domain.PaymentIntent`, `IntentStatus` CREATED/PAID/EXPIRED/FAILED) with a `payment_intents` table created by additive migration `V20`. One intent per payment group, keyed by `payment_group_id` (VARCHAR(36), unique).
+- **Online checkout creates one shared intent + one `PENDING` payment per order.** All orders in a multi-vendor checkout share the same `payment_group_id` and the same intent reference (`intent_sim_<uuid>`). Orders start `PENDING_PAYMENT`; stock is reserved via `RESERVE` movement but quantity is untouched. Intent expires after `app.intentTtlMinutes` (default 30).
+- **`resumePayment` transitions `PENDING_PAYMENT -> PLACED` exclusively through `OrderStateMachine`** (ActorType.SYSTEM, SideEffect.NONE since stock already reserved), then syncs `payments.status` to PAID, `orders.payment_status` to PAID, and intent status to PAID — all in one transaction. Expired intent (past `expiresAt`) is rejected with 409.
+- **`fetchPaymentState` and `fetchGroupState` are read-only views** scoped to the owning customer. RBAC: `/api/v1/payments/**` ? `hasRole("CUSTOMER")`. Florist and admin are 403; unauthenticated is 401.
+- **`OrderStateMachine` dependency on `PaymentService` is broken via `ObjectProvider`** (circular dependency: `PaymentService ? OrderStateMachine ? PaymentService`). `OrderStateMachineProvider.getObject()` resolves lazily at call time.
+- **`PENDING_PAYMENT` is excluded from vendor order list and summary** (`VendorOrderService`) since it's not yet an actionable order — the customer hasn't paid yet.
+- **`created_at`/`updated_at` on `PaymentIntent` use `@CreationTimestamp`/`@UpdateTimestamp`** (Hibernate) so manually created intents in tests persist correctly.
+
+### Consequences
+
+- COD path is unchanged from Stage 1; `paymentMethod` defaults to COD in `CheckoutRequest`/`CheckoutQuoteRequest`.
+- No external gateway, no card data, no secrets stored — the simulated intent is test-only scaffolding for Stage 2 part 1. A real online provider (intent creation, webhooks, capture) is deferred to a later Phase 7 step.
+- `V20` is additive; no applied migration is edited (ADR-002/D-9).
+- 7 integration tests + 17 unit tests + 9 slice RBAC tests all green; full backend unit suite 1133 tests pass.
+
+
+## D-49: Signed webhook and simulated pay/fail provider (Phase 7 Stage 3)
+
+**Status:** Accepted
+**Date:** Phase 7 Stage 3 (task 7.4 part 2)
+
+### Context
+
+Stage 3 introduces the webhook endpoint that provider callbacks hit, plus a simulated test-mode provider so the online pay/resume flow can be exercised end-to-end without a real gateway. Decisions to settle: webhook authentication, signature scheme, RBAC ordering, simulator profile gating, prod startup validation, event outcome semantics, and late-event/duplicate handling.
+
+### Decision
+
+- **`POST /api/v1/payments/webhook` is `permitAll` and carries no JWT.** It is authenticated solely by the HMAC-SHA256 signature over `timestamp + raw body`, presented via `X-FlowerConnect-Timestamp` and `X-FlowerConnect-Signature: v1=<hex>` headers. A body-size cap (`app.webhook-max-body-bytes`) rejects oversized payloads before buffering.
+- **Signature verified with constant-time comparison** (`MessageDigest.isEqual`) against `app.webhook-secret` (`APP_WEBHOOK_SECRET` env). A tolerance window (`app.webhookToleranceSeconds`) rejects stale timestamps.
+- **`SecurityConfig` matcher ordering fixed:** the webhook `permitAll` rule is placed **before** the `/api/v1/payments/**` ? `hasRole("CUSTOMER")` rule so the webhook is reachable without authentication while all other payment endpoints remain CUSTOMER-only.
+- **Prod startup validation:** `WebhookSecretValidator` (`@Profile("prod")`) fails application startup if the webhook secret is absent or shorter than 32 bytes, preventing a silently-inert webhook in production.
+- **Simulator behind `!prod` profile:** `SimulatedPaymentProvider` + `SimulatorController` expose `POST /api/v1/payments/simulator/{orderId}/pay|fail` (customer auth + ownership required). The simulator generates a correctly signed event and delivers it through the same webhook verification path — no card-like fields, no external calls, no secrets stored.
+- **Rate limiting:** webhook is IP-keyed via `RateLimitFilter` (no email available on webhook requests).
+- **`PaymentService.processProviderEvent`** applies group transitions atomically via `OrderStateMachine.transitionGroup` (locks order rows ascending id). Success ? PAID/PLACED (ActorType.SYSTEM); failure ? FAILED/CANCELLED with reservation release. Late success after cancel/timeout ? REFUND_PENDING (no resurrection); failure after success ? no regression; duplicate event IDs ? idempotent. Each accepted event persists one `PaymentEvent` row transactionally.
+- **`resumePayment` fixed** to not transition payment/order; returns pending state and marks intent EXPIRED on timeout only. Regression test added.
+- **Tests:** `WebhookControllerIntegrationTest` 13/13 pass (real HTTP + MySQL + Testcontainers); `WebhookSignatureServiceTest`, `WebhookSecretValidatorTest`, `PaymentServiceTest` unit tests pass; `SimulatorControllerIntegrationTest` (5 tests), `SimulatorProdAbsenceIntegrationTest` (2 tests); full unit suite 1156 tests pass (1 environment-only failure: `AppPropertiesBindingTest` requires local MySQL `test` user).
+
+### Consequences
+
+- Webhook security rests entirely on signature verification; a leaked secret would allow forged callbacks, so the secret is treated as a production credential with startup validation.
+- The simulator is compiled but inactive in prod (`!prod` profile), so it cannot leak test endpoints to production.
+- Late-event and duplicate handling is explicit rather than implicit, preventing double-collection or resurrection of terminal orders.
+- `V19`/`V20` migrations already created the payments tables; no new migration is needed for Stage 3.
+
+
+## D-50: Customer payment UI polls payment state; resume is a refresh, not a completion (Phase 7 frontend Stage 3 / task 7.6)
+
+**Status:** Accepted
+**Date:** Phase 7 frontend stage (task 7.6)
+
+### Context
+
+The backend Stage 3 (webhook + simulator) is complete. The frontend needs to integrate the online checkout response and payment-group state APIs into the customer UI. Decisions to settle: where the payment-method selector lives, how payment state is polled, what the resume action does, and how the simulated pay/fail controls are exposed.
+
+### Decision
+
+- **Payment-method selector at checkout.** `CheckoutPage` gains a payment-method radio group (COD default; ONLINE offered because backend 7.4 is built). The selected method is sent as `paymentMethod` in the `CheckoutRequest`. On COD checkout the confirmation step navigates to `/orders`; on ONLINE checkout it navigates to `/payment/:paymentGroupId`.
+
+- **Payment status page.** `PaymentStatusPage` at `/payment/:paymentGroupId` polls `GET /api/v1/payments/group/{paymentGroupId}` via TanStack Query with `refetchInterval` of 8 s (within plan §9.4's 5â€“10 s). Polling pauses while the tab is hidden (`usePolling`) and stops for terminal states (`PAID`, `FAILED`, `REFUNDED`). The page shows pending â†" paid/failed/expired/refund-pending states using existing design tokens and responsive layouts.
+
+- **Resume is a refresh, not a completion.** The resume action calls `POST /api/v1/payments/{orderId}/resume`. After Stage 3 backend changes, `resumePayment` does *not* transition payment/order to paid â€” it returns the current pending state and marks the intent expired on timeout. Only the verified webhook flow transitions a payment to `PAID`/`PLACED`. The frontend resume button is shown only for pending orders in non-terminal groups.
+
+- **No card-like data anywhere.** The frontend never collects, renders, stores, logs, or submits card numbers, CVV, or other card-like data. Online payment in v1 is a simulated test-mode provider (D-48/D-49).
+
+- **Simulator controls are backend-only.** The frontend does not expose pay/fail controls directly. The simulated pay/fail endpoints (`POST /api/v1/payments/simulator/{orderId}/pay|fail`) are backend-only behind the `!prod` profile. The frontend only polls payment state and shows transitions.
+
+- **Role protection.** `/payment/:paymentGroupId` is guarded by `ProtectedRoute roles={[CUSTOMER_ROLE]}`. Existing API/error-handling conventions (Axios interceptors, `ApiErrorInfo`, TanStack Query) are preserved.
+
+- **COD checkout preserved.** The COD checkout flow is unchanged â€” COD remains the default payment method and navigates to `/orders` on success.
+
+### Consequences
+
+- The payment-method selector is a new checkout control; existing COD tests are updated to include `paymentMethod: "COD"` in the expected `placeCheckout` payload.
+- The payment status page is a new route; no existing routes are modified.
+- 7 new Vitest/RTL tests cover pendingâ†"terminal transitions, polling stop behavior, resume API call, terminal-state UI, and API error handling.
+- Full frontend suite: lint, typecheck, tests, build all clean. Backend unit suite: 1157 tests, 0 failures.
+
+
+## D-51: Reservation expiry job cancels stale `PENDING_PAYMENT` orders and releases stock (Phase 7 task 7.5)
+
+**Status:** Accepted
+**Date:** Phase 7 Stage 3.5 (task 7.5)
+
+### Context
+
+Online orders sit in `PENDING_PAYMENT` while the customer completes payment through the simulated gateway (task 7.4). If the intent expires before the customer pays, the order must be cancelled and its reserved stock released, otherwise reservations can leak forever. Decisions to settle: where the threshold lives, who writes the cancellation, how stock is released, and how failures in one candidate affect the batch.
+
+### Decision
+
+- **`PaymentExpiryService` is the sole owner of payment expiry.** It selects `PENDING_PAYMENT` orders whose `created_at` is strictly older than the configured threshold (`app.payment-expiry-minutes`, default 30) and cancels each through `OrderStateMachine.transition` (`PENDING_PAYMENT -> CANCELLED`, actor `SYSTEM`, reason `PAYMENT_EXPIRED_NO_RESPONSE`). The state machine's `SideEffect.RELEASE` delegates stock release to `InventoryService.releaseReservedStock`, which decrements `reserved_quantity` without touching `quantity` and appends exactly one `stock_movements` row of type `RELEASE`.
+
+- **Each candidate is processed in its own `REQUIRES_NEW` transaction.** One failing order (e.g. insufficient reserved quantity for the release) never rolls back or blocks another candidate. The state machine locks the order row and re-checks its status under the lock, so a customer who resumed the order first leaves it `PLACED` and the expiry is skipped; an already-cancelled order is skipped without a duplicate history row or stock movement.
+
+- **The threshold comes from `AppProperties`, not `platform_config`.** `paymentExpiryMinutes` (default 30) is a simple configuration property because payment expiry is only relevant when online payment exists and does not need the generic key/value table. The cron (`paymentExpiryCron`, default every minute) and batch bound (`paymentExpiryBatchSize`, default 100) follow the same pattern as `autoRejectCron`/`autoRejectBatchSize`.
+
+- **The scheduler is a thin component** (`PaymentExpiryScheduler`) that owns only the cron and delegates all business logic to `PaymentExpiryService`. The cron is disabled in the test profile (`payment-expiry-cron: "-"`) so a scheduled run cannot fire mid-test; the service is driven directly with the injected `Clock` instead.
+
+- **Tests:** `PaymentExpiryServiceTest` (2 unit tests for configuration reading) and `PaymentExpiryIntegrationTest` (13 integration tests vs real MySQL covering cutoff boundary, only `PENDING_PAYMENT` orders changed, reservation released without changing quantity, one history row with `SYSTEM` actor, rerun idempotency, customer resume wins race, one failing order does not block batch, batch bounds, threshold from `AppProperties`).
+
+### Consequences
+
+- Payment-expiry writes go through the same ownership boundaries as all other order status changes: `OrderStateMachine` is the sole writer of `Order#status`, `InventoryService` is the sole writer of stock levels and movements.
+- No new migration: the `orders`, `order_status_history`, `inventory`, and `stock_movements` tables already exist and support `PENDING_PAYMENT` and the `RELEASE` movement type.
+- Full backend unit suite: 1159 tests, 0 failures (2 new unit tests from `PaymentExpiryServiceTest`).
+
+

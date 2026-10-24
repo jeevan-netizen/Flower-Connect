@@ -55,6 +55,7 @@ jwt:
 
 app:
   base-url: ${APP_BASE_URL:http://localhost:5173}
+  webhook-secret: ${APP_WEBHOOK_SECRET:}
   cors:
     origins: ${APP_CORS_ORIGINS:http://localhost:5173}
   rate-limit:
