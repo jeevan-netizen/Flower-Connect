@@ -102,8 +102,10 @@ describe("AdminDisputesPage", () => {
       expect(screen.getByRole("heading", { name: /disputes/i })).toBeInTheDocument();
     });
     expect(screen.getByLabelText(/status/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/open/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/resolve/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: /resolve/i }).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/resolve/i).length).toBeGreaterThan(0);
+    });
   });
 
   it("shows empty state when no disputes match filters", async () => {

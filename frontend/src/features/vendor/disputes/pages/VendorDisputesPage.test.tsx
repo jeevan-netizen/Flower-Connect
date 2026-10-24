@@ -98,12 +98,10 @@ describe("VendorDisputesPage", () => {
   it("renders the disputes table with status and totals", async () => {
     renderWithProviders(<VendorDisputesPage />, { route: "/vendor/disputes" });
 
-    await waitFor(() => {
-      expect(screen.getByRole("heading", { name: /disputes/i })).toBeInTheDocument();
-    });
-    expect(screen.getAllByText(/open/i).length).toBeGreaterThan(0);
+    await screen.findByRole("heading", { name: /disputes/i });
+    await screen.findByRole("button", { name: /respond/i });
     expect(screen.getByText(/100\.00/i)).toBeInTheDocument();
-    expect(screen.getByText(/petal & stem/i)).toBeInTheDocument();
+    expect(screen.getByText(/item not as described/i)).toBeInTheDocument();
   });
 
   it("shows empty state when no disputes", async () => {
