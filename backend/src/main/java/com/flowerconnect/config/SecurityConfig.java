@@ -107,6 +107,12 @@ public class SecurityConfig {
                  .requestMatchers("/api/v1/payments/**").hasRole("CUSTOMER")
                  // Customer order history and detail (plan Phase 6, task 6.3):
                  // only the authenticated customer's own orders, newest first.
+                 // Phase 8 cancellation (task 8.2) lives under the same path but
+                 // is reachable by CUSTOMER, VENDOR and ADMIN, so its more
+                 // specific matcher is declared first; the broad rule below keeps
+                 // every other orders route CUSTOMER-only.
+                 .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/cancel")
+                     .hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")
                  .requestMatchers("/api/v1/orders/**").hasRole("CUSTOMER")
                  // Slot discovery endpoint - CUSTOMER only with address ownership and vendor approval checks in handler.
                  // The path must be written in the same shape as the controller's own mapping

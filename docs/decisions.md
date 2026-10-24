@@ -2391,3 +2391,78 @@ Online orders sit in `PENDING_PAYMENT` while the customer completes payment thro
 - Full backend unit suite: 1159 tests, 0 failures (2 new unit tests from `PaymentExpiryServiceTest`).
 
 
+## D-52: Single cancellation endpoint for CUSTOMER, VENDOR, and ADMIN (Phase 8 Stage 1)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 1 (tasks 8.1, 8.2)
+
+### Context
+
+Plan task 8.2 specifies a single cancellation endpoint `POST /api/v1/orders/{id}/cancel` with a reason. Section 6.1 allows CUSTOMER, VENDOR, and ADMIN to cancel orders in different states, with different target statuses (CANCELLED or REJECTED) and different reason requirements. The existing `SecurityConfig` restricts `/api/v1/orders/**` to CUSTOMER only, but the cancellation endpoint must be reachable by all three roles.
+
+### Decision
+
+- **Single endpoint `POST /api/v1/orders/{id}/cancel` for all three roles.** A specific matcher in `SecurityConfig` permits CUSTOMER, FLORIST, and ADMIN on `POST /api/v1/orders/{orderId}/cancel`, placed before the broad `/api/v1/orders/**` → CUSTOMER rule. The `CancellationService` derives the actor type from the authentication authorities and enforces ownership: CUSTOMER on their own order, VENDOR on their own order (including suspended vendors per D-6), ADMIN on any order.
+
+- **`CancellationService` as orchestrator.** Validates actor, ownership, current state, and reason requirements, then delegates the status change to `OrderStateMachine`. It does not write order status, payment status, or stock directly. Payment status updates go through `PaymentService.markRefundPending`.
+
+- **Target status resolution follows section 6.1 exactly:**
+  - VENDOR on PLACED → REJECTED (reason required)
+  - CUSTOMER/ADMIN on PLACED → CANCELLED (reason optional for CUSTOMER, required for ADMIN)
+  - CUSTOMER/VENDOR/ADMIN on CONFIRMED → CANCELLED (reason required for VENDOR/ADMIN)
+  - VENDOR/ADMIN on PREPARING → CANCELLED (reason required)
+  - ADMIN on OUT_FOR_DELIVERY → CANCELLED (reason required)
+  - Terminal states (DELIVERED, CANCELLED, REJECTED) admit no transition (409).
+
+- **Payment effects:** Paid online orders (paymentMethod=ONLINE, paymentStatus=PAID) become REFUND_PENDING via `PaymentService.markRefundPending`; COD before delivery leaves payment PENDING (Option B, per D-47). No money moves for COD cancellations before delivery.
+
+- **Stock effects** delegated to `OrderStateMachine` → `InventoryService` per section 6.2: RELEASE before acceptance, RESTOCK after acceptance but before PREPARING, NONE from PREPARING onward.
+
+- **`OrderCancelled` event** published after commit with actor, reason, previous status. Slot capacity freed automatically via existing `countBookedOrdersForSlot` query (CANCELLED/REJECTED excluded from PLACED/CONFIRMED/PENDING_PAYMENT count).
+
+- **Suspended vendors** may cancel in-flight orders (D-6 honored).
+
+### Consequences
+
+- No separate vendor/admin cancellation URLs; single endpoint with role-based ownership enforcement.
+- `CancellationService` in `com.flowerconnect.order.service` (alongside `OrderStateMachine`), not a separate `dispute` package — cancellations are order transitions, not disputes.
+- Integration test covers full status × actor matrix, reason validation, exact stock quantities/movements, cancel-vs-accept race, duplicate cancellation, paid-online REFUND_PENDING, COD Option B, slot capacity, suspended vendor, RBAC (401, 403 foreign, 404, 200).
+
+
+## D-53: CancellationService in order.service package (not dispute package)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 1
+
+### Context
+
+The plan's package layout (section 3) places `CancellationService` in a `dispute` package alongside `DisputeService`. However, cancellations are order state transitions governed by the section 6.1 state machine, not disputes. Disputes (Phase 8 task 8.4) are post-delivery customer complaints with admin resolution.
+
+### Decision
+
+Place `CancellationService` in `com.flowerconnect.order.service` alongside `OrderStateMachine`. This follows the architectural principle that order state transitions live in the order domain. The `dispute` package will be created later for the dispute workflow (customer raises, vendor responds, admin resolves).
+
+### Consequences
+
+- Clean separation: `order.service` owns order lifecycle; future `dispute.service` will own dispute lifecycle.
+- No premature package creation; `dispute` package added when disputes are implemented (Stage 2+).
+
+
+## D-54: PaymentService.markRefundPending for paid-online cancellations
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 1
+
+### Context
+
+Plan 8.3: "Paid online orders: REFUND_PENDING → REFUNDED (admin marks in v1...). COD orders cancelled before delivery: no money has moved." Section 6.1 says "refund if already paid" for PLACED → REJECTED/CANCELLED. The state machine does not modify payment status; `PaymentService` is the sole writer of payment status (D-47).
+
+### Decision
+
+Add `PaymentService.markRefundPending(Long orderId)` that transitions both `payments.status` and `orders.payment_status` from PAID to REFUND_PENDING in one transaction. Called by `CancellationService` after `OrderStateMachine.transition` when cancelling a paid online order. Idempotent: if already REFUND_PENDING or REFUNDED, throws 409 CONFLICT.
+
+### Consequences
+
+- Refund state managed by `PaymentService` (sole writer of payment status per D-47).
+- Admin refund queue (Stage 2) will use this to mark REFUNDED.
+- No money moved in v1; admin manually processes refund or gateway refund if 7.4 exists.

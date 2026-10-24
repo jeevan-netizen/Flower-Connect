@@ -147,6 +147,37 @@ public class PaymentService {
         return payment;
     }
 
+    /**
+     * Marks a paid online order's payment as awaiting a refund
+     * ({@code payments.status} and {@code orders.payment_status} move
+     * {@code PAID &#8594; REFUND_PENDING}) after the order has been cancelled
+     * or rejected. No money is moved in v1: an admin marks the refund
+     * complete through the refund queue (Phase 8 task 8.3). Rejected with
+     * 409 when the payment is not {@code PAID}.
+     */
+    @Transactional
+    public Payment markRefundPending(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
+        Payment payment = paymentRepository.findByOrderIdForUpdate(orderId)
+                .orElseThrow(() -> BusinessException.notFound("Payment not found for order: " + orderId));
+
+        if (payment.getStatus() != Payment.PaymentStatus.PAID) {
+            throw BusinessException.conflict(
+                    "Payment for order " + orderId + " is not PAID (current: " + payment.getStatus()
+                            + "); cannot mark refund-pending");
+        }
+
+        payment.setStatus(Payment.PaymentStatus.REFUND_PENDING);
+        order.setPaymentStatus(Order.PaymentStatus.REFUND_PENDING);
+
+        paymentRepository.saveAndFlush(payment);
+        orderRepository.saveAndFlush(order);
+
+        log.info("Marked payment for order {} refund-pending", orderId);
+        return payment;
+    }
+
     // ------------------------------------------------------------------
     // Stage 2: online payment state and resume
     // ------------------------------------------------------------------
