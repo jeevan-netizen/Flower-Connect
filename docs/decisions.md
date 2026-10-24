@@ -2575,3 +2575,43 @@ Key questions:
 - Suspended vendors may respond to in-flight disputes (D-6 honored).
 - Resolution, UI, and notifications are Stage 5+; `POST /admin/disputes/{id}/resolve` returns 501.
 
+
+## D-58: Dispute resolution (Phase 8 Stage 5, task 8.5)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 5
+
+### Context
+
+Phase 8 Stage 5 implements dispute resolution (plan task 8.5): admins resolve OPEN or UNDER_REVIEW disputes to RESOLVED_REFUND, RESOLVED_PARTIAL, or RESOLVED_REJECTED. Key questions:
+
+- **Refund amount representation**: The Payment entity previously had no field for the actual refund amount, so marking a payment REFUNDED for a partial refund would lose information about how much was actually refunded. A `refunded_amount` column (V24) was added to `payments` to record the actual refunded amount for both full and partial refunds.
+- **Partial refund through PaymentService**: `PaymentService.markRefundedWithAmount` was added to handle partial refunds, accepting a `refundAmount` parameter that must be > 0 and <= payment amount, rounded HALF_UP to 2 decimals (INR). Full refunds default to the payment amount when `refundAmount` is null.
+- **RESOLVED_REJECTED has no payment effect**: PaymentService is not called for rejected disputes; payment status is unchanged.
+- **COD orders**: Payment status remains COLLECTED; the refund obligation is recorded on the dispute via `refund_amount` for out-of-band handling (Phase 10 settlement).
+- **Order status preserved**: `order.status` remains DELIVERED; resolution never changes order state or stock.
+- **Concurrency**: Dispute row is locked with `PESSIMISTIC_WRITE` before checking state, ensuring exactly one winner on concurrent resolution attempts.
+- **Audit**: `DISPUTE_RESOLVED` audit row written with actor, action, timestamp, before/after resolution values.
+- **Event**: Scalar-only `DisputeResolved` Spring event published after commit with Phase 10 hook data (dispute/order/vendor IDs, outcome, refund amount, payment method, resolver ID, occurrence timestamp).
+
+### Decision
+
+- **Migration V23** adds `refund_amount DECIMAL(10,2) NULL` to `disputes`.
+- **Migration V24** adds `refunded_amount DECIMAL(10,2) NULL` to `payments`.
+- **`Dispute` entity** gains `refundAmount` field mapped to `refund_amount`.
+- **`ResolveDisputeRequest` DTO** gains `refundAmount` field with `@DecimalMin("0.01")` validation.
+- **`DisputeService.resolveDispute`** locks the dispute row via `findByIdForUpdate`, validates status is OPEN/UNDER_REVIEW, validates refund amount rules per outcome, coordinates with `PaymentService` for online refunds, writes audit log, and publishes `DisputeResolved` event after commit.
+- **`AdminDisputeController.resolveDispute`** replaces the 501 stub with the real ADMIN-only endpoint at `POST /api/v1/admin/disputes/{disputeId}/resolve`.
+- **`PaymentService.markRefundedWithAmount`** handles partial and full refunds, idempotent when already REFUNDED with matching amount.
+- **`Payment.markRefunded`** now delegates to `markRefundedWithAmount` with null amount (defaults to full payment amount).
+
+### Consequences
+
+- Online full/partial refunds go through PaymentService, never direct payment field writes.
+- COD payment status stays COLLECTED; refund obligation recorded on dispute for out-of-band handling.
+- Rejected disputes have no payment or stock effect.
+- Order status (DELIVERED) and stock are never changed by dispute resolution.
+- No Phase 10 ledger entries created in this stage.
+- 11 new integration tests cover all resolution outcomes, partial amount bounds/rounding, final-state behavior, concurrent resolution, audit contents, event payload, online vs COD payment effects, unchanged order status, and ADMIN-only RBAC.
+
+

@@ -214,6 +214,37 @@ public class PaymentService {
      */
     @Transactional
     public Payment markRefunded(Long orderId, String adminEmail, String referenceNote) {
+        return markRefundedInternal(orderId, adminEmail, referenceNote, null);
+    }
+
+    /**
+     * Marks a {@code REFUND_PENDING} or {@code PAID} online order's payment as
+     * partially or fully refunded. Used by dispute resolution for partial refunds
+     * where the payment may be in {@code PAID} state (not {@code REFUND_PENDING}).
+     *
+     * <p>State rules:
+     * <ul>
+     *   <li>{@code REFUND_PENDING} or {@code PAID} may be marked refunded.</li>
+     *   <li>Already {@code REFUNDED} returns the current result idempotently if the
+     *       refunded amount matches.</li>
+     *   <li>Any other state returns 409 {@code CONFLICT}.</li>
+     *   <li>For partial refunds, {@code refundAmount} must be > 0 and <= payment amount.</li>
+     *   <li>For full refunds, {@code refundAmount} should be null or equal to payment amount.</li>
+     * </ul>
+     *
+     * @param orderId the order whose payment to mark refunded
+     * @param adminEmail the authenticated admin's email (ownership/actor)
+     * @param referenceNote non-blank, length-limited reference note (e.g. gateway refund id)
+     * @param refundAmount the amount refunded; null for full refund (defaults to payment amount)
+     * @return the updated payment record
+     * @throws BusinessException 404 if missing, 409 if wrong state or invalid amount
+     */
+    @Transactional
+    public Payment markRefundedWithAmount(Long orderId, String adminEmail, String referenceNote, BigDecimal refundAmount) {
+        return markRefundedInternal(orderId, adminEmail, referenceNote, refundAmount);
+    }
+
+    private Payment markRefundedInternal(Long orderId, String adminEmail, String referenceNote, BigDecimal refundAmount) {
         if (referenceNote == null || referenceNote.trim().isEmpty()) {
             throw BusinessException.badRequest("Reference note is required");
         }
@@ -230,18 +261,36 @@ public class PaymentService {
         Payment.PaymentStatus before = payment.getStatus();
         if (before == Payment.PaymentStatus.REFUNDED) {
             // Idempotent: already refunded, return current state without change.
+            // If a refundAmount was provided, verify it matches.
+            if (refundAmount != null && payment.getRefundedAmount() != null
+                    && payment.getRefundedAmount().compareTo(refundAmount) != 0) {
+                throw BusinessException.conflict(
+                        "Payment for order " + orderId + " already refunded with different amount: "
+                                + payment.getRefundedAmount());
+            }
             log.info("Payment for order {} already refunded (idempotent)", orderId);
             return payment;
         }
-        if (before != Payment.PaymentStatus.REFUND_PENDING) {
+        if (before != Payment.PaymentStatus.REFUND_PENDING && before != Payment.PaymentStatus.PAID) {
             throw BusinessException.conflict(
                     "Payment for order " + orderId + " is " + before
-                            + "; only REFUND_PENDING can be marked refunded");
+                            + "; only REFUND_PENDING or PAID can be marked refunded");
         }
+
+        BigDecimal effectiveRefundAmount = refundAmount != null ? refundAmount : payment.getAmount();
+        if (effectiveRefundAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw BusinessException.badRequest("Refund amount must be greater than zero");
+        }
+        if (effectiveRefundAmount.compareTo(payment.getAmount()) > 0) {
+            throw BusinessException.badRequest("Refund amount cannot exceed payment amount");
+        }
+        // Round to 2 decimal places HALF_UP for INR
+        effectiveRefundAmount = effectiveRefundAmount.setScale(2, java.math.RoundingMode.HALF_UP);
 
         LocalDateTime now = LocalDateTime.now(clock);
         payment.setStatus(Payment.PaymentStatus.REFUNDED);
         payment.setRefundedAt(now);
+        payment.setRefundedAmount(effectiveRefundAmount);
         order.setPaymentStatus(Order.PaymentStatus.REFUNDED);
 
         paymentRepository.saveAndFlush(payment);
@@ -252,12 +301,13 @@ public class PaymentService {
                 .actionType("PAYMENT_REFUNDED")
                 .entityType("PAYMENT")
                 .entityId(payment.getId())
-                .reason("Order " + orderId + ": REFUND_PENDING -> REFUNDED (reference: "
+                .reason("Order " + orderId + ": " + before + " -> REFUNDED (refunded: "
+                        + effectiveRefundAmount + " of " + payment.getAmount() + ", reference: "
                         + referenceNote + ")")
                 .build());
 
-        log.info("Marked payment for order {} refunded at {} (reference: {})",
-                orderId, now, referenceNote);
+        log.info("Marked payment for order {} refunded at {} (refunded: {} of {}, reference: {})",
+                orderId, now, effectiveRefundAmount, payment.getAmount(), referenceNote);
         return payment;
     }
 
@@ -659,6 +709,15 @@ public class PaymentService {
                 .intentReference(intent.getProviderReference())
                 .paidAt(null)
                 .build();
+    }
+
+    /**
+     * Finds the payment for the given order ID. Used by DisputeService during
+     * dispute resolution.
+     */
+    @Transactional(readOnly = true)
+    public Payment getPaymentForOrder(Long orderId) {
+        return paymentRepository.findByOrderId(orderId).orElse(null);
     }
 }
 

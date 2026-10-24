@@ -26,6 +26,7 @@ public class DisputeDetailResponse {
     private String customerEmail;
     private String vendorName;
     private BigDecimal orderTotal;
+    private BigDecimal refundAmount;
     private String vendorResponse;
     private String resolutionNote;
     private LocalDateTime createdAt;

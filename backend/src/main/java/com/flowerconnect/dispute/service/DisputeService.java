@@ -7,14 +7,20 @@ import com.flowerconnect.dispute.dto.DisputeDetailResponse;
 import com.flowerconnect.dispute.dto.DisputeListItem;
 import com.flowerconnect.dispute.dto.DisputePageResponse;
 import com.flowerconnect.dispute.dto.RaiseDisputeRequest;
+import com.flowerconnect.dispute.dto.ResolveDisputeRequest;
 import com.flowerconnect.dispute.dto.VendorDisputeResponseRequest;
 import com.flowerconnect.dispute.event.DisputeOpened;
+import com.flowerconnect.dispute.event.DisputeResolved;
 import com.flowerconnect.dispute.repository.DisputeRepository;
+import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.OrderStatusHistory;
 import com.flowerconnect.order.repository.OrderRepository;
 import com.flowerconnect.order.repository.OrderStatusHistoryRepository;
+import com.flowerconnect.payment.domain.Payment;
+import com.flowerconnect.payment.service.PaymentService;
+import com.flowerconnect.repository.AuditLogRepository;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
 import com.flowerconnect.domain.VendorProfile;
@@ -28,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -83,6 +90,8 @@ public class DisputeService {
     private final UserRepository userRepository;
     private final VendorProfileRepository vendorProfileRepository;
     private final PlatformConfigRepository platformConfigRepository;
+    private final PaymentService paymentService;
+    private final AuditLogRepository auditLogRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -333,6 +342,169 @@ public class DisputeService {
         }
     }
 
+    /**
+     * Admin resolves a dispute. Moves {@code OPEN} or {@code UNDER_REVIEW} to
+     * one of {@code RESOLVED_REFUND}, {@code RESOLVED_PARTIAL}, or
+     * {@code RESOLVED_REJECTED}.
+     *
+     * <p>Business rules:
+     * <ul>
+     *   <li>Only ADMIN may call this (enforced by SecurityConfig).</li>
+     *   <li>Dispute must be in {@code OPEN} or {@code UNDER_REVIEW} status.</li>
+     *   <li>Resolution status must be one of the three RESOLVED_* values.</li>
+     *   <li>Resolution note is required (validated by DTO).</li>
+     *   <li>For {@code RESOLVED_REFUND}: refundAmount must equal order total.</li>
+     *   <li>For {@code RESOLVED_PARTIAL}: refundAmount must be > 0 and <= order total.</li>
+     *   <li>For {@code RESOLVED_REJECTED}: refundAmount must be null.</li>
+     *   <li>Online payments: full/partial refund goes through PaymentService.</li>
+     *   <li>COD payments: payment status left as {@code COLLECTED}; refund obligation
+     *       recorded on dispute for out-of-band handling.</li>
+     *   <li>Order status ({@code DELIVERED}) and stock are never changed.</li>
+     *   <li>Concurrency: dispute row is locked before checking state.</li>
+     * </ul>
+     *
+     * @param adminEmail the JWT subject (the admin's email)
+     * @param disputeId  the dispute to resolve
+     * @param request    resolution status, note, and optional refund amount
+     * @return the updated dispute detail
+     * @throws BusinessException 404 if dispute not found, 400 for invalid request,
+     *                           409 if dispute not resolvable or amount invalid
+     */
+    @Transactional
+    public DisputeDetailResponse resolveDispute(String adminEmail, Long disputeId, ResolveDisputeRequest request) {
+        // Validate resolution status
+        DisputeStatus newStatus = request.getStatus();
+        if (newStatus == null || !isResolvedStatus(newStatus)) {
+            throw BusinessException.badRequest("Invalid resolution status: must be one of RESOLVED_REFUND, RESOLVED_PARTIAL, RESOLVED_REJECTED");
+        }
+
+        // Round refundAmount to 2 decimal places HALF_UP if provided
+        BigDecimal refundAmount = request.getRefundAmount();
+        if (refundAmount != null) {
+            refundAmount = refundAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+
+        // Resolve admin actor
+        var admin = userRepository.findByEmailWithRole(adminEmail)
+                .orElseThrow(() -> BusinessException.notFound("Authenticated admin not found"));
+
+        // Lock the dispute row for concurrency control
+        Dispute dispute = disputeRepository.findByIdForUpdate(disputeId)
+                .orElseThrow(() -> BusinessException.notFound("Dispute not found: " + disputeId));
+
+        // Check current status - only OPEN or UNDER_REVIEW can be resolved
+        DisputeStatus currentStatus = dispute.getStatus();
+        if (currentStatus != DisputeStatus.OPEN && currentStatus != DisputeStatus.UNDER_REVIEW) {
+            throw BusinessException.conflict(
+                    "Dispute " + disputeId + " cannot be resolved from status: " + currentStatus);
+        }
+
+        // Already resolved - idempotency check (should not happen due to status check, but defensive)
+        if (isResolvedStatus(currentStatus)) {
+            throw BusinessException.conflict(
+                    "Dispute " + disputeId + " is already resolved: " + currentStatus);
+        }
+
+        Order order = dispute.getOrder();
+        BigDecimal orderTotal = order.getTotal();
+
+        // Validate refund amount based on resolution status
+        if (newStatus == DisputeStatus.RESOLVED_REFUND) {
+            if (refundAmount == null) {
+                throw BusinessException.badRequest("refundAmount is required for RESOLVED_REFUND");
+            }
+            if (refundAmount.compareTo(orderTotal) != 0) {
+                throw BusinessException.badRequest(
+                        "For RESOLVED_REFUND, refundAmount must equal order total (" + orderTotal + ")");
+            }
+        } else if (newStatus == DisputeStatus.RESOLVED_PARTIAL) {
+            if (refundAmount == null) {
+                throw BusinessException.badRequest("refundAmount is required for RESOLVED_PARTIAL");
+            }
+            if (refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw BusinessException.badRequest("refundAmount must be greater than zero for RESOLVED_PARTIAL");
+            }
+            if (refundAmount.compareTo(orderTotal) > 0) {
+                throw BusinessException.badRequest(
+                        "refundAmount cannot exceed order total (" + orderTotal + ") for RESOLVED_PARTIAL");
+            }
+        } else if (newStatus == DisputeStatus.RESOLVED_REJECTED) {
+            if (refundAmount != null) {
+                throw BusinessException.badRequest("refundAmount must not be provided for RESOLVED_REJECTED");
+            }
+        }
+
+        // Capture before state for audit
+        String beforeStatus = currentStatus.name();
+        String beforeNote = dispute.getResolutionNote();
+        BigDecimal beforeRefundAmount = dispute.getRefundAmount();
+
+        // Apply resolution
+        LocalDateTime now = LocalDateTime.now(clock);
+        dispute.setStatus(newStatus);
+        dispute.setResolutionNote(request.getResolutionNote().trim());
+        dispute.setResolvedBy(admin);
+        dispute.setResolvedAt(now);
+        dispute.setRefundAmount(refundAmount);
+        disputeRepository.saveAndFlush(dispute);
+
+        // Coordinate with PaymentService for online payments
+        // Only refund outcomes (RESOLVED_REFUND / RESOLVED_PARTIAL) touch payment;
+        // RESOLVED_REJECTED has no payment effect.
+        if (order.getPaymentMethod() == Order.PaymentMethod.ONLINE
+                && (newStatus == DisputeStatus.RESOLVED_REFUND
+                    || newStatus == DisputeStatus.RESOLVED_PARTIAL)) {
+            Payment payment = paymentService.getPaymentForOrder(order.getId());
+            if (payment != null && (payment.getStatus() == Payment.PaymentStatus.PAID
+                    || payment.getStatus() == Payment.PaymentStatus.REFUND_PENDING)) {
+                // Use the new markRefundedWithAmount method
+                paymentService.markRefundedWithAmount(order.getId(), adminEmail,
+                        "Dispute " + disputeId + " resolved: " + newStatus + " - " + request.getResolutionNote(),
+                        refundAmount);
+            }
+        }
+        // For COD: payment status remains COLLECTED; refund obligation recorded on dispute
+
+        // Write audit log
+        auditLogRepository.save(AuditLog.builder()
+                .actor(admin)
+                .actionType("DISPUTE_RESOLVED")
+                .entityType("DISPUTE")
+                .entityId(dispute.getId())
+                .reason("Dispute " + disputeId + " for order " + order.getId()
+                        + ": " + beforeStatus + " -> " + newStatus
+                        + (refundAmount != null ? " (refund: " + refundAmount + ")" : "")
+                        + "; note: " + request.getResolutionNote())
+                .build());
+
+        // Publish DisputeResolved event after commit
+        Instant nowInstant = now.atZone(clock.getZone()).toInstant();
+        DisputeResolved event = new DisputeResolved(this, dispute.getId(), order.getId(),
+                order.getVendor().getId(), order.getUser().getId(), newStatus,
+                refundAmount, order.getPaymentMethod(), admin.getId(), nowInstant);
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronizationAdapter() {
+                        @Override
+                        public void afterCommit() {
+                            eventPublisher.publishEvent(event);
+                        }
+                    });
+        } else {
+            eventPublisher.publishEvent(event);
+        }
+
+        log.info("Admin {} resolved dispute {} for order {} as {} (refund: {})",
+                adminEmail, disputeId, order.getId(), newStatus, refundAmount);
+        return toDetailResponse(dispute);
+    }
+
+    private boolean isResolvedStatus(DisputeStatus status) {
+        return status == DisputeStatus.RESOLVED_REFUND
+                || status == DisputeStatus.RESOLVED_PARTIAL
+                || status == DisputeStatus.RESOLVED_REJECTED;
+    }
+
     private DisputePageResponse toPageResponse(Page<Dispute> page) {
         return DisputePageResponse.builder()
                 .content(page.getContent().stream().map(this::toListItem).toList())
@@ -379,6 +551,7 @@ public class DisputeService {
                 .customerEmail(d.getRaisedBy().getEmail())
                 .vendorName(d.getOrder().getVendor().getBusinessName())
                 .orderTotal(d.getOrder().getTotal())
+                .refundAmount(d.getRefundAmount())
                 .vendorResponse(vendorResponse)
                 .resolutionNote(resolutionNote)
                 .createdAt(d.getCreatedAt())
