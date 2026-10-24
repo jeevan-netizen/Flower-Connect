@@ -2538,3 +2538,40 @@ Three things needed settling:
 - Conditional dialog rendering means `findByRole("dialog")` reliably finds the open dialog.
 - Disputes (customer raises, vendor responds, admin resolves) are deliberately out of scope for Stage 3.
 
+
+## D-57: Disputes backend (Phase 8 Stage 4, task 8.4)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 4
+
+### Context
+
+Phase 8 Stage 4 implements the disputes backend (plan task 8.4): customers raise disputes for delivered orders within a configurable window; vendors respond once; admins queue and review. Resolution (Stage 5) and UI (Stage 6) are deferred.
+
+Key questions:
+- **Dispute window**: Measured from the order's entry into `DELIVERED` (per `order_status_history`), not `orders.updated_at`, so a delayed delivery scan doesn't shrink the window. The window (default 7 days) lives in `platform_config` and is read at runtime.
+- **One dispute per order ever**: Enforced by `uq_disputes_order` unique constraint on `order_id` at the database level. The service checks first for a clean 409; the constraint backstops concurrent races.
+- **Vendor response**: One response per dispute, moving `OPEN` ? `UNDER_REVIEW`. A suspended vendor may still respond (D-6).
+- **Reason codes**: Fixed vocabulary (`ITEM_NOT_AS_DESCRIBED`, `ITEM_DAMAGED`, `ITEM_MISSING`, `WRONG_ITEM_DELIVERED`, `QUALITY_COMPLAINT`, `LATE_DELIVERY`, `OTHER`) so the admin queue can be filtered/grouped. The list is in the service, not a DB CHECK, because it may evolve before resolution work.
+- **RBAC**: Customers see only their own disputes; vendors see only disputes on their orders; admins see the full queue with status/date filters. Missing ? 404, foreign ? 403.
+- **Event**: `DisputeOpened` published after commit (scalar-only payload).
+
+### Decision
+
+- **Migration V22** creates `disputes` table with `UNIQUE(order_id)`, `status` ENUM (`OPEN`, `UNDER_REVIEW`, `RESOLVED_REFUND`, `RESOLVED_PARTIAL`, `RESOLVED_REJECTED`), and seeds `platform_config.dispute_window_days = 7`.
+- **Service** reads window from `platform_config`; falls back to 7 if missing. Window measured from `order_status_history` row where `to_status = DELIVERED`, using injected `Clock`.
+- **Customer endpoints** (`/api/v1/disputes`): `POST /orders/{orderId}` to raise (validates reason code, description ?2000), `GET` list, `GET /{disputeId}` detail. All CUSTOMER-only, owner-only.
+- **Vendor endpoints** (`/api/v1/vendor/disputes`): `GET` list (disputes on vendor's orders), `GET /{disputeId}` detail, `POST /{disputeId}/respond` (required response ?500 chars, moves `OPEN` ? `UNDER_REVIEW`). All FLORIST-only, owner-only. Suspended vendor may respond.
+- **Admin endpoints** (`/api/v1/admin/disputes`): `GET` queue with optional `status`, `from`, `to` filters; `GET /{disputeId}` detail (full record). ADMIN-only. Resolution endpoint returns 501 (Stage 5).
+- **Event** `DisputeOpened` published after commit with scalar payload (`disputeId`, `orderId`, `customerId`, `reasonCode`, `status`, `createdAt`).
+- **SecurityConfig** adds `/api/v1/disputes/**` ? CUSTOMER, `/api/v1/vendor/disputes/**` ? FLORIST, `/api/v1/admin/disputes/**` ? ADMIN.
+- **OrderStatusHistoryRepository** gains `findFirstByOrderIdAndToStatusOrderByCreatedAtDesc` for window measurement.
+
+### Consequences
+
+- Concurrency-safe: DB unique constraint + service-level check prevent duplicate disputes even under concurrent raise attempts (tested with 8 threads).
+- Window measurement uses `DELIVERED` history entry, not `orders.updated_at`, so delayed scans don't shrink the customer's window.
+- Fixed reason-code list in the service (not DB CHECK) allows evolution before Stage 5 resolution.
+- Suspended vendors may respond to in-flight disputes (D-6 honored).
+- Resolution, UI, and notifications are Stage 5+; `POST /admin/disputes/{id}/resolve` returns 501.
+

@@ -114,30 +114,38 @@ public class SecurityConfig {
                  .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/cancel")
                      .hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")
                  .requestMatchers("/api/v1/orders/**").hasRole("CUSTOMER")
-                 // Slot discovery endpoint - CUSTOMER only with address ownership and vendor approval checks in handler.
-                 // The path must be written in the same shape as the controller's own mapping
-                 // (SlotController: @RequestMapping("/api/v1/vendors") + @GetMapping("/{vendorId}/slots")).
-                 // It was previously "/api/v1/vendors/**/slots", which Spring's PathPattern syntax
-                 // rejects: "**" is only allowed as the last element of a pattern. Evaluating that rule
-                 // threw PatternParseException inside the authorization filter, before the dispatcher,
-                 // and the request was answered with a container-generated HTML 500 instead of the
-                 // application's error envelope. See SecurityMatcherIntegrationTest.
-                  .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/slots").hasRole("CUSTOMER")
-                  // Phase 6 vendor order API (task 6.2/6.4): the order action, list and summary
-                 // routes live under the singular /api/v1/vendor/ base, so they need their own
-                 // FLORIST rule alongside the plural /api/v1/vendors/** namespace used by the
-                 // catalog, inventory, profile and slots routes.
-                 .requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")
+// Slot discovery endpoint - CUSTOMER only with address ownership and vendor approval checks in handler.
+                  // The path must be written in the same shape as the controller's own mapping
+                  // (SlotController: @RequestMapping("/api/v1/vendors") + @GetMapping("/{vendorId}/slots")).
+                  // It was previously "/api/v1/vendors/**/slots", which Spring's PathPattern syntax
+                  // rejects: "**" is only allowed as the last element of a pattern. Evaluating that rule
+                  // threw PatternParseException inside the authorization filter, before the dispatcher,
+                  // and the request was answered with a container-generated HTML 500 instead of the
+                  // application's error envelope. See SecurityMatcherIntegrationTest.
+                   .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/slots").hasRole("CUSTOMER")
+                   // Phase 8 customer disputes (task 8.4): customer raises/views own disputes.
+                   .requestMatchers("/api/v1/disputes/**").hasRole("CUSTOMER")
+                   // Phase 6 vendor order API (task 6.2/6.4): the order action, list and summary
+                   // routes live under the singular /api/v1/vendor/ base, so they need their own
+                   // FLORIST rule alongside the plural /api/v1/vendors/** namespace used by the
+                   // catalog, inventory, profile and slots routes.
+                   .requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")
+                   // Phase 8 vendor disputes (task 8.4): vendor views/responds to disputes on their orders.
+                   .requestMatchers("/api/v1/vendor/disputes/**").hasRole("FLORIST")
                 // Public customer discovery: storefront and product detail are readable
                 // anonymously; authorization/visibility is enforced per handler.
                 // These exceptions must precede the /api/v1/vendors/** FLORIST rule.
                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{id}/storefront").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/products/{id}").permitAll()
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
-                 // Phase 8 refund queue (task 8.3): admin-only listing of
-                 // REFUND_PENDING payments and mark-refunded endpoint.
-                 .requestMatchers("/api/v1/admin/refunds/**").hasRole("ADMIN")
-                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+// Phase 8 refund queue (task 8.3): admin-only listing of
+                  // REFUND_PENDING payments and mark-refunded endpoint.
+                  .requestMatchers("/api/v1/admin/refunds/**").hasRole("ADMIN")
+                  // Phase 8 dispute queue (task 8.4): admin-only listing of
+                  // disputes and detail. Customer/vendor endpoints have their
+                  // own namespaces below.
+                  .requestMatchers("/api/v1/admin/disputes/**").hasRole("ADMIN")
+                  .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                  .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
