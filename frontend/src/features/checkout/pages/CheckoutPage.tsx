@@ -30,6 +30,10 @@ import type {
   CheckoutResponse,
   CheckoutStep,
 } from "@/features/checkout/types";
+import {
+  PAYMENT_METHODS,
+  type PaymentMethod,
+} from "@/features/payment/types";
 import { formatMoney } from "@/features/vendor/format";
 import { VendorErrorState } from "@/features/vendor/components/VendorErrorState";
 import { Card, PageHeading } from "@/features/vendor/components/StatCard";
@@ -62,6 +66,7 @@ export function CheckoutPage() {
 
   const [step, setStep] = useState<CheckoutStep>("address");
   const [addressId, setAddressId] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
   const [deliveryDate, setDeliveryDate] = useState(getBrowserLocalDate());
   const [slotSelections, setSlotSelections] = useState<Record<number, string>>({});
   const [quoteData, setQuoteData] = useState<CheckoutQuoteResponse | null>(null);
@@ -120,6 +125,10 @@ export function CheckoutPage() {
     }
   }, [quote]);
 
+  const onPaymentMethodChange = useCallback((method: PaymentMethod) => {
+    setPaymentMethod(method);
+  }, []);
+
   const onSlotChange = useCallback((vendorId: number, slotStart: string) => {
     quoteRequestIdRef.current += 1;
     setSlotSelections((prev) => ({ ...prev, [vendorId]: slotStart }));
@@ -158,6 +167,7 @@ export function CheckoutPage() {
         clientOrderId,
         quoteHash: quoteData.quoteHash,
         confirmPriceChanges,
+        paymentMethod,
       });
       setOrderResult(result);
       clearCartCache(queryClient);
@@ -168,7 +178,7 @@ export function CheckoutPage() {
       placingRef.current = false;
       setPlacing(false);
     }
-  }, [addressId, quoteData, slotSelections, clientOrderId, confirmPriceChanges, placeCheckout, queryClient]);
+  }, [addressId, quoteData, slotSelections, clientOrderId, confirmPriceChanges, paymentMethod, placeCheckout, queryClient]);
 
   if (cartError || addressesError) {
     return (
@@ -229,7 +239,9 @@ export function CheckoutPage() {
           isPending={addressesPending}
           error={addressesError}
           selectedAddressId={addressId}
+          paymentMethod={paymentMethod}
           onAddressChange={onAddressChange}
+          onPaymentMethodChange={onPaymentMethodChange}
           onRetry={() => void refetchAddresses()}
           canProceed={Boolean(addressId)}
           onProceed={() => setStep("slots")}
@@ -276,7 +288,14 @@ export function CheckoutPage() {
       {step === "confirmation" && (
         <ConfirmationStep
           result={orderResult}
-          onDone={() => navigate("/orders")}
+          paymentMethod={paymentMethod}
+          onDone={() => {
+            if (paymentMethod === "ONLINE" && orderResult?.paymentGroupId) {
+              navigate(`/payment/${orderResult.paymentGroupId}`);
+            } else {
+              navigate("/orders");
+            }
+          }}
         />
       )}
     </div>
@@ -303,13 +322,26 @@ interface AddressStepProps {
   isPending: boolean;
   error: unknown;
   selectedAddressId: number | null;
+  paymentMethod: PaymentMethod;
   onAddressChange: (id: number | null) => void;
+  onPaymentMethodChange: (method: PaymentMethod) => void;
   onRetry: () => void;
   canProceed: boolean;
   onProceed: () => void;
 }
 
-function AddressStep({ addresses, isPending, error, selectedAddressId, onAddressChange, onRetry, canProceed, onProceed }: AddressStepProps) {
+function AddressStep({
+  addresses,
+  isPending,
+  error,
+  selectedAddressId,
+  paymentMethod,
+  onAddressChange,
+  onPaymentMethodChange,
+  onRetry,
+  canProceed,
+  onProceed,
+}: AddressStepProps) {
   if (error) {
     return <VendorErrorState error={error} onRetry={onRetry} />;
   }
@@ -353,6 +385,33 @@ function AddressStep({ addresses, isPending, error, selectedAddressId, onAddress
                   {address.line1} {address.line2 ?? ""} — {address.area}, {address.city} {address.pincode}
                 </p>
                 {address.defaultAddress && <span className="text-[10px] font-medium text-brand-700 uppercase tracking-tighter">Default</span>}
+              </div>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="border-0 p-0 m-0 mt-6">
+        <legend className="text-sm font-semibold text-slate-900 mb-4">Payment method</legend>
+        <div className="space-y-2">
+          {PAYMENT_METHODS.map((method) => (
+            <label key={method} className="block cursor-pointer">
+              <input
+                type="radio"
+                name="paymentMethod"
+                checked={paymentMethod === method}
+                onChange={() => onPaymentMethodChange(method)}
+                className={`${PRESSABLE} ${FOCUS_RING}`}
+              />
+              <div className="ml-3">
+                <p className="text-sm font-medium text-slate-900">
+                  {method === "COD" ? "Cash on delivery" : "Online payment"}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {method === "COD"
+                    ? "Pay the florist in cash when your flowers are delivered."
+                    : "Pay online now; your payment is confirmed through a secure test-mode provider."}
+                </p>
               </div>
             </label>
           ))}
@@ -705,10 +764,15 @@ function ReviewStep({
 
 interface ConfirmationStepProps {
   result: CheckoutResponse | null;
+  paymentMethod: "COD" | "ONLINE";
   onDone: () => void;
 }
 
-function ConfirmationStep({ result, onDone }: ConfirmationStepProps) {
+function ConfirmationStep({
+  result,
+  paymentMethod,
+  onDone,
+}: ConfirmationStepProps) {
   if (!result) {
     return (
       <Card>
@@ -750,7 +814,7 @@ function ConfirmationStep({ result, onDone }: ConfirmationStepProps) {
             onClick={onDone}
             className={`rounded-md bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
           >
-            View your orders
+            {paymentMethod === "ONLINE" ? "Track payment" : "View your orders"}
           </button>
         </div>
       </div>

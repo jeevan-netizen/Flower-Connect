@@ -2330,3 +2330,36 @@ Stage 3 introduces the webhook endpoint that provider callbacks hit, plus a simu
 - `V19`/`V20` migrations already created the payments tables; no new migration is needed for Stage 3.
 
 
+## D-50: Customer payment UI polls payment state; resume is a refresh, not a completion (Phase 7 frontend Stage 3 / task 7.6)
+
+**Status:** Accepted
+**Date:** Phase 7 frontend stage (task 7.6)
+
+### Context
+
+The backend Stage 3 (webhook + simulator) is complete. The frontend needs to integrate the online checkout response and payment-group state APIs into the customer UI. Decisions to settle: where the payment-method selector lives, how payment state is polled, what the resume action does, and how the simulated pay/fail controls are exposed.
+
+### Decision
+
+- **Payment-method selector at checkout.** `CheckoutPage` gains a payment-method radio group (COD default; ONLINE offered because backend 7.4 is built). The selected method is sent as `paymentMethod` in the `CheckoutRequest`. On COD checkout the confirmation step navigates to `/orders`; on ONLINE checkout it navigates to `/payment/:paymentGroupId`.
+
+- **Payment status page.** `PaymentStatusPage` at `/payment/:paymentGroupId` polls `GET /api/v1/payments/group/{paymentGroupId}` via TanStack Query with `refetchInterval` of 8 s (within plan §9.4's 5â€“10 s). Polling pauses while the tab is hidden (`usePolling`) and stops for terminal states (`PAID`, `FAILED`, `REFUNDED`). The page shows pending â†" paid/failed/expired/refund-pending states using existing design tokens and responsive layouts.
+
+- **Resume is a refresh, not a completion.** The resume action calls `POST /api/v1/payments/{orderId}/resume`. After Stage 3 backend changes, `resumePayment` does *not* transition payment/order to paid â€” it returns the current pending state and marks the intent expired on timeout. Only the verified webhook flow transitions a payment to `PAID`/`PLACED`. The frontend resume button is shown only for pending orders in non-terminal groups.
+
+- **No card-like data anywhere.** The frontend never collects, renders, stores, logs, or submits card numbers, CVV, or other card-like data. Online payment in v1 is a simulated test-mode provider (D-48/D-49).
+
+- **Simulator controls are backend-only.** The frontend does not expose pay/fail controls directly. The simulated pay/fail endpoints (`POST /api/v1/payments/simulator/{orderId}/pay|fail`) are backend-only behind the `!prod` profile. The frontend only polls payment state and shows transitions.
+
+- **Role protection.** `/payment/:paymentGroupId` is guarded by `ProtectedRoute roles={[CUSTOMER_ROLE]}`. Existing API/error-handling conventions (Axios interceptors, `ApiErrorInfo`, TanStack Query) are preserved.
+
+- **COD checkout preserved.** The COD checkout flow is unchanged â€” COD remains the default payment method and navigates to `/orders` on success.
+
+### Consequences
+
+- The payment-method selector is a new checkout control; existing COD tests are updated to include `paymentMethod: "COD"` in the expected `placeCheckout` payload.
+- The payment status page is a new route; no existing routes are modified.
+- 7 new Vitest/RTL tests cover pendingâ†"terminal transitions, polling stop behavior, resume API call, terminal-state UI, and API error handling.
+- Full frontend suite: lint, typecheck, tests, build all clean. Backend unit suite: 1157 tests, 0 failures.
+
+

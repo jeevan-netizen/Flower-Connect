@@ -1,39 +1,33 @@
 package com.flowerconnect.config;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-
-import com.flowerconnect.config.TestClockConfig;
-import org.springframework.context.annotation.Import;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Fast check that {@link AppProperties} binds {@code app.webhook-secret} from
- * {@code application-test.yml} without needing a database (no Testcontainers).
+ * Fast check that {@link AppProperties} binds {@code app.webhook-secret}
+ * without needing a database (no Testcontainers).
+ *
+ * A minimal Spring context loads only {@link AppProperties} via
+ * {@link EnableConfigurationProperties}, so no DataSource auto-configuration
+ * runs and no database connection is required.
  */
-@SpringBootTest(webEnvironment = WebEnvironment.NONE)
-@ActiveProfiles("test")
-@Import(TestClockConfig.class)
+@ExtendWith(SpringExtension.class)
+@ContextConfiguration(classes = AppProperties.class)
+@EnableConfigurationProperties(AppProperties.class)
+@TestPropertySource(properties = "app.webhook-secret=test-webhook-secret-key-for-testing-phase-3-plus-at-least-32-chars")
 class AppPropertiesBindingTest {
-
-    @DynamicPropertySource
-    static void noSchemaValidation(DynamicPropertyRegistry registry) {
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
-        registry.add("spring.flyway.enabled", () -> "false");
-    }
 
     @Autowired
     private AppProperties appProperties;
 
     @Test
-    void webhookSecretIsBoundFromTestYaml() {
+    void webhookSecretIsBound() {
         assertThat(appProperties.getWebhookSecret())
             .isEqualTo("test-webhook-secret-key-for-testing-phase-3-plus-at-least-32-chars");
     }

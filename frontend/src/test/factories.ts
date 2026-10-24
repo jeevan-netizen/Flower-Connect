@@ -47,6 +47,12 @@ import type {
   PaymentMethod,
   PaymentStatus,
 } from "@/features/customer/orders/types";
+import type {
+  PaymentGroupOrderEntry,
+  PaymentGroupStateResponse,
+  PaymentResumeResponse,
+  PaymentStateResponse,
+} from "@/features/payment/types";
 import type { PageResponse } from "@/shared/types";
 
 /**
@@ -453,6 +459,10 @@ export function makeCheckoutResponse(overrides: Partial<CheckoutResponse> = {}):
     idempotentReplay: false,
     orders: [makeOrderSummary()],
     total: 1823,
+    paymentMethod: "COD",
+    paymentGroupId: null,
+    intentReference: null,
+    intentExpiresAt: null,
     ...overrides,
   };
 }
@@ -659,6 +669,68 @@ export function makeCustomerOrderResponse(
     note: null,
     items: [makeCustomerOrderItemResponse()],
     timeline: [makeCustomerOrderTimelineEntry()],
+    ...overrides,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Payment fixtures (plan task 7.6)                                           */
+/* -------------------------------------------------------------------------- */
+
+export function makePaymentGroupOrderEntry(
+  overrides: Partial<PaymentGroupOrderEntry> = {},
+): PaymentGroupOrderEntry {
+  return {
+    orderId: 5001,
+    paymentStatus: "PENDING",
+    orderStatus: "PENDING_PAYMENT",
+    method: "ONLINE",
+    amount: 1823,
+    ...overrides,
+  };
+}
+
+export function makePaymentGroupStateResponse(
+  overrides: Partial<PaymentGroupStateResponse> = {},
+): PaymentGroupStateResponse {
+  return {
+    paymentGroupId: "pg-1001",
+    intentReference: "intent_sim_abc123",
+    status: "CREATED",
+    total: 1823,
+    expiresAt: "2026-10-01T10:30:00",
+    orders: [makePaymentGroupOrderEntry()],
+    ...overrides,
+  };
+}
+
+export function makePaymentStateResponse(
+  overrides: Partial<PaymentStateResponse> = {},
+): PaymentStateResponse {
+  return {
+    orderId: 5001,
+    paymentGroupId: "pg-1001",
+    intentReference: "intent_sim_abc123",
+    method: "ONLINE",
+    paymentStatus: "PENDING",
+    orderStatus: "PENDING_PAYMENT",
+    amount: 1823,
+    expiresAt: "2026-10-01T10:30:00",
+    createdAt: "2026-10-01T10:00:00",
+    ...overrides,
+  };
+}
+
+export function makePaymentResumeResponse(
+  overrides: Partial<PaymentResumeResponse> = {},
+): PaymentResumeResponse {
+  return {
+    orderId: 5001,
+    orderStatus: "PENDING_PAYMENT",
+    paymentStatus: "PENDING",
+    paymentGroupId: "pg-1001",
+    intentReference: "intent_sim_abc123",
+    paidAt: null,
     ...overrides,
   };
 }

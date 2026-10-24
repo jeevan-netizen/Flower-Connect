@@ -27,6 +27,7 @@ import { ProductDetailPage } from "@/features/customer/pages/ProductDetailPage";
 import { OrderHistoryPage } from "@/features/customer/orders/pages/OrderHistoryPage";
 import { OrderDetailPage } from "@/features/customer/orders/pages/OrderDetailPage";
 import { PRODUCT_ROUTE_IDS } from "@/features/customer/navigation";
+import { PaymentStatusPage } from "@/features/payment/pages/PaymentStatusPage";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
@@ -146,6 +147,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute roles={[CUSTOMER_ROLE]}>
             <CheckoutPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "payment/:paymentGroupId",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE]}>
+            <PaymentStatusPage />
           </ProtectedRoute>
         ),
       },
