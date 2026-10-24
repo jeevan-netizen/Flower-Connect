@@ -49,6 +49,7 @@ jwt:
 
 app:
   base-url: ${APP_BASE_URL}
+  webhook-secret: ${APP_WEBHOOK_SECRET}
   cors:
     origins: ${APP_CORS_ORIGINS}
   storage:

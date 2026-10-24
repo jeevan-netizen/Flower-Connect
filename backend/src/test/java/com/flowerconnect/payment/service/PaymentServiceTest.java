@@ -15,6 +15,7 @@ import com.flowerconnect.payment.dto.PaymentGroupStateResponse;
 import com.flowerconnect.payment.dto.PaymentResumeResponse;
 import com.flowerconnect.payment.dto.PaymentStateResponse;
 import com.flowerconnect.payment.gateway.PaymentGateway;
+import com.flowerconnect.payment.repository.PaymentEventRepository;
 import com.flowerconnect.payment.repository.PaymentIntentRepository;
 import com.flowerconnect.payment.repository.PaymentRepository;
 import com.flowerconnect.exception.BusinessException;
@@ -40,6 +41,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -55,6 +57,8 @@ class PaymentServiceTest {
     private PaymentRepository paymentRepository;
     @Mock
     private PaymentIntentRepository paymentIntentRepository;
+    @Mock
+    private PaymentEventRepository paymentEventRepository;
     @Mock
     private OrderRepository orderRepository;
     @Mock
@@ -327,31 +331,59 @@ class PaymentServiceTest {
     // ------------------------------------------------------------------
 
     @Test
-    void resumePaymentTransitionsThroughStateMachineAndSetsPaid() {
+    void resumePaymentReturnsPendingStateWithoutTransitioning() {
         when(orderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(order));
         when(paymentRepository.findByOrderIdForUpdate(100L)).thenReturn(Optional.of(payment));
         when(paymentIntentRepository.findByPaymentGroupId(payment.getPaymentGroupId()))
                 .thenReturn(Optional.of(intent));
-        Order placed = Order.builder()
-                .id(100L)
-                .status(OrderStatus.PLACED)
-                .build();
-        when(orderStateMachine.transition(
-                eq(100L), eq(OrderStatus.PLACED), eq(ActorType.SYSTEM),
-                eq(null), anyString()))
-            .thenAnswer(inv -> { order.setStatus(OrderStatus.PLACED); return placed; });
         when(clock.instant()).thenReturn(fixedInstant);
 
         PaymentResumeResponse result = paymentService.resumePayment(100L, "customer@test.com");
 
+        // Resume must NOT complete the payment or transition the order: only a
+        // valid signed webhook success event may do that.
         assertThat(result.getOrderId()).isEqualTo(100L);
-        assertThat(result.getOrderStatus()).isEqualTo(OrderStatus.PLACED.name());
-        assertThat(result.getPaymentStatus()).isEqualTo("PAID");
-        assertThat(order.getPaymentStatus()).isEqualTo(PaymentStatus.PAID);
-        assertThat(payment.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID);
-        assertThat(intent.getStatus()).isEqualTo(IntentStatus.PAID);
-        verify(orderStateMachine).transition(
-                eq(100L), eq(OrderStatus.PLACED), eq(ActorType.SYSTEM), eq(null), anyString());
+        assertThat(result.getOrderStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT.name());
+        assertThat(result.getPaymentStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.PENDING.name());
+        assertThat(result.getPaidAt()).isNull();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(order.getPaymentStatus()).isEqualTo(com.flowerconnect.order.domain.Order.PaymentStatus.PENDING);
+        assertThat(payment.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.PENDING);
+        assertThat(intent.getStatus()).isEqualTo(IntentStatus.CREATED);
+        // The state machine must never be invoked by resume.
+        verify(orderStateMachineProvider, never()).getObject();
+        verify(orderRepository, never()).saveAndFlush(any());
+        verify(paymentRepository, never()).saveAndFlush(any());
+        verify(paymentIntentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void resumePaymentExpiredIntentMarksIntentExpiredOnlyOrderAndPaymentUnchanged() {
+        PaymentIntent expiredIntent = PaymentIntent.builder()
+                .id(1L)
+                .paymentGroupId(payment.getPaymentGroupId())
+                .total(new BigDecimal("643.00"))
+                .status(IntentStatus.CREATED)
+                .providerReference("intent_sim_expired")
+                .expiresAt(LocalDateTime.parse("2026-10-20T09:00:00"))
+                .build();
+        when(orderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderIdForUpdate(100L)).thenReturn(Optional.of(payment));
+        when(paymentIntentRepository.findByPaymentGroupId(payment.getPaymentGroupId()))
+                .thenReturn(Optional.of(expiredIntent));
+        when(clock.instant()).thenReturn(Instant.parse("2026-10-20T10:00:00Z"));
+
+        assertThatThrownBy(() -> paymentService.resumePayment(100L, "customer@test.com"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("has expired");
+
+        // Intent is marked expired (timeout bookkeeping), but payment and order
+        // statuses are left untouched.
+        assertThat(expiredIntent.getStatus()).isEqualTo(IntentStatus.EXPIRED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(order.getPaymentStatus()).isEqualTo(com.flowerconnect.order.domain.Order.PaymentStatus.PENDING);
+        assertThat(payment.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.PENDING);
+        verify(orderStateMachineProvider, never()).getObject();
     }
 
     @Test
@@ -418,5 +450,172 @@ class PaymentServiceTest {
         assertThatThrownBy(() -> paymentService.resumePayment(100L, "customer@test.com"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("belongs to another customer");
+    }
+
+    // ------------------------------------------------------------------
+    // Stage 3: processProviderEvent (webhook)
+    // ------------------------------------------------------------------
+
+    @Test
+    void processProviderEventSuccessPlacesAllOrdersAndMarksPaid() {
+        when(paymentEventRepository.existsByProviderEventId("evt-1")).thenReturn(false);
+        when(paymentIntentRepository.findByPaymentGroupId("group-1"))
+                .thenReturn(Optional.of(intent));
+        when(paymentRepository.findByPaymentGroupId("group-1")).thenReturn(List.of(payment));
+        when(orderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(order));
+        when(orderStateMachine.transitionGroup(anyList(), eq(OrderStatus.PLACED),
+                eq(ActorType.SYSTEM), eq(null), anyString()))
+            .thenReturn(List.of(order));
+
+        PaymentService.WebhookResult result = paymentService.processProviderEvent(
+                "group-1", "evt-1", "payment.succeeded", "success", new BigDecimal("643.00"));
+
+        assertThat(result.getOutcome()).isEqualTo(PaymentService.WebhookOutcome.ACCEPTED);
+        assertThat(intent.getStatus()).isEqualTo(IntentStatus.PAID);
+        assertThat(payment.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID);
+        assertThat(order.getPaymentStatus()).isEqualTo(Order.PaymentStatus.PAID);
+        verify(paymentEventRepository).saveAndFlush(any());
+        verify(paymentIntentRepository).saveAndFlush(intent);
+        verify(paymentRepository).saveAndFlush(payment);
+        verify(orderRepository).saveAndFlush(order);
+    }
+
+    @Test
+    void processProviderEventFailureCancelsAllOrdersAndReleasesReservations() {
+        when(paymentEventRepository.existsByProviderEventId("evt-1")).thenReturn(false);
+        when(paymentIntentRepository.findByPaymentGroupId("group-1"))
+                .thenReturn(Optional.of(intent));
+        when(paymentRepository.findByPaymentGroupId("group-1")).thenReturn(List.of(payment));
+        when(orderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(order));
+        when(orderStateMachine.transitionGroup(anyList(), eq(OrderStatus.CANCELLED),
+                eq(ActorType.SYSTEM), eq(null), anyString()))
+            .thenReturn(List.of(order));
+
+        PaymentService.WebhookResult result = paymentService.processProviderEvent(
+                "group-1", "evt-1", "payment.failed", "failure", new BigDecimal("643.00"));
+
+        assertThat(result.getOutcome()).isEqualTo(PaymentService.WebhookOutcome.ACCEPTED);
+        assertThat(intent.getStatus()).isEqualTo(IntentStatus.FAILED);
+        assertThat(payment.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.FAILED);
+        assertThat(order.getPaymentStatus()).isEqualTo(Order.PaymentStatus.FAILED);
+        verify(paymentEventRepository).saveAndFlush(any());
+        verify(orderStateMachine).transitionGroup(anyList(), eq(OrderStatus.CANCELLED),
+                eq(ActorType.SYSTEM), eq(null), anyString());
+    }
+
+    @Test
+    void processProviderEventDuplicateEventIdIsAcknowledgedWithoutSideEffects() {
+        when(paymentEventRepository.existsByProviderEventId("evt-1")).thenReturn(true);
+        when(paymentIntentRepository.findByPaymentGroupId("group-1"))
+                .thenReturn(Optional.of(intent));
+
+        PaymentService.WebhookResult result = paymentService.processProviderEvent(
+                "group-1", "evt-1", "payment.succeeded", "success", new BigDecimal("643.00"));
+
+        assertThat(result.getOutcome()).isEqualTo(PaymentService.WebhookOutcome.DUPLICATE);
+        verify(orderStateMachine, never()).transitionGroup(anyList(), any(), any(), any(), anyString());
+        verify(paymentEventRepository, never()).saveAndFlush(any());
+        verify(orderRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void processProviderEventUnknownIntentIsNotFound() {
+        when(paymentEventRepository.existsByProviderEventId("evt-1")).thenReturn(false);
+        when(paymentIntentRepository.findByPaymentGroupId("unknown-group")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentService.processProviderEvent(
+                "unknown-group", "evt-1", "payment.succeeded", "success", new BigDecimal("10.00")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("not found");
+    }
+
+    @Test
+    void processProviderEventLateSuccessAfterFailureSetsRefundPendingAndDoesNotResurrect() {
+        PaymentIntent failedIntent = PaymentIntent.builder()
+                .id(1L)
+                .paymentGroupId("group-1")
+                .total(new BigDecimal("643.00"))
+                .status(IntentStatus.FAILED)
+                .providerReference("intent_sim_1")
+                .expiresAt(LocalDateTime.parse("2026-10-20T11:00:00"))
+                .build();
+        Order cancelled = Order.builder()
+                .id(100L)
+                .status(OrderStatus.CANCELLED)
+                .paymentMethod(PaymentMethod.ONLINE)
+                .paymentStatus(com.flowerconnect.order.domain.Order.PaymentStatus.PENDING)
+                .user(customerUser)
+                .build();
+        Payment failedPayment = Payment.builder()
+                .id(1L)
+                .order(cancelled)
+                .method(com.flowerconnect.payment.domain.Payment.PaymentMethod.ONLINE)
+                .provider("simulated")
+                .providerReference("intent_sim_1")
+                .amount(new BigDecimal("643.00"))
+                .status(com.flowerconnect.payment.domain.Payment.PaymentStatus.FAILED)
+                .paymentGroupId("group-1")
+                .build();
+
+        when(paymentEventRepository.existsByProviderEventId("evt-late")).thenReturn(false);
+        when(paymentIntentRepository.findByPaymentGroupId("group-1"))
+                .thenReturn(Optional.of(failedIntent));
+        when(paymentRepository.findByPaymentGroupId("group-1")).thenReturn(List.of(failedPayment));
+        when(orderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(cancelled));
+
+        PaymentService.WebhookResult result = paymentService.processProviderEvent(
+                "group-1", "evt-late", "payment.succeeded", "success", new BigDecimal("643.00"));
+
+        assertThat(result.getOutcome()).isEqualTo(PaymentService.WebhookOutcome.ACCEPTED);
+        assertThat(failedIntent.getStatus()).isEqualTo(IntentStatus.FAILED);
+        assertThat(failedPayment.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.REFUND_PENDING);
+        assertThat(cancelled.getPaymentStatus()).isEqualTo(Order.PaymentStatus.REFUND_PENDING);
+        assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(orderStateMachine, never()).transitionGroup(anyList(), any(), any(), any(), anyString());
+    }
+
+    @Test
+    void processProviderEventFailureAfterSuccessDoesNotRegress() {
+        PaymentIntent paidIntent = PaymentIntent.builder()
+                .id(1L)
+                .paymentGroupId("group-1")
+                .total(new BigDecimal("643.00"))
+                .status(IntentStatus.PAID)
+                .providerReference("intent_sim_1")
+                .expiresAt(LocalDateTime.parse("2026-10-20T11:00:00"))
+                .build();
+        Order placed = Order.builder()
+                .id(100L)
+                .status(OrderStatus.PLACED)
+                .paymentMethod(PaymentMethod.ONLINE)
+                .paymentStatus(com.flowerconnect.order.domain.Order.PaymentStatus.PAID)
+                .user(customerUser)
+                .build();
+        Payment paidPayment = Payment.builder()
+                .id(1L)
+                .order(placed)
+                .method(com.flowerconnect.payment.domain.Payment.PaymentMethod.ONLINE)
+                .provider("simulated")
+                .providerReference("intent_sim_1")
+                .amount(new BigDecimal("643.00"))
+                .status(com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID)
+                .paymentGroupId("group-1")
+                .build();
+
+        when(paymentEventRepository.existsByProviderEventId("evt-late-fail")).thenReturn(false);
+        when(paymentIntentRepository.findByPaymentGroupId("group-1"))
+                .thenReturn(Optional.of(paidIntent));
+        when(paymentRepository.findByPaymentGroupId("group-1")).thenReturn(List.of(paidPayment));
+        when(orderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(placed));
+
+        PaymentService.WebhookResult result = paymentService.processProviderEvent(
+                "group-1", "evt-late-fail", "payment.failed", "failure", new BigDecimal("643.00"));
+
+        assertThat(result.getOutcome()).isEqualTo(PaymentService.WebhookOutcome.IGNORED);
+        assertThat(paidIntent.getStatus()).isEqualTo(IntentStatus.PAID);
+        assertThat(paidPayment.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID);
+        assertThat(placed.getPaymentStatus()).isEqualTo(Order.PaymentStatus.PAID);
+        assertThat(placed.getStatus()).isEqualTo(OrderStatus.PLACED);
+        verify(orderStateMachine, never()).transitionGroup(anyList(), any(), any(), any(), anyString());
     }
 }

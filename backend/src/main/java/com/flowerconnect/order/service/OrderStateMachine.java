@@ -28,6 +28,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -137,6 +138,7 @@ public class OrderStateMachine {
     @Transactional
     public Order transition(Long orderId, OrderStatus toStatus,
                             ActorType actorType, Long actorUserId, String reason) {
+
         // 1. Lock the order row first (agreed lock order: order before inventory).
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
@@ -214,6 +216,34 @@ public class OrderStateMachine {
         log.info("Order {} transitioned {} -> {} by {} {}", orderId, fromStatus, toStatus,
                 actorType, actorUserId != null ? "user=" + actorUserId : "system");
         return order;
+    }
+
+    /**
+     * Transitions every order in {@code orderIds} from {@code PENDING_PAYMENT}
+     * to {@code toStatus} by {@code actorType}, atomically. Order rows are
+     * locked in ascending id order before any transition is applied, consistent
+     * with the agreed order-row-then-inventory lock order. If any order cannot
+     * transition, the whole group rolls back: no payment, order, history or
+     * stock effect is partially committed.
+     *
+     * @return the transitioned orders, in ascending id order
+     * @throws BusinessException 404 if an order does not exist, 409 if any
+     *         order cannot transition (the entire group is rolled back)
+     */
+    @Transactional
+    public List<Order> transitionGroup(List<Long> orderIds, OrderStatus toStatus,
+                                       ActorType actorType, Long actorUserId, String reason) {
+        List<Long> sorted = orderIds.stream().distinct().sorted().toList();
+        List<Order> orders = new ArrayList<>(sorted.size());
+        for (Long id : sorted) {
+            orders.add(orderRepository.findByIdForUpdate(id)
+                    .orElseThrow(() -> BusinessException.notFound("Order not found: " + id)));
+        }
+        List<Order> result = new ArrayList<>(orders.size());
+        for (Order order : orders) {
+            result.add(transition(order.getId(), toStatus, actorType, actorUserId, reason));
+        }
+        return result;
     }
 
     // ------------------------------------------------------------------

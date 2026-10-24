@@ -100,8 +100,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/addresses/**").hasRole("CUSTOMER")
                 .requestMatchers("/api/v1/cart/**").hasRole("CUSTOMER")
                  .requestMatchers("/api/v1/checkout/**").hasRole("CUSTOMER")
-                 // Customer payments (Phase 7, task 7.4): fetch/resume payment
-                 // state for the authenticated customer's own orders/groups.
+                 // Phase 7 public webhook: signature-authenticated, no JWT. Must be declared
+                 // before the broader /api/v1/payments/** CUSTOMER rule below so it matches first.
+                 .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()
+                 // Customer payments (Phase 7, task 7.4): fetch/resume payment state for the authenticated customer's own orders/groups.
                  .requestMatchers("/api/v1/payments/**").hasRole("CUSTOMER")
                  // Customer order history and detail (plan Phase 6, task 6.3):
                  // only the authenticated customer's own orders, newest first.
@@ -114,8 +116,8 @@ public class SecurityConfig {
                  // threw PatternParseException inside the authorization filter, before the dispatcher,
                  // and the request was answered with a container-generated HTML 500 instead of the
                  // application's error envelope. See SecurityMatcherIntegrationTest.
-                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/slots").hasRole("CUSTOMER")
-                 // Phase 6 vendor order API (task 6.2/6.4): the order action, list and summary
+                  .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/slots").hasRole("CUSTOMER")
+                  // Phase 6 vendor order API (task 6.2/6.4): the order action, list and summary
                  // routes live under the singular /api/v1/vendor/ base, so they need their own
                  // FLORIST rule alongside the plural /api/v1/vendors/** namespace used by the
                  // catalog, inventory, profile and slots routes.

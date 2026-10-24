@@ -25,6 +25,28 @@ public class AppProperties {
      */
     private int intentTtlMinutes = 30;
 
+    /**
+     * Shared secret used to verify signatures on the public payment webhook
+     * ({@code POST /api/v1/payments/webhook}). Configured from
+     * {@code APP_WEBHOOK_SECRET} / {@code app.webhook-secret} only; there is no
+     * default. In the {@code prod} profile the startup validator rejects a
+     * missing or shorter-than-32-byte secret.
+     */
+    private String webhookSecret;
+
+    /**
+     * Tolerance window (seconds) for webhook timestamps. Defaults to five
+     * minutes. Override with {@code APP_WEBHOOK_TOLERANCE_SECONDS} or
+     * {@code app.webhook-tolerance-seconds}.
+     */
+    private int webhookToleranceSeconds = 300;
+
+    /**
+     * Maximum webhook request body size (bytes). Override with
+     * {@code APP_WEBHOOK_MAX_BODY_BYTES} or {@code app.webhook-max-body-bytes}.
+     */
+    private int webhookMaxBodyBytes = 65_536;
+
     public String getBaseUrl() {
         return baseUrl;
     }
@@ -120,5 +142,29 @@ public class AppProperties {
 
     public void setIntentTtlMinutes(int intentTtlMinutes) {
         this.intentTtlMinutes = intentTtlMinutes;
+    }
+
+    public String getWebhookSecret() {
+        return webhookSecret;
+    }
+
+    public void setWebhookSecret(String webhookSecret) {
+        this.webhookSecret = webhookSecret;
+    }
+
+    public int getWebhookToleranceSeconds() {
+        return webhookToleranceSeconds;
+    }
+
+    public void setWebhookToleranceSeconds(int webhookToleranceSeconds) {
+        this.webhookToleranceSeconds = webhookToleranceSeconds;
+    }
+
+    public int getWebhookMaxBodyBytes() {
+        return webhookMaxBodyBytes;
+    }
+
+    public void setWebhookMaxBodyBytes(int webhookMaxBodyBytes) {
+        this.webhookMaxBodyBytes = webhookMaxBodyBytes;
     }
 }

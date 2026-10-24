@@ -33,6 +33,7 @@ jwt:
 
 app:
   base-url: http://localhost:5173
+  webhook-secret: test-webhook-secret-key-for-testing-phase-3-plus-at-least-32-chars
   cors:
     origins: http://localhost:5173
   refresh-cookie-secure: false

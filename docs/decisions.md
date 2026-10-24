@@ -2301,3 +2301,32 @@ Stage 1 of Phase 7 supports COD only. Stage 2 part 1 introduces online checkout 
 - 7 integration tests + 17 unit tests + 9 slice RBAC tests all green; full backend unit suite 1133 tests pass.
 
 
+## D-49: Signed webhook and simulated pay/fail provider (Phase 7 Stage 3)
+
+**Status:** Accepted
+**Date:** Phase 7 Stage 3 (task 7.4 part 2)
+
+### Context
+
+Stage 3 introduces the webhook endpoint that provider callbacks hit, plus a simulated test-mode provider so the online pay/resume flow can be exercised end-to-end without a real gateway. Decisions to settle: webhook authentication, signature scheme, RBAC ordering, simulator profile gating, prod startup validation, event outcome semantics, and late-event/duplicate handling.
+
+### Decision
+
+- **`POST /api/v1/payments/webhook` is `permitAll` and carries no JWT.** It is authenticated solely by the HMAC-SHA256 signature over `timestamp + raw body`, presented via `X-FlowerConnect-Timestamp` and `X-FlowerConnect-Signature: v1=<hex>` headers. A body-size cap (`app.webhook-max-body-bytes`) rejects oversized payloads before buffering.
+- **Signature verified with constant-time comparison** (`MessageDigest.isEqual`) against `app.webhook-secret` (`APP_WEBHOOK_SECRET` env). A tolerance window (`app.webhookToleranceSeconds`) rejects stale timestamps.
+- **`SecurityConfig` matcher ordering fixed:** the webhook `permitAll` rule is placed **before** the `/api/v1/payments/**` ? `hasRole("CUSTOMER")` rule so the webhook is reachable without authentication while all other payment endpoints remain CUSTOMER-only.
+- **Prod startup validation:** `WebhookSecretValidator` (`@Profile("prod")`) fails application startup if the webhook secret is absent or shorter than 32 bytes, preventing a silently-inert webhook in production.
+- **Simulator behind `!prod` profile:** `SimulatedPaymentProvider` + `SimulatorController` expose `POST /api/v1/payments/simulator/{orderId}/pay|fail` (customer auth + ownership required). The simulator generates a correctly signed event and delivers it through the same webhook verification path — no card-like fields, no external calls, no secrets stored.
+- **Rate limiting:** webhook is IP-keyed via `RateLimitFilter` (no email available on webhook requests).
+- **`PaymentService.processProviderEvent`** applies group transitions atomically via `OrderStateMachine.transitionGroup` (locks order rows ascending id). Success ? PAID/PLACED (ActorType.SYSTEM); failure ? FAILED/CANCELLED with reservation release. Late success after cancel/timeout ? REFUND_PENDING (no resurrection); failure after success ? no regression; duplicate event IDs ? idempotent. Each accepted event persists one `PaymentEvent` row transactionally.
+- **`resumePayment` fixed** to not transition payment/order; returns pending state and marks intent EXPIRED on timeout only. Regression test added.
+- **Tests:** `WebhookControllerIntegrationTest` 13/13 pass (real HTTP + MySQL + Testcontainers); `WebhookSignatureServiceTest`, `WebhookSecretValidatorTest`, `PaymentServiceTest` unit tests pass; `SimulatorControllerIntegrationTest` (5 tests), `SimulatorProdAbsenceIntegrationTest` (2 tests); full unit suite 1156 tests pass (1 environment-only failure: `AppPropertiesBindingTest` requires local MySQL `test` user).
+
+### Consequences
+
+- Webhook security rests entirely on signature verification; a leaked secret would allow forged callbacks, so the secret is treated as a production credential with startup validation.
+- The simulator is compiled but inactive in prod (`!prod` profile), so it cannot leak test endpoints to production.
+- Late-event and duplicate handling is explicit rather than implicit, preventing double-collection or resurrection of terminal orders.
+- `V19`/`V20` migrations already created the payments tables; no new migration is needed for Stage 3.
+
+

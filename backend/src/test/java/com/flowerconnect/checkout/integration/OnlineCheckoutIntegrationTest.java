@@ -472,7 +472,7 @@ class OnlineCheckoutIntegrationTest extends AbstractIntegrationTest {
     // 5) Resume payment transitions PENDING_PAYMENT -> PLACED
     // ========================================================================
     @Test
-    void resumePaymentTransitionsThroughStateMachine() throws Exception {
+    void resumePaymentReturnsPendingStateWithoutTransitioning() throws Exception {
         User c = createUser("resume-c-" + UUID.randomUUID() + "@t.com", "CUSTOMER");
         String t = login(c);
         Long pId = createProduct(vendorEmail, "Resume Test", new BigDecimal("199.00"));
@@ -510,18 +510,20 @@ class OnlineCheckoutIntegrationTest extends AbstractIntegrationTest {
             .expiresAt(LocalDateTime.now().plusMinutes(30))
             .build());
 
+        // Resume is a status refresh only: it must NOT complete the payment or
+        // transition the order. Only a valid signed webhook success event may do that.
         mvc.perform(post("/api/v1/payments/" + orderId + "/resume")
             .header(HttpHeaders.AUTHORIZATION, bearer(t)))
             .andExpect(status().isOk());
 
         Order updated = orders.findByIdForUpdate(orderId).orElseThrow();
-        assertThat(updated.getStatus()).isEqualTo(OrderStatus.PLACED);
+        assertThat(updated.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
 
         Payment updatedPay = payments.findByPaymentGroupId(pay.getPaymentGroupId()).stream().findFirst().orElseThrow();
-        assertThat(updatedPay.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID);
+        assertThat(updatedPay.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.PENDING);
 
         PaymentIntent updatedIntent = intents.findByPaymentGroupId(pay.getPaymentGroupId()).orElseThrow();
-        assertThat(updatedIntent.getStatus()).isEqualTo(IntentStatus.PAID);
+        assertThat(updatedIntent.getStatus()).isEqualTo(IntentStatus.CREATED);
     }
 
     // ========================================================================

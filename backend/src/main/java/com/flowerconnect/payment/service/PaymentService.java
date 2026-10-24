@@ -7,18 +7,22 @@ import com.flowerconnect.order.domain.ActorType;
 import com.flowerconnect.order.repository.OrderRepository;
 import com.flowerconnect.order.service.OrderStateMachine;
 import com.flowerconnect.payment.domain.Payment;
+import com.flowerconnect.payment.domain.PaymentEvent;
 import com.flowerconnect.payment.domain.PaymentIntent;
 import com.flowerconnect.payment.domain.PaymentIntent.IntentStatus;
 import com.flowerconnect.payment.dto.PaymentGroupStateResponse;
 import com.flowerconnect.payment.dto.PaymentResumeResponse;
 import com.flowerconnect.payment.dto.PaymentStateResponse;
 import com.flowerconnect.payment.gateway.PaymentGateway;
+import com.flowerconnect.payment.repository.PaymentEventRepository;
 import com.flowerconnect.payment.repository.PaymentIntentRepository;
 import com.flowerconnect.payment.repository.PaymentRepository;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.exception.ErrorCode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -67,6 +71,7 @@ public class PaymentService {
     private final PaymentGateway paymentGateway;
     private final PaymentRepository paymentRepository;
     private final PaymentIntentRepository paymentIntentRepository;
+    private final PaymentEventRepository paymentEventRepository;
     private final OrderRepository orderRepository;
     private final ObjectProvider<OrderStateMachine> orderStateMachineProvider;
     private final java.time.Clock clock;
@@ -76,12 +81,14 @@ public class PaymentService {
             PaymentGateway paymentGateway,
             PaymentRepository paymentRepository,
             PaymentIntentRepository paymentIntentRepository,
+            PaymentEventRepository paymentEventRepository,
             OrderRepository orderRepository,
             ObjectProvider<OrderStateMachine> orderStateMachineProvider,
             java.time.Clock clock) {
         this.paymentGateway = paymentGateway;
         this.paymentRepository = paymentRepository;
         this.paymentIntentRepository = paymentIntentRepository;
+        this.paymentEventRepository = paymentEventRepository;
         this.orderRepository = orderRepository;
         this.orderStateMachineProvider = orderStateMachineProvider;
         this.clock = clock;
@@ -215,18 +222,20 @@ public class PaymentService {
     }
 
     /**
-     * Confirms payment for an unexpired {@code PENDING_PAYMENT} order
-     * (simulated/test-mode resume). Transitions the order
-     * {@code PENDING_PAYMENT -> PLACED} exclusively through {@link
-     * OrderStateMachine}, then synchronizes {@code payments.status} and
-     * {@code orders.payment_status} to {@code PAID} and marks the intent
-     * {@code PAID}, all in one transaction.
+     * Refreshes the payment state of an unexpired {@code PENDING_PAYMENT} order
+     * without changing it. A resume request is deliberately <b>not</b> treated
+     * as payment success: only a valid signed success event delivered through
+     * {@link #processProviderEvent} may complete a payment and transition the
+     * order. This method only validates that the order is still awaiting
+     * payment and returns the current (still-pending) state; if the intent has
+     * expired it is marked {@code EXPIRED} (timeout bookkeeping only --- the
+     * order and payment statuses are left untouched) and a 409 is returned.
      *
-     * @param orderId the order to pay
+     * @param orderId the order to inspect
      * @param customerEmail the authenticated customer's email (ownership scope)
-     * @return the resume result
+     * @return the current resume/refresh result (payment and order unchanged)
      * @throws BusinessException 404 if missing, 403 if foreign,
-     *         409 if not pending, already paid, or the intent has expired
+     *         409 if not pending, not online, not CREATED, or the intent has expired
      */
     @Transactional
     public PaymentResumeResponse resumePayment(Long orderId, String customerEmail) {
@@ -259,30 +268,220 @@ public class PaymentService {
         }
         LocalDateTime now = LocalDateTime.now(clock);
         if (intent.getExpiresAt() != null && intent.getExpiresAt().isBefore(now)) {
+            // Timeout bookkeeping only: mark the intent expired so a late webhook
+            // event lands on the REFUND_PENDING path instead of completing the
+            // order. The order and payment statuses are left untouched here.
             intent.setStatus(IntentStatus.EXPIRED);
             paymentIntentRepository.saveAndFlush(intent);
             throw BusinessException.conflict("Payment intent for order " + orderId + " has expired");
         }
 
-        // Transition the order PENDING_PAYMENT -> PLACED through the state
-        // machine only (SideEffect.NONE: stock was already reserved at checkout).
-        orderStateMachineProvider.getObject().transition(orderId, Order.OrderStatus.PLACED,
-                ActorType.SYSTEM, null, "Payment confirmed (online)");
-
-        // Synchronize payment status with order payment status in the same
-        // transaction, and mark the intent PAID.
-        order.setPaymentStatus(PaymentStatus.PAID);
-        payment.setStatus(com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID);
-        orderRepository.saveAndFlush(order);
-        paymentRepository.saveAndFlush(payment);
-
-        intent.setStatus(IntentStatus.PAID);
-        paymentIntentRepository.saveAndFlush(intent);
-
-        log.info("Resumed online payment for order {} (group {}, intent {}) at {}",
-                orderId, intent.getPaymentGroupId(), intent.getProviderReference(), now);
-
+        // Deliberately no state change: payment and order stay PENDING /
+        // PENDING_PAYMENT until a signed webhook event completes them.
         return toPaymentResumeResponse(order, payment, intent);
+    }
+
+    // ------------------------------------------------------------------
+    // Stage 3: signed webhook event handling
+    // ------------------------------------------------------------------
+
+    /**
+     * Outcome of processing a provider webhook event.
+     */
+    public enum WebhookOutcome {
+        /** The event was accepted and its state effects applied. */
+        ACCEPTED,
+        /** The event ID was already processed; no side effects repeated. */
+        DUPLICATE,
+        /** The group was already terminal; the outcome was recorded without regression. */
+        IGNORED
+    }
+
+    /**
+     * The result of processing a provider event.
+     */
+    public static class WebhookResult {
+        private final WebhookOutcome outcome;
+        private final String providerEventId;
+        private final String paymentGroupId;
+        private final String intentStatus;
+
+        private WebhookResult(WebhookOutcome outcome, String providerEventId,
+                              String paymentGroupId, String intentStatus) {
+            this.outcome = outcome;
+            this.providerEventId = providerEventId;
+            this.paymentGroupId = paymentGroupId;
+            this.intentStatus = intentStatus;
+        }
+
+        public static WebhookResult duplicate(String providerEventId, String paymentGroupId, String intentStatus) {
+            return new WebhookResult(WebhookOutcome.DUPLICATE, providerEventId, paymentGroupId, intentStatus);
+        }
+
+        public static WebhookResult ignored(String providerEventId, String paymentGroupId, String intentStatus) {
+            return new WebhookResult(WebhookOutcome.IGNORED, providerEventId, paymentGroupId, intentStatus);
+        }
+
+        public static WebhookResult accepted(String providerEventId, String paymentGroupId, String intentStatus) {
+            return new WebhookResult(WebhookOutcome.ACCEPTED, providerEventId, paymentGroupId, intentStatus);
+        }
+
+        public WebhookOutcome getOutcome() { return outcome; }
+        public String getProviderEventId() { return providerEventId; }
+        public String getPaymentGroupId() { return paymentGroupId; }
+        public String getIntentStatus() { return intentStatus; }
+    }
+
+    /**
+     * Processes a provider webhook event for a payment group.
+     *
+     * <p>The signature must already have been verified by the caller (the
+     * webhook controller verifies it before parsing or looking up an intent).
+     * The event is persisted in {@code payment_events} together with its status
+     * effects in one transaction, so concurrent duplicate deliveries produce
+     * exactly one state change.
+     *
+     * <p>Group transitions are atomic and go exclusively through {@link
+     * OrderStateMachine}; stock side effects use the existing order-then-
+     * inventory lock policy. A success event moves every group order
+     * {@code PENDING_PAYMENT -> PLACED} (actor {@code SYSTEM}); a failure event
+     * moves them {@code PENDING_PAYMENT -> CANCELLED} with reason
+     * {@code PAYMENT_FAILED}, releasing reservations through the state machine.
+     * A late success after cancellation/timeout sets both
+     * {@code payments.status} and {@code orders.payment_status} to
+     * {@code REFUND_PENDING} without resurrecting the order. A failure after
+     * success never regresses {@code PAID}/{@code REFUND_PENDING}.
+     *
+     * @param paymentGroupId the payment group the event belongs to
+     * @param providerEventId the provider's unique event id (idempotency key)
+     * @param eventType the provider event type (stored, not interpreted)
+     * @param outcome {@code success} or {@code failure}
+     * @param amount the event amount (falls back to the order total)
+     * @return the processing result
+     * @throws BusinessException 404 if the intent is unknown (no information
+     *         leakage), 409 if the group cannot transition atomically
+     */
+    @Transactional
+    public WebhookResult processProviderEvent(String paymentGroupId, String providerEventId,
+                                              String eventType, String outcome, BigDecimal amount) {
+        boolean success = "success".equalsIgnoreCase(outcome);
+        boolean failure = "failure".equalsIgnoreCase(outcome);
+        if (!success && !failure) {
+            throw BusinessException.badRequest("Unknown payment outcome: " + outcome);
+        }
+
+        // 1. Idempotency: a duplicate event ID is acknowledged without side effects.
+        if (paymentEventRepository.existsByProviderEventId(providerEventId)) {
+            PaymentIntent known = paymentIntentRepository.findByPaymentGroupId(paymentGroupId).orElse(null);
+            return WebhookResult.duplicate(providerEventId, paymentGroupId,
+                    known != null ? known.getStatus().name() : null);
+        }
+
+        // 2. Look up the intent. Unknown intent -> 404 with no information leakage.
+        PaymentIntent intent = paymentIntentRepository.findByPaymentGroupId(paymentGroupId)
+                .orElseThrow(() -> BusinessException.notFound("Payment intent not found"));
+
+        // 3. Lock every order in the group in ascending id order before reading
+        //    the group state, so concurrent deliveries serialize and the status
+        //    observed below is stable under the locks.
+        List<Payment> payments = paymentRepository.findByPaymentGroupId(paymentGroupId);
+        List<Long> orderIds = payments.stream()
+                .map(p -> p.getOrder().getId())
+                .distinct()
+                .sorted()
+                .toList();
+        List<Order> lockedOrders = new ArrayList<>();
+        for (Long id : orderIds) {
+            lockedOrders.add(orderRepository.findByIdForUpdate(id)
+                    .orElseThrow(() -> BusinessException.notFound("Order not found: " + id)));
+        }
+
+        // Re-read the intent under the locks to observe the latest committed
+        // group state (a prior concurrent delivery may have completed it).
+        intent = paymentIntentRepository.findByPaymentGroupId(paymentGroupId)
+                .orElseThrow(() -> BusinessException.notFound("Payment intent not found"));
+        payments = paymentRepository.findByPaymentGroupId(paymentGroupId);
+
+        IntentStatus status = intent.getStatus();
+        boolean stateChanged = false;
+
+        switch (status) {
+            case CREATED:
+                // Initial outcome: every order must still be awaiting payment.
+                for (Order order : lockedOrders) {
+                    if (order.getStatus() != Order.OrderStatus.PENDING_PAYMENT) {
+                        throw BusinessException.conflict(
+                                "Order " + order.getId() + " is not awaiting payment (current: " + order.getStatus() + ")");
+                    }
+                }
+                List<Long> ids = lockedOrders.stream().map(Order::getId).toList();
+                if (success) {
+                    orderStateMachineProvider.getObject().transitionGroup(
+                            ids, Order.OrderStatus.PLACED, ActorType.SYSTEM, null, "Payment succeeded (webhook)");
+                    intent.setStatus(IntentStatus.PAID);
+                    setPaymentAndOrderStatuses(payments, lockedOrders,
+                            com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID,
+                            Order.PaymentStatus.PAID);
+                    stateChanged = true;
+                } else {
+                    orderStateMachineProvider.getObject().transitionGroup(
+                            ids, Order.OrderStatus.CANCELLED, ActorType.SYSTEM, null, "PAYMENT_FAILED");
+                    intent.setStatus(IntentStatus.FAILED);
+                    setPaymentAndOrderStatuses(payments, lockedOrders,
+                            com.flowerconnect.payment.domain.Payment.PaymentStatus.FAILED,
+                            Order.PaymentStatus.FAILED);
+                    stateChanged = true;
+                }
+                break;
+            case PAID:
+                // Already succeeded: any further event is idempotent, no regression.
+                break;
+            case FAILED:
+            case EXPIRED:
+                if (success) {
+                    // Late success after cancellation/timeout: REFUND_PENDING,
+                    // do not resurrect the order.
+                    setPaymentAndOrderStatuses(payments, lockedOrders,
+                            com.flowerconnect.payment.domain.Payment.PaymentStatus.REFUND_PENDING,
+                            Order.PaymentStatus.REFUND_PENDING);
+                    stateChanged = true;
+                }
+                // Failure after already failed/expired: idempotent, no regression.
+                break;
+        }
+
+        // 4. Persist the event and all status effects atomically.
+        Payment firstPayment = payments.stream()
+                .min(Comparator.comparing(Payment::getId))
+                .orElseThrow(() -> new IllegalStateException("Group has no payments"));
+        PaymentEvent event = PaymentEvent.builder()
+                .payment(firstPayment)
+                .paymentGroupId(paymentGroupId)
+                .providerEventId(providerEventId)
+                .eventType(eventType)
+                .outcome(outcome)
+                .amount(amount != null ? amount : firstPayment.getAmount())
+                .build();
+        paymentEventRepository.saveAndFlush(event);
+        paymentIntentRepository.saveAndFlush(intent);
+        payments.forEach(paymentRepository::saveAndFlush);
+        lockedOrders.forEach(orderRepository::saveAndFlush);
+
+        WebhookOutcome resultOutcome = stateChanged
+                ? WebhookOutcome.ACCEPTED
+                : WebhookOutcome.IGNORED;
+        return new WebhookResult(resultOutcome, providerEventId, paymentGroupId, intent.getStatus().name());
+    }
+
+    private void setPaymentAndOrderStatuses(List<Payment> payments, List<Order> orders,
+                                            com.flowerconnect.payment.domain.Payment.PaymentStatus paymentStatus,
+                                            Order.PaymentStatus orderPaymentStatus) {
+        for (Payment payment : payments) {
+            payment.setStatus(paymentStatus);
+        }
+        for (Order order : orders) {
+            order.setPaymentStatus(orderPaymentStatus);
+        }
     }
 
     private void requireOrderOwner(Order order, String customerEmail) {
@@ -314,7 +513,7 @@ public class PaymentService {
                 .paymentStatus(payment.getStatus().name())
                 .paymentGroupId(payment.getPaymentGroupId())
                 .intentReference(intent.getProviderReference())
-                .paidAt(LocalDateTime.now(clock).toString())
+                .paidAt(null)
                 .build();
     }
 }
