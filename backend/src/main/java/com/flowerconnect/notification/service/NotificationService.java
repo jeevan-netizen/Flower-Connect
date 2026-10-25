@@ -72,6 +72,10 @@ public class NotificationService {
             return null;
         }
 
+        if (dedupeKey != null && repository.existsByDedupeKey(dedupeKey)) {
+            return null;
+        }
+
         Notification notification = Notification.builder()
                 .userId(userId)
                 .type(type)

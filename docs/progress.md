@@ -896,3 +896,35 @@ Verification:
 All Phase 9 stages (1ù5) and test task 9.T are complete on branch
 `phase-9-notifications` (from main d5e7ca9), unmerged.
 
+### Phase 9 remaining verification (2026-10-26)
+
+**Full backend integration suite:** `./mvnw verify -Pintegration` from `backend`
+completed successfully: **1885 tests** (unit + integration across 121 report files),
+**0 failures, 0 errors, 0 skipped**, BUILD SUCCESS. This run includes the fix below.
+
+**Fix applied (branch regression exposed by the full suite):** `NotificationService.create`
+logged `UnexpectedRollbackException: Transaction silently rolled back because it has
+been marked as rollback-only` on duplicate dedupe-key delivery. Hibernate marks the
+`REQUIRES_NEW` transaction rollback-only after the unique-constraint violation, so the
+`catch (DataIntegrityViolationException)` never commits cleanly. Added a pre-insert
+`repository.existsByDedupeKey(dedupeKey)` check that returns `null` (idempotent skip)
+before attempting the save, avoiding the doomed transaction. The pre-existing
+`catch (DataIntegrityViolationException)` is retained as a backstop.
+
+File changed:
+- `backend/src/main/java/com/flowerconnect/notification/service/NotificationService.java`
+  (dedupe pre-check in `create`)
+
+**Real Playwright browser check:** NOT OBSERVABLE ó environment/credential-state
+limitation, not an implementation defect. The running Docker stack's `users` table
+already contains an admin user (`Admin bootstrap skipped: ADMIN user already exists`),
+but it cannot be authenticated with the `.env` credentials (401 `Invalid email or
+password`); the admin was created in a prior session with different credentials. Without
+an authenticated admin, a vendor cannot be approved, and `CheckoutService` requires
+`vendor.getStatus() == APPROVED` (CheckoutService.java:550, 923) before an order can be
+placed, so no customer order can be created and no vendor new-order toast can be
+observed. Neither the SSE-connected path nor the polling-fallback path was observed;
+neither is claimed as passed. No implementation change was made for this, and no test
+artifact was left in the tree (a scratch `tests/e2e/notification-sse-flow.test.ts` was
+created and removed).
+
