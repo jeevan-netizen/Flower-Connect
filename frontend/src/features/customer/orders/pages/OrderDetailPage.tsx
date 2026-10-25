@@ -14,6 +14,7 @@ import { useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCancelOrder, useOrder } from "@/features/customer/orders/queries";
 import { usePolling } from "@/hooks/usePolling";
+import { useOrderStatusToast } from "@/hooks/useOrderStatusToast";
 import type { CustomerOrderResponse } from "@/features/customer/orders/types";
 import {
   isTerminalStatus,
@@ -28,6 +29,7 @@ import { CustomerErrorState } from "@/features/customer/components/CustomerError
 import { PageHeading } from "@/features/vendor/components/StatCard";
 import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
+import { StatusToast } from "@/features/customer/orders/components/StatusToast";
 
 /** The amounts a customer agreed to pay at checkout are tax-inclusive (D-3). */
 const TAX_INCLUSIVE = " (incl. taxes)";
@@ -74,6 +76,9 @@ export function OrderDetailPage() {
   usePolling(refetchOrder, {
     enabled: order != null && !isTerminalStatus(order.status),
   });
+
+  // Status change toast
+  const { toast, dismissToast } = useOrderStatusToast(order ?? null, { enabled: true });
 
   const canCancel =
     order != null &&
@@ -125,7 +130,9 @@ export function OrderDetailPage() {
   const isCancelling = cancelOrder.isPending;
 
   return (
-    <div className="space-y-6">
+    <>
+      {toast && <StatusToast message={toast.message} type={toast.type} onDismiss={dismissToast} />}
+      <div className="space-y-6">
       <div className="flex flex-wrap justify-between items-end gap-4">
         <PageHeading title={`Order #${order.id}`} description={order.vendorName} />
         <Link
@@ -360,6 +367,7 @@ export function OrderDetailPage() {
         </button>
       </div>
     </div>
+  </>
   );
 }
 

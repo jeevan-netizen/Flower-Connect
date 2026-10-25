@@ -546,6 +546,46 @@ External services (Phase 3+):
 
 See `docs/decisions.md` for the full ADR log. Key decisions made so far:
 
+| ADR-004 | Feature-sliced frontend directory layout | Accepted |
+
+## 11. Notifications Architecture (Phase 9)
+
+### 11.1 Email Notifications (Phase 9 Stage 3)
+
+**Package**: `com.flowerconnect.notification.email`
+
+- **`EmailTemplateService`**: Plain-text templates for order events (placed, status changes, refunds), disputes, and vendor lifecycle (approved/rejected/suspended/reinstated). INR formatting, plain text only — no HTML/template engine dependency.
+
+- **`EmailNotificationListener`**: Async listeners with `@Async("notificationExecutor")` + `@TransactionalEventListener(phase = AFTER_COMMIT)` for all notification events:
+  - Order lifecycle: `OrderPlaced`, `OrderStatusChanged` (covers CONFIRMED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, REJECTED)
+  - Payments: `PaymentRefundPending`, `PaymentRefunded`
+  - Disputes: `DisputeOpened`, `DisputeResolved`
+  - Vendor lifecycle: `VendorApproved`, `VendorRejected`, `VendorSuspended`, `VendorReinstated`
+
+- **`EmailSender` abstraction**: `SmtpEmailSender` (MailHog in dev, real SMTP in prod) + `NoOpEmailSender` (fallback). Fire-and-forget; failures logged and swallowed.
+
+- **MailHog**: Local development at `http://localhost:8025` (port 1025). Configured in `docker-compose.yml` and `application-dev.yml`.
+
+### 11.2 In-App Notifications (Phase 9 Stage 2)
+
+**Package**: `com.flowerconnect.notification`
+
+- **`NotificationService`**: Persists notifications with per-recipient deduplication (`dedupe_key`), exposes read API (list, unread count, mark read, mark all read).
+- **`NotificationController`**: `/api/v1/notifications` (GET paginated, GET /unread-count, PATCH /{id}/read, POST /read-all). Open to all authenticated roles (`CUSTOMER`, `FLORIST`, `ADMIN`).
+
+### 11.3 Live Updates via Polling (Phase 9 Stage 4)
+
+**Frontend hooks** (`src/hooks/`):
+
+- **`usePolling`**: 8s interval, respects `document.hidden`, stops on terminal states/page hidden.
+- **`useNewOrderAlert`**: Detects new `PLACED` orders on vendor board, deduplicates via `Set`, shows `NewOrderToast` + plays Web Audio API chime (unlocked on first user interaction).
+- **`useOrderStatusToast`**: Detects status transitions on customer order detail, shows `StatusToast` with type-appropriate styling.
+
+**Components**:
+
+- `NewOrderToast`: Vendor toast with order name, auto-dismiss 8s, manual dismiss.
+- `StatusToast`: Generic toast (info/success/warning/error), auto-dismiss 6s.
+
 | ADR-001 | Maven wrapper + thin Dockerfile | Accepted |
 |---------|---------------------------------|----------|
 | ADR-002 | Flyway baseline + additive migrations | Accepted |

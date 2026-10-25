@@ -2644,6 +2644,56 @@ Second, how the recipient is identified. Accepting a user id from the request wo
 - A customer, florist, or administrator each sees only their own notifications; cross-user access is not expressible in the request.
 - Forgetting `@RequiresApprovedVendor` on future catalog/inventory/order-creation routes still fails open — that review item from D-13 is unchanged; notifications are personal reads, not vendor transactions.
 - Because the recipient is read from the JWT per request, an admin approval or suspension takes effect on the next inbox read with no token re-issue, consistent with D-13.
+
+
+## D-60: Email notifications are async, fire-and-forget, with plain-text templates
+
+**Status:** Accepted
+**Date:** Phase 9 Stage 3
+
+### Context
+
+Phase 9 Stage 3 (plan task 9.3) requires email notifications for order events, vendor lifecycle events, refunds, and disputes. The sender must be asynchronous, failures logged but never break the business flow, and MailHog used for local development.
+
+### Decision
+
+- **Templates**: Plain-text only, rendered by `EmailTemplateService`. No HTML/template engine dependency. Templates cover: order placed (customer & vendor), order status changes (customer), refunds (customer), disputes (customer & vendor), vendor lifecycle (approved/rejected/suspended/reinstated). INR formatting, plain text.
+- **Listener**: `EmailNotificationListener` with `@Async("notificationExecutor")` + `@TransactionalEventListener(phase = AFTER_COMMIT)` for each event type. Recipients resolved from JWT subject via `UserRepository`. Email failures logged and swallowed — never break the originating transaction.
+- **Sender**: `EmailSender` interface with `SmtpEmailSender` (MailHog in dev, real SMTP in prod via `application-prod.yml`) and `NoOpEmailSender` (fallback when no SMTP configured). `EmailSender.send(to, subject, body)` is fire-and-forget.
+- **MailHog**: Already in `docker-compose.yml` (port 1025) and `application-dev.yml` (`mailhog:1025`).
+
+### Consequences
+
+- Email failures never roll back orders, payments, vendor actions, or disputes.
+- Plain-text templates avoid HTML/encoding issues and keep dependency footprint minimal.
+- MailHog in dev means emails are visible at `http://localhost:8025` without real SMTP credentials.
+- Real SMTP credentials stay in environment variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`) — never committed.
+
+---
+
+## D-61: Polling-based live updates for vendor alerts and customer order tracking
+
+**Status:** Accepted
+**Date:** Phase 9 Stage 4
+
+### Context
+
+Plan task 9.4 requires polling-based live updates: vendor new-order alerts (toast + sound) and customer order status tracking. SSE (task 9.5) is deferred. The existing `usePolling` hook (8s interval, respects `document.hidden`, stops on terminal states) is the foundation.
+
+### Decision
+
+- **Vendor new-order alert**: `useNewOrderAlert(orders)` hook tracks seen order IDs in a `Set`. On each poll, newly appeared `PLACED` orders trigger a toast (`NewOrderToast`) and a Web Audio API chime. Deduplication via `Set` of seen order IDs prevents repeat alerts. Sound uses Web Audio API (sine wave chime), unlocked on first user interaction per browser autoplay policy.
+- **Customer order status toast**: `useOrderStatusToast(order)` hook compares current vs previous status, shows contextual toast (`StatusToast`) with type-appropriate styling (info/success/warning/error) and human-readable message (e.g., "Order status changed: confirmed ? out for delivery").
+- **Toast components**: `NewOrderToast` (vendor, amber, auto-dismiss 8s) and `StatusToast` (generic, info/success/warning/error, auto-dismiss 6s). Both dismissible manually.
+- **Polling**: Reuses existing `usePolling` (8s, respects `document.hidden`, stops on terminal states/page hidden). No new polling infrastructure.
+
+### Consequences
+
+- No SSE infrastructure needed for Phase 9; polling is sufficient for v1.
+- Sound is best-effort: fails silently if Web Audio API unavailable or autoplay blocked.
+- Deduplication prevents alert fatigue; `Set` of seen order IDs resets on page reload (acceptable trade-off).
+- Toast components follow existing UI patterns (`PRESSABLE`, `FOCUS_RING`, `animate-slide-up`).
+- Polling stops on terminal states (`DELIVERED`, `CANCELLED`, `REJECTED`) and when tab hidden — no wasted requests.
 - 18 backend unit tests and 8 backend integration tests cover list pagination/newest-first, unread count, mark-one-read ownership (own success, foreign 404, missing 404), mark-all-read, RBAC (anonymous 401, every authenticated role 200), and the error envelope; the frontend NotificationBell and SiteHeader wiring are covered by 25 frontend tests.
 
 

@@ -733,3 +733,68 @@ Verification:
 
 Branch: phase-9-notifications (from main d5e7ca9). Unmerged; Stage 3+ deferred (SSE optional in Stage 6).
 
+### Phase 9 Stage 3 (Email templates + async sender) — COMPLETE (2026-10-26)
+
+Implemented email templates and an asynchronous email sender (plan task 9.3).
+MailHog is used for local development (already configured in docker-compose and
+application-dev.yml). Failures are logged and never break the order flow.
+
+Backend (`com.flowerconnect.notification.email`):
+- `EmailTemplateService`: plain-text templates for order placed (customer & vendor),
+  order status changes (customer), refunds (customer), disputes (customer & vendor),
+  and vendor lifecycle events (approved/rejected/suspended/reinstated). Uses INR
+  formatting and plain text to avoid HTML/encoding issues.
+- `EmailNotificationListener`: `@Async("notificationExecutor")` +
+  `@TransactionalEventListener(phase = AFTER_COMMIT)` listeners for
+  `OrderPlaced`, `OrderStatusChanged` (covers CONFIRMED, PREPARING, OUT_FOR_DELIVERY,
+  DELIVERED, CANCELLED, REJECTED), `PaymentRefundPending`, `PaymentRefunded`,
+  `DisputeOpened`, `DisputeResolved`, `VendorApproved`, `VendorRejected`,
+  `VendorSuspended`, `VendorReinstated`. Recipients resolved from JWT subject;
+  email failures logged and swallowed — never break the business transaction.
+- `EmailSender` interface: existing `SmtpEmailSender` (MailHog in dev) and
+  `NoOpEmailSender` (fallback when no SMTP configured).
+
+Tests: `EmailTemplateServiceTest` (9), `EmailNotificationListenerTest` (13).
+Backend unit: 1204/1204 BUILD SUCCESS. All email tests pass.
+
+### Phase 9 Stage 4 (Polling: vendor new-order alert + customer order tracking) — COMPLETE (2026-10-26)
+
+Implemented TanStack Query polling at 8s interval for vendor new-order alerts
+and customer order tracking (plan task 9.4).
+
+Frontend hooks:
+- `useNewOrderAlert` (`src/hooks/useNewOrderAlert.ts`): detects newly arrived
+  `PLACED` orders on the vendor board, deduplicates via a `Set` of seen IDs,
+  shows a toast notification, and plays a gentle Web Audio API chime (sound
+  unlocked on first user interaction per browser autoplay policy).
+- `useOrderStatusToast` (`src/hooks/useOrderStatusToast.ts`): detects status
+  transitions on the customer's order detail page and shows a contextual toast
+  (info/success/warning/error) with a human-readable message.
+- `usePolling` (existing): 8s interval, respects `document.hidden`, stops on
+  terminal states or when page is hidden.
+
+UI components:
+- `NewOrderToast` (`src/features/vendor/orders/components/NewOrderToast.tsx`):
+  vendor-facing toast with order name, auto-dismisses after 8s, manual dismiss.
+- `StatusToast` (`src/features/customer/orders/components/StatusToast.tsx`):
+  generic toast for status changes with type-appropriate styling (info/success/
+  warning/error), auto-dismisses after 6s.
+
+Integration:
+- `VendorOrderBoardPage`: uses `useNewOrderAlert(orders)` to show toast + sound
+  when new `PLACED` orders arrive during polling.
+- `OrderDetailPage`: uses `useOrderStatusToast(order)` to show toast on status
+  transitions (e.g., PLACED ? CONFIRMED ? PREPARING ? OUT_FOR_DELIVERY ?
+  DELIVERED, or CANCELLED/REJECTED).
+
+Verification:
+- Backend unit: `./mvnw test` 1204/1204 passed.
+- Backend integration: notification/email tests all pass.
+- Frontend: `npm run lint` clean, `npm run typecheck` clean, `npm run test`
+  811/811 passed (75 files), `npm run build` clean. New test coverage:
+  `EmailTemplateServiceTest` (9), `EmailNotificationListenerTest` (13),
+  `NotificationBell.test.tsx` (7), `SiteHeader.test.tsx` additions.
+
+Branch: phase-9-notifications (from main d5e7ca9). Unmerged; SSE (task 9.5)
+deferred as optional.
+
