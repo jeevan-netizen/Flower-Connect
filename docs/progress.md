@@ -696,4 +696,18 @@ integration tests**, all green â€” `BUILD SUCCESS`.
 - Browser lifecycle: Playwright passed customer COD checkout, vendor accept/prepare/out-for-delivery/delivered, customer dispute creation, vendor response, admin partial resolution, customer outcome view, and duplicate-dispute rejection (409). Ephemeral local credentials were supplied only through process environment.
 - Database evidence from the disposable database: order 2 `DELIVERED`, COD, `COLLECTED`, total 100.00; dispute 2 `RESOLVED_PARTIAL`, refund amount 30.00; four vendor transition-history rows; payment remains `COLLECTED` (COD); inventory quantity 9, reserved quantity 0.
 - Verification: `./mvnw test` 1167 passed; Phase 8 Failsafe batch (DisputeIntegrationTest, CancellationIntegrationTest, RefundIntegrationTest) 63 passed; frontend lint, typecheck, 802 Vitest tests, and production build passed. Playwright browser flow passed.
-- The first browser run exposed `DisputeRepository` derived queries comparing the `raisedBy` User association with a Long. Explicit JPQL queries now compare `raisedBy.id` and `order.vendor.id`; customer and vendor list integration tests cover both queries.
+- The first browser run exposed `DisputeRepository` derived queries comparing the `raisedBy` User association with a Long. Explicit JPQL queries now compare `raisedBy.id` and `order.vendor.id`; customer and vendor list integration tests cover both queries.## Phase 9 — Notifications
+
+### Phase 9 Stage 1 (Notifications persistence + events/listeners) — COMPLETE (2026-10-25)
+
+Implemented notification persistence and event-driven delivery wiring:
+- Migration: V25__create_notifications.sql creates notifications table with dedupe_key unique nullable, indexes idx_notifications_user_created(user_id, created_at DESC), idx_notifications_user_unread(user_id, read_at, created_at DESC).
+- Domain/persistence: Notification entity, NotificationRepository, NotificationService with @Transactional(propagation = REQUIRES_NEW), recipient existence guard, and DataIntegrityViolationException ? dedupe no-op.
+- Async executor: NotificationAsyncConfig.notificationExecutor (core 2, max 4, queue 500), custom RejectedExecutionHandler logs and discards (non-blocking; delivery loss accepted).
+- Events: Scalar-only events for order placement, vendor lifecycle (approved/rejected/suspended/reinstated), and refund state changes; OrderStatusChanged inheritance covers cancellations/deliveries.
+- Publications: CheckoutService publishes OrderPlaced for COD orders; OrderStateMachine publishes OrderPlaced on PENDING_PAYMENT?PLACED; VendorAdminService publishes vendor lifecycle events; PaymentService publishes refund events. Added repository helpers OrderRepository.findCustomerIdByOrderId, OrderRepository.findVendorUserIdByOrderId, VendorProfileRepository.findUserIdByProfileId.
+- Listener: NotificationListener routes events with per-recipient dedupe keys, failures logged and swallowed, rolled-back transactions produce no notifications.
+- Tests: NotificationServiceTest, NotificationListenerTest (23), NotificationIntegrationTest (5). Updated CheckoutServiceTest and VendorAdminServiceTest for ApplicationEventPublisher. Backend unit: 1190/1190 BUILD SUCCESS (+23). Backend integration: 639/639 passed (0 failures, 0 errors); Notification integration 5/5 passed.
+
+Branch: phase-9-notifications (from main d5e7ca9). Unmerged; Stage 2+ deferred (SSE optional in Stage 6).
+

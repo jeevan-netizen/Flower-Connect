@@ -88,6 +88,8 @@ class CheckoutServiceTest {
     private SlotValidationService slotValidationService;
     @Mock
     private com.flowerconnect.payment.service.PaymentService paymentService;
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private CheckoutService checkoutService;

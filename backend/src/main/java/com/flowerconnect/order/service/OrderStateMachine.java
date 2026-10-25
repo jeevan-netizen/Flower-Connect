@@ -7,6 +7,7 @@ import com.flowerconnect.order.domain.Order.OrderStatus;
 import com.flowerconnect.order.domain.OrderStatusHistory;
 import com.flowerconnect.order.event.OrderCancelled;
 import com.flowerconnect.order.event.OrderDelivered;
+import com.flowerconnect.notification.event.OrderPlaced;
 import com.flowerconnect.order.event.OrderStatusChanged;
 import com.flowerconnect.order.repository.OrderItemRepository;
 import com.flowerconnect.order.repository.OrderRepository;
@@ -211,6 +212,18 @@ public class OrderStateMachine {
         if (toStatus == OrderStatus.DELIVERED) {
             publishAfterCommit(new OrderDelivered(this, orderId, fromStatus, actorType,
                     actorUserId, normalizedReason, nowInstant));
+        }
+
+        // Online payment confirmation: publish OrderPlaced once when the order
+        // moves from PENDING_PAYMENT to PLACED. COD orders publish OrderPlaced
+        // from CheckoutService at order creation instead. Never notify for
+        // PENDING_PAYMENT itself. Guarded against null vendor/user because the
+        // order entity may not have them populated in every call path.
+        if (fromStatus == OrderStatus.PENDING_PAYMENT && toStatus == OrderStatus.PLACED
+                && order.getVendor() != null && order.getVendor().getUser() != null) {
+            publishAfterCommit(new OrderPlaced(this, orderId,
+                    order.getUser().getId(), order.getVendor().getUser().getId(),
+                    order.getPaymentMethod(), order.getTotal(), nowInstant));
         }
 
         log.info("Order {} transitioned {} -> {} by {} {}", orderId, fromStatus, toStatus,

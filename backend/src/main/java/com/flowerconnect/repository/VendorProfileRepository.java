@@ -41,6 +41,9 @@ public interface VendorProfileRepository
     @Query("SELECT vp FROM VendorProfile vp JOIN FETCH vp.user u JOIN FETCH vp.serviceLocation WHERE vp.id = :id")
     Optional<VendorProfile> findByIdWithDetails(Long id);
 
+    @Query("SELECT vp.user.id FROM VendorProfile vp WHERE vp.id = :id")
+    Optional<Long> findUserIdByProfileId(@Param("id") Long id);
+
     boolean existsByUserId(Long userId);
 
     List<VendorProfile> findAllByStatus(VendorProfile.Status status);

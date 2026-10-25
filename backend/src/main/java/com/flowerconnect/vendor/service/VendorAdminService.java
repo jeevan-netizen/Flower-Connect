@@ -5,6 +5,10 @@ import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorHours;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
+import com.flowerconnect.notification.event.VendorApproved;
+import com.flowerconnect.notification.event.VendorReinstated;
+import com.flowerconnect.notification.event.VendorRejected;
+import com.flowerconnect.notification.event.VendorSuspended;
 import com.flowerconnect.repository.AuditLogRepository;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorHoursRepository;
@@ -14,12 +18,16 @@ import com.flowerconnect.vendor.dto.VendorProfileResponse;
 import com.flowerconnect.vendor.mapper.VendorMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
 
 import java.util.Collections;
 import java.util.List;
@@ -56,6 +64,7 @@ public class VendorAdminService {
     private final UserRepository userRepository;
     private final AuditLogRepository auditLogRepository;
     private final VendorMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Lists vendor profiles, optionally narrowed to one status.
@@ -102,10 +111,16 @@ public class VendorAdminService {
         VendorProfile profile = requireProfile(profileId);
         requireStatus(profile, VendorProfile.Status.PENDING_APPROVAL, "approve");
 
+        String prevStatus = profile.getStatus().name();
         profile.setStatus(VendorProfile.Status.APPROVED);
         vendorProfileRepository.saveAndFlush(profile);
 
         writeAudit(adminEmail, ACTION_APPROVED, profile, null);
+        publishAfterCommit(new VendorApproved(this, profile.getId(),
+                profile.getUser().getId(), prevStatus,
+                VendorProfile.Status.APPROVED.name(), resolveAdminId(adminEmail),
+                null, java.time.LocalDateTime.now(java.time.Clock.systemUTC())
+                        .atZone(java.time.Clock.systemUTC().getZone()).toInstant()));
         return toResponse(profile);
     }
 
@@ -118,10 +133,16 @@ public class VendorAdminService {
         VendorProfile profile = requireProfile(profileId);
         requireStatus(profile, VendorProfile.Status.PENDING_APPROVAL, "reject");
 
+        String prevStatus = profile.getStatus().name();
         profile.setStatus(VendorProfile.Status.REJECTED);
         vendorProfileRepository.saveAndFlush(profile);
 
         writeAudit(adminEmail, ACTION_REJECTED, profile, reason);
+        publishAfterCommit(new VendorRejected(this, profile.getId(),
+                profile.getUser().getId(), prevStatus,
+                VendorProfile.Status.REJECTED.name(), resolveAdminId(adminEmail),
+                reason, java.time.LocalDateTime.now(java.time.Clock.systemUTC())
+                        .atZone(java.time.Clock.systemUTC().getZone()).toInstant()));
         return toResponse(profile);
     }
 
@@ -133,10 +154,16 @@ public class VendorAdminService {
         VendorProfile profile = requireProfile(profileId);
         requireStatus(profile, VendorProfile.Status.APPROVED, "suspend");
 
+        String prevStatus = profile.getStatus().name();
         profile.setStatus(VendorProfile.Status.SUSPENDED);
         vendorProfileRepository.saveAndFlush(profile);
 
         writeAudit(adminEmail, ACTION_SUSPENDED, profile, reason);
+        publishAfterCommit(new VendorSuspended(this, profile.getId(),
+                profile.getUser().getId(), prevStatus,
+                VendorProfile.Status.SUSPENDED.name(), resolveAdminId(adminEmail),
+                reason, java.time.LocalDateTime.now(java.time.Clock.systemUTC())
+                        .atZone(java.time.Clock.systemUTC().getZone()).toInstant()));
         return toResponse(profile);
     }
 
@@ -149,10 +176,16 @@ public class VendorAdminService {
         VendorProfile profile = requireProfile(profileId);
         requireStatus(profile, VendorProfile.Status.SUSPENDED, "reinstate");
 
+        String prevStatus = profile.getStatus().name();
         profile.setStatus(VendorProfile.Status.APPROVED);
         vendorProfileRepository.saveAndFlush(profile);
 
         writeAudit(adminEmail, ACTION_REINSTATED, profile, null);
+        publishAfterCommit(new VendorReinstated(this, profile.getId(),
+                profile.getUser().getId(), prevStatus,
+                VendorProfile.Status.APPROVED.name(), resolveAdminId(adminEmail),
+                java.time.LocalDateTime.now(java.time.Clock.systemUTC())
+                        .atZone(java.time.Clock.systemUTC().getZone()).toInstant()));
         return toResponse(profile);
     }
 
@@ -191,5 +224,32 @@ public class VendorAdminService {
         }
         return vendorHoursRepository.findByVendorProfileIdInOrderByWeekdayAsc(profileIds).stream()
                 .collect(Collectors.groupingBy(hours -> hours.getVendorProfile().getId()));
+    }
+
+    private Long resolveAdminId(String adminEmail) {
+        return userRepository.findByEmailWithRole(adminEmail)
+                .map(User::getId)
+                .orElse(null);
+    }
+
+    /**
+     * Publishes a scalar-only domain event after the current transaction
+     * commits, mirroring the pattern in {@code OrderStateMachine}. A rollback
+     * prevents the event from ever being published.
+     */
+    private void publishAfterCommit(ApplicationEvent event) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager
+                .isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .registerSynchronization(
+                            new org.springframework.transaction.support.TransactionSynchronizationAdapter() {
+                                @Override
+                                public void afterCommit() {
+                                    eventPublisher.publishEvent(event);
+                                }
+                            });
+        } else {
+            eventPublisher.publishEvent(event);
+        }
     }
 }

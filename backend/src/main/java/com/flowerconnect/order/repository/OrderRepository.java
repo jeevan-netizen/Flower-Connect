@@ -107,6 +107,25 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByVendorIdAndCreatedAtBetween(Long vendorId, LocalDateTime from, LocalDateTime to);
 
     // ------------------------------------------------------------------
+    // Phase 9: notification recipient resolution (task 9.1)
+    // ------------------------------------------------------------------
+
+    /**
+     * Resolves the customer (user) id for an order as a scalar, avoiding lazy
+     * loading of the order entity in async notification listeners.
+     */
+    @Query("SELECT o.user.id FROM Order o WHERE o.id = :id")
+    Optional<Long> findCustomerIdByOrderId(@Param("id") Long id);
+
+    /**
+     * Resolves the vendor user id for an order as a scalar, avoiding lazy
+     * loading of the order and vendor profile entities in async notification
+     * listeners. Navigates order -> vendor_profile -> user.
+     */
+    @Query("SELECT o.vendor.user.id FROM Order o WHERE o.id = :id")
+    Optional<Long> findVendorUserIdByOrderId(@Param("id") Long id);
+
+    // ------------------------------------------------------------------
     // Phase 6: auto-reject job (task 6.5)
     // ------------------------------------------------------------------
 
