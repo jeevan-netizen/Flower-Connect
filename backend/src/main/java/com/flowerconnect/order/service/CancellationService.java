@@ -79,7 +79,11 @@ public class CancellationService {
         User actor = userRepository.findByEmailWithRole(authenticatedEmail)
                 .orElseThrow(() -> BusinessException.notFound("Authenticated user not found"));
 
-        Order order = orderRepository.findById(orderId)
+        // Acquire the order lock before reading its status or ownership. The
+        // transition service uses the same order-before-inventory lock order;
+        // loading an unlocked entity here could leave this transaction with a
+        // stale status while it waits for OrderStateMachine's lock.
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
 
         enforceOwnership(order, actor, actorType);

@@ -8,6 +8,8 @@ dist/
 package-lock.json
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+frontend/playwright-report/
+frontend/test-results/
 
 # Environment
 .env

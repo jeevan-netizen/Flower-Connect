@@ -76,7 +76,10 @@ public class VendorOrderService {
      */
     @Transactional(readOnly = true)
     private Order requireOwnedOrder(Long orderId, Long vendorId) {
-        Order order = orderRepository.findById(orderId)
+        // Keep ownership validation in the same order-row lock as the state
+        // transition. An unlocked pre-read can leave a stale managed Order in
+        // this transaction while accept waits behind a customer cancellation.
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
         if (!order.getVendor().getId().equals(vendorId)) {
             throw BusinessException.forbidden("Order " + orderId + " belongs to another vendor");

@@ -21,6 +21,6 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "tests/e2e", "playwright.config.ts"],
   "exclude": ["node", "dist"]
 }

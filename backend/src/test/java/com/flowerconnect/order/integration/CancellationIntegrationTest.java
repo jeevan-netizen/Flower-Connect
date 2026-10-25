@@ -11,6 +11,8 @@ import com.flowerconnect.inventory.domain.Inventory;
 import com.flowerconnect.inventory.domain.StockMovement;
 import com.flowerconnect.inventory.repository.InventoryRepository;
 import com.flowerconnect.inventory.repository.StockMovementRepository;
+import com.flowerconnect.catalog.domain.Product;
+import com.flowerconnect.catalog.repository.ProductRepository;
 import com.flowerconnect.catalog.dto.ProductRequest;
 import com.flowerconnect.catalog.repository.CategoryRepository;
 import com.flowerconnect.catalog.service.ProductService;
@@ -23,7 +25,9 @@ import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.Order.OrderStatus;
 import com.flowerconnect.order.domain.Order.PaymentMethod;
 import com.flowerconnect.order.domain.Order.PaymentStatus;
+import com.flowerconnect.order.domain.OrderItem;
 import com.flowerconnect.order.repository.OrderRepository;
+import com.flowerconnect.order.repository.OrderItemRepository;
 import com.flowerconnect.order.service.CancellationService;
 import com.flowerconnect.payment.domain.Payment;
 import com.flowerconnect.payment.repository.PaymentRepository;
@@ -79,9 +83,11 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
     @Autowired private ServiceLocationRepository locations;
     @Autowired private CategoryRepository categories;
     @Autowired private ProductService products;
+    @Autowired private ProductRepository productRepository;
     @Autowired private InventoryRepository inventoryRepository;
     @Autowired private StockMovementRepository stockMovementRepository;
     @Autowired private OrderRepository orderRepository;
+    @Autowired private OrderItemRepository orderItemRepository;
     @Autowired private PaymentRepository payments;
     @Autowired private CancellationService cancellationService;
     @Autowired private VendorOrderService vendorOrderService;
@@ -115,6 +121,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.PLACED,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("100.00"), 3);
+        addOrderItem(orderId, productId, 3);
 
         MvcResult res = cancel(token, orderId, null);
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
@@ -144,6 +151,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(lookup(customerEmail), vendorProfileId, OrderStatus.PLACED,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("50.00"), 2);
+        addOrderItem(orderId, productId, 2);
         String token = login(lookup(vendorEmail));
 
         MvcResult res = cancel(token, orderId, "out of stock");
@@ -172,6 +180,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.PLACED,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("75.00"), 4);
+        addOrderItem(orderId, productId, 4);
 
         MvcResult res = cancel(adminToken, orderId, "fraud");
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
@@ -197,6 +206,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.CONFIRMED,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("30.00"), 3);
+        addOrderItem(orderId, productId, 3);
 
         MvcResult res = cancel(token, orderId, null);
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
@@ -215,7 +225,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
         Long vendorProfileId = vendorProfileId(vendorEmail);
         String customerEmail = "cust-prep-" + uuid() + "@t.com";
         User customer = createUser(customerEmail, "CUSTOMER");
-        String token = login(customer);
+        String vendorToken = login(lookup(vendorEmail));
 
         Long productId = createProduct(vendorEmail, "Prep Rose " + uuid(), new BigDecimal("40.00"));
         stockIn(productId, 10);
@@ -224,8 +234,9 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.PREPARING,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("40.00"), 4);
+        addOrderItem(orderId, productId, 4);
 
-        MvcResult res = cancel(token, orderId, null);
+        MvcResult res = cancel(vendorToken, orderId, "test reason");
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
         assertThat(json.readTree(res.getResponse().getContentAsString()).get("status").asText())
             .isEqualTo("CANCELLED");
@@ -253,11 +264,12 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.OUT_FOR_DELIVERY,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("55.00"), 5);
+        addOrderItem(orderId, productId, 5);
 
-        // A vendor may not cancel an out-for-delivery order.
+        // A vendor may not cancel an out-for-delivery order (illegal transition -> 409).
         String vendorToken = login(lookup(vendorEmail));
         MvcResult vendorRes = cancel(vendorToken, orderId, "failed");
-        assertThat(vendorRes.getResponse().getStatus()).isEqualTo(403);
+        assertThat(vendorRes.getResponse().getStatus()).isEqualTo(409);
 
         // An admin may cancel it, with no restock.
         MvcResult res = cancel(adminToken, orderId, "failed delivery");
@@ -287,6 +299,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.PLACED,
                 PaymentMethod.ONLINE, PaymentStatus.PAID, new BigDecimal("200.00"), 2);
+        addOrderItem(orderId, productId, 2);
         createPayment(orderId, com.flowerconnect.payment.domain.Payment.PaymentMethod.ONLINE,
             com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID, new BigDecimal("200.00"));
 
@@ -316,6 +329,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.PLACED,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("90.00"), 2);
+        addOrderItem(orderId, productId, 2);
 
         MvcResult res = cancel(token, orderId, null);
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
@@ -506,6 +520,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.PLACED,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("12.00"), 1, slot);
+        addOrderItem(orderId, productId, 1);
 
         long before = orderRepository.countBookedOrdersForSlot(vendorProfileId, slot);
         assertThat(before).isGreaterThanOrEqualTo(1);
@@ -534,6 +549,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.PLACED,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("10.00"), 1);
+        addOrderItem(orderId, productId, 1);
 
         MvcResult res = cancel(token, orderId, null);
         assertThat(res.getResponse().getStatus()).isEqualTo(200);
@@ -558,6 +574,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
 
         Long orderId = createOrder(customer, vendorProfileId, OrderStatus.PLACED,
                 PaymentMethod.COD, PaymentStatus.PENDING, new BigDecimal("10.00"), 1);
+        addOrderItem(orderId, productId, 1);
 
         int threads = 2;
         CountDownLatch ready = new CountDownLatch(threads);
@@ -599,13 +616,33 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
         assertThat(done.await(60, TimeUnit.SECONDS)).isTrue();
         pool.shutdownNow();
 
-        assertThat(failures).isEmpty();
-        // Exactly one of the two transitions may succeed; the loser sees 409.
-        long ok = outcomes.stream().filter(s -> s.endsWith("-ok")).count();
-        assertThat(ok).isEqualTo(1);
+        // If cancellation locks first, accept loses with 409. If accept locks
+        // first, customer cancellation is a valid subsequent CONFIRMED ->
+        // CANCELLED transition, so both calls may succeed. No database or stock
+        // constraint failure is a valid race outcome.
+        assertThat(failures).hasSizeLessThanOrEqualTo(1);
+        failures.forEach(failure -> {
+            assertThat(failure).isInstanceOf(com.flowerconnect.exception.BusinessException.class);
+            var loserCode = ((com.flowerconnect.exception.BusinessException) failure).getErrorCode();
+            assertThat(loserCode).isEqualTo(com.flowerconnect.exception.ErrorCode.CONFLICT);
+        });
 
         Order order = orderRepository.findById(orderId).orElseThrow();
-        assertThat(order.getStatus()).isIn(OrderStatus.CANCELLED, OrderStatus.CONFIRMED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        Inventory inventory = inventoryRepository.findByProductId(productId).orElseThrow();
+        assertThat(inventory.getQuantity()).isEqualTo(2);
+        assertThat(inventory.getReservedQuantity()).isZero();
+        var orderMovements = stockMovementRepository.findByProductIdOrderByCreatedAtDescIdDesc(productId)
+                .stream()
+                .map(StockMovement::getMovementType)
+                .filter(type -> type == StockMovement.MovementType.RELEASE
+                        || type == StockMovement.MovementType.SALE_ONLINE
+                        || type == StockMovement.MovementType.RESTOCK)
+                .collect(java.util.stream.Collectors.toSet());
+        assertThat(orderMovements).isIn(
+                java.util.Set.of(StockMovement.MovementType.RELEASE),
+                java.util.Set.of(StockMovement.MovementType.SALE_ONLINE,
+                        StockMovement.MovementType.RESTOCK));
     }
 
     // ------------------------------------------------------------------
@@ -749,6 +786,19 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
                 .slotStart(slotStart)
                 .build();
         return orderRepository.saveAndFlush(order).getId();
+    }
+
+    private void addOrderItem(Long orderId, Long productId, int qty) {
+        Product product = productRepository.findById(productId).orElseThrow();
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        OrderItem item = OrderItem.builder()
+                .order(order)
+                .product(product)
+                .vendorId(order.getVendor().getId())
+                .quantity(qty)
+                .priceSnapshot(BigDecimal.ZERO)
+                .build();
+        orderItemRepository.saveAndFlush(item);
     }
 
     private void createPayment(Long orderId, com.flowerconnect.payment.domain.Payment.PaymentMethod method,

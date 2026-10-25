@@ -137,6 +137,51 @@ class DisputeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void customerCanListOwnDisputes() throws Exception {
+        String vendorEmail = createVendor();
+        Long vendorProfileId = vendorProfileId(vendorEmail);
+        User customer = createUser("cust-list-" + uuid() + "@t.com", "CUSTOMER");
+        String token = login(customer);
+        Long productId = createProduct(vendorEmail, "Customer List Rose " + uuid(), new BigDecimal("100.00"));
+        Long orderId = createDeliveredOrder(customer, vendorProfileId, productId);
+        raiseDispute(token, orderId, "ITEM_DAMAGED", "Damaged for customer list test");
+
+        MvcResult result = mvc.perform(get("/api/v1/disputes")
+                        .header("Authorization", "Bearer " + token)
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode content = json.readTree(result.getResponse().getContentAsString()).get("content");
+        assertThat(content.isArray()).isTrue();
+        assertThat(content.toString()).contains("\"orderId\":" + orderId);
+    }
+
+    @Test
+    void vendorCanListDisputesForOwnOrders() throws Exception {
+        String vendorEmail = createVendor();
+        Long vendorProfileId = vendorProfileId(vendorEmail);
+        User customer = createUser("vendor-list-" + uuid() + "@t.com", "CUSTOMER");
+        String customerToken = login(customer);
+        String vendorToken = login(users.findByEmailWithRole(vendorEmail).orElseThrow());
+        Long productId = createProduct(vendorEmail, "Vendor List Rose " + uuid(), new BigDecimal("100.00"));
+        Long orderId = createDeliveredOrder(customer, vendorProfileId, productId);
+        raiseDispute(customerToken, orderId, "ITEM_DAMAGED", "Damaged for vendor list test");
+
+        MvcResult result = mvc.perform(get("/api/v1/vendor/disputes")
+                        .header("Authorization", "Bearer " + vendorToken)
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode content = json.readTree(result.getResponse().getContentAsString()).get("content");
+        assertThat(content.isArray()).isTrue();
+        assertThat(content.toString()).contains("\"orderId\":" + orderId);
+    }
+
+    @Test
     void customerCannotRaiseDisputeAfterWindowExpires() throws Exception {
         // Default window is 7 days. Deliver the order, then advance the clock
         // 8 days past delivery so the window has clearly expired.

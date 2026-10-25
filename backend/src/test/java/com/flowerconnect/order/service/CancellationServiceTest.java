@@ -62,7 +62,7 @@ class CancellationServiceTest {
         Order cancelled = order(1L, customer, vendorProfile, OrderStatus.CANCELLED, PaymentMethod.COD,
             PaymentStatus.PENDING, new BigDecimal("100.00"));
         when(users.findByEmailWithRole("customer@t.com")).thenReturn(Optional.of(customer));
-        when(orders.findById(1L)).thenReturn(Optional.of(order));
+        when(orders.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
         when(stateMachine.transition(eq(1L), eq(OrderStatus.CANCELLED), eq(ActorType.CUSTOMER),
             eq(customer.getId()), eq(null))).thenReturn(cancelled);
 
@@ -84,7 +84,7 @@ class CancellationServiceTest {
             PaymentStatus.PENDING, new BigDecimal("100.00"));
         when(users.findByEmailWithRole("vendor@t.com")).thenReturn(Optional.of(florist));
         when(vendorProfiles.findByUserEmail("vendor@t.com")).thenReturn(Optional.of(vendorProfile));
-        when(orders.findById(2L)).thenReturn(Optional.of(order));
+        when(orders.findByIdForUpdate(2L)).thenReturn(Optional.of(order));
         when(stateMachine.transition(eq(2L), eq(OrderStatus.REJECTED), eq(ActorType.VENDOR),
             eq(florist.getId()), eq("out of stock"))).thenReturn(rejected);
 
@@ -102,7 +102,7 @@ class CancellationServiceTest {
         Order cancelled = order(3L, customer, vendorProfile, OrderStatus.CANCELLED, PaymentMethod.COD,
             PaymentStatus.PENDING, new BigDecimal("100.00"));
         when(users.findByEmailWithRole("admin@t.com")).thenReturn(Optional.of(admin));
-        when(orders.findById(3L)).thenReturn(Optional.of(order));
+        when(orders.findByIdForUpdate(3L)).thenReturn(Optional.of(order));
         when(stateMachine.transition(eq(3L), eq(OrderStatus.CANCELLED), eq(ActorType.ADMIN),
             eq(admin.getId()), eq("fraud"))).thenReturn(cancelled);
 
@@ -119,7 +119,7 @@ class CancellationServiceTest {
             PaymentStatus.PENDING, new BigDecimal("100.00"));
         User other = user("other@t.com", Role.builder().name("CUSTOMER").build());
         when(users.findByEmailWithRole("other@t.com")).thenReturn(Optional.of(other));
-        when(orders.findById(4L)).thenReturn(Optional.of(order));
+        when(orders.findByIdForUpdate(4L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.cancel("other@t.com", ActorType.CUSTOMER, 4L, null))
             .isInstanceOf(BusinessException.class)
@@ -135,7 +135,7 @@ class CancellationServiceTest {
             .id(8L).user(otherFlorist).businessName("Other").status(VendorProfile.Status.APPROVED).build();
         when(users.findByEmailWithRole("other-vendor@t.com")).thenReturn(Optional.of(otherFlorist));
         when(vendorProfiles.findByUserEmail("other-vendor@t.com")).thenReturn(Optional.of(otherProfile));
-        when(orders.findById(5L)).thenReturn(Optional.of(order));
+        when(orders.findByIdForUpdate(5L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.cancel("other-vendor@t.com", ActorType.VENDOR, 5L, "x"))
             .isInstanceOf(BusinessException.class)
@@ -149,7 +149,7 @@ class CancellationServiceTest {
         Order cancelled = order(6L, customer, vendorProfile, OrderStatus.CANCELLED, PaymentMethod.ONLINE,
             PaymentStatus.PAID, new BigDecimal("200.00"));
         when(users.findByEmailWithRole("customer@t.com")).thenReturn(Optional.of(customer));
-        when(orders.findById(6L)).thenReturn(Optional.of(order));
+        when(orders.findByIdForUpdate(6L)).thenReturn(Optional.of(order));
         when(stateMachine.transition(eq(6L), eq(OrderStatus.CANCELLED), eq(ActorType.CUSTOMER),
             eq(customer.getId()), eq(null))).thenReturn(cancelled);
 
@@ -168,7 +168,7 @@ class CancellationServiceTest {
         Order cancelled = order(7L, customer, vendorProfile, OrderStatus.CANCELLED, PaymentMethod.COD,
             PaymentStatus.PENDING, new BigDecimal("100.00"));
         when(users.findByEmailWithRole("customer@t.com")).thenReturn(Optional.of(customer));
-        when(orders.findById(7L)).thenReturn(Optional.of(order));
+        when(orders.findByIdForUpdate(7L)).thenReturn(Optional.of(order));
         when(stateMachine.transition(eq(7L), eq(OrderStatus.CANCELLED), eq(ActorType.CUSTOMER),
             eq(customer.getId()), eq(null))).thenReturn(cancelled);
 
@@ -182,7 +182,7 @@ class CancellationServiceTest {
     @Test
     void missingOrderIsNotFound() {
         when(users.findByEmailWithRole("customer@t.com")).thenReturn(Optional.of(customer));
-        when(orders.findById(99L)).thenReturn(Optional.empty());
+        when(orders.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.cancel("customer@t.com", ActorType.CUSTOMER, 99L, null))
             .isInstanceOf(BusinessException.class)

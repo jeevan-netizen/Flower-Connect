@@ -4,20 +4,25 @@ Tracks what has been implemented and what remains. Updated after each session.
 
 ## Current Phase
 
-**Phase 7 (Payments) — COMPLETE** (final audit, 2026-10-24)
+**Phase 8 (Cancellations and Disputes) - COMPLETE** (final audit, 2026-10-25)
 
-Phase 7 is implemented and verified on branch `phase-7-payments` at commit
-`f0f2b52` plus the final-audit commit. All implementation stages are done:
-Stage 1 COD payments model; Stage 2 online checkout with simulated intent;
-Stage 3 signed webhook + simulated provider; Stage 3.5 reservation expiry job;
-frontend Stage 3 payment UI. Final audit confirmed two simulator integration
-test failures were caused by test setup (missing `order_items` row ? no
-reserved stock to release; unauthenticated simulator route ? 401 not 404),
-not shared database state. Both fixed and pass alone and together.
+The Phase 8 audit on `phase-8-cancellations-disputes` verifies the customer,
+vendor, and admin dispute lifecycle in Chromium against a disposable MySQL
+database. The browser flow passed. SQL confirmed a DELIVERED COD order with
+COLLECTED payment status, a RESOLVED_PARTIAL dispute for INR 30.00, vendor
+status history, and a second dispute attempt returning 409. The browser run
+exposed and fixed a dispute-list repository query comparing a User relationship
+to a scalar ID. Customer and vendor list queries now have regression coverage.
 
-Verified: backend unit suite 1159 tests + integration suite 571 tests, 0
-failures; frontend lint, typecheck, 782 tests, build all clean.
-
+Verified: backend unit suite 1167/1167; Phase 8 integration batch 63/63
+(31 disputes, 19 cancellations, 13 refunds); frontend lint, typecheck, 802
+tests, and build pass. Cancellation integration methods use JUnit's default
+same-thread execution; the final class passed 19/19 within the Phase 8 batch.
+Stock-side-effect cases create the required order_items fixtures. A real
+cancel-versus-accept race exposed stale unlocked ownership/status reads in the
+cancellation and vendor action services; both now lock the order before those
+reads, preserving order-before-inventory lock order. Temporary E2E database
+and generated Playwright artifacts were removed; no credentials were committed.
 Stage 1 implements the Phase 5 data model: the `V13__create_carts_orders.sql`
 Flyway migration (adding `service_locations.timezone` per D-5, and creating
 `carts`, `cart_items`, `orders`, `order_items`, and `order_status_history`),
@@ -684,3 +689,11 @@ integration tests**, all green â€” `BUILD SUCCESS`.
 - Stage 5a complete: forgot-password, reset-password, change-password, PATCH /users/me endpoints fully tested with unit and integration tests covering all acceptance criteria.
 - Stage 5b complete: admin bootstrap, token cleanup extended to password_reset_tokens, rate limiting with Bucket4j+Caffeine, springdoc added (disabled for tests).
 - Stage 6 complete: Redis removed, Vite dev proxy added, MySQL healthcheck verified, .gitignore updated for uploads, known-issues.md updated.
+
+## Phase 8 Final Audit (2026-10-25)
+
+- Cancellation test diagnosis: test methods run on JUnit's same-thread executor; only the explicit race test creates worker threads. Initial failures included missing `order_items` fixture rows, an invalid customer actor for PREPARING cancellation, and an incorrect 403 expectation where the state machine correctly returns 409. The race then exposed a production stale-read defect: both services read the order before the state machine lock, allowing an obsolete PLACED status to trigger a second stock side effect. Cancellation and vendor order services now acquire the order lock before owner/status reads. Race assertions cover both legal serial orders and verify coherent inventory and movement types. Final cancellation result: 19/19 in the 63-test integration batch.
+- Browser lifecycle: Playwright passed customer COD checkout, vendor accept/prepare/out-for-delivery/delivered, customer dispute creation, vendor response, admin partial resolution, customer outcome view, and duplicate-dispute rejection (409). Ephemeral local credentials were supplied only through process environment.
+- Database evidence from the disposable database: order 2 `DELIVERED`, COD, `COLLECTED`, total 100.00; dispute 2 `RESOLVED_PARTIAL`, refund amount 30.00; four vendor transition-history rows; payment remains `COLLECTED` (COD); inventory quantity 9, reserved quantity 0.
+- Verification: `./mvnw test` 1167 passed; Phase 8 Failsafe batch (DisputeIntegrationTest, CancellationIntegrationTest, RefundIntegrationTest) 63 passed; frontend lint, typecheck, 802 Vitest tests, and production build passed. Playwright browser flow passed.
+- The first browser run exposed `DisputeRepository` derived queries comparing the `raisedBy` User association with a Long. Explicit JPQL queries now compare `raisedBy.id` and `order.vendor.id`; customer and vendor list integration tests cover both queries.

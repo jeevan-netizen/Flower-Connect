@@ -31,12 +31,16 @@ public interface DisputeRepository extends JpaRepository<Dispute, Long> {
     /**
      * Page of disputes raised by the given customer, newest first.
      */
-    Page<Dispute> findByRaisedByOrderByCreatedAtDesc(Long raisedById, Pageable pageable);
+    @Query("SELECT d FROM Dispute d WHERE d.raisedBy.id = :raisedById ORDER BY d.createdAt DESC")
+    Page<Dispute> findByRaisedByOrderByCreatedAtDesc(
+            @Param("raisedById") Long raisedById, Pageable pageable);
 
     /**
      * Page of disputes on orders belonging to the given vendor, newest first.
      */
-    Page<Dispute> findByOrderVendorIdOrderByCreatedAtDesc(Long vendorId, Pageable pageable);
+    @Query("SELECT d FROM Dispute d WHERE d.order.vendor.id = :vendorId ORDER BY d.createdAt DESC")
+    Page<Dispute> findByOrderVendorIdOrderByCreatedAtDesc(
+            @Param("vendorId") Long vendorId, Pageable pageable);
 
     /**
      * Page of disputes in a single status, newest first. Used by the admin
