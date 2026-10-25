@@ -25,6 +25,7 @@ import com.flowerconnect.inventory.domain.StockMovement;
 import com.flowerconnect.inventory.repository.InventoryRepository;
 import com.flowerconnect.inventory.repository.StockMovementRepository;
 import com.flowerconnect.customer.repository.AddressRepository;
+import com.flowerconnect.notification.event.OrderPlaced;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.OrderItem;
 import com.flowerconnect.order.domain.OrderStatusHistory;
@@ -41,6 +42,8 @@ import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -109,6 +112,7 @@ public class CheckoutService {
     private final AppProperties appProperties;
     private final Clock clock;
     private final SlotValidationService slotValidationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final BigDecimal EARTH_RADIUS_KM = new BigDecimal("6371");
     private static final int SCALE_2 = 2;
@@ -637,6 +641,15 @@ public class CheckoutService {
                     .build();
             orderRepository.saveAndFlush(order);
 
+            // Publish OrderPlaced for COD orders (online orders publish when
+            // payment confirmation moves PENDING_PAYMENT -> PLACED via
+            // OrderStateMachine). Never notify for PENDING_PAYMENT itself.
+            if (paymentMethod == Order.PaymentMethod.COD) {
+                publishAfterCommit(new OrderPlaced(this, order.getId(), user.getId(),
+                        vendor.getUser().getId(), paymentMethod, order.getTotal(),
+                        now.atZone(clock.getZone()).toInstant()));
+            }
+
             // Create one payment row per order inside the checkout transaction.
             // COD: pending COD payment. ONLINE: pending payment linked to the
             // shared group/intent. Any failure rolls back orders, payments and
@@ -1076,5 +1089,27 @@ public class CheckoutService {
     private User requireUser(String customerEmail) {
         return userRepository.findByEmailWithRole(customerEmail)
                 .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
+    }
+
+    /**
+     * Publishes a scalar-only domain event after the current transaction
+     * commits, mirroring the pattern in {@code OrderStateMachine}. A rollback
+     * of the checkout transaction prevents the event from ever being
+     * published.
+     */
+    private void publishAfterCommit(ApplicationEvent event) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager
+                .isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .registerSynchronization(
+                            new org.springframework.transaction.support.TransactionSynchronizationAdapter() {
+                                @Override
+                                public void afterCommit() {
+                                    eventPublisher.publishEvent(event);
+                                }
+                            });
+        } else {
+            eventPublisher.publishEvent(event);
+        }
     }
 }

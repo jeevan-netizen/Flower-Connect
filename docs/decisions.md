@@ -2615,3 +2615,137 @@ Phase 8 Stage 5 implements dispute resolution (plan task 8.5): admins resolve OP
 - 11 new integration tests cover all resolution outcomes, partial amount bounds/rounding, final-state behavior, concurrent resolution, audit contents, event payload, online vs COD payment effects, unchanged order status, and ADMIN-only RBAC.
 
 
+## D-59: In-app notification read API — recipient derived from the authenticated principal, namespace open to every authenticated role
+
+**Status:** Accepted
+**Date:** Phase 9 Stage 2
+
+### Context
+
+Phase 9 Stage 1 persisted notifications and wired event-driven delivery (V25, `Notification`, `NotificationService`, `NotificationListener`, async executor). Stage 2 (plan task 9.2) adds the read API so recipients can list their notifications, see the unread count, and mark items read. Two questions had to be settled before writing the endpoints.
+
+First, who may call the API. Notifications are generated for both customers (order lifecycle, refund, dispute outcomes) and vendors (order lifecycle, dispute opened/resolved, vendor status changes). Restricting the namespace to a single role would either lock out one side or require a second namespace. Since every authenticated account holds exactly one of `CUSTOMER`, `FLORIST`, `ADMIN`, the namespace can be open to every authenticated role without exposing anything a caller isn't entitled to.
+
+Second, how the recipient is identified. Accepting a user id from the request would let a caller probe another user's inbox, so no route takes a user identifier. The recipient is derived from the JWT subject on every call, and ownership is enforced in the repository queries themselves (`findByIdAndUserId`), so a missing or foreign notification id is a 404 and the caller never learns whether it exists.
+
+### Decision
+
+- **`GET /api/v1/notifications`** — one page of the caller's own notifications, newest first, with read state, returned as the shared `PageResponse<NotificationResponse>` envelope.
+- **`GET /api/v1/notifications/unread-count`** — the caller's unread count.
+- **`PATCH /api/v1/notifications/{id}/read`** — marks one of the caller's notifications read; a missing or foreign id is 404.
+- **`POST /api/v1/notifications/read-all`** — marks all of the caller's notifications read, returns the number marked.
+- The namespace `/api/v1/notifications/**` is mapped to `hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")` in `SecurityConfig`, placed before the `.anyRequest().authenticated()` catch-all.
+- The recipient is derived from `Authentication.getName()` (the JWT subject); no route accepts a user id. `NotificationService` resolves the user from the email and scopes every read/mark query by `userId`.
+- `NotificationResponse` exposes only safe recipient-facing fields (category, title, message, optional deep-link target, read/create timestamps); internal event and entity details are omitted.
+- SSE real-time delivery remains out of scope for Stage 2 and is deferred to a later stage; the read API is poll-based and does not depend on a live connection.
+
+### Consequences
+
+- A customer, florist, or administrator each sees only their own notifications; cross-user access is not expressible in the request.
+- Forgetting `@RequiresApprovedVendor` on future catalog/inventory/order-creation routes still fails open — that review item from D-13 is unchanged; notifications are personal reads, not vendor transactions.
+- Because the recipient is read from the JWT per request, an admin approval or suspension takes effect on the next inbox read with no token re-issue, consistent with D-13.
+
+
+## D-60: Email notifications are async, fire-and-forget, with plain-text templates
+
+**Status:** Accepted
+**Date:** Phase 9 Stage 3
+
+### Context
+
+Phase 9 Stage 3 (plan task 9.3) requires email notifications for order events, vendor lifecycle events, refunds, and disputes. The sender must be asynchronous, failures logged but never break the business flow, and MailHog used for local development.
+
+### Decision
+
+- **Templates**: Plain-text only, rendered by `EmailTemplateService`. No HTML/template engine dependency. Templates cover: order placed (customer & vendor), order status changes (customer), refunds (customer), disputes (customer & vendor), vendor lifecycle (approved/rejected/suspended/reinstated). INR formatting, plain text.
+- **Listener**: `EmailNotificationListener` with `@Async("notificationExecutor")` + `@TransactionalEventListener(phase = AFTER_COMMIT)` for each event type. Recipients resolved from JWT subject via `UserRepository`. Email failures logged and swallowed — never break the originating transaction.
+- **Sender**: `EmailSender` interface with `SmtpEmailSender` (MailHog in dev, real SMTP in prod via `application-prod.yml`) and `NoOpEmailSender` (fallback when no SMTP configured). `EmailSender.send(to, subject, body)` is fire-and-forget.
+- **MailHog**: Already in `docker-compose.yml` (port 1025) and `application-dev.yml` (`mailhog:1025`).
+
+### Consequences
+
+- Email failures never roll back orders, payments, vendor actions, or disputes.
+- Plain-text templates avoid HTML/encoding issues and keep dependency footprint minimal.
+- MailHog in dev means emails are visible at `http://localhost:8025` without real SMTP credentials.
+- Real SMTP credentials stay in environment variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`) — never committed.
+
+---
+
+## D-61: Polling-based live updates for vendor alerts and customer order tracking
+
+**Status:** Accepted
+**Date:** Phase 9 Stage 4
+
+### Context
+
+Plan task 9.4 requires polling-based live updates: vendor new-order alerts (toast + sound) and customer order status tracking. SSE (task 9.5) is deferred. The existing `usePolling` hook (8s interval, respects `document.hidden`, stops on terminal states) is the foundation.
+
+### Decision
+
+- **Vendor new-order alert**: `useNewOrderAlert(orders)` hook tracks seen order IDs in a `Set`. On each poll, newly appeared `PLACED` orders trigger a toast (`NewOrderToast`) and a Web Audio API chime. Deduplication via `Set` of seen order IDs prevents repeat alerts. Sound uses Web Audio API (sine wave chime), unlocked on first user interaction per browser autoplay policy.
+- **Customer order status toast**: `useOrderStatusToast(order)` hook compares current vs previous status, shows contextual toast (`StatusToast`) with type-appropriate styling (info/success/warning/error) and human-readable message (e.g., "Order status changed: confirmed ? out for delivery").
+- **Toast components**: `NewOrderToast` (vendor, amber, auto-dismiss 8s) and `StatusToast` (generic, info/success/warning/error, auto-dismiss 6s). Both dismissible manually.
+- **Polling**: Reuses existing `usePolling` (8s, respects `document.hidden`, stops on terminal states/page hidden). No new polling infrastructure.
+
+### Consequences
+
+- No SSE infrastructure needed for Phase 9; polling is sufficient for v1.
+- Sound is best-effort: fails silently if Web Audio API unavailable or autoplay blocked.
+- Deduplication prevents alert fatigue; `Set` of seen order IDs resets on page reload (acceptable trade-off).
+- Toast components follow existing UI patterns (`PRESSABLE`, `FOCUS_RING`, `animate-slide-up`).
+- Polling stops on terminal states (`DELIVERED`, `CANCELLED`, `REJECTED`) and when tab hidden — no wasted requests.
+- 18 backend unit tests and 8 backend integration tests cover list pagination/newest-first, unread count, mark-one-read ownership (own success, foreign 404, missing 404), mark-all-read, RBAC (anonymous 401, every authenticated role 200), and the error envelope; the frontend NotificationBell and SiteHeader wiring are covered by 25 frontend tests.
+
+---
+
+## D-62: Notification SSE stream supplements polling; best-effort, post-commit delivery
+
+**Status:** Accepted
+**Date:** Phase 9 Stage 5 (task 9.5)
+
+### Context
+
+Plan task 9.5 adds an optional Server-Sent Events stream so notification badges and lists refresh
+promptly without relying on polling. Browser `EventSource` cannot send an `Authorization` header,
+so the transport choice and the delivery guarantees had to be settled before implementation.
+
+### Decision
+
+- **Transport**: a fetch-based SSE client (`src/features/notification/sse.ts`) that sends the existing
+  bearer token via `Authorization: Bearer`. Tokens are never placed in URLs or logs. The endpoint is
+  `GET /api/v1/notifications/stream` under the existing `/api/v1/notifications/**` namespace
+  (`hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")`); no new security-config change is required.
+- **Recipient boundary**: derived from the authenticated principal only; the request never accepts a
+  user id, so cross-user subscription is not expressible.
+- **Emitter lifecycle**: one `SseEmitter` per open connection in a per-user map; multiple connections
+  per user are supported, capped by `app.notification.sse-max-connections-per-user` (default 5).
+  Every emitter registers `onCompletion`/`onTimeout`/`onError` cleanup, and a scheduled heartbeat
+  (`app.notification.sse-heartbeat-cron`, default `0/30 * * * * *`) sends a comment event to every
+  live emitter and drops any whose send fails. A slow or disconnected client therefore cannot block
+  other clients. Emitter timeout defaults to 90 seconds (`app.notification.sse-timeout-seconds`).
+- **No-buffering**: response headers `Cache-Control: no-cache, no-transform`,
+  `Connection: keep-alive`, `X-Accel-Buffering: no`; `spring.mvc.async.request-timeout` raised to
+  300s so the container never terminates a live stream before the emitter timeout.
+- **Post-commit delivery only**: `NotificationService.create` pushes to SSE subscribers via
+  `TransactionSynchronization.afterCommit`. A rolled-back business transaction never produces a
+  stream event, and an SSE delivery failure is logged and swallowed — it can never roll back
+  notification persistence, email delivery, or the originating business transaction.
+- **Best-effort, no replay**: delivery is best-effort; there is no replay and no exactly-once
+  promise. Reconnects recover through the existing `GET /api/v1/notifications` list and the
+  unread-count API. SSE is optional: polling (`useNewOrderAlert`/`useOrderStatusToast`) is retained
+  as the fallback, and SSE supplements it — it must never become necessary for persisting or
+  reading notifications.
+- **Frontend integration**: `useNotificationStream` invalidates the notification list and unread-count
+  query keys on each event; the bell subscribes while signed in and closes on unmount, disable,
+  sign-out, and token change. Both SSE and polling only invalidate shared query keys, so a single
+  update cannot produce duplicate user alerts.
+
+### Consequences
+
+- SSE delivery is a best-effort UI refresh, not a source of truth; the read API remains authoritative.
+- Per-user connection cap (default 5) prevents a single client from opening unbounded streams.
+- The heartbeat cron is disabled in the test profile (`"-"`); delivery is driven directly in tests
+  for determinism.
+- No secrets or tokens are logged or placed in URLs.
+
+

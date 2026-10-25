@@ -15,6 +15,8 @@
 import { useCallback, useState } from "react";
 import { useVendorOrders, useVendorOrderSummary, useVendorOrderAction } from "@/features/vendor/orders/queries";
 import { usePolling } from "@/hooks/usePolling";
+import { useNewOrderAlert } from "@/hooks/useNewOrderAlert";
+import { NewOrderToast } from "@/features/vendor/orders/components/NewOrderToast";
 import type { VendorOrderResponse, VendorOrderAction } from "@/features/vendor/orders/types";
 import { ORDER_BOARD_COLUMNS, OrderBoardColumnKey } from "@/features/vendor/orders/types";
 import { isTerminalStatus } from "@/features/vendor/orders/types";
@@ -60,7 +62,10 @@ export function VendorOrderBoardPage() {
   // here the vendor's own board stays fresh while open.
   usePolling(refetchOrders, { enabled: true });
 
+  // Detect new PLACED orders and show toast + play sound
   const orders: VendorOrderResponse[] = data?.content ?? [];
+  const { showToast, dismissToast } = useNewOrderAlert(orders, { enabled: true, soundEnabled: true });
+
   const ordersByColumn = new Map<OrderBoardColumnKey, VendorOrderResponse[]>();
   ORDER_BOARD_COLUMNS.forEach((column) => ordersByColumn.set(column.key, []));
 
@@ -134,7 +139,14 @@ export function VendorOrderBoardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      {showToast && (
+        <NewOrderToast
+          orderName={showToast.orderName}
+          onDismiss={dismissToast}
+        />
+      )}
+      <div className="space-y-6">
       <PageHeading title="Orders" description="Your shop's incoming orders." />
 
       <TodaySummaryStrip summary={summary.data ?? null} isPending={summary.isPending} />
@@ -243,5 +255,6 @@ export function VendorOrderBoardPage() {
         </p>
       )}
     </div>
+  </>
   );
 }

@@ -6,6 +6,12 @@ server:
 spring:
   application:
     name: flowerconnect
+  mvc:
+    async:
+      # SSE streams stay open for minutes; the container-level async timeout
+      # must exceed the SSE emitter timeout (app.notification.sse-timeout-seconds)
+      # so heartbeats, not the container, decide when a connection is stale.
+      request-timeout: 300000
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/flowerconnect}
     username: ${DB_USER:flowerconnect}
@@ -82,6 +88,21 @@ app:
 
   auto-reject-cron: "0 0 * * * ?"
   auto-reject-batch-size: 100
+
+  notification:
+    sse:
+      # Heartbeat comment sent on every live SSE connection so proxies and the
+      # servlet container keep the stream open, and so stale/disconnected
+      # emitters are detected and removed. Override with
+      # APP_NOTIFICATION_SSE_HEARTBEAT_CRON / app.notification.sse-heartbeat-cron.
+      heartbeat-cron: "0/30 * * * * *"
+      # SSE emitter timeout (seconds). Override with
+      # APP_NOTIFICATION_SSE_TIMEOUT_SECONDS / app.notification.sse-timeout-seconds.
+      timeout-seconds: 90
+      # Maximum concurrent SSE connections per user. Override with
+      # APP_NOTIFICATION_SSE_MAX_CONNECTIONS_PER_USER /
+      # app.notification.sse-max-connections-per-user.
+      max-connections-per-user: 5
 
   management:
     endpoints:

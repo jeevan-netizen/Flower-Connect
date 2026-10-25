@@ -696,4 +696,235 @@ integration tests**, all green ‚Äî `BUILD SUCCESS`.
 - Browser lifecycle: Playwright passed customer COD checkout, vendor accept/prepare/out-for-delivery/delivered, customer dispute creation, vendor response, admin partial resolution, customer outcome view, and duplicate-dispute rejection (409). Ephemeral local credentials were supplied only through process environment.
 - Database evidence from the disposable database: order 2 `DELIVERED`, COD, `COLLECTED`, total 100.00; dispute 2 `RESOLVED_PARTIAL`, refund amount 30.00; four vendor transition-history rows; payment remains `COLLECTED` (COD); inventory quantity 9, reserved quantity 0.
 - Verification: `./mvnw test` 1167 passed; Phase 8 Failsafe batch (DisputeIntegrationTest, CancellationIntegrationTest, RefundIntegrationTest) 63 passed; frontend lint, typecheck, 802 Vitest tests, and production build passed. Playwright browser flow passed.
-- The first browser run exposed `DisputeRepository` derived queries comparing the `raisedBy` User association with a Long. Explicit JPQL queries now compare `raisedBy.id` and `order.vendor.id`; customer and vendor list integration tests cover both queries.
+- The first browser run exposed `DisputeRepository` derived queries comparing the `raisedBy` User association with a Long. Explicit JPQL queries now compare `raisedBy.id` and `order.vendor.id`; customer and vendor list integration tests cover both queries.## Phase 9 ó Notifications
+
+### Phase 9 Stage 1 (Notifications persistence + events/listeners) ó COMPLETE (2026-10-25)
+
+Implemented notification persistence and event-driven delivery wiring:
+- Migration: V25__create_notifications.sql creates notifications table with dedupe_key unique nullable, indexes idx_notifications_user_created(user_id, created_at DESC), idx_notifications_user_unread(user_id, read_at, created_at DESC).
+- Domain/persistence: Notification entity, NotificationRepository, NotificationService with @Transactional(propagation = REQUIRES_NEW), recipient existence guard, and DataIntegrityViolationException ? dedupe no-op.
+- Async executor: NotificationAsyncConfig.notificationExecutor (core 2, max 4, queue 500), custom RejectedExecutionHandler logs and discards (non-blocking; delivery loss accepted).
+- Events: Scalar-only events for order placement, vendor lifecycle (approved/rejected/suspended/reinstated), and refund state changes; OrderStatusChanged inheritance covers cancellations/deliveries.
+- Publications: CheckoutService publishes OrderPlaced for COD orders; OrderStateMachine publishes OrderPlaced on PENDING_PAYMENT?PLACED; VendorAdminService publishes vendor lifecycle events; PaymentService publishes refund events. Added repository helpers OrderRepository.findCustomerIdByOrderId, OrderRepository.findVendorUserIdByOrderId, VendorProfileRepository.findUserIdByProfileId.
+- Listener: NotificationListener routes events with per-recipient dedupe keys, failures logged and swallowed, rolled-back transactions produce no notifications.
+- Tests: NotificationServiceTest, NotificationListenerTest (23), NotificationIntegrationTest (5). Updated CheckoutServiceTest and VendorAdminServiceTest for ApplicationEventPublisher. Backend unit: 1190/1190 BUILD SUCCESS (+23). Backend integration: 639/639 passed (0 failures, 0 errors); Notification integration 5/5 passed.
+
+### Phase 9 Stage 2 (Notification read API + customer-facing UI) ó COMPLETE (2026-10-25)
+
+Implemented the plan task 9.2 in-app notification read API and the notification bell UI. SSE remains out of scope for Stage 2 (deferred to a later stage); persistence does not depend on a live connection.
+
+Backend (`com.flowerconnect.notification`):
+- `NotificationRepository`: added `findByIdAndUserId` (ownership-enforced lookup) plus `@Modifying` bulk queries `markReadByIdAndUserId` and `markAllReadByUserId`, all scoped by `userId` so a caller can never touch another user's notifications.
+- `NotificationService`: injects `Clock`; adds `listNotifications(email, pageable)`, `countUnread(email)`, `markAsRead(email, id)` (404 `NOT_FOUND` for missing/foreign id, never leaks existence) and `markAllAsRead(email)` returning the marked count. Recipient resolved from the JWT subject only.
+- `NotificationResponse` DTO + `NotificationMapper` (MapStruct) exposing only safe recipient-facing fields.
+- `NotificationController` at `/api/v1/notifications`: `GET` (paginated, newest first), `GET /unread-count`, `PATCH /{id}/read`, `POST /read-all`. Namespace mapped to `hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")` in `SecurityConfig` before the authenticated catch-all.
+- Tests: extended `NotificationServiceTest` (11 tests), new `NotificationControllerTest` slice (7 tests) with role-boundary and ownership checks, new `NotificationApiIntegrationTest` (8 tests against real MySQL covering pagination/newest-first, unread count, mark-read ownership, mark-all-read, RBAC).
+
+Frontend (`src/features/notification`):
+- `types.ts`, `api.ts`, `queries.ts` following the cart/queries conventions (`notificationKeys`, `useNotifications`, `useUnreadCount`, `useMarkNotificationRead`, `useMarkAllNotificationsRead`, `clearNotificationCache`). The list query loads on demand when the panel opens; the unread-count query drives the badge.
+- `NotificationBell` component: bell button with unread badge, disclosure panel listing notifications with per-row "mark read" and a "mark all as read" action. Explicit loading, empty, error (with retry) and read states. Renders nothing when signed out (no fetch, no bell) ó the signed-out discipline of D-41.
+- Wired into `SiteHeader` (signed-in cluster, before Log out); notification cache cleared on logout.
+- Tests: `NotificationBell.test.tsx` (7 tests), plus `SiteHeader.test.tsx` additions (anonymous: no bell/no fetch; signed-in: badge shows unread count).
+
+Verification:
+- Backend unit: `./mvnw test` 1204/1204 passed, 0 failures, BUILD SUCCESS.
+- Backend integration: `./mvnw verify -Pintegration -Dit.test=NotificationApiIntegrationTest` 8/8 passed, BUILD SUCCESS.
+- Frontend: `npm run lint` clean, `npm run typecheck` clean, `npm run test` 811/811 passed (75 files), `npm run build` clean.
+
+Branch: phase-9-notifications (from main d5e7ca9). Unmerged; Stage 3+ deferred (SSE optional in Stage 6).
+
+### Phase 9 Stage 3 (Email templates + async sender) ó COMPLETE (2026-10-26)
+
+Implemented email templates and an asynchronous email sender (plan task 9.3).
+MailHog is used for local development (already configured in docker-compose and
+application-dev.yml). Failures are logged and never break the order flow.
+
+Backend (`com.flowerconnect.notification.email`):
+- `EmailTemplateService`: plain-text templates for order placed (customer & vendor),
+  order status changes (customer), refunds (customer), disputes (customer & vendor),
+  and vendor lifecycle events (approved/rejected/suspended/reinstated). Uses INR
+  formatting and plain text to avoid HTML/encoding issues.
+- `EmailNotificationListener`: `@Async("notificationExecutor")` +
+  `@TransactionalEventListener(phase = AFTER_COMMIT)` listeners for
+  `OrderPlaced`, `OrderStatusChanged` (covers CONFIRMED, PREPARING, OUT_FOR_DELIVERY,
+  DELIVERED, CANCELLED, REJECTED), `PaymentRefundPending`, `PaymentRefunded`,
+  `DisputeOpened`, `DisputeResolved`, `VendorApproved`, `VendorRejected`,
+  `VendorSuspended`, `VendorReinstated`. Recipients resolved from JWT subject;
+  email failures logged and swallowed ó never break the business transaction.
+- `EmailSender` interface: existing `SmtpEmailSender` (MailHog in dev) and
+  `NoOpEmailSender` (fallback when no SMTP configured).
+
+Tests: `EmailTemplateServiceTest` (9), `EmailNotificationListenerTest` (13).
+Backend unit: 1204/1204 BUILD SUCCESS. All email tests pass.
+
+### Phase 9 Stage 4 (Polling: vendor new-order alert + customer order tracking) ó COMPLETE (2026-10-26)
+
+Implemented TanStack Query polling at 8s interval for vendor new-order alerts
+and customer order tracking (plan task 9.4).
+
+Frontend hooks:
+- `useNewOrderAlert` (`src/hooks/useNewOrderAlert.ts`): detects newly arrived
+  `PLACED` orders on the vendor board, deduplicates via a `Set` of seen IDs,
+  shows a toast notification, and plays a gentle Web Audio API chime (sound
+  unlocked on first user interaction per browser autoplay policy).
+- `useOrderStatusToast` (`src/hooks/useOrderStatusToast.ts`): detects status
+  transitions on the customer's order detail page and shows a contextual toast
+  (info/success/warning/error) with a human-readable message.
+- `usePolling` (existing): 8s interval, respects `document.hidden`, stops on
+  terminal states or when page is hidden.
+
+UI components:
+- `NewOrderToast` (`src/features/vendor/orders/components/NewOrderToast.tsx`):
+  vendor-facing toast with order name, auto-dismisses after 8s, manual dismiss.
+- `StatusToast` (`src/features/customer/orders/components/StatusToast.tsx`):
+  generic toast for status changes with type-appropriate styling (info/success/
+  warning/error), auto-dismisses after 6s.
+
+Integration:
+- `VendorOrderBoardPage`: uses `useNewOrderAlert(orders)` to show toast + sound
+  when new `PLACED` orders arrive during polling.
+- `OrderDetailPage`: uses `useOrderStatusToast(order)` to show toast on status
+  transitions (e.g., PLACED ? CONFIRMED ? PREPARING ? OUT_FOR_DELIVERY ?
+  DELIVERED, or CANCELLED/REJECTED).
+
+Verification:
+- Backend unit: `./mvnw test` 1204/1204 passed.
+- Backend integration: notification/email tests all pass.
+- Frontend: `npm run lint` clean, `npm run typecheck` clean, `npm run test`
+  811/811 passed (75 files), `npm run build` clean. New test coverage:
+  `EmailTemplateServiceTest` (9), `EmailNotificationListenerTest` (13),
+  `NotificationBell.test.tsx` (7), `SiteHeader.test.tsx` additions.
+
+Branch: phase-9-notifications (from main d5e7ca9). Unmerged; SSE (task 9.5)
+and the Phase 9 test task (9.T) are now COMPLETE.
+
+### Phase 9 Stage 5 (Optional SSE live updates) ù COMPLETE (2026-10-26)
+
+Implemented plan task 9.5, an authenticated SSE stream that supplements (never
+replaces) the existing polling fallback:
+
+Backend (`com.flowerconnect.notification.sse`):
+- `NotificationSseController`: `GET /api/v1/notifications/stream` producing
+  `text/event-stream`. The recipient is derived from the authenticated
+  principal (`authentication.getName()` ? `UserRepository.findByEmailWithRole`);
+  the request never accepts a user id, so cross-user subscription is not
+  expressible. Sits under the existing `/api/v1/notifications/**` namespace
+  mapped to `hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")` in `SecurityConfig`.
+  Response headers disable buffering: `Cache-Control: no-cache, no-transform`,
+  `Connection: keep-alive`, `X-Accel-Buffering: no`.
+- `NotificationSseService`: one `SseEmitter` per open connection in a
+  per-user `ConcurrentHashMap`; multiple connections per user supported, capped
+  by `app.notification.sse-max-connections-per-user` (default 5). Every emitter
+  registers `onCompletion`/`onTimeout`/`onError` cleanup; a scheduled heartbeat
+  (`app.notification.sse-heartbeat-cron`, default `0/30 * * * * *`) sends a
+  comment event to every live emitter and drops any whose send fails, so a slow
+  or disconnected client cannot block other clients. Emitter timeout defaults
+  to 90 seconds (`app.notification.sse-timeout-seconds`).
+- `NotificationService.create` now pushes to the recipient's SSE subscribers
+  via `TransactionSynchronization.afterCommit`, so delivery happens only after
+  the notification row commits. A delivery failure is logged and swallowed and
+  can never roll back notification persistence, email delivery, or the
+  originating business transaction. Delivery is best-effort: no replay, no
+  exactly-once promise; reconnects recover through `GET /api/v1/notifications`
+  and the unread-count API.
+
+Config: `spring.mvc.async.request-timeout` raised to 300s so the servlet
+container never terminates a live stream before the emitter timeout; SSE
+settings added to `application.yml` (`app.notification.sse.*`) and disabled in
+the test profile (`heartbeat-cron: "-"`).
+
+Frontend (`src/features/notification`):
+- `sse.ts`: fetch-based SSE client that sends the existing bearer token via
+  `Authorization: Bearer` (browser `EventSource` cannot send auth headers);
+  tokens are never placed in URLs or logs. `fetch` is injectable for unit
+  testing. Parses SSE blocks into `data`/`event`/`id`/`retry`.
+- `hooks/useNotificationStream.ts`: connects the stream when signed in,
+  invalidates the notification list and unread-count TanStack Query keys on
+  each event so the badge and list refresh promptly, and closes on unmount,
+  disable, sign-out, and token change (refresh/logout).
+- `NotificationBell.tsx`: subscribes via `useNotificationStream({ enabled })`.
+  Polling (`useNewOrderAlert`/`useOrderStatusToast`) is retained as the
+  fallback and is unchanged; because both mechanisms only invalidate shared
+  query keys, a single update cannot produce duplicate user alerts.
+
+Tests:
+- `NotificationSseServiceTest` (8 unit tests): registration, delivery,
+  completed/errored emitter removal, heartbeat, per-user cap, no-throw on dead
+  clients.
+- `NotificationSseControllerIntegrationTest` (4 integration tests vs real
+  MySQL + real security chain): `/stream` requires authentication (anonymous
+  401), accepts every authenticated role (200), post-commit delivery persists
+  even when SSE delivery fails (failure isolation), notification ownership
+  unchanged (foreign/missing read returns 404, unread count excludes foreign
+  rows).
+- `sse.test.ts` (7 frontend unit tests): `parseSSE` field parsing, bearer
+  token header, event parsing, non-OK response ? `onError`, fetch rejection ?
+  `onError`, `close()` stops reads/no error after close.
+- `useNotificationStream.test.tsx` (7 frontend tests): connect with token,
+  no connect when disabled/signed out, reconnect on token change, invalidate
+  list + unread count on event, close on unmount.
+- `NotificationBell.test.tsx` updated to cover the signed-in stream wiring.
+
+Verification:
+- Backend unit: `./mvnw test` **1234/1234 passed**, 0 failures, BUILD SUCCESS.
+- Backend integration: `NotificationSseControllerIntegrationTest` 4/4 passed;
+  existing `NotificationApiIntegrationTest` 8/8 passed.
+- Frontend: `npm run lint` clean, `npm run typecheck` clean, `npm run test`
+  **825/825 passed** (77 files), `npm run build` clean.
+
+### Phase 9 test task 9.T ù COMPLETE (2026-10-26)
+
+- Rolled-back transaction does not create or publish a notification: covered
+  by `NotificationService.create` running in `REQUIRES_NEW` (commits
+  independently) plus `NotificationListener` using
+  `@TransactionalEventListener(AFTER_COMMIT)` ó if the publishing business
+  transaction rolls back, `AFTER_COMMIT` never fires and no notification row
+  is created.
+- Notification ownership, unread counts, and mark-read behavior, including
+  foreign and missing IDs: `NotificationSseControllerIntegrationTest`
+  (foreign read ? 404, unread count excludes foreign rows) plus the existing
+  `NotificationApiIntegrationTest`.
+- Integration tests use the real security/filter chain and real MySQL via
+  `AbstractIntegrationTest` + Testcontainers.
+- Email and SSE failures cannot break the business transaction or notification
+  persistence: `NotificationSseControllerIntegrationTest.postCommitDelivery
+  PersistsEvenWhenSseFails` (mocked SSE throw, row still committed) and
+  `EmailNotificationListenerTest` (SMTP failure logged and swallowed).
+- Deterministic: no timing-based assertions; behavior established via
+  controlled executors, clocks, and direct emitter completion/error.
+
+All Phase 9 stages (1ù5) and test task 9.T are complete on branch
+`phase-9-notifications` (from main d5e7ca9), unmerged.
+
+### Phase 9 remaining verification (2026-10-26)
+
+**Full backend integration suite:** `./mvnw verify -Pintegration` from `backend`
+completed successfully: **1885 tests** (unit + integration across 121 report files),
+**0 failures, 0 errors, 0 skipped**, BUILD SUCCESS. This run includes the fix below.
+
+**Fix applied (branch regression exposed by the full suite):** `NotificationService.create`
+logged `UnexpectedRollbackException: Transaction silently rolled back because it has
+been marked as rollback-only` on duplicate dedupe-key delivery. Hibernate marks the
+`REQUIRES_NEW` transaction rollback-only after the unique-constraint violation, so the
+`catch (DataIntegrityViolationException)` never commits cleanly. Added a pre-insert
+`repository.existsByDedupeKey(dedupeKey)` check that returns `null` (idempotent skip)
+before attempting the save, avoiding the doomed transaction. The pre-existing
+`catch (DataIntegrityViolationException)` is retained as a backstop.
+
+File changed:
+- `backend/src/main/java/com/flowerconnect/notification/service/NotificationService.java`
+  (dedupe pre-check in `create`)
+
+**Real Playwright browser check:** NOT OBSERVABLE ó environment/credential-state
+limitation, not an implementation defect. The running Docker stack's `users` table
+already contains an admin user (`Admin bootstrap skipped: ADMIN user already exists`),
+but it cannot be authenticated with the `.env` credentials (401 `Invalid email or
+password`); the admin was created in a prior session with different credentials. Without
+an authenticated admin, a vendor cannot be approved, and `CheckoutService` requires
+`vendor.getStatus() == APPROVED` (CheckoutService.java:550, 923) before an order can be
+placed, so no customer order can be created and no vendor new-order toast can be
+observed. Neither the SSE-connected path nor the polling-fallback path was observed;
+neither is claimed as passed. No implementation change was made for this, and no test
+artifact was left in the tree (a scratch `tests/e2e/notification-sse-flow.test.ts` was
+created and removed).
+

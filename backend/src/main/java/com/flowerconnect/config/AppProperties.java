@@ -20,6 +20,33 @@ public class AppProperties {
     private int paymentExpiryMinutes = 30;
 
     /**
+     * Cron expression for the notification SSE heartbeat (plan task 9.5). The
+     * heartbeat keeps live event streams open and sweeps out stale/disconnected
+     * emitters. Override with {@code APP_NOTIFICATION_SSE_HEARTBEAT_CRON} or
+     * {@code app.notification.sse-heartbeat-cron}. Set to {@code -} (Spring's
+     * {@code CRON_DISABLED}) to turn the heartbeat off (used in the test profile).
+     */
+    private String sseHeartbeatCron = "0/30 * * * * *";
+
+    /**
+     * SSE emitter timeout (seconds). A connection with no successful send for
+     * this long is considered stale and removed. Heartbeats keep live
+     * connections well under this bound. Override with
+     * {@code APP_NOTIFICATION_SSE_TIMEOUT_SECONDS} or
+     * {@code app.notification.sse-timeout-seconds}.
+     */
+    private int sseTimeoutSeconds = 90;
+
+    /**
+     * Maximum number of concurrent SSE connections a single user may hold.
+     * Connections beyond the cap are refused (the emitter is completed
+     * immediately so the client can reconnect later). Override with
+     * {@code APP_NOTIFICATION_SSE_MAX_CONNECTIONS_PER_USER} or
+     * {@code app.notification.sse-max-connections-per-user}.
+     */
+    private int sseMaxConnectionsPerUser = 5;
+
+    /**
      * Time-to-live (minutes) for a simulated online payment intent. After the
      * TTL elapses the intent expires and the pending order can no longer be
      * resumed through {@code POST /api/v1/payments/{orderId}/resume}.
@@ -211,5 +238,29 @@ public class AppProperties {
 
     public void setWebhookMaxBodyBytes(int webhookMaxBodyBytes) {
         this.webhookMaxBodyBytes = webhookMaxBodyBytes;
+    }
+
+    public String getSseHeartbeatCron() {
+        return sseHeartbeatCron;
+    }
+
+    public void setSseHeartbeatCron(String sseHeartbeatCron) {
+        this.sseHeartbeatCron = sseHeartbeatCron;
+    }
+
+    public int getSseTimeoutSeconds() {
+        return sseTimeoutSeconds;
+    }
+
+    public void setSseTimeoutSeconds(int sseTimeoutSeconds) {
+        this.sseTimeoutSeconds = sseTimeoutSeconds;
+    }
+
+    public int getSseMaxConnectionsPerUser() {
+        return sseMaxConnectionsPerUser;
+    }
+
+    public void setSseMaxConnectionsPerUser(int sseMaxConnectionsPerUser) {
+        this.sseMaxConnectionsPerUser = sseMaxConnectionsPerUser;
     }
 }

@@ -1,5 +1,7 @@
 package com.flowerconnect.payment.service;
 
+import com.flowerconnect.notification.event.PaymentRefundPending;
+import com.flowerconnect.notification.event.PaymentRefunded;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.Order.PaymentMethod;
 import com.flowerconnect.order.domain.Order.PaymentStatus;
@@ -33,6 +35,8 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -84,6 +88,7 @@ public class PaymentService {
     private final java.time.Clock clock;
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired
     public PaymentService(
@@ -95,7 +100,8 @@ public class PaymentService {
             ObjectProvider<OrderStateMachine> orderStateMachineProvider,
             java.time.Clock clock,
             AuditLogRepository auditLogRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.paymentGateway = paymentGateway;
         this.paymentRepository = paymentRepository;
         this.paymentIntentRepository = paymentIntentRepository;
@@ -105,6 +111,7 @@ public class PaymentService {
         this.clock = clock;
         this.auditLogRepository = auditLogRepository;
         this.userRepository = userRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -188,6 +195,9 @@ public class PaymentService {
         orderRepository.saveAndFlush(order);
 
         log.info("Marked payment for order {} refund-pending", orderId);
+        publishAfterCommit(new PaymentRefundPending(this, orderId, order.getUser().getId(),
+                payment.getAmount(), java.time.LocalDateTime.now(clock)
+                        .atZone(clock.getZone()).toInstant()));
         return payment;
     }
 
@@ -308,6 +318,9 @@ public class PaymentService {
 
         log.info("Marked payment for order {} refunded at {} (refunded: {} of {}, reference: {})",
                 orderId, now, effectiveRefundAmount, payment.getAmount(), referenceNote);
+        publishAfterCommit(new PaymentRefunded(this, orderId, order.getUser().getId(),
+                payment.getAmount(), actor.getId(),
+                now.atZone(clock.getZone()).toInstant()));
         return payment;
     }
 
@@ -718,6 +731,27 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public Payment getPaymentForOrder(Long orderId) {
         return paymentRepository.findByOrderId(orderId).orElse(null);
+    }
+
+    /**
+     * Publishes a scalar-only domain event after the current transaction
+     * commits, mirroring the pattern in {@code OrderStateMachine}. A rollback
+     * prevents the event from ever being published.
+     */
+    private void publishAfterCommit(ApplicationEvent event) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager
+                .isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .registerSynchronization(
+                            new org.springframework.transaction.support.TransactionSynchronizationAdapter() {
+                                @Override
+                                public void afterCommit() {
+                                    eventPublisher.publishEvent(event);
+                                }
+                            });
+        } else {
+            eventPublisher.publishEvent(event);
+        }
     }
 }
 
