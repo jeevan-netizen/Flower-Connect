@@ -52,6 +52,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import jakarta.annotation.PostConstruct;
+
 /**
  * Integration tests for order cancellation (plan Phase 8, tasks 8.1 and 8.2)
  * against a real MySQL database.
@@ -84,9 +86,16 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
     @Autowired private CancellationService cancellationService;
     @Autowired private VendorOrderService vendorOrderService;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
-    private final Long locationId = locations.findByPincode(PINCODE).orElseThrow().getId();
-    private final Long categoryId = categories.findBySlug("roses").orElseThrow().getId();
+    private Long locationId;
+    private Long categoryId;
+
+    @PostConstruct
+    void init() {
+        locationId = locations.findByPincode(PINCODE).orElseThrow().getId();
+        categoryId = categories.findBySlug("roses").orElseThrow().getId();
+    }
 
     // ------------------------------------------------------------------
     // Happy matrix: who may cancel what, and the stock effect
@@ -636,7 +645,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
         Role role = roles.findByName(roleName).orElseThrow();
         User user = User.builder()
                 .email(email)
-                .passwordHash("$2a$10$dummyhash")
+                .passwordHash(passwordEncoder.encode(PASSWORD))
                 .fullName("Test " + roleName)
                 .role(role)
                 .status(Status.ACTIVE)
@@ -649,7 +658,7 @@ class CancellationIntegrationTest extends AbstractIntegrationTest {
         Role role = roles.findByName("FLORIST").orElseThrow();
         User user = User.builder()
                 .email(email)
-                .passwordHash("$2a$10$dummyhash")
+                .passwordHash(passwordEncoder.encode(PASSWORD))
                 .fullName("Vendor " + uuid())
                 .role(role)
                 .status(Status.ACTIVE)
