@@ -2696,4 +2696,56 @@ Plan task 9.4 requires polling-based live updates: vendor new-order alerts (toas
 - Polling stops on terminal states (`DELIVERED`, `CANCELLED`, `REJECTED`) and when tab hidden — no wasted requests.
 - 18 backend unit tests and 8 backend integration tests cover list pagination/newest-first, unread count, mark-one-read ownership (own success, foreign 404, missing 404), mark-all-read, RBAC (anonymous 401, every authenticated role 200), and the error envelope; the frontend NotificationBell and SiteHeader wiring are covered by 25 frontend tests.
 
+---
+
+## D-62: Notification SSE stream supplements polling; best-effort, post-commit delivery
+
+**Status:** Accepted
+**Date:** Phase 9 Stage 5 (task 9.5)
+
+### Context
+
+Plan task 9.5 adds an optional Server-Sent Events stream so notification badges and lists refresh
+promptly without relying on polling. Browser `EventSource` cannot send an `Authorization` header,
+so the transport choice and the delivery guarantees had to be settled before implementation.
+
+### Decision
+
+- **Transport**: a fetch-based SSE client (`src/features/notification/sse.ts`) that sends the existing
+  bearer token via `Authorization: Bearer`. Tokens are never placed in URLs or logs. The endpoint is
+  `GET /api/v1/notifications/stream` under the existing `/api/v1/notifications/**` namespace
+  (`hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")`); no new security-config change is required.
+- **Recipient boundary**: derived from the authenticated principal only; the request never accepts a
+  user id, so cross-user subscription is not expressible.
+- **Emitter lifecycle**: one `SseEmitter` per open connection in a per-user map; multiple connections
+  per user are supported, capped by `app.notification.sse-max-connections-per-user` (default 5).
+  Every emitter registers `onCompletion`/`onTimeout`/`onError` cleanup, and a scheduled heartbeat
+  (`app.notification.sse-heartbeat-cron`, default `0/30 * * * * *`) sends a comment event to every
+  live emitter and drops any whose send fails. A slow or disconnected client therefore cannot block
+  other clients. Emitter timeout defaults to 90 seconds (`app.notification.sse-timeout-seconds`).
+- **No-buffering**: response headers `Cache-Control: no-cache, no-transform`,
+  `Connection: keep-alive`, `X-Accel-Buffering: no`; `spring.mvc.async.request-timeout` raised to
+  300s so the container never terminates a live stream before the emitter timeout.
+- **Post-commit delivery only**: `NotificationService.create` pushes to SSE subscribers via
+  `TransactionSynchronization.afterCommit`. A rolled-back business transaction never produces a
+  stream event, and an SSE delivery failure is logged and swallowed — it can never roll back
+  notification persistence, email delivery, or the originating business transaction.
+- **Best-effort, no replay**: delivery is best-effort; there is no replay and no exactly-once
+  promise. Reconnects recover through the existing `GET /api/v1/notifications` list and the
+  unread-count API. SSE is optional: polling (`useNewOrderAlert`/`useOrderStatusToast`) is retained
+  as the fallback, and SSE supplements it — it must never become necessary for persisting or
+  reading notifications.
+- **Frontend integration**: `useNotificationStream` invalidates the notification list and unread-count
+  query keys on each event; the bell subscribes while signed in and closes on unmount, disable,
+  sign-out, and token change. Both SSE and polling only invalidate shared query keys, so a single
+  update cannot produce duplicate user alerts.
+
+### Consequences
+
+- SSE delivery is a best-effort UI refresh, not a source of truth; the read API remains authoritative.
+- Per-user connection cap (default 5) prevents a single client from opening unbounded streams.
+- The heartbeat cron is disabled in the test profile (`"-"`); delivery is driven directly in tests
+  for determinism.
+- No secrets or tokens are logged or placed in URLs.
+
 

@@ -3,7 +3,10 @@ package com.flowerconnect.notification.service;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.notification.domain.Notification;
+import com.flowerconnect.notification.dto.NotificationResponse;
+import com.flowerconnect.notification.mapper.NotificationMapper;
 import com.flowerconnect.notification.repository.NotificationRepository;
+import com.flowerconnect.notification.sse.NotificationSseService;
 import com.flowerconnect.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +16,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -41,6 +47,8 @@ public class NotificationService {
     private final NotificationRepository repository;
     private final UserRepository userRepository;
     private final Clock clock;
+    private final NotificationMapper mapper;
+    private final NotificationSseService sseService;
 
     /**
      * Creates one notification row in its own transaction.
@@ -75,11 +83,40 @@ public class NotificationService {
                 .build();
 
         try {
-            return repository.save(notification);
+            Notification saved = repository.save(notification);
+            // Deliver to SSE subscribers only after the notification row has
+            // committed; a delivery failure here can never affect persistence.
+            emitAfterCommit(userId, saved);
+            return saved;
         } catch (DataIntegrityViolationException ex) {
             // Duplicate dedupe key from redelivery: idempotent, no-op.
             log.debug("Dedupe key already exists, skipping duplicate notification: {}", dedupeKey);
             return null;
+        }
+    }
+
+    /**
+     * Pushes the newly committed notification to the recipient's SSE
+     * subscribers. Runs after the notification transaction commits so a rolled
+     * back business transaction never produces a stream event, and a stream
+     * delivery failure can never roll the notification back.
+     */
+    private void emitAfterCommit(Long userId, Notification saved) {
+        NotificationResponse response = mapper.toResponse(saved);
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        sseService.emit(userId, response);
+                    } catch (Exception ex) {
+                        log.error("Failed to deliver notification {} to SSE subscribers for user {}",
+                                saved.getId(), userId, ex);
+                    }
+                }
+            });
+        } else {
+            sseService.emit(userId, response);
         }
     }
 

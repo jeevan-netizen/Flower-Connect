@@ -586,6 +586,40 @@ See `docs/decisions.md` for the full ADR log. Key decisions made so far:
 - `NewOrderToast`: Vendor toast with order name, auto-dismiss 8s, manual dismiss.
 - `StatusToast`: Generic toast (info/success/warning/error), auto-dismiss 6s.
 
+### 11.4 Live Updates via SSE (Phase 9 Stage 5)
+
+**Package**: `com.flowerconnect.notification.sse` (backend) + `src/features/notification/` (frontend)
+
+- **`NotificationSseController`**: `GET /api/v1/notifications/stream` producing `text/event-stream`.
+  The recipient is derived from the authenticated principal only — the request never accepts a user
+  id, so cross-user subscription is not expressible. Sits under the existing
+  `/api/v1/notifications/**` namespace (`hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")`). Response
+  headers disable buffering: `Cache-Control: no-cache, no-transform`,
+  `Connection: keep-alive`, `X-Accel-Buffering: no`.
+- **`NotificationSseService`**: one `SseEmitter` per open connection in a per-user map; multiple
+  connections per user supported, capped by `app.notification.sse-max-connections-per-user`
+  (default 5). Every emitter registers completion/timeout/error cleanup; a scheduled heartbeat
+  (`app.notification.sse-heartbeat-cron`, default `0/30 * * * * *`) pings live emitters and drops
+  any whose send fails, so a slow or disconnected client cannot block other clients. Emitter timeout
+  defaults to 90 seconds (`app.notification.sse-timeout-seconds`).
+- **Post-commit delivery only**: `NotificationService.create` pushes to SSE subscribers via
+  `TransactionSynchronization.afterCommit`, so delivery happens only after the notification row
+  commits. An SSE delivery failure is logged and swallowed and can never roll back notification
+  persistence, email delivery, or the originating business transaction.
+- **Frontend**: `sse.ts` is a fetch-based SSE client that sends the existing bearer token via
+  `Authorization: Bearer` (browser `EventSource` cannot send auth headers; tokens are never placed
+  in URLs or logs). `hooks/useNotificationStream.ts` connects when signed in and invalidates the
+  notification list and unread-count query keys on each event; `NotificationBell.tsx` subscribes
+  via `useNotificationStream({ enabled })`.
+- **Fallback**: polling (`useNewOrderAlert`/`useOrderStatusToast`) is retained as the fallback and
+  is unchanged. SSE supplements polling — it must never become necessary for persisting or reading
+  notifications. Both mechanisms only invalidate shared query keys, so a single update cannot
+  produce duplicate user alerts.
+
+Config: `spring.mvc.async.request-timeout` raised to 300s so the servlet container never terminates
+a live stream before the emitter timeout. SSE settings are in `application.yml`
+(`app.notification.sse.*`) and disabled in the test profile (`heartbeat-cron: "-"`).
+
 | ADR-001 | Maven wrapper + thin Dockerfile | Accepted |
 |---------|---------------------------------|----------|
 | ADR-002 | Flyway baseline + additive migrations | Accepted |

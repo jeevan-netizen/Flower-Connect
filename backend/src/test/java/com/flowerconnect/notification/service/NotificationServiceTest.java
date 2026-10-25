@@ -14,7 +14,9 @@ import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.exception.ErrorCode;
 import com.flowerconnect.notification.domain.Notification;
+import com.flowerconnect.notification.mapper.NotificationMapper;
 import com.flowerconnect.notification.repository.NotificationRepository;
+import com.flowerconnect.notification.sse.NotificationSseService;
 import com.flowerconnect.repository.UserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -48,13 +50,19 @@ class NotificationServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private NotificationMapper mapper;
+
+    @Mock
+    private NotificationSseService sseService;
+
     private Clock clock;
     private NotificationService service;
 
     @BeforeEach
     void init() {
         clock = Clock.fixed(FIXED, ZoneOffset.UTC);
-        service = new NotificationService(repository, userRepository, clock);
+        service = new NotificationService(repository, userRepository, clock, mapper, sseService);
     }
 
     @Test

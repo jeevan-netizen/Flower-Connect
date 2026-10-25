@@ -796,5 +796,103 @@ Verification:
   `NotificationBell.test.tsx` (7), `SiteHeader.test.tsx` additions.
 
 Branch: phase-9-notifications (from main d5e7ca9). Unmerged; SSE (task 9.5)
-deferred as optional.
+and the Phase 9 test task (9.T) are now COMPLETE.
+
+### Phase 9 Stage 5 (Optional SSE live updates) ù COMPLETE (2026-10-26)
+
+Implemented plan task 9.5, an authenticated SSE stream that supplements (never
+replaces) the existing polling fallback:
+
+Backend (`com.flowerconnect.notification.sse`):
+- `NotificationSseController`: `GET /api/v1/notifications/stream` producing
+  `text/event-stream`. The recipient is derived from the authenticated
+  principal (`authentication.getName()` ? `UserRepository.findByEmailWithRole`);
+  the request never accepts a user id, so cross-user subscription is not
+  expressible. Sits under the existing `/api/v1/notifications/**` namespace
+  mapped to `hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")` in `SecurityConfig`.
+  Response headers disable buffering: `Cache-Control: no-cache, no-transform`,
+  `Connection: keep-alive`, `X-Accel-Buffering: no`.
+- `NotificationSseService`: one `SseEmitter` per open connection in a
+  per-user `ConcurrentHashMap`; multiple connections per user supported, capped
+  by `app.notification.sse-max-connections-per-user` (default 5). Every emitter
+  registers `onCompletion`/`onTimeout`/`onError` cleanup; a scheduled heartbeat
+  (`app.notification.sse-heartbeat-cron`, default `0/30 * * * * *`) sends a
+  comment event to every live emitter and drops any whose send fails, so a slow
+  or disconnected client cannot block other clients. Emitter timeout defaults
+  to 90 seconds (`app.notification.sse-timeout-seconds`).
+- `NotificationService.create` now pushes to the recipient's SSE subscribers
+  via `TransactionSynchronization.afterCommit`, so delivery happens only after
+  the notification row commits. A delivery failure is logged and swallowed and
+  can never roll back notification persistence, email delivery, or the
+  originating business transaction. Delivery is best-effort: no replay, no
+  exactly-once promise; reconnects recover through `GET /api/v1/notifications`
+  and the unread-count API.
+
+Config: `spring.mvc.async.request-timeout` raised to 300s so the servlet
+container never terminates a live stream before the emitter timeout; SSE
+settings added to `application.yml` (`app.notification.sse.*`) and disabled in
+the test profile (`heartbeat-cron: "-"`).
+
+Frontend (`src/features/notification`):
+- `sse.ts`: fetch-based SSE client that sends the existing bearer token via
+  `Authorization: Bearer` (browser `EventSource` cannot send auth headers);
+  tokens are never placed in URLs or logs. `fetch` is injectable for unit
+  testing. Parses SSE blocks into `data`/`event`/`id`/`retry`.
+- `hooks/useNotificationStream.ts`: connects the stream when signed in,
+  invalidates the notification list and unread-count TanStack Query keys on
+  each event so the badge and list refresh promptly, and closes on unmount,
+  disable, sign-out, and token change (refresh/logout).
+- `NotificationBell.tsx`: subscribes via `useNotificationStream({ enabled })`.
+  Polling (`useNewOrderAlert`/`useOrderStatusToast`) is retained as the
+  fallback and is unchanged; because both mechanisms only invalidate shared
+  query keys, a single update cannot produce duplicate user alerts.
+
+Tests:
+- `NotificationSseServiceTest` (8 unit tests): registration, delivery,
+  completed/errored emitter removal, heartbeat, per-user cap, no-throw on dead
+  clients.
+- `NotificationSseControllerIntegrationTest` (4 integration tests vs real
+  MySQL + real security chain): `/stream` requires authentication (anonymous
+  401), accepts every authenticated role (200), post-commit delivery persists
+  even when SSE delivery fails (failure isolation), notification ownership
+  unchanged (foreign/missing read returns 404, unread count excludes foreign
+  rows).
+- `sse.test.ts` (7 frontend unit tests): `parseSSE` field parsing, bearer
+  token header, event parsing, non-OK response ? `onError`, fetch rejection ?
+  `onError`, `close()` stops reads/no error after close.
+- `useNotificationStream.test.tsx` (7 frontend tests): connect with token,
+  no connect when disabled/signed out, reconnect on token change, invalidate
+  list + unread count on event, close on unmount.
+- `NotificationBell.test.tsx` updated to cover the signed-in stream wiring.
+
+Verification:
+- Backend unit: `./mvnw test` **1234/1234 passed**, 0 failures, BUILD SUCCESS.
+- Backend integration: `NotificationSseControllerIntegrationTest` 4/4 passed;
+  existing `NotificationApiIntegrationTest` 8/8 passed.
+- Frontend: `npm run lint` clean, `npm run typecheck` clean, `npm run test`
+  **825/825 passed** (77 files), `npm run build` clean.
+
+### Phase 9 test task 9.T ù COMPLETE (2026-10-26)
+
+- Rolled-back transaction does not create or publish a notification: covered
+  by `NotificationService.create` running in `REQUIRES_NEW` (commits
+  independently) plus `NotificationListener` using
+  `@TransactionalEventListener(AFTER_COMMIT)` ó if the publishing business
+  transaction rolls back, `AFTER_COMMIT` never fires and no notification row
+  is created.
+- Notification ownership, unread counts, and mark-read behavior, including
+  foreign and missing IDs: `NotificationSseControllerIntegrationTest`
+  (foreign read ? 404, unread count excludes foreign rows) plus the existing
+  `NotificationApiIntegrationTest`.
+- Integration tests use the real security/filter chain and real MySQL via
+  `AbstractIntegrationTest` + Testcontainers.
+- Email and SSE failures cannot break the business transaction or notification
+  persistence: `NotificationSseControllerIntegrationTest.postCommitDelivery
+  PersistsEvenWhenSseFails` (mocked SSE throw, row still committed) and
+  `EmailNotificationListenerTest` (SMTP failure logged and swallowed).
+- Deterministic: no timing-based assertions; behavior established via
+  controlled executors, clocks, and direct emitter completion/error.
+
+All Phase 9 stages (1ù5) and test task 9.T are complete on branch
+`phase-9-notifications` (from main d5e7ca9), unmerged.
 

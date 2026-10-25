@@ -5,6 +5,7 @@ import {
   useNotifications,
   useUnreadCount,
 } from "@/features/notification/queries";
+import { useNotificationStream } from "@/features/notification/hooks/useNotificationStream";
 import { FOCUS_RING_DARK, PRESSABLE } from "@/motion/pressable";
 
 const BUTTON_CLASS = `inline-flex items-center gap-2 rounded-sm text-[15px] font-medium text-bolder-text transition-colors duration-micro ease-standard hover:text-bolder-blush ${PRESSABLE} ${FOCUS_RING_DARK}`;
@@ -43,6 +44,9 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
     error: listError,
     refetch: refetchList,
   } = useNotifications({ enabled: enabled && open });
+
+  // Keep the badge and list in sync with live SSE events while signed in.
+  useNotificationStream({ enabled });
 
   const markNotificationRead = useMarkNotificationRead();
   const markAllNotificationsRead = useMarkAllNotificationsRead();
