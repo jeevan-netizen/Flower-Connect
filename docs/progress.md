@@ -709,5 +709,27 @@ Implemented notification persistence and event-driven delivery wiring:
 - Listener: NotificationListener routes events with per-recipient dedupe keys, failures logged and swallowed, rolled-back transactions produce no notifications.
 - Tests: NotificationServiceTest, NotificationListenerTest (23), NotificationIntegrationTest (5). Updated CheckoutServiceTest and VendorAdminServiceTest for ApplicationEventPublisher. Backend unit: 1190/1190 BUILD SUCCESS (+23). Backend integration: 639/639 passed (0 failures, 0 errors); Notification integration 5/5 passed.
 
-Branch: phase-9-notifications (from main d5e7ca9). Unmerged; Stage 2+ deferred (SSE optional in Stage 6).
+### Phase 9 Stage 2 (Notification read API + customer-facing UI) — COMPLETE (2026-10-25)
+
+Implemented the plan task 9.2 in-app notification read API and the notification bell UI. SSE remains out of scope for Stage 2 (deferred to a later stage); persistence does not depend on a live connection.
+
+Backend (`com.flowerconnect.notification`):
+- `NotificationRepository`: added `findByIdAndUserId` (ownership-enforced lookup) plus `@Modifying` bulk queries `markReadByIdAndUserId` and `markAllReadByUserId`, all scoped by `userId` so a caller can never touch another user's notifications.
+- `NotificationService`: injects `Clock`; adds `listNotifications(email, pageable)`, `countUnread(email)`, `markAsRead(email, id)` (404 `NOT_FOUND` for missing/foreign id, never leaks existence) and `markAllAsRead(email)` returning the marked count. Recipient resolved from the JWT subject only.
+- `NotificationResponse` DTO + `NotificationMapper` (MapStruct) exposing only safe recipient-facing fields.
+- `NotificationController` at `/api/v1/notifications`: `GET` (paginated, newest first), `GET /unread-count`, `PATCH /{id}/read`, `POST /read-all`. Namespace mapped to `hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")` in `SecurityConfig` before the authenticated catch-all.
+- Tests: extended `NotificationServiceTest` (11 tests), new `NotificationControllerTest` slice (7 tests) with role-boundary and ownership checks, new `NotificationApiIntegrationTest` (8 tests against real MySQL covering pagination/newest-first, unread count, mark-read ownership, mark-all-read, RBAC).
+
+Frontend (`src/features/notification`):
+- `types.ts`, `api.ts`, `queries.ts` following the cart/queries conventions (`notificationKeys`, `useNotifications`, `useUnreadCount`, `useMarkNotificationRead`, `useMarkAllNotificationsRead`, `clearNotificationCache`). The list query loads on demand when the panel opens; the unread-count query drives the badge.
+- `NotificationBell` component: bell button with unread badge, disclosure panel listing notifications with per-row "mark read" and a "mark all as read" action. Explicit loading, empty, error (with retry) and read states. Renders nothing when signed out (no fetch, no bell) — the signed-out discipline of D-41.
+- Wired into `SiteHeader` (signed-in cluster, before Log out); notification cache cleared on logout.
+- Tests: `NotificationBell.test.tsx` (7 tests), plus `SiteHeader.test.tsx` additions (anonymous: no bell/no fetch; signed-in: badge shows unread count).
+
+Verification:
+- Backend unit: `./mvnw test` 1204/1204 passed, 0 failures, BUILD SUCCESS.
+- Backend integration: `./mvnw verify -Pintegration -Dit.test=NotificationApiIntegrationTest` 8/8 passed, BUILD SUCCESS.
+- Frontend: `npm run lint` clean, `npm run typecheck` clean, `npm run test` 811/811 passed (75 files), `npm run build` clean.
+
+Branch: phase-9-notifications (from main d5e7ca9). Unmerged; Stage 3+ deferred (SSE optional in Stage 6).
 

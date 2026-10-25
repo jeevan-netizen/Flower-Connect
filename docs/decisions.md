@@ -2615,3 +2615,35 @@ Phase 8 Stage 5 implements dispute resolution (plan task 8.5): admins resolve OP
 - 11 new integration tests cover all resolution outcomes, partial amount bounds/rounding, final-state behavior, concurrent resolution, audit contents, event payload, online vs COD payment effects, unchanged order status, and ADMIN-only RBAC.
 
 
+## D-59: In-app notification read API — recipient derived from the authenticated principal, namespace open to every authenticated role
+
+**Status:** Accepted
+**Date:** Phase 9 Stage 2
+
+### Context
+
+Phase 9 Stage 1 persisted notifications and wired event-driven delivery (V25, `Notification`, `NotificationService`, `NotificationListener`, async executor). Stage 2 (plan task 9.2) adds the read API so recipients can list their notifications, see the unread count, and mark items read. Two questions had to be settled before writing the endpoints.
+
+First, who may call the API. Notifications are generated for both customers (order lifecycle, refund, dispute outcomes) and vendors (order lifecycle, dispute opened/resolved, vendor status changes). Restricting the namespace to a single role would either lock out one side or require a second namespace. Since every authenticated account holds exactly one of `CUSTOMER`, `FLORIST`, `ADMIN`, the namespace can be open to every authenticated role without exposing anything a caller isn't entitled to.
+
+Second, how the recipient is identified. Accepting a user id from the request would let a caller probe another user's inbox, so no route takes a user identifier. The recipient is derived from the JWT subject on every call, and ownership is enforced in the repository queries themselves (`findByIdAndUserId`), so a missing or foreign notification id is a 404 and the caller never learns whether it exists.
+
+### Decision
+
+- **`GET /api/v1/notifications`** — one page of the caller's own notifications, newest first, with read state, returned as the shared `PageResponse<NotificationResponse>` envelope.
+- **`GET /api/v1/notifications/unread-count`** — the caller's unread count.
+- **`PATCH /api/v1/notifications/{id}/read`** — marks one of the caller's notifications read; a missing or foreign id is 404.
+- **`POST /api/v1/notifications/read-all`** — marks all of the caller's notifications read, returns the number marked.
+- The namespace `/api/v1/notifications/**` is mapped to `hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")` in `SecurityConfig`, placed before the `.anyRequest().authenticated()` catch-all.
+- The recipient is derived from `Authentication.getName()` (the JWT subject); no route accepts a user id. `NotificationService` resolves the user from the email and scopes every read/mark query by `userId`.
+- `NotificationResponse` exposes only safe recipient-facing fields (category, title, message, optional deep-link target, read/create timestamps); internal event and entity details are omitted.
+- SSE real-time delivery remains out of scope for Stage 2 and is deferred to a later stage; the read API is poll-based and does not depend on a live connection.
+
+### Consequences
+
+- A customer, florist, or administrator each sees only their own notifications; cross-user access is not expressible in the request.
+- Forgetting `@RequiresApprovedVendor` on future catalog/inventory/order-creation routes still fails open — that review item from D-13 is unchanged; notifications are personal reads, not vendor transactions.
+- Because the recipient is read from the JWT per request, an admin approval or suspension takes effect on the next inbox read with no token re-issue, consistent with D-13.
+- 18 backend unit tests and 8 backend integration tests cover list pagination/newest-first, unread count, mark-one-read ownership (own success, foreign 404, missing 404), mark-all-read, RBAC (anonymous 401, every authenticated role 200), and the error envelope; the frontend NotificationBell and SiteHeader wiring are covered by 25 frontend tests.
+
+

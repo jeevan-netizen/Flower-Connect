@@ -132,6 +132,11 @@ public class SecurityConfig {
                    .requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")
                    // Phase 8 vendor disputes (task 8.4): vendor views/responds to disputes on their orders.
                    .requestMatchers("/api/v1/vendor/disputes/**").hasRole("FLORIST")
+                   // Phase 9 in-app notifications (task 9.2): every authenticated
+                   // role receives its own notifications, resolved from the JWT
+                   // subject. Ownership is enforced in the service layer, so no
+                   // route accepts a user id and cross-user access is impossible.
+                   .requestMatchers("/api/v1/notifications/**").hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")
                 // Public customer discovery: storefront and product detail are readable
                 // anonymously; authorization/visibility is enforced per handler.
                 // These exceptions must precede the /api/v1/vendors/** FLORIST rule.

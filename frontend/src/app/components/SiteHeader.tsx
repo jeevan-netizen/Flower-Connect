@@ -3,9 +3,11 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { useCart, clearCartCache } from "@/features/cart/queries";
+import { clearNotificationCache } from "@/features/notification/queries";
 import { clearVendorCache } from "@/features/vendor/queries";
 import { clearAdminCache } from "@/features/admin/queries";
 import { LocationMenu } from "@/features/location/components/LocationMenu";
+import { NotificationBell } from "@/features/notification/components/NotificationBell";
 import { FOCUS_RING_DARK, PRESSABLE } from "@/motion/pressable";
 import { useMediaQuery, WIDE_HEADER_QUERY } from "@/app/hooks/useMediaQuery";
 
@@ -156,6 +158,7 @@ export function SiteHeader() {
     clearVendorCache(queryClient);
     clearAdminCache(queryClient);
     clearCartCache(queryClient);
+    clearNotificationCache(queryClient);
     logout();
     setMenuOpen(false);
     navigate("/", { replace: true });
@@ -204,6 +207,9 @@ export function SiteHeader() {
               Admin
             </Link>
           )}
+          <span className="relative">
+            <NotificationBell enabled={isAuthenticated} />
+          </span>
           <button type="button" onClick={handleLogout} className={NAV_PILL}>
             Log out
           </button>

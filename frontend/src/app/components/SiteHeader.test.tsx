@@ -76,6 +76,16 @@ vi.mock("@/features/cart/api", () => ({
   clearCart: vi.fn(),
 }));
 
+const mockFetchUnreadCount = vi.hoisted(() => vi.fn());
+const mockFetchNotifications = vi.hoisted(() => vi.fn());
+
+vi.mock("@/features/notification/api", () => ({
+  fetchUnreadCount: mockFetchUnreadCount,
+  fetchNotifications: mockFetchNotifications,
+  markNotificationRead: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
+}));
+
 const { SiteHeader } = await import("@/app/components/SiteHeader");
 
 /** Report a viewport narrower than the header's breakpoint. */
@@ -147,6 +157,19 @@ describe("SiteHeader navigation", () => {
     mockState.logout.mockClear();
     mockFetchCart.mockReset();
     mockFetchCart.mockResolvedValue(makeCartResponse());
+    mockFetchUnreadCount.mockReset();
+    mockFetchUnreadCount.mockResolvedValue(0);
+    mockFetchNotifications.mockReset();
+    mockFetchNotifications.mockResolvedValue({
+      content: [],
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+      first: true,
+      last: true,
+      empty: true,
+    });
     vi.unstubAllGlobals();
     // The location control's session store is real here; every test starts with
     // no location chosen and a clean storage.
@@ -294,6 +317,31 @@ describe("SiteHeader navigation", () => {
     renderAt();
 
     expect(mockFetchCart).not.toHaveBeenCalled();
+  });
+
+  it("does not render the notification bell or fetch the unread count as an anonymous visitor", () => {
+    renderAt();
+
+    expect(screen.queryByRole("button", { name: /notifications/i })).not.toBeInTheDocument();
+    expect(mockFetchUnreadCount).not.toHaveBeenCalled();
+  });
+
+  it("renders the notification bell with the unread badge when a customer is signed in", async () => {
+    mockState.isAuthenticated = true;
+    mockState.user = customer();
+    mockFetchUnreadCount.mockResolvedValue(2);
+    renderAt();
+
+    const bell = screen.getByRole("button", { name: /notifications/i });
+    expect(bell).toHaveAttribute("aria-expanded", "false");
+    expect(bell).toHaveTextContent("Notifications");
+    // The badge reports the unread count once the count query resolves.
+    await waitFor(() => {
+      expect(screen.getByText("2")).toBeInTheDocument();
+    });
+    expect(mockFetchUnreadCount).toHaveBeenCalledTimes(1);
+    // The list loads on demand, not on mount.
+    expect(mockFetchNotifications).not.toHaveBeenCalled();
   });
 
   it("names the breakpoint the bar and the stylesheet share", () => {
