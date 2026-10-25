@@ -21,6 +21,7 @@ import { isTerminalStatus } from "@/features/vendor/orders/types";
 import { TodaySummaryStrip } from "@/features/vendor/orders/components/TodaySummaryStrip";
 import { OrderCard } from "@/features/vendor/orders/components/OrderCard";
 import { RejectReasonDialog } from "@/features/vendor/orders/components/RejectReasonDialog";
+import { CancelReasonDialog } from "@/features/vendor/orders/components/CancelReasonDialog";
 import { VendorErrorState } from "@/features/vendor/components/VendorErrorState";
 import { PageHeading } from "@/features/vendor/components/StatCard";
 import { FadeIn } from "@/motion/FadeIn";
@@ -35,6 +36,10 @@ function todayLocalDate(): string {
 export function VendorOrderBoardPage() {
   const today = todayLocalDate();
   const [rejectTarget, setRejectTarget] = useState<{
+    orderId: number;
+    orderName: string;
+  } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{
     orderId: number;
     orderName: string;
   } | null>(null);
@@ -98,6 +103,22 @@ export function VendorOrderBoardPage() {
         });
     },
     [rejectTarget, runAction],
+  );
+
+  const confirmCancel = useCallback(
+    (reason: string) => {
+      if (!cancelTarget) return;
+      setActionError(null);
+      void runAction
+        .mutateAsync({ orderId: cancelTarget.orderId, action: "cancel", reason })
+        .catch((mutationError) => {
+          setActionError(toApiError(mutationError));
+        })
+        .finally(() => {
+          setCancelTarget(null);
+        });
+    },
+    [cancelTarget, runAction],
   );
 
   const hasOrders = orders.length > 0;
@@ -181,6 +202,12 @@ export function VendorOrderBoardPage() {
                           orderName: `Order #${order.id}`,
                         });
                       }}
+                      onCancel={() => {
+                        setCancelTarget({
+                          orderId: order.id,
+                          orderName: `Order #${order.id}`,
+                        });
+                      }}
                     />
                   ))}
                 </div>
@@ -198,6 +225,17 @@ export function VendorOrderBoardPage() {
         onConfirm={confirmReject}
         onCancel={() => setRejectTarget(null)}
       />
+
+      {cancelTarget && (
+        <CancelReasonDialog
+          orderName={cancelTarget.orderName}
+          open={true}
+          isSubmitting={runAction.isPending && cancelTarget !== null}
+          error={actionError?.code === "VALIDATION_FAILED" ? actionError.message : null}
+          onConfirm={confirmCancel}
+          onCancel={() => setCancelTarget(null)}
+        />
+      )}
 
       {hasNonTerminal && (
         <p className="mt-2 text-xs text-slate-500">

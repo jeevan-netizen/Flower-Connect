@@ -1,5 +1,6 @@
 import api from "@/shared/lib/api";
 import type {
+  CancelOrderResponse,
   CustomerOrderPageResponse,
   CustomerOrderResponse,
 } from "@/features/customer/orders/types";
@@ -32,5 +33,17 @@ export async function fetchOrder(
   const response = await api.get<CustomerOrderResponse>(`/orders/${orderId}`, {
     signal,
   });
+  return response.data;
+}
+
+/** `POST /api/v1/orders/{id}/cancel` — cancels the caller's own order. */
+export async function cancelOrder(
+  orderId: number,
+  reason?: string,
+): Promise<CancelOrderResponse> {
+  const response = await api.post<CancelOrderResponse>(
+    `/orders/${orderId}/cancel`,
+    { reason },
+  );
   return response.data;
 }

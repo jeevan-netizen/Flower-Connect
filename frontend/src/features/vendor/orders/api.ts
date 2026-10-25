@@ -83,3 +83,15 @@ export async function deliveredOrder(orderId: number): Promise<VendorOrderRespon
   const response = await api.post<VendorOrderResponse>(`/vendor/orders/${orderId}/delivered`);
   return response.data;
 }
+
+/** `POST /api/v1/orders/{orderId}/cancel` — vendor cancels their own order. */
+export async function cancelOrder(
+  orderId: number,
+  reason: string,
+): Promise<VendorOrderResponse> {
+  const response = await api.post<VendorOrderResponse>(
+    `/orders/${orderId}/cancel`,
+    { reason },
+  );
+  return response.data;
+}

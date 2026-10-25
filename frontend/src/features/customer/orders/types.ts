@@ -90,6 +90,9 @@ export interface CustomerOrderResponse {
   note: string | null;
   items: CustomerOrderItemResponse[];
   timeline: CustomerOrderTimelineEntry[];
+  /** When the payment was marked refunded (`payments.status` moved
+   *  `REFUND_PENDING -> REFUNDED`). Null until then. */
+  refundedAt: string | null;
 }
 
 /** One item snapshot within a customer order. */
@@ -124,6 +127,20 @@ export interface CustomerOrderPageResponse {
 }
 
 export type CustomerOrderPage = PageResponse<CustomerOrderListItem>;
+
+/** Request body for `POST /api/v1/orders/{id}/cancel` (customer cancels own order). */
+export interface CancelOrderRequest {
+  reason?: string;
+}
+
+/** Response body for `POST /api/v1/orders/{id}/cancel`. */
+export interface CancelOrderResponse {
+  id: number;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  total: number;
+  refundPending: boolean;
+}
 
 /** The orders namespace under `/api/v1`. */
 export const ORDERS_PATH = "/orders";

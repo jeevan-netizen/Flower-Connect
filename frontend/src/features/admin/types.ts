@@ -218,3 +218,56 @@ export const ADMIN_MAX_PAGE_SIZE = 100;
  * carry `@NotBlank` + `@Size(max = 500)`. Single source for both forms.
  */
 export const ADMIN_REASON_MAX_LENGTH = 500;
+
+/* -------------------------------------------------------------------------- */
+/* Refund queue (plan Phase 8, task 8.3)                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Mirrors `RefundQueueItem` — only fields needed to review a pending refund. */
+export interface RefundQueueItem {
+  orderId: number;
+  vendorName: string;
+  paymentMethod: "COD" | "ONLINE";
+  paymentStatus: string;
+  orderStatus: string;
+  amount: number;
+  createdAt: string;
+  customerEmail: string;
+}
+
+/** Body of `POST /api/v1/admin/refunds/{orderId}/mark`. */
+export interface MarkRefundRequest {
+  referenceNote: string;
+}
+
+/** Response of `POST /api/v1/admin/refunds/{orderId}/mark`. */
+export interface RefundMarkedResponse {
+  orderId: number;
+  paymentStatus: string;
+  refundedAt: string | null;
+  referenceNote: string;
+}
+
+/** Filters for the refund queue listing. */
+export interface RefundQueueFilters {
+  status: string | null;
+  vendorId: number | null;
+  fromDate: string | null;
+  toDate: string | null;
+  page: number;
+}
+
+/** Refund queue route path. */
+export const REFUNDS_PATH = "/admin/refunds";
+
+/** Paginated wrapper for the refund queue listing. */
+export interface RefundQueuePageResponse {
+  content: RefundQueueItem[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}

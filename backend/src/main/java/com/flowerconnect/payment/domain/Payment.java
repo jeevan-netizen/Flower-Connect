@@ -63,6 +63,22 @@ public class Payment {
     @Column(name = "collected_at")
     private LocalDateTime collectedAt;
 
+    /**
+     * Timestamp when this payment was marked refunded ({@code payments.status}
+     * moved {@code REFUND_PENDING -> REFUNDED}). Null until then. Stamped from
+     * the injected {@link java.time.Clock} in {@link PaymentService#markRefunded}.
+     */
+    @Column(name = "refunded_at")
+    private LocalDateTime refundedAt;
+
+    /**
+     * The actual amount refunded for this payment. For full refunds, this
+     * equals {@code amount}. For partial refunds (dispute resolution), this
+     * is the partial amount. Null until the payment is refunded.
+     */
+    @Column(name = "refunded_amount", precision = 10, scale = 2)
+    private BigDecimal refundedAmount;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -46,6 +46,11 @@ public class CustomerOrderResponse {
     private LocalDateTime slotStart;
     private LocalDateTime slotEnd;
     private String note;
+    /**
+     * Timestamp when the payment was marked refunded ({@code payments.status}
+     * moved {@code REFUND_PENDING -> REFUNDED}). Null until then.
+     */
+    private LocalDateTime refundedAt;
     private List<CustomerOrderItemResponse> items;
     private List<CustomerOrderTimelineEntry> timeline;
 }

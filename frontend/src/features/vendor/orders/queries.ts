@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import {
   acceptOrder,
+  cancelOrder,
   deliveredOrder,
   fetchVendorOrderSummary,
   fetchVendorOrders,
@@ -76,13 +77,18 @@ export function useVendorOrderSummary(date: string | null) {
  * frontend only picks the route for the action the card offers and renders the
  * returned order (or the 409/400 the backend refuses with). On success the
  * whole listing is invalidated: an accepted order moves out of "New", a
- * rejected one leaves the board entirely, and today's summary changes.
+ * cancelled or rejected one leaves the board entirely, and today's summary
+ * changes.
  */
 export function useVendorOrderAction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (variables: { orderId: number; action: VendorOrderAction; reason?: string }) => {
+    mutationFn: async (variables: {
+      orderId: number;
+      action: VendorOrderAction;
+      reason?: string;
+    }) => {
       const { orderId, action, reason } = variables;
 
       switch (action) {
@@ -93,6 +99,11 @@ export function useVendorOrderAction() {
             throw new Error("reject requires a reason");
           }
           return rejectOrder(orderId, reason);
+        case "cancel":
+          if (reason === undefined) {
+            throw new Error("cancel requires a reason");
+          }
+          return cancelOrder(orderId, reason);
         case "prepare":
           return prepareOrder(orderId);
         case "out-for-delivery":

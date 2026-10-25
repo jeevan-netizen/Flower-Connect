@@ -26,6 +26,8 @@ interface OrderCardProps {
   onAction: (action: VendorOrderAction, reason?: string) => void;
   /** Opens the reject-reason dialog for this order. */
   onReject: () => void;
+  /** Opens the cancel-reason dialog for this order. */
+  onCancel: () => void;
 }
 
 const STATUS_TONES: Record<VendorOrderResponse["status"], string> = {
@@ -54,6 +56,7 @@ export function OrderCard({
   error,
   onAction,
   onReject,
+  onCancel,
 }: OrderCardProps) {
   const actions = NEXT_ACTIONS[order.status] ?? [];
 
@@ -64,9 +67,13 @@ export function OrderCard({
         onReject();
         return;
       }
+      if (action === "cancel") {
+        onCancel();
+        return;
+      }
       onAction(action);
     },
-    [isPending, onReject, onAction],
+    [isPending, onReject, onCancel, onAction],
   );
 
   const insufficientStock = error?.status === 409 && order.status === "PLACED";

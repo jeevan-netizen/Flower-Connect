@@ -234,6 +234,7 @@ describe("application router", () => {
       "catalog/:productId",
       "inventory",
       "orders",
+      "disputes",
     ]);
   });
 
@@ -594,6 +595,9 @@ describe("admin route protection", () => {
       undefined,
       "vendors",
       "users",
+      "refunds",
+      "orders/lookup",
+      "disputes",
     ]);
   });
 

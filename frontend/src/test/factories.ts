@@ -669,6 +669,7 @@ export function makeCustomerOrderResponse(
     note: null,
     items: [makeCustomerOrderItemResponse()],
     timeline: [makeCustomerOrderTimelineEntry()],
+    refundedAt: null,
     ...overrides,
   };
 }

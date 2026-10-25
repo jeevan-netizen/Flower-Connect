@@ -347,6 +347,7 @@ These cost real debugging time and will recur if forgotten:
   original intent.
 
 | 025 | Dev / Docker | **Backend Docker image can be out of date with source.** The `flowerconnect-backend` image (created 3 days ago) did not include Stage 4 backend changes (`VendorOrderController`, `VendorOrderService`, etc.), causing `GET|POST /api/v1/vendor/orders/**` to return 404 "No static resource" at runtime. Rebuilding the image (`docker compose build backend`) and recreating the container resolved it. Always rebuild backend image after backend changes before browser verification. | Open | Run `docker compose build backend && docker compose up -d --no-deps --force-recreate backend` after backend changes. |
+| 028 | Test / Dev | **Phase 8 dispute-flow browser E2E blocker is resolved.** The full Chromium lifecycle passed against a disposable local MySQL database: order delivery, dispute creation, vendor response, admin partial resolution, customer outcome view, and duplicate attempt (409). Temporary ADMIN/customer/vendor credentials were provided through environment variables only and were not committed. | Fixed | Playwright E2E and browser evidence captured on 2026-10-25. Database evidence: order DELIVERED/COD/COLLECTED; dispute RESOLVED_PARTIAL/INR 30.00; COD payment remains COLLECTED; inventory quantity 9/reserved 0. The temporary database and generated artifacts were removed. |
 
 ## Deprecation Notices
 

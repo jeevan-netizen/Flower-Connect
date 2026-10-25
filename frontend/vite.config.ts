@@ -25,6 +25,12 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
+    include: ["src/**/*.{test,spec}.{js,ts,jsx,tsx}"],
+    resolve: {
+      alias: {
+        "@": new URL("./src", import.meta.url).pathname,
+      },
+    },
     // The suite runs several jsdom workers in parallel; the default 5s per-test
     // budget produces spurious timeouts on interaction-heavy page tests.
     testTimeout: 30000,

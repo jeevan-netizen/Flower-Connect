@@ -6,8 +6,11 @@ import {
 } from "@tanstack/react-query";
 import {
   approveVendor,
+  adminCancelOrder,
   fetchAdminUsers,
   fetchAdminVendors,
+  fetchRefundQueue,
+  markRefunded,
   reinstateVendor,
   rejectVendor,
   suspendVendor,
@@ -19,6 +22,7 @@ import type {
   VendorAdminMutation,
   VendorListFilters,
   UserListFilters,
+  RefundQueueFilters,
 } from "@/features/admin/types";
 
 /**
@@ -41,6 +45,20 @@ export const adminKeys = {
     all: ["admin", "users"] as const,
     list: (filters: UserListFilters) =>
       ["admin", "users", "list", filters.role, filters.status, filters.page] as const,
+  },
+  refunds: {
+    all: ["admin", "refunds"] as const,
+    list: (filters: RefundQueueFilters) =>
+      [
+        "admin",
+        "refunds",
+        "list",
+        filters.status ?? null,
+        filters.vendorId ?? null,
+        filters.fromDate ?? null,
+        filters.toDate ?? null,
+        filters.page,
+      ] as const,
   },
 };
 
@@ -133,4 +151,53 @@ export function useUpdateUserStatus() {
  */
 export function clearAdminCache(queryClient: QueryClient): void {
   queryClient.removeQueries({ queryKey: adminKeys.all });
+}
+
+/**
+ * One page of `REFUND_PENDING` payments for the admin refund queue, keyed by
+ * every filter and page so a filter change is a cache miss rather than a stale
+ * render. On success of a mark-refunded mutation the whole listing is
+ * invalidated: a refunded payment leaves the queue entirely.
+ */
+export function useRefundQueue(filters: RefundQueueFilters) {
+  return useQuery({
+    queryKey: adminKeys.refunds.list(filters),
+    queryFn: () => fetchRefundQueue(filters),
+  });
+}
+
+/**
+ * Marks a `REFUND_PENDING` payment as `REFUNDED`. Requires a reference note;
+ * the backend enforces the state transition (`REFUND_PENDING -> REFUNDED`)
+ * and returns 409 for any other state. On success the whole refund queue is
+ * invalidated so the marked payment drops out of the listing.
+ */
+export function useMarkRefunded() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (variables: { orderId: number; referenceNote: string }) =>
+      markRefunded(variables.orderId, { referenceNote: variables.referenceNote }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.refunds.all });
+    },
+  });
+}
+
+/**
+ * Admin cancels any order. A reason is mandatory. On success the refund queue
+ * (if the order had a pending refund) and any other cached admin listings are
+ * invalidated.
+ */
+export function useAdminCancelOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (variables: { orderId: number; reason: string }) =>
+      adminCancelOrder(variables.orderId, variables.reason),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.refunds.all });
+      void queryClient.invalidateQueries({ queryKey: adminKeys.all });
+    },
+  });
 }

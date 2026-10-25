@@ -4,25 +4,39 @@
  * Full read-only detail of one of the customer's own orders: a status
  * stepper plus the chronological timeline, the payment method and status,
  * the address snapshot and delivery slot, the item snapshots and the fee
- * breakdown. Nothing here changes status — every transition goes through
- * the backend state machine.
+ * breakdown. Phase 8 adds cancellation: a customer may cancel a `PLACED` or
+ * `CONFIRMED` order, and the refund state (`REFUND_PENDING` / `REFUNDED`) is
+ * shown when the payment has been marked for refund. Every transition still
+ * goes through the backend state machine.
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useOrder } from "@/features/customer/orders/queries";
+import { useCancelOrder, useOrder } from "@/features/customer/orders/queries";
 import { usePolling } from "@/hooks/usePolling";
 import type { CustomerOrderResponse } from "@/features/customer/orders/types";
-import { isTerminalStatus, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/features/customer/orders/types";
+import {
+  isTerminalStatus,
+  ORDER_STATUS_LABELS,
+  PAYMENT_STATUS_LABELS,
+} from "@/features/customer/orders/types";
 import { OrderStatusStepper } from "@/features/customer/orders/components/OrderStatusStepper";
+import { CancelOrderDialog } from "@/features/customer/orders/components/CancelOrderDialog";
 import { formatMoney } from "@/features/vendor/format";
 import { formatDateTime } from "@/features/vendor/format";
 import { CustomerErrorState } from "@/features/customer/components/CustomerErrorState";
 import { PageHeading } from "@/features/vendor/components/StatCard";
 import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
+import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
 
 /** The amounts a customer agreed to pay at checkout are tax-inclusive (D-3). */
 const TAX_INCLUSIVE = " (incl. taxes)";
+
+/** Statuses the customer is allowed to cancel (section 6.1 matrix). */
+const CUSTOMER_CANCELLABLE_STATUSES: CustomerOrderResponse["status"][] = [
+  "PLACED",
+  "CONFIRMED",
+];
 
 function paymentStatusTone(status: CustomerOrderResponse["paymentStatus"]): string {
   switch (status) {
@@ -44,6 +58,7 @@ export function OrderDetailPage() {
   const navigate = useNavigate();
   const { orderId } = useParams();
   const id = orderId ? Number(orderId) : NaN;
+  const [cancelError, setCancelError] = useState<ApiErrorInfo | null>(null);
 
   const {
     data: order,
@@ -52,15 +67,34 @@ export function OrderDetailPage() {
     refetch: refetchOrder,
   } = useOrder(id);
 
+  const cancelOrder = useCancelOrder();
+
   // Refetch while the tab is visible, but stop once the order is terminal — a
   // delivered/cancelled/rejected order never changes again.
   usePolling(refetchOrder, {
     enabled: order != null && !isTerminalStatus(order.status),
   });
 
+  const canCancel =
+    order != null &&
+    CUSTOMER_CANCELLABLE_STATUSES.includes(order.status as CustomerOrderResponse["status"]);
+
   const onBack = useCallback(() => {
     navigate("/orders");
   }, [navigate]);
+
+  const [cancelTarget, setCancelTarget] = useState<boolean>(false);
+
+  const confirmCancel = async (reason?: string) => {
+    setCancelError(null);
+    if (!order) return;
+    try {
+      await cancelOrder.mutateAsync({ orderId: order.id, reason });
+      setCancelTarget(false);
+    } catch (mutationError) {
+      setCancelError(toApiError(mutationError));
+    }
+  };
 
   if (error) {
     return (
@@ -88,6 +122,8 @@ export function OrderDetailPage() {
     );
   }
 
+  const isCancelling = cancelOrder.isPending;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap justify-between items-end gap-4">
@@ -100,10 +136,59 @@ export function OrderDetailPage() {
         </Link>
       </div>
 
+      {/* Refund state banner */}
+      {order.paymentStatus === "REFUND_PENDING" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Refund pending</p>
+          <p className="mt-1 text-xs text-amber-800">
+            This order has been cancelled and a refund has been requested. An
+            administrator will mark the refund complete.
+          </p>
+        </div>
+      )}
+      {order.paymentStatus === "REFUNDED" && order.refundedAt && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+          <p className="font-semibold">Refunded</p>
+          <p className="mt-1 text-xs text-slate-600">
+            Refunded on {new Date(order.refundedAt).toLocaleDateString(undefined, {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}.
+          </p>
+        </div>
+      )}
+
       {/* Status stepper */}
       <Card title="Order status">
         <OrderStatusStepper status={order.status} heading="Status" />
       </Card>
+
+      {/* Cancel action */}
+      {canCancel && !isTerminalStatus(order.status) && (
+        <Card title="Cancel order">
+          <p className="text-sm text-slate-700 mb-4">
+            Canceling this order releases any reserved stock. A reason is
+            optional and is stored on the order's status timeline.
+          </p>
+          <button
+            type="button"
+            disabled={isCancelling}
+            onClick={() => {
+              setCancelError(null);
+              setCancelTarget(true);
+            }}
+            className={`rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+          >
+            {isCancelling ? "Canceling…" : "Cancel order"}
+          </button>
+          {cancelError && (
+            <p className="mt-3 text-sm text-red-800 bg-red-50 rounded-lg p-2 border border-red-100">
+              {cancelError.message}
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Payment */}
       <Card title="Payment">
@@ -250,6 +335,20 @@ export function OrderDetailPage() {
           </ul>
         )}
       </Card>
+
+      {cancelTarget && (
+        <CancelOrderDialog
+          orderName={`Order #${order.id}`}
+          open={cancelTarget}
+          isSubmitting={isCancelling}
+          error={cancelError}
+          onConfirm={confirmCancel}
+          onCancel={() => {
+            setCancelTarget(false);
+            setCancelError(null);
+          }}
+        />
+      )}
 
       <div className="mt-6 flex justify-end">
         <button

@@ -2391,3 +2391,227 @@ Online orders sit in `PENDING_PAYMENT` while the customer completes payment thro
 - Full backend unit suite: 1159 tests, 0 failures (2 new unit tests from `PaymentExpiryServiceTest`).
 
 
+## D-52: Single cancellation endpoint for CUSTOMER, VENDOR, and ADMIN (Phase 8 Stage 1)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 1 (tasks 8.1, 8.2)
+
+### Context
+
+Plan task 8.2 specifies a single cancellation endpoint `POST /api/v1/orders/{id}/cancel` with a reason. Section 6.1 allows CUSTOMER, VENDOR, and ADMIN to cancel orders in different states, with different target statuses (CANCELLED or REJECTED) and different reason requirements. The existing `SecurityConfig` restricts `/api/v1/orders/**` to CUSTOMER only, but the cancellation endpoint must be reachable by all three roles.
+
+### Decision
+
+- **Single endpoint `POST /api/v1/orders/{id}/cancel` for all three roles.** A specific matcher in `SecurityConfig` permits CUSTOMER, FLORIST, and ADMIN on `POST /api/v1/orders/{orderId}/cancel`, placed before the broad `/api/v1/orders/**` → CUSTOMER rule. The `CancellationService` derives the actor type from the authentication authorities and enforces ownership: CUSTOMER on their own order, VENDOR on their own order (including suspended vendors per D-6), ADMIN on any order.
+
+- **`CancellationService` as orchestrator.** Validates actor, ownership, current state, and reason requirements, then delegates the status change to `OrderStateMachine`. It does not write order status, payment status, or stock directly. Payment status updates go through `PaymentService.markRefundPending`.
+
+- **Target status resolution follows section 6.1 exactly:**
+  - VENDOR on PLACED → REJECTED (reason required)
+  - CUSTOMER/ADMIN on PLACED → CANCELLED (reason optional for CUSTOMER, required for ADMIN)
+  - CUSTOMER/VENDOR/ADMIN on CONFIRMED → CANCELLED (reason required for VENDOR/ADMIN)
+  - VENDOR/ADMIN on PREPARING → CANCELLED (reason required)
+  - ADMIN on OUT_FOR_DELIVERY → CANCELLED (reason required)
+  - Terminal states (DELIVERED, CANCELLED, REJECTED) admit no transition (409).
+
+- **Payment effects:** Paid online orders (paymentMethod=ONLINE, paymentStatus=PAID) become REFUND_PENDING via `PaymentService.markRefundPending`; COD before delivery leaves payment PENDING (Option B, per D-47). No money moves for COD cancellations before delivery.
+
+- **Stock effects** delegated to `OrderStateMachine` → `InventoryService` per section 6.2: RELEASE before acceptance, RESTOCK after acceptance but before PREPARING, NONE from PREPARING onward.
+
+- **`OrderCancelled` event** published after commit with actor, reason, previous status. Slot capacity freed automatically via existing `countBookedOrdersForSlot` query (CANCELLED/REJECTED excluded from PLACED/CONFIRMED/PENDING_PAYMENT count).
+
+- **Suspended vendors** may cancel in-flight orders (D-6 honored).
+
+### Consequences
+
+- No separate vendor/admin cancellation URLs; single endpoint with role-based ownership enforcement.
+- `CancellationService` in `com.flowerconnect.order.service` (alongside `OrderStateMachine`), not a separate `dispute` package — cancellations are order transitions, not disputes.
+- Integration test covers full status × actor matrix, reason validation, exact stock quantities/movements, cancel-vs-accept race, duplicate cancellation, paid-online REFUND_PENDING, COD Option B, slot capacity, suspended vendor, RBAC (401, 403 foreign, 404, 200).
+
+
+## D-53: CancellationService in order.service package (not dispute package)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 1
+
+### Context
+
+The plan's package layout (section 3) places `CancellationService` in a `dispute` package alongside `DisputeService`. However, cancellations are order state transitions governed by the section 6.1 state machine, not disputes. Disputes (Phase 8 task 8.4) are post-delivery customer complaints with admin resolution.
+
+### Decision
+
+Place `CancellationService` in `com.flowerconnect.order.service` alongside `OrderStateMachine`. This follows the architectural principle that order state transitions live in the order domain. The `dispute` package will be created later for the dispute workflow (customer raises, vendor responds, admin resolves).
+
+### Consequences
+
+- Clean separation: `order.service` owns order lifecycle; future `dispute.service` will own dispute lifecycle.
+- No premature package creation; `dispute` package added when disputes are implemented (Stage 2+).
+
+
+## D-54: PaymentService.markRefundPending for paid-online cancellations
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 1
+
+### Context
+
+Plan 8.3: "Paid online orders: REFUND_PENDING → REFUNDED (admin marks in v1...). COD orders cancelled before delivery: no money has moved." Section 6.1 says "refund if already paid" for PLACED → REJECTED/CANCELLED. The state machine does not modify payment status; `PaymentService` is the sole writer of payment status (D-47).
+
+### Decision
+
+Add `PaymentService.markRefundPending(Long orderId)` that transitions both `payments.status` and `orders.payment_status` from PAID to REFUND_PENDING in one transaction. Called by `CancellationService` after `OrderStateMachine.transition` when cancelling a paid online order. Idempotent: if already REFUND_PENDING or REFUNDED, throws 409 CONFLICT.
+
+### Consequences
+
+- Refund state managed by `PaymentService` (sole writer of payment status per D-47).
+- Admin refund queue (Stage 2) will use this to mark REFUNDED.
+- No money moved in v1; admin manually processes refund or gateway refund if 7.4 exists.
+
+
+## D-55: Admin refund queue and mark-refunded endpoint (Phase 8 Stage 2, task 8.3)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 2
+
+### Context
+
+Plan 8.3 requires an admin-only refund queue listing REFUND_PENDING payments and an endpoint to mark a refund complete. Section 6.1 says "refund if already paid" for cancellations/refunds. PaymentService is the sole writer of payment status (D-47, D-54). The admin needs to review pending refunds and mark them as completed, with audit trail.
+
+### Decision
+
+- **GET /api/v1/admin/refunds** -- paginated refund queue listing payments with payment_status = REFUND_PENDING. Supports optional vendorId, fromDate, toDate filters. Returns only fields needed to review: orderId, vendorName, paymentMethod, paymentStatus, orderStatus, amount, createdAt, customerEmail. No internal or unrelated customer data exposed. /api/v1/admin/refunds/** mapped to hasRole("ADMIN") in SecurityConfig, placed before the broad /api/v1/admin/** rule.
+
+- **POST /api/v1/admin/refunds/{orderId}/mark** -- marks a REFUND_PENDING payment as REFUNDED. Requires a non-blank, length-limited (<= 500 chars) referenceNote in the request body. Returns RefundMarkedResponse with orderId, paymentStatus, refundedAt, referenceNote.
+
+- **PaymentService.markRefunded(Long orderId, String adminEmail, String referenceNote)** is the sole writer of payment status for refunds. Validates:
+  - Reference note non-blank and <= 500 chars (400 otherwise).
+  - Order exists (404 otherwise), payment exists (404 otherwise).
+  - Only REFUND_PENDING can be marked refunded; any other state returns 409 CONFLICT.
+  - Already REFUNDED returns the current result idempotently (no duplicate refundedAt update).
+  - Transitions both payments.status and orders.payment_status to REFUNDED in one transaction.
+  - Stamps refundedAt from the injected Clock.
+  - Writes one audit_log row: actor, action PAYMENT_REFUNDED, entity type PAYMENT, entity id (payment id), reason with before/after values and reference note.
+
+- **Customer order detail** exposes refundedAt and paymentStatus from payment data via CustomerOrderResponse. Internal fields (commission, etc.) not exposed.
+
+- **refundedAt column** added to payments table via additive migration V21__add_refunded_at_to_payments.sql. No commission, ledger, settlement, or dispute logic in this stage.
+
+### Consequences
+
+- Refund state is consistent between payments and orders because PaymentService updates both in one transaction.
+- Idempotent mark-refunded prevents duplicate processing; already-refunded payments return current state.
+- Audit trail records who marked what refund and when, with before/after status.
+- Customer can see refund state and timestamp on their order detail page.
+- No money is moved in v1; admin manually processes the refund externally.
+- Disputes, dispute UI, ledger entries, and settlement logic belong to later Phase 8 stages.
+
+
+## D-56: Cancellation UI patterns (Phase 8 Stage 3, task 8.6)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 3
+
+### Context
+
+Stage 1 and Stage 2 of Phase 8 implemented the backend cancellation endpoint (`POST /api/v1/orders/{id}/cancel` for CUSTOMER/VENDOR/ADMIN), the admin refund queue (`GET /api/v1/admin/refunds`), and the mark-refunded endpoint (`POST /api/v1/admin/refunds/{orderId}/mark`). Stage 3 adds the frontend UI for these features across three screens: customer order detail, vendor order board, and admin refunds page.
+
+Three things needed settling:
+
+**Why a customer's reason is optional but a vendor's and admin's are required.** The backend state machine enforces this: CUSTOMER cancellation of PLACED/CONFIRMED does not require a reason, while VENDOR cancellation of CONFIRMED/PREPARING and ADMIN cancellation of any non-terminal state does. The frontend mirrors the backend rather than duplicating the rule � each dialog's `requiresReason` flag drives both the rendered reason box and the zod resolver, so they cannot disagree (following D-30's precedent).
+
+**Conditional dialog rendering to avoid framer-motion role conflicts.** Both `RejectReasonDialog` and `CancelReasonDialog` use `motion.div` with `animate={open ? "visible" : "hidden"}`. When always rendered (even with `open={false}`), testing-library's `findByRole("dialog")` cannot reliably resolve which dialog matches, causing flaky timeouts. Dialogs are therefore conditionally rendered (`{cancelTarget && <CancelReasonDialog ... />}`) so only the open dialog exists in the DOM.
+
+**Dialog state reset on unmount.** When a dialog unmounts (cancel target set to null), its internal reason state resets to empty. This is intentional � each dialog instance starts fresh, so a vendor who opens cancel, types a reason, cancels, then reopens sees an empty reason field rather than stale text.
+
+### Decision
+
+- **Customer cancel (OrderDetailPage):** Cancel button shows for PLACED/CONFIRMED orders. Reason is optional (sent as `null` when blank). Refund status banner shows `REFUND_PENDING`/`REFUNDED` with `refundedAt` date when applicable.
+- **Vendor cancel (OrderCard + VendorOrderBoardPage):** Cancel button shows for CONFIRMED/PREPARING orders. Reason is required. Double-click protection via `isPending` from `useVendorOrderAction`. 409 insufficient-stock errors surface a "reject instead" prompt.
+- **Admin cancel (AdminOrderLookupPage):** Admin can cancel any non-terminal order. Reason is required.
+- **Admin refund queue (AdminRefundsPage):** Paginated listing of `REFUND_PENDING` payments with optional vendor/date filters. Mark-refunded dialog requires a non-blank reference note (<= 500 chars). Idempotent: already-REFUNDED returns current state.
+- **Dialogs render conditionally** based on their open state to avoid framer-motion role resolution conflicts with testing-library.
+- **No disputes UI yet** � deferred to Phase 8 Stage 4+ per plan.
+
+### Consequences
+
+- The cancellation matrix is enforced by the backend; the frontend only offers the buttons the backend allows for each status/role combination.
+- Conditional dialog rendering means `findByRole("dialog")` reliably finds the open dialog.
+- Disputes (customer raises, vendor responds, admin resolves) are deliberately out of scope for Stage 3.
+
+
+## D-57: Disputes backend (Phase 8 Stage 4, task 8.4)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 4
+
+### Context
+
+Phase 8 Stage 4 implements the disputes backend (plan task 8.4): customers raise disputes for delivered orders within a configurable window; vendors respond once; admins queue and review. Resolution (Stage 5) and UI (Stage 6) are deferred.
+
+Key questions:
+- **Dispute window**: Measured from the order's entry into `DELIVERED` (per `order_status_history`), not `orders.updated_at`, so a delayed delivery scan doesn't shrink the window. The window (default 7 days) lives in `platform_config` and is read at runtime.
+- **One dispute per order ever**: Enforced by `uq_disputes_order` unique constraint on `order_id` at the database level. The service checks first for a clean 409; the constraint backstops concurrent races.
+- **Vendor response**: One response per dispute, moving `OPEN` ? `UNDER_REVIEW`. A suspended vendor may still respond (D-6).
+- **Reason codes**: Fixed vocabulary (`ITEM_NOT_AS_DESCRIBED`, `ITEM_DAMAGED`, `ITEM_MISSING`, `WRONG_ITEM_DELIVERED`, `QUALITY_COMPLAINT`, `LATE_DELIVERY`, `OTHER`) so the admin queue can be filtered/grouped. The list is in the service, not a DB CHECK, because it may evolve before resolution work.
+- **RBAC**: Customers see only their own disputes; vendors see only disputes on their orders; admins see the full queue with status/date filters. Missing ? 404, foreign ? 403.
+- **Event**: `DisputeOpened` published after commit (scalar-only payload).
+
+### Decision
+
+- **Migration V22** creates `disputes` table with `UNIQUE(order_id)`, `status` ENUM (`OPEN`, `UNDER_REVIEW`, `RESOLVED_REFUND`, `RESOLVED_PARTIAL`, `RESOLVED_REJECTED`), and seeds `platform_config.dispute_window_days = 7`.
+- **Service** reads window from `platform_config`; falls back to 7 if missing. Window measured from `order_status_history` row where `to_status = DELIVERED`, using injected `Clock`.
+- **Customer endpoints** (`/api/v1/disputes`): `POST /orders/{orderId}` to raise (validates reason code, description ?2000), `GET` list, `GET /{disputeId}` detail. All CUSTOMER-only, owner-only.
+- **Vendor endpoints** (`/api/v1/vendor/disputes`): `GET` list (disputes on vendor's orders), `GET /{disputeId}` detail, `POST /{disputeId}/respond` (required response ?500 chars, moves `OPEN` ? `UNDER_REVIEW`). All FLORIST-only, owner-only. Suspended vendor may respond.
+- **Admin endpoints** (`/api/v1/admin/disputes`): `GET` queue with optional `status`, `from`, `to` filters; `GET /{disputeId}` detail (full record). ADMIN-only. Resolution endpoint returns 501 (Stage 5).
+- **Event** `DisputeOpened` published after commit with scalar payload (`disputeId`, `orderId`, `customerId`, `reasonCode`, `status`, `createdAt`).
+- **SecurityConfig** adds `/api/v1/disputes/**` ? CUSTOMER, `/api/v1/vendor/disputes/**` ? FLORIST, `/api/v1/admin/disputes/**` ? ADMIN.
+- **OrderStatusHistoryRepository** gains `findFirstByOrderIdAndToStatusOrderByCreatedAtDesc` for window measurement.
+
+### Consequences
+
+- Concurrency-safe: DB unique constraint + service-level check prevent duplicate disputes even under concurrent raise attempts (tested with 8 threads).
+- Window measurement uses `DELIVERED` history entry, not `orders.updated_at`, so delayed scans don't shrink the customer's window.
+- Fixed reason-code list in the service (not DB CHECK) allows evolution before Stage 5 resolution.
+- Suspended vendors may respond to in-flight disputes (D-6 honored).
+- Resolution, UI, and notifications are Stage 5+; `POST /admin/disputes/{id}/resolve` returns 501.
+
+
+## D-58: Dispute resolution (Phase 8 Stage 5, task 8.5)
+
+**Status:** Accepted
+**Date:** Phase 8 Stage 5
+
+### Context
+
+Phase 8 Stage 5 implements dispute resolution (plan task 8.5): admins resolve OPEN or UNDER_REVIEW disputes to RESOLVED_REFUND, RESOLVED_PARTIAL, or RESOLVED_REJECTED. Key questions:
+
+- **Refund amount representation**: The Payment entity previously had no field for the actual refund amount, so marking a payment REFUNDED for a partial refund would lose information about how much was actually refunded. A `refunded_amount` column (V24) was added to `payments` to record the actual refunded amount for both full and partial refunds.
+- **Partial refund through PaymentService**: `PaymentService.markRefundedWithAmount` was added to handle partial refunds, accepting a `refundAmount` parameter that must be > 0 and <= payment amount, rounded HALF_UP to 2 decimals (INR). Full refunds default to the payment amount when `refundAmount` is null.
+- **RESOLVED_REJECTED has no payment effect**: PaymentService is not called for rejected disputes; payment status is unchanged.
+- **COD orders**: Payment status remains COLLECTED; the refund obligation is recorded on the dispute via `refund_amount` for out-of-band handling (Phase 10 settlement).
+- **Order status preserved**: `order.status` remains DELIVERED; resolution never changes order state or stock.
+- **Concurrency**: Dispute row is locked with `PESSIMISTIC_WRITE` before checking state, ensuring exactly one winner on concurrent resolution attempts.
+- **Audit**: `DISPUTE_RESOLVED` audit row written with actor, action, timestamp, before/after resolution values.
+- **Event**: Scalar-only `DisputeResolved` Spring event published after commit with Phase 10 hook data (dispute/order/vendor IDs, outcome, refund amount, payment method, resolver ID, occurrence timestamp).
+
+### Decision
+
+- **Migration V23** adds `refund_amount DECIMAL(10,2) NULL` to `disputes`.
+- **Migration V24** adds `refunded_amount DECIMAL(10,2) NULL` to `payments`.
+- **`Dispute` entity** gains `refundAmount` field mapped to `refund_amount`.
+- **`ResolveDisputeRequest` DTO** gains `refundAmount` field with `@DecimalMin("0.01")` validation.
+- **`DisputeService.resolveDispute`** locks the dispute row via `findByIdForUpdate`, validates status is OPEN/UNDER_REVIEW, validates refund amount rules per outcome, coordinates with `PaymentService` for online refunds, writes audit log, and publishes `DisputeResolved` event after commit.
+- **`AdminDisputeController.resolveDispute`** replaces the 501 stub with the real ADMIN-only endpoint at `POST /api/v1/admin/disputes/{disputeId}/resolve`.
+- **`PaymentService.markRefundedWithAmount`** handles partial and full refunds, idempotent when already REFUNDED with matching amount.
+- **`Payment.markRefunded`** now delegates to `markRefundedWithAmount` with null amount (defaults to full payment amount).
+
+### Consequences
+
+- Online full/partial refunds go through PaymentService, never direct payment field writes.
+- COD payment status stays COLLECTED; refund obligation recorded on dispute for out-of-band handling.
+- Rejected disputes have no payment or stock effect.
+- Order status (DELIVERED) and stock are never changed by dispute resolution.
+- No Phase 10 ledger entries created in this stage.
+- 11 new integration tests cover all resolution outcomes, partial amount bounds/rounding, final-state behavior, concurrent resolution, audit contents, event payload, online vs COD payment effects, unchanged order status, and ADMIN-only RBAC.
+
+

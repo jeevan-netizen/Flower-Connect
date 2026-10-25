@@ -1,6 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchOrder, fetchOrders } from "@/features/customer/orders/api";
-import type { CustomerOrderPageResponse, CustomerOrderResponse } from "@/features/customer/orders/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { cancelOrder, fetchOrder, fetchOrders } from "@/features/customer/orders/api";
+import type {
+  CancelOrderResponse,
+  CustomerOrderPageResponse,
+  CustomerOrderResponse,
+} from "@/features/customer/orders/types";
 
 /**
  * Query keys for the customer's orders (plan Phase 6, task 6.3).
@@ -35,5 +39,25 @@ export function useOrder(orderId: number | null) {
     queryKey: customerOrderKeys.detail(orderId ?? 0),
     queryFn: ({ signal }) => fetchOrder(orderId as number, signal),
     enabled: orderId !== null,
+  });
+}
+
+/**
+ * Cancels the caller's own order. On success the whole order listing and the
+ * detail are invalidated so the cancelled order leaves the history and its
+ * detail reflects the new status.
+ */
+export function useCancelOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (variables: { orderId: number; reason?: string }) =>
+      cancelOrder(variables.orderId, variables.reason),
+    onSuccess: (_data: CancelOrderResponse, variables) => {
+      void queryClient.invalidateQueries({ queryKey: customerOrderKeys.all });
+      void queryClient.invalidateQueries({
+        queryKey: customerOrderKeys.detail(variables.orderId),
+      });
+    },
   });
 }

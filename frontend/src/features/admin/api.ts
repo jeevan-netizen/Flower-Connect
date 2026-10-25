@@ -9,6 +9,10 @@ import type {
   VendorAdminReasonRequest,
   VendorListFilters,
   VendorProfilePageResponse,
+  MarkRefundRequest,
+  RefundMarkedResponse,
+  RefundQueuePageResponse,
+  RefundQueueFilters,
 } from "@/features/admin/types";
 import { ADMIN_PAGE_SIZE } from "@/features/admin/types";
 
@@ -18,11 +22,6 @@ import { ADMIN_PAGE_SIZE } from "@/features/admin/types";
  * Every call here sits under `/api/v1/admin/**`, which `SecurityConfig` matches
  * with `hasRole("ADMIN")`. That backend check is the authorization authority; the
  * frontend `ProtectedRoute roles={["ADMIN"]}` is routing UX only.
- *
- * The two listings send only the filters the controllers declare. A `null` filter
- * is omitted entirely rather than sent as an empty string, because
- * `AdminUserController` binds `status` to the `User.Status` enum — an empty
- * string would fail to convert and produce a 400 instead of "no filter".
  */
 
 /* -------------------------------------------------------------------------- */
@@ -136,5 +135,74 @@ export async function updateUserStatus(
   payload: UserStatusUpdateRequest,
 ): Promise<AdminUser> {
   const response = await api.patch<AdminUser>(`/admin/users/${userId}/status`, payload);
+  return response.data;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Refund queue (plan Phase 8, task 8.3)                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `GET /api/v1/admin/refunds` — paginated page of `REFUND_PENDING` payments,
+ * optionally narrowed to one vendor and/or a date range.
+ *
+ * The backend clamps `size` to `1..100` and defaults `page` to `0`; the caller
+ * always sends an explicit size so the page controls know what they asked for.
+ * Null filters are omitted entirely rather than sent as empty strings.
+ */
+export async function fetchRefundQueue(
+  filters: RefundQueueFilters,
+): Promise<RefundQueuePageResponse> {
+  const params: Record<string, string> = {
+    page: String(filters.page),
+    size: String(ADMIN_PAGE_SIZE),
+  };
+  if (filters.status) {
+    params.status = filters.status;
+  }
+  if (filters.vendorId) {
+    params.vendorId = String(filters.vendorId);
+  }
+  if (filters.fromDate) {
+    params.fromDate = filters.fromDate;
+  }
+  if (filters.toDate) {
+    params.toDate = filters.toDate;
+  }
+
+  const response = await api.get<RefundQueuePageResponse>("/admin/refunds", { params });
+  return response.data;
+}
+
+/**
+ * `POST /api/v1/admin/refunds/{orderId}/mark` — marks a `REFUND_PENDING`
+ * payment as `REFUNDED`. Requires a non-blank reference note of at most 500
+ * characters.
+ */
+export async function markRefunded(
+  orderId: number,
+  payload: MarkRefundRequest,
+): Promise<RefundMarkedResponse> {
+  const response = await api.post<RefundMarkedResponse>(
+    `/admin/refunds/${orderId}/mark`,
+    payload,
+  );
+  return response.data;
+}
+
+/**
+ * `POST /api/v1/orders/{orderId}/cancel` — admin cancels any order.
+ * A reason is mandatory for an admin cancellation.
+ */
+export async function adminCancelOrder(
+  orderId: number,
+  reason: string,
+): Promise<{ id: number; status: string; paymentStatus: string; refundPending: boolean }> {
+  const response = await api.post<{
+    id: number;
+    status: string;
+    paymentStatus: string;
+    refundPending: boolean;
+  }>(`/orders/${orderId}/cancel`, { reason });
   return response.data;
 }
