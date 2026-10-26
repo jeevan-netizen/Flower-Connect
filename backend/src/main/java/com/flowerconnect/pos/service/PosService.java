@@ -220,7 +220,11 @@ public class PosService {
     @Transactional(readOnly = true)
     public PosSummaryResponse getSummary(String vendorEmail, LocalDate date) {
         VendorProfile vendor = requireVendor(vendorEmail);
-        ZoneId zoneId = ZoneId.of(vendor.getServiceLocation().getTimezone());
+        ZoneId zoneId = resolveZoneId(vendor);
+
+        if (date == null) {
+            date = LocalDate.now(clock.withZone(zoneId));
+        }
 
         ZonedDateTime startLocal = date.atStartOfDay(zoneId);
         ZonedDateTime endLocal = startLocal.plusDays(1);

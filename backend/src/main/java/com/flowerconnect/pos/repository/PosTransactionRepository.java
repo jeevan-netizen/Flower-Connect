@@ -19,6 +19,8 @@ public interface PosTransactionRepository extends JpaRepository<PosTransaction, 
 
     Optional<PosTransaction> findByVendorIdAndIdempotencyKey(Long vendorId, String idempotencyKey);
 
+    long countByVendorId(Long vendorId);
+
     /**
      * One page of a vendor's own sales, newest first. Used by the sale listing
      * and daily/weekly reports.

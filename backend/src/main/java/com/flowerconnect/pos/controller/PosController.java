@@ -121,8 +121,7 @@ public class PosController {
             @Parameter(description = "Local date (ISO-8601); defaults to today")
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        LocalDate localDate = date != null ? date : java.time.LocalDate.now(java.time.Clock.systemUTC());
-        PosSummaryResponse response = posService.getSummary(authentication.getName(), localDate);
+        PosSummaryResponse response = posService.getSummary(authentication.getName(), date);
         return ResponseEntity.ok(response);
     }
 

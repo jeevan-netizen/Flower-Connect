@@ -116,7 +116,7 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("VENDOR_NOT_APPROVED"));
 
-        assertEquals(0L, posTransactionRepository.count());
+        assertEquals(0L, transactionsOf(vendor.profileId));
     }
 
     @Test
@@ -132,7 +132,7 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("VENDOR_NOT_APPROVED"));
 
-        assertEquals(0L, posTransactionRepository.count());
+        assertEquals(0L, transactionsOf(vendor.profileId));
     }
 
     @Test
@@ -248,8 +248,8 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
 
         assertEquals(7L, quantityOf(productId));
         assertEquals(1L, movementsOf(productId, MovementType.SALE_POS));
-        assertEquals(1L, posTransactionRepository.count());
-        assertEquals(1L, posItemRepository.count());
+        assertEquals(1L, transactionsOf(vendor.profileId));
+        assertEquals(1L, itemsOf(vendor.profileId));
     }
 
     @Test
@@ -290,12 +290,14 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("INSUFFICIENT_STOCK"));
 
-        assertEquals(0L, posTransactionRepository.count());
-        assertEquals(0L, posItemRepository.count());
+        assertEquals(0L, transactionsOf(vendor.profileId));
+        assertEquals(0L, itemsOf(vendor.profileId));
         assertEquals(10L, quantityOf(abundant));
         assertEquals(1L, quantityOf(scarce));
-        assertEquals(0L, movementsOf(abundant));
-        assertEquals(0L, movementsOf(scarce));
+        assertEquals(1L, movementsOf(abundant));
+        assertEquals(0L, movementsOf(abundant, MovementType.SALE_POS));
+        assertEquals(1L, movementsOf(scarce));
+        assertEquals(0L, movementsOf(scarce, MovementType.SALE_POS));
     }
 
     // ------------------------------------------------------------------
@@ -319,7 +321,8 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
 
         assertEquals(10L, quantityOf(productId));
         assertEquals(9L, reservedQuantityOf(productId));
-        assertEquals(0L, movementsOf(productId));
+        assertEquals(1L, movementsOf(productId));
+        assertEquals(0L, movementsOf(productId, MovementType.SALE_POS));
     }
 
     // ------------------------------------------------------------------
@@ -355,7 +358,8 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
 
         assertEquals(firstId, replayId, "replay must return the same transaction");
         assertEquals(8L, quantityOf(productId), "deduction happened once");
-        assertEquals(1L, posTransactionRepository.count());
+        assertEquals(1L, transactionsOf(vendor.profileId));
+        assertEquals(1L, itemsOf(vendor.profileId));
         assertEquals(1L, movementsOf(productId, MovementType.SALE_POS));
     }
 
@@ -380,6 +384,11 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
                         .content(body(productId, 2, "CARD")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CONFLICT"));
+
+        assertEquals(9L, quantityOf(productId));
+        assertEquals(1L, transactionsOf(vendor.profileId));
+        assertEquals(1L, itemsOf(vendor.profileId));
+        assertEquals(1L, movementsOf(productId, MovementType.SALE_POS));
     }
 
     @Test
@@ -413,9 +422,11 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
         latch.await(60, java.util.concurrent.TimeUnit.SECONDS);
         pool.shutdown();
 
-        assertEquals(1L, posTransactionRepository.count(),
+        assertEquals(1L, transactionsOf(vendor.profileId),
                 "exactly one sale may be created for the same key and body");
+        assertEquals(1L, itemsOf(vendor.profileId));
         assertEquals(9L, quantityOf(productId));
+        assertEquals(1L, movementsOf(productId, MovementType.SALE_POS));
     }
 
     // ------------------------------------------------------------------
@@ -469,7 +480,8 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
         assertEquals(ordersBefore, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM orders", Long.class));
         assertEquals(paymentsBefore, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM payments", Long.class));
         assertEquals(orderItemsBefore, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM order_items", Long.class));
-        assertEquals(1L, posTransactionRepository.count());
+        assertEquals(1L, transactionsOf(vendor.profileId));
+        assertEquals(1L, itemsOf(vendor.profileId));
     }
 
     // ------------------------------------------------------------------
@@ -522,6 +534,17 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
         return stockMovementRepository.countByProductIdAndMovementType(productId, type);
     }
 
+    private long transactionsOf(Long vendorId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pos_transactions WHERE vendor_id = ?", Long.class, vendorId);
+    }
+
+    private long itemsOf(Long vendorId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pos_items i JOIN pos_transactions t ON i.transaction_id = t.id WHERE t.vendor_id = ?",
+                Long.class, vendorId);
+    }
+
     private Vendor registerVendor(VendorProfile.Status target) throws Exception {
         String email = uniqueEmail();
         mockMvc.perform(post("/api/v1/vendors/register")
@@ -553,6 +576,7 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
                         .categoryId(rosesCategoryId)
                         .description("Integration probe")
                         .basePrice(new BigDecimal("299.00"))
+                        .status(ProductStatus.ACTIVE)
                         .build())
                 .getId();
     }
@@ -587,7 +611,9 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
 
     private org.springframework.test.web.servlet.ResultActions adminAction(Long profileId, String action) throws Exception {
         return mockMvc.perform(post("/api/v1/admin/vendors/" + profileId + "/" + action)
-                        .header("Authorization", bearer(adminToken())));
+                        .header("Authorization", bearer(adminToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("reason", "test " + action))));
     }
 
     private String tokenFor(User user) throws Exception {
