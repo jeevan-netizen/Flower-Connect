@@ -120,7 +120,7 @@ class CartOrderSchemaIT extends AbstractIntegrationTest {
         assertEquals("decimal(10,2)", columnType("orders", "delivery_fee"));
         assertEquals("decimal(10,2)", columnType("orders", "platform_fee"));
         assertEquals("decimal(10,2)", columnType("orders", "total"));
-        assertEquals("decimal(5,4)", columnType("orders", "commission_rate"));
+        assertEquals("decimal(5,2)", columnType("orders", "commission_rate"));
         assertEquals("decimal(10,8)", columnType("orders", "delivery_latitude"));
         assertEquals("decimal(11,8)", columnType("orders", "delivery_longitude"));
         assertEquals("varchar(36)", columnType("orders", "client_order_id"));

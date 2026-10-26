@@ -1098,6 +1098,23 @@ ew_value (VARCHAR(500) NULL) to udit_log, and seeded commission_rate_default = 
   - Frontend tests: `api.test.ts` (11/11), `AdminBillingPage.test.tsx` (7/7), `router.test.tsx` (44/44) — all passed.
   - Frontend typecheck (`npm run typecheck`), lint (`npm run lint`), and production build (`npm run build`) all passed cleanly.
 
+### Stage 10.T (Integration, Verification, and Phase 10 Sign-off) - COMPLETE (2026-10-26)
+
+- **Test Suite Updates & Alignment:**
+  - `CartOrderSchemaIT`: updated `orders.commission_rate` column type expectation from `decimal(5,4)` to `decimal(5,2)` reflecting Phase 10 percentage rate migration `V26`.
+  - `VendorProfileSchemaIT`: updated `vendor_profiles.commission_rate` column type expectation from `decimal(5,4)` to `decimal(5,2)`.
+  - `VendorProfileRepositoryIT`: updated money scale test for `commission_rate` to persist percentage (`12.50`) matching `DECIMAL(5,2)` precision.
+- **Verification Results:**
+  - Backend Unit Tests: **1,322 passed, 0 failed, 0 errors** (`.\mvnw.cmd test`).
+  - Backend Integration Tests: **42 passed, 0 failed, 0 errors** (`.\mvnw.cmd failsafe:integration-test failsafe:verify`).
+  - Frontend Unit/Component Tests: **853 passed across 81 files, 0 failed** (`npm test`).
+  - Frontend Static Checks:
+    - Typecheck (`npm run typecheck`): passed with 0 errors.
+    - Lint (`npm run lint`): passed with 0 warnings/errors.
+    - Production Build (`npm run build`): passed cleanly (dist bundle output generated in 24s).
+- **All Phase 10 Tasks (10.1–10.7 + 10.T) fully complete and verified on branch `phase-10-billing-ledger`.**
+
+
 
 
 

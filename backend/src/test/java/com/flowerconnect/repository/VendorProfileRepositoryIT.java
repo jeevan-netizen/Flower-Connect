@@ -61,7 +61,7 @@ class VendorProfileRepositoryIT extends AbstractIntegrationTest {
         profile.setPerKmFee(new BigDecimal("1.75"));
         profile.setFreeDeliveryAbove(new BigDecimal("500.00"));
         profile.setDeliveryRadiusKm(new BigDecimal("7.50"));
-        profile.setCommissionRate(new BigDecimal("0.1250"));
+        profile.setCommissionRate(new BigDecimal("12.50"));
 
         VendorProfile saved = vendorProfileRepository.saveAndFlush(profile);
         entityManagerClear();
@@ -72,7 +72,7 @@ class VendorProfileRepositoryIT extends AbstractIntegrationTest {
         assertEquals(new BigDecimal("1.75"), reloaded.getPerKmFee());
         assertEquals(new BigDecimal("500.00"), reloaded.getFreeDeliveryAbove());
         assertEquals(new BigDecimal("7.50"), reloaded.getDeliveryRadiusKm());
-        assertEquals(new BigDecimal("0.1250"), reloaded.getCommissionRate());
+        assertEquals(new BigDecimal("12.50"), reloaded.getCommissionRate());
     }
 
     @Test

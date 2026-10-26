@@ -53,7 +53,7 @@ class VendorProfileSchemaIT extends AbstractIntegrationTest {
         assertEquals("decimal(10,2)", columnType("vendor_profiles", "base_delivery_fee"));
         assertEquals("decimal(10,2)", columnType("vendor_profiles", "per_km_fee"));
         assertEquals("decimal(10,2)", columnType("vendor_profiles", "free_delivery_above"));
-        assertEquals("decimal(5,4)", columnType("vendor_profiles", "commission_rate"));
+        assertEquals("decimal(5,2)", columnType("vendor_profiles", "commission_rate"));
         assertEquals("decimal(3,2)", columnType("vendor_profiles", "avg_rating"));
         assertEquals("int", columnType("vendor_profiles", "review_count"));
         assertEquals("int", columnType("vendor_profiles", "prep_time_minutes"));
