@@ -47,6 +47,9 @@ app:
   # Disabled for the same reason; the payment-expiry job is driven directly with
   # the MutableClock bean in PaymentExpiryIntegrationTest instead.
   payment-expiry-cron: "-"
+  billing:
+    backfill:
+      enabled: false
   # Disabled for the same reason; SSE delivery is driven directly in tests rather
   # than by the scheduled heartbeat.
   notification:

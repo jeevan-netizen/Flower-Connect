@@ -149,4 +149,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "(SELECT osh.order.id FROM OrderStatusHistory osh " +
             " WHERE osh.toStatus = 'PLACED' AND osh.createdAt < :before)")
     Page<Order> findPlacedStaleBefore(@Param("before") LocalDateTime before, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.status = 'DELIVERED' AND NOT EXISTS (SELECT c FROM Commission c WHERE c.order.id = o.id)")
+    List<Order> findDeliveredOrdersWithoutCommission();
 }

@@ -84,6 +84,8 @@ class OrderStateMachineTest {
     @Mock
     private PaymentService paymentService;
     @Mock
+    private com.flowerconnect.billing.service.CommissionService commissionService;
+    @Mock
     private java.time.Clock clock;
     @Mock
     private Product product;

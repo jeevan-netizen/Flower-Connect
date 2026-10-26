@@ -58,6 +58,7 @@ public class OrderStateMachine {
     private final InventoryService inventoryService;
     private final UserRepository userRepository;
     private final PaymentService paymentService;
+    private final com.flowerconnect.billing.service.CommissionService commissionService;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -186,6 +187,12 @@ public class OrderStateMachine {
         // 8. Update the order status.
         order.setStatus(toStatus);
         orderRepository.saveAndFlush(order);
+
+        // 8b. Create exactly one commission record when an order transitions to DELIVERED,
+        // within the same transaction as that transition.
+        if (toStatus == OrderStatus.DELIVERED) {
+            commissionService.createOrGet(order);
+        }
 
         // 9. Write exactly one history row, timestamped from the injected Clock.
         LocalDateTime now = LocalDateTime.now(clock);

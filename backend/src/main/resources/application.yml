@@ -89,6 +89,10 @@ app:
   auto-reject-cron: "0 0 * * * ?"
   auto-reject-batch-size: 100
 
+  billing:
+    backfill:
+      enabled: ${APP_BILLING_BACKFILL_ENABLED:false}
+
   notification:
     sse:
       # Heartbeat comment sent on every live SSE connection so proxies and the
