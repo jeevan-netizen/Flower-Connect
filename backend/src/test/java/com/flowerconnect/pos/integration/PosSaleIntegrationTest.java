@@ -94,7 +94,7 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
     private String customerToken;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         rosesCategoryId = categoryRepository.findBySlug("roses").orElseThrow().getId();
         customerToken = tokenFor(createUser(uniqueEmail(), "CUSTOMER"));
     }
@@ -507,11 +507,11 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Long quantityOf(Long productId) {
-        return inventoryRepository.findByProductId(productId).orElseThrow().getQuantity();
+        return Long.valueOf(inventoryRepository.findByProductId(productId).orElseThrow().getQuantity());
     }
 
     private Long reservedQuantityOf(Long productId) {
-        return inventoryRepository.findByProductId(productId).orElseThrow().getReservedQuantity();
+        return Long.valueOf(inventoryRepository.findByProductId(productId).orElseThrow().getReservedQuantity());
     }
 
     private long movementsOf(Long productId) {
@@ -583,6 +583,11 @@ class PosSaleIntegrationTest extends AbstractIntegrationTest {
 
     private String adminToken() throws Exception {
         return tokenFor(createUser(uniqueEmail(), "ADMIN"));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions adminAction(Long profileId, String action) throws Exception {
+        return mockMvc.perform(post("/api/v1/admin/vendors/" + profileId + "/" + action)
+                        .header("Authorization", bearer(adminToken())));
     }
 
     private String tokenFor(User user) throws Exception {

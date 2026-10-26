@@ -91,6 +91,10 @@ app:
     max-lines-per-sale: 50
     # Maximum quantity of a single product on one POS sale line.
     max-quantity-per-line: 100
+    # Maximum span of a report's date range in days (task 11.5).
+    max-report-days: 365
+    # Maximum number of top-selling products returned in a report.
+    top-products-limit: 5
 
   auto-reject-cron: "0 0 * * * ?"
   auto-reject-batch-size: 100

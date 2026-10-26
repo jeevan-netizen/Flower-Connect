@@ -24,6 +24,18 @@ public class PosProperties {
      */
     private int maxQuantityPerLine = 100;
 
+    /**
+     * Maximum span of a report's date range in days (plan task 11.5).
+     * Ranges longer than this are rejected before the database is queried.
+     */
+    private int maxReportDays = 365;
+
+    /**
+     * Maximum number of top-selling products returned in a report (plan
+     * task 11.5). Top products are ranked by quantity sold descending.
+     */
+    private int topProductsLimit = 5;
+
     public int getMaxLinesPerSale() {
         return maxLinesPerSale;
     }
@@ -38,5 +50,21 @@ public class PosProperties {
 
     public void setMaxQuantityPerLine(int maxQuantityPerLine) {
         this.maxQuantityPerLine = maxQuantityPerLine;
+    }
+
+    public int getMaxReportDays() {
+        return maxReportDays;
+    }
+
+    public void setMaxReportDays(int maxReportDays) {
+        this.maxReportDays = maxReportDays;
+    }
+
+    public int getTopProductsLimit() {
+        return topProductsLimit;
+    }
+
+    public void setTopProductsLimit(int topProductsLimit) {
+        this.topProductsLimit = topProductsLimit;
     }
 }

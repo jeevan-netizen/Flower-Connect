@@ -14,6 +14,9 @@ import com.flowerconnect.pos.config.PosProperties;
 import com.flowerconnect.pos.domain.PosItem;
 import com.flowerconnect.pos.domain.PosMoney;
 import com.flowerconnect.pos.domain.PosTransaction;
+import com.flowerconnect.pos.dto.PosReportResponse;
+import com.flowerconnect.pos.dto.PosReportResponse.PosPaymentBreakdown;
+import com.flowerconnect.pos.dto.PosReportResponse.TopProduct;
 import com.flowerconnect.pos.dto.PosSaleRequest;
 import com.flowerconnect.pos.dto.PosSaleRequest.PosSaleLineRequest;
 import com.flowerconnect.pos.dto.PosSaleResponse;
@@ -31,6 +34,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.security.MessageDigest;
@@ -255,6 +259,218 @@ public class PosService {
     }
 
     // ------------------------------------------------------------------
+    // Reports (plan Phase 11, task 11.5)
+    // ------------------------------------------------------------------
+
+    /**
+     * Resolves the vendor's service-location timezone, falling back to UTC
+     * if the stored value is missing or invalid (D-65 UTC fallback).
+     */
+    private ZoneId resolveZoneId(VendorProfile vendor) {
+        try {
+            String tz = vendor.getServiceLocation().getTimezone();
+            return ZoneId.of(tz);
+        } catch (Exception e) {
+            return ZoneOffset.UTC;
+        }
+    }
+
+    /**
+     * Daily POS report for the calling vendor. "Today" is the calendar day
+     * in the vendor's service-location timezone (V13, D-5); timestamps are
+     * stored in UTC and day boundaries are converted at query time.
+     *
+     * @param vendorEmail the calling vendor's email (from the JWT subject)
+     * @param date        the local date to report on, or null for today in the
+     *                    vendor's timezone
+     * @return the daily report
+     */
+    @Transactional(readOnly = true)
+    public PosReportResponse dailyReport(String vendorEmail, LocalDate date) {
+        VendorProfile vendor = requireVendor(vendorEmail);
+        ZoneId zoneId = resolveZoneId(vendor);
+
+        if (date == null) {
+            date = LocalDate.now(clock.withZone(zoneId));
+        }
+
+        ZonedDateTime startLocal = date.atStartOfDay(zoneId);
+        ZonedDateTime endLocal = startLocal.plusDays(1);
+        LocalDateTime from = startLocal.toInstant().atZone(ZoneOffset.UTC).toLocalDateTime();
+        LocalDateTime to = endLocal.toInstant().atZone(ZoneOffset.UTC).toLocalDateTime();
+
+        return buildReport(vendorEmail, vendor, date, zoneId, from, to);
+    }
+
+    /**
+     * Weekly POS report for the calling vendor, covering seven calendar days
+     * starting from {@code startDate} (default: today in the vendor's timezone).
+     * The seven-day span is well under the 365-day cap, but the range is still
+     * validated for consistency with a future range-extended endpoint.
+     *
+     * @param vendorEmail  the calling vendor's email (from the JWT subject)
+     * @param startDate    the first day of the report week, or null for today
+     *                     in the vendor's timezone
+     * @return the weekly report
+     */
+    @Transactional(readOnly = true)
+    public PosReportResponse weeklyReport(String vendorEmail, LocalDate startDate) {
+        VendorProfile vendor = requireVendor(vendorEmail);
+        ZoneId zoneId = resolveZoneId(vendor);
+
+        if (startDate == null) {
+            startDate = LocalDate.now(clock.withZone(zoneId));
+        }
+
+        validateDateRange(startDate, startDate.plusDays(6));
+
+        ZonedDateTime startLocal = startDate.atStartOfDay(zoneId);
+        ZonedDateTime endLocal = startLocal.plusDays(7);
+        LocalDateTime from = startLocal.toInstant().atZone(ZoneOffset.UTC).toLocalDateTime();
+        LocalDateTime to = endLocal.toInstant().atZone(ZoneOffset.UTC).toLocalDateTime();
+
+        return buildReport(vendorEmail, vendor, startDate, zoneId, from, to);
+    }
+
+    /**
+     * General date-range report. Validates the range against {@link
+     * PosProperties#getMaxReportDays} (D-65: capped at 365 days), then
+     * delegates to {@link #buildReport}.
+     *
+     * @param vendorEmail the calling vendor's email (from the JWT subject)
+     * @param startDate   the first day of the report (inclusive, local date)
+     * @param endDate     the last day of the report (inclusive, local date)
+     * @return the report for the given range
+     */
+    @Transactional(readOnly = true)
+    public PosReportResponse reportForRange(String vendorEmail, LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw BusinessException.badRequest("startDate and endDate are required for a range report");
+        }
+        if (endDate.isBefore(startDate)) {
+            throw BusinessException.badRequest("endDate must not be before startDate");
+        }
+        validateDateRange(startDate, endDate);
+
+        VendorProfile vendor = requireVendor(vendorEmail);
+        ZoneId zoneId = resolveZoneId(vendor);
+
+        ZonedDateTime startLocal = startDate.atStartOfDay(zoneId);
+        ZonedDateTime endLocal = endDate.plusDays(1).atStartOfDay(zoneId);
+        LocalDateTime from = startLocal.toInstant().atZone(ZoneOffset.UTC).toLocalDateTime();
+        LocalDateTime to = endLocal.toInstant().atZone(ZoneOffset.UTC).toLocalDateTime();
+
+        return buildReport(vendorEmail, vendor, startDate, zoneId, from, to);
+    }
+
+    /**
+     * Builds a {@link PosReportResponse} for the given UTC interval, computing
+     * transaction count, total revenue, payment-method breakdown and top
+     * products by quantity sold. POS revenue is commission-free and reported
+     * separately from marketplace revenue (D-66).
+     */
+    private PosReportResponse buildReport(String vendorEmail, VendorProfile vendor,
+                                          LocalDate date, ZoneId zoneId,
+                                          LocalDateTime from, LocalDateTime to) {
+        List<PosTransaction> sales =
+                posTransactionRepository.findByVendorIdAndCreatedAtBetween(
+                        vendor.getId(), from, to,
+                        org.springframework.data.domain.Pageable.unpaged()).getContent();
+
+        int transactionCount = sales.size();
+        BigDecimal totalRevenue = sales.stream()
+                .map(PosTransaction::getTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<String, PosPaymentBreakdown> breakdownMap = new LinkedHashMap<>();
+        for (PosTransaction sale : sales) {
+            String method = sale.getPaymentMethod();
+            PosPaymentBreakdown entry = breakdownMap.computeIfAbsent(method,
+                    m -> PosPaymentBreakdown.builder()
+                            .paymentMethod(m)
+                            .transactionCount(0)
+                            .revenue(BigDecimal.ZERO).build());
+            entry.setTransactionCount(entry.getTransactionCount() + 1);
+            entry.setRevenue(PosMoney.round(entry.getRevenue().add(sale.getTotal())));
+        }
+
+        List<TopProduct> topProducts = computeTopProducts(
+                vendor.getId(), from, to, posProperties.getTopProductsLimit());
+
+        return PosReportResponse.builder()
+                .date(date)
+                .timezone(zoneId.getId())
+                .transactionCount(transactionCount)
+                .totalRevenue(PosMoney.round(totalRevenue))
+                .breakdownByPaymentMethod(new ArrayList<>(breakdownMap.values()))
+                .topProducts(topProducts)
+                .build();
+    }
+
+    /**
+     * Aggregates POS line items by product to find the top-selling products
+     * by quantity sold, then by revenue as a tiebreaker.
+     */
+    private List<TopProduct> computeTopProducts(Long vendorId, LocalDateTime from, LocalDateTime to, int limit) {
+        List<PosItem> items = posItemRepository.findByVendorIdAndCreatedAtBetween(vendorId, from, to);
+
+        Map<Long, TopProductAggregator> aggregated = new LinkedHashMap<>();
+        for (PosItem item : items) {
+            TopProductAggregator agg = aggregated.computeIfAbsent(item.getProductId(),
+                    id -> TopProductAggregator.builder()
+                            .productId(id)
+                            .productName(item.getProductNameSnapshot())
+                            .quantitySold(0)
+                            .revenue(BigDecimal.ZERO).build());
+            agg.quantitySold += item.getQuantity();
+            agg.revenue = PosMoney.round(agg.revenue.add(item.getLineTotal()));
+        }
+
+        return aggregated.values().stream()
+                .sorted((a, b) -> {
+                    int cmp = Integer.compare(b.quantitySold, a.quantitySold);
+                    if (cmp != 0) return cmp;
+                    return b.revenue.compareTo(a.revenue);
+                })
+                .limit(limit)
+                .map(agg -> TopProduct.builder()
+                        .productId(agg.productId)
+                        .productName(agg.productName)
+                        .quantitySold(agg.quantitySold)
+                        .revenue(agg.revenue)
+                        .build())
+                .toList();
+    }
+
+    /**
+     * Validates that a date range does not exceed {@link
+     * PosProperties#getMaxReportDays} (D-65: 365-day cap).
+     */
+    private void validateDateRange(LocalDate start, LocalDate end) {
+        long days = java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1;
+        if (days > posProperties.getMaxReportDays()) {
+            throw BusinessException.badRequest(
+                    "Report date range exceeds the maximum of " + posProperties.getMaxReportDays() + " days");
+        }
+    }
+
+    /**
+     * Mutable accumulator for {@link #computeTopProducts}. Kept as a separate
+     * inner type so the aggregation loop is free of boxing churn.
+     */
+    @lombok.Getter
+    @lombok.Setter
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    private static class TopProductAggregator {
+        private Long productId;
+        private String productName;
+        private int quantitySold;
+        private BigDecimal revenue;
+    }
+
+    // ------------------------------------------------------------------
     // Validation helpers
     // ------------------------------------------------------------------
 
@@ -305,7 +521,7 @@ public class PosService {
         return new ArrayList<>(merged.values());
     }
 
-    private List<Product> validateProductsExistence(VendorProfile vendor, List<PosSaleLineRequest> lines) {
+    List<Product> validateProductsExistence(VendorProfile vendor, List<PosSaleLineRequest> lines) {
         List<Product> products = new ArrayList<>();
         for (PosSaleLineRequest line : lines) {
             Product product = productRepository.findById(line.getProductId())
@@ -321,7 +537,7 @@ public class PosService {
         return products;
     }
 
-    private List<Inventory> validateInventories(List<Product> products, List<PosSaleLineRequest> lines) {
+    List<Inventory> validateInventories(List<Product> products, List<PosSaleLineRequest> lines) {
         LocalDate today = LocalDate.now(clock);
         List<Inventory> inventories = new ArrayList<>();
         for (int i = 0; i < products.size(); i++) {

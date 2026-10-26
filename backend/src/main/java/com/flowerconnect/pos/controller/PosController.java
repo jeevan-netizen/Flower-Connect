@@ -1,5 +1,7 @@
 package com.flowerconnect.pos.controller;
 
+import com.flowerconnect.exception.BusinessException;
+import com.flowerconnect.pos.dto.PosReportResponse;
 import com.flowerconnect.pos.dto.PosSaleRequest;
 import com.flowerconnect.pos.dto.PosSaleResponse;
 import com.flowerconnect.pos.dto.PosSummaryResponse;
@@ -28,7 +30,10 @@ import java.time.LocalDate;
  * <p>Base path: {@code /api/v1/pos}. Routes:
  * <ul>
  *   <li>{@code POST /sales} — quick sale with an {@code Idempotency-Key} header</li>
+ *   <li>{@code GET /sales/{id}} — retrieve a past sale receipt</li>
  *   <li>{@code GET /summary} — today's sale count, revenue and payment-method breakdown</li>
+ *   <li>{@code GET /reports} — daily/weekly sales report with transaction count,
+ *       revenue, payment-method breakdown and top-selling products</li>
  * </ul>
  *
  * <p>The namespace is restricted to the {@code FLORIST} role in
@@ -118,6 +123,57 @@ public class PosController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         LocalDate localDate = date != null ? date : java.time.LocalDate.now(java.time.Clock.systemUTC());
         PosSummaryResponse response = posService.getSummary(authentication.getName(), localDate);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Daily or weekly POS sales report for the calling vendor (plan task 11.5).
+     *
+     * <p>The {@code date} parameter selects the report day. When omitted,
+     * "today" is computed in the vendor's service-location timezone
+     * ({@code service_locations.timezone}, V13) with a UTC fallback (D-65).
+     * For {@code weekly}, the report covers seven calendar days starting on
+     * {@code date}. Both spans are well under the 365-day cap, which is
+     * still validated for consistency.
+     *
+     * <p>POS revenue is commission-free and reported separately from
+     * marketplace revenue (D-66): this endpoint reads {@code pos_transactions}
+     * only and creates no order, payment, commission or ledger row.
+     */
+    @Operation(summary = "POS sales report",
+            description = "Returns a daily or weekly sales summary for the calling vendor: "
+                    + "transaction count, total revenue, payment-method breakdown (CASH/CARD/UPI), "
+                    + "and top-selling products by quantity sold. POS revenue is commission-free "
+                    + "and separate from marketplace revenue.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Report generated"),
+            @ApiResponse(responseCode = "400", description = "Invalid period, or date range exceeds 365 days"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account, or vendor profile is not APPROVED")
+    })
+    @GetMapping("/reports")
+    public ResponseEntity<PosReportResponse> getReport(
+            Authentication authentication,
+            @Parameter(description = "Report period: 'daily' (default), 'weekly', or 'range' (with fromDate/toDate)")
+            @RequestParam(defaultValue = "daily") String period,
+            @Parameter(description = "Reference date for daily/weekly (ISO-8601); defaults to today in vendor's timezone")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "Start date for range reports (ISO-8601; required for period=range)")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @Parameter(description = "End date for range reports (ISO-8601; required for period=range)")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+
+        PosReportResponse response = switch (period.toLowerCase()) {
+            case "daily" -> posService.dailyReport(authentication.getName(), date);
+            case "weekly" -> posService.weeklyReport(authentication.getName(), date);
+            case "range" -> posService.reportForRange(authentication.getName(), fromDate, toDate);
+            default -> throw BusinessException.badRequest(
+                    "Unknown report period '" + period + "'. Use 'daily', 'weekly', or 'range'.");
+        };
+        log.info("Vendor {} generated POS {} report", authentication.getName(), period);
         return ResponseEntity.ok(response);
     }
 }
