@@ -19,6 +19,7 @@ import { VendorProductFormPage } from "@/features/vendor/pages/VendorProductForm
 import { VendorInventoryPage } from "@/features/vendor/pages/VendorInventoryPage";
 import { VendorOrderBoardPage } from "@/features/vendor/orders/pages/VendorOrderBoardPage";
 import { VendorDisputesPage } from "@/features/vendor/disputes/pages/VendorDisputesPage";
+import { VendorPosPage } from "@/features/vendor/pages/VendorPosPage";
 import { CartPage } from "@/features/cart/pages/CartPage";
 import { CheckoutPage } from "@/features/checkout/pages/CheckoutPage";
 import { BrowsePage } from "@/features/customer/pages/BrowsePage";
@@ -237,6 +238,7 @@ export const router = createBrowserRouter([
           // deliberately not @RequiresApprovedVendor (D-6 / D-43).
           { path: "orders", element: <VendorOrderBoardPage /> },
           { path: "disputes", element: <VendorDisputesPage /> },
+          { path: "pos", element: gated(<VendorPosPage />) },
         ],
       },
       {
