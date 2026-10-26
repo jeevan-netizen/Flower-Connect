@@ -928,3 +928,28 @@ neither is claimed as passed. No implementation change was made for this, and no
 artifact was left in the tree (a scratch `tests/e2e/notification-sse-flow.test.ts` was
 created and removed).
 
+
+### Phase 11 — POS (walk-in sales)
+
+Stage 1 (task 11.1: POS entities) complete on branch `phase-11-pos`.
+
+- Migration `V26__create_pos_transactions.sql`: `pos_transactions` (vendor_id, idempotency_key,
+  request_fingerprint, total DECIMAL(10,2), payment_method CASH/CARD/UPI label, created_at
+  UTC DATETIME(6)) and `pos_items` (transaction_id, product_id, product_name_snapshot,
+  unit_price_snapshot DECIMAL(10,2), quantity, line_total DECIMAL(10,2)); unique
+  `(vendor_id, idempotency_key)`; indexes `(vendor_id, created_at DESC)` and
+  `(transaction_id)`. Additive only (ADR-002/D-9).
+- Entities `PosTransaction` and `PosItem` (BigDecimal money, DECIMAL(10,2), Lombok
+  @Builder, UTC timestamps).
+- Repositories `PosTransactionRepository` (find by vendor+idempotency key, paginated own
+  sales newest-first, vendor sales in a UTC half-open interval) and `PosItemRepository`
+  (by transaction id).
+- `PosProperties` (`app.pos.max-lines-per-sale`, `app.pos.max-quantity-per-line`) registered
+  in `FlowerConnectApplication`; added to `application.yml` and `application-test.yml`.
+- `PosMoney` shared helper: HALF_UP scale-2 rounding, `lineTotal(unitPrice, quantity)`,
+  `transactionTotal(lines)` — one shared place for POS totals.
+- Unit tests: `PosMoneyTest` (5 tests: rounding half up, line totals, transaction totals).
+- Backend unit suite: 1239 tests, 0 failures, BUILD SUCCESS (baseline 1234 + 5).
+
+No code conflicts with the plan found. `SALE_POS` movement type already exists
+(StockMovement.java:77); no enum migration needed. Role name is FLORIST (D-11).

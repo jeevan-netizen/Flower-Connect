@@ -86,6 +86,12 @@ app:
     min-lead-time-minutes: 120
     max-booking-horizon-days: 7
 
+  pos:
+    # Maximum number of distinct products on one walk-in sale ticket.
+    max-lines-per-sale: 50
+    # Maximum quantity of a single product on one POS sale line.
+    max-quantity-per-line: 100
+
   auto-reject-cron: "0 0 * * * ?"
   auto-reject-batch-size: 100
 

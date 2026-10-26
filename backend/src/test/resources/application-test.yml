@@ -75,3 +75,6 @@ app:
       register-requests-per-hour: 5
       forgot-password-requests-per-hour: 5
       reset-password-requests-per-hour: 5
+  pos:
+    max-lines-per-sale: 50
+    max-quantity-per-line: 100

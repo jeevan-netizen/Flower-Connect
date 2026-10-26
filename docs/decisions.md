@@ -2749,3 +2749,84 @@ so the transport choice and the delivery guarantees had to be settled before imp
 - No secrets or tokens are logged or placed in URLs.
 
 
+
+## D-63: POS idempotency semantics (Phase 11 task 11.2)
+
+**Status:** Accepted
+**Date:** Phase 11 Stage 1
+
+### Context
+
+Task 11.2 requires a quick-sale endpoint with an idempotency key against double submit. The key questions: what happens on replay, what header carries the key, how a same-key/different-body request is handled, and what concurrent identical requests produce.
+
+### Decision
+
+- **Required header `Idempotency-Key`.** A missing or non-canonical-UUID key returns 400 `VALIDATION_FAILED`. Key format/length are validated before any stock or database work.
+- **Replay returns the original response.** A completed sale with the same key and the same request fingerprint returns the stored transaction (re-queried items) and deducts nothing.
+- **Same key, different body → 409.** The request fingerprint is the SHA-256 hex of the canonical body (sorted `productId:quantity` + `paymentMethod`). A mismatch rejects with `CONFLICT`.
+- **Same key, in-progress → 409.** A row exists but `completed_at` is null, meaning a concurrent sale with the same key is mid-flight.
+- **Concurrent identical requests → exactly one sale.** All writers serialize on the unique `(vendor_id, idempotency_key)` constraint. The loser rolls back its own deduction (releasing locks) and replays the winner's stored response, or receives a clean 409 if the payload differs.
+- **Transaction boundary.** The idempotency check, the stock lock, the deduction, the `pos_transactions` insert and the `pos_items` insert are all one `@Transactional` unit. Stock is never negative and never double-deducted.
+
+### Consequences
+
+- The idempotency key identifies the *sale attempt*, not the product set. A new ticket requires a new key; a retry after a network failure reuses the same key.
+- The unique constraint is the authority for "exactly one sale"; the application-level fingerprint check is the authority for "same body".
+- Stock deductions happen only after the idempotency/record check passes and after inventory rows are locked.
+
+## D-64: POS available-stock rule (Phase 11 task 11.3)
+
+**Status:** Accepted
+**Date:** Phase 11 Stage 1
+
+### Context
+
+Task 11.3 requires POS to draw from the same stock pool as marketplace orders, under the same locking discipline, while never consuming units reserved for pending orders.
+
+### Decision
+
+- **Sellability gate.** A product must exist (else 404), belong to the calling vendor (else 403), be `ACTIVE` and not expired (`expiryDate != null && expiryDate < today`, where `today` is `LocalDate.now(clock)` in the vendor's business zone, else 409), and have an inventory row (else 409).
+- **Available stock only.** `available = quantity − reservedQuantity`. A sale may consume only available stock; it must never take units reserved for marketplace orders. If any line is short, return 409 `INSUFFICIENT_STOCK` naming the short product and persist nothing (all-or-nothing).
+- **Locking discipline.** Inventory rows are locked with `SELECT ... FOR UPDATE` via `InventoryRepository.findByProductIdForUpdate`, ordered by ascending product ID, exactly as checkout/accept/cancellation do (D-24). Ownership and sellability are checked *before* locking, so a foreign vendor cannot stall another vendor's row.
+- **One movement per line.** Each deducted line writes one `stock_movements` row of type `SALE_POS`, delta `-quantity`, `reference_id` = POS transaction id, `reference_type` = `pos-transaction`, actor = authenticated vendor. All through `InventoryService`/`StockService` — POS never writes inventory fields directly and never creates a second locking path.
+- **Duplicate product IDs** in one request are merged (quantities summed) and validated once.
+
+### Consequences
+
+- POS and marketplace sales race fairly for the last unit: exactly one succeeds; stock is never negative nor over-reserved.
+- Reserved units are invisible to POS: a product with `quantity = reservedQuantity` shows `available = 0` and is refused.
+
+## D-65: POS summary time-zone rule (Phase 11 task 11.5)
+
+**Status:** Accepted
+**Date:** Phase 11 Stage 1
+
+### Context
+
+Task 11.5 requires daily/weekly POS reports. The question: what does "today" mean, given vendors are in a single business time zone while timestamps persist in UTC.
+
+### Decision
+
+- **"Today" is the calendar day in the vendor's service-location `timezone`** (the `service_locations.timezone` column added in V13 per D-5), computed at report time from the injected `Clock`. UTC timestamps are converted to local day boundaries using that zone; the day is [local midnight, next local midnight) mapped back to a UTC half-open interval.
+- **Date ranges are validated and capped** (max 365 days) before querying.
+- Reports use `PosTransactionRepository.findByVendorIdAndCreatedAtBetween(vendorId, fromUtc, toUtc, pageable)`.
+
+### Consequences
+
+- A sale at 23:30 UTC that is still the same local calendar day counts in "today"; a sale just after local midnight starts the next day.
+- Fake-clock tests can verify boundaries at instants immediately before and after local midnight.
+
+## D-66: POS commission-free separation (Phase 11 task 11.5)
+
+**Status:** Accepted
+**Date:** Phase 11 Stage 1
+
+### Context
+
+Plan section 6.4 states POS is commission-free and outside the marketplace ledger: it creates no commission rows, `settlement_entries`, payment rows, or order/order-item rows, and POS revenue is reported separately from marketplace revenue.
+
+### Decision
+
+- **No ledger footprint.** A POS sale creates only `pos_transactions` and `pos_items`. It calls neither the order state machine nor `PaymentService`, and creates no commission, settlement-entry, payment, order or order-item row.
+- **Separate reporting.** POS revenue is reported in its own APIs/UI, labeled "commission-free", and is never netted into marketplace revenue (commission + platform fees from `orders`/`settlement_entries`).
+- **Payment methods are labels only.** `CASH`, `CARD`, `UPI` are stored as a `payment_method` label; no gateway, card, UPI or refund processing exists in v1.
