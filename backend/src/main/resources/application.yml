@@ -88,6 +88,7 @@ app:
 
   auto-reject-cron: "0 0 * * * ?"
   auto-reject-batch-size: 100
+  settlement-cron: ${APP_SETTLEMENT_CRON:0 0 0 * * 0}
 
   billing:
     backfill:

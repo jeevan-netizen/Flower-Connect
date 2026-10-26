@@ -47,6 +47,9 @@ app:
   # Disabled for the same reason; the payment-expiry job is driven directly with
   # the MutableClock bean in PaymentExpiryIntegrationTest instead.
   payment-expiry-cron: "-"
+  # Disabled for the same reason; the weekly settlement job is driven directly
+  # with the Clock bean in tests instead.
+  settlement-cron: "-"
   billing:
     backfill:
       enabled: false

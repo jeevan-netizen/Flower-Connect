@@ -992,5 +992,35 @@ ew_value (VARCHAR(500) NULL) to udit_log, and seeded commission_rate_default = 
   - `AdminBillingLedgerControllerTest`: 4 WebMvc slice tests with `RoleBoundaryTester` validating ADMIN RBAC and 200 responses.
   - `SettlementLedgerIntegrationTest`: 3 integration tests against real MySQL on Testcontainers testing delivered order entries, dispute adjustments, balance netting, and cancellation/rejection exclusion.
 
+### Stage 4 (Task 10.4: Weekly Settlement Cycles) - COMPLETE (2026-10-26)
+
+- **Configuration:**
+  - `AppProperties`: added `settlementCron` field (default `0 0 0 * * 0`, Sunday midnight UTC) with getter and setter.
+  - `application.yml`: mapped `app.settlement-cron: ${APP_SETTLEMENT_CRON:0 0 0 * * 0}`.
+  - `application-test.yml`: disabled `app.settlement-cron: "-"` to ensure test isolation.
+- **DTOs:**
+  - `SettlementResponse`: includes `id`, `vendorId`, `vendorBusinessName`, `periodStart`, `periodEnd`, `totalCredits`, `totalDues`, `netAmount`, `direction`, `status`, `adminReferenceNote`, `settledByUserId`, `settledByEmail`, `settledAt`, and `createdAt`.
+  - `SettlementDetailResponse`: contains summary `settlement` and `List<SettlementEntryResponse> entries`.
+  - `SettlementPageResponse`: standard paginated response envelope.
+  - `RunSettlementRequest`: `@NotNull periodStart`, `@NotNull periodEnd`, optional `vendorId`.
+  - `FinalizeSettlementRequest`: `@NotBlank adminReferenceNote`.
+- **Domain & Service:**
+  - `SettlementService`:
+    - `runSettlement(vendorId, periodStart, periodEnd)`: idempotent settlement cycle generation. Validates date intervals, returns existing `PENDING` settlement on re-run, throws 409 `CONFLICT` if already `SETTLED`. Fetches unattached ledger entries up to period cutoff (`periodEnd.plusDays(1).atStartOfDay()`), computes `totalCredits`, `totalDues`, `netAmount = totalCredits - totalDues`, assigns `direction` (`PLATFORM_PAYS_VENDOR`, `VENDOR_PAYS_PLATFORM`, `ZERO`), creates `Settlement` with `PENDING` status, and attaches each entry via `entry.attachToSettlement(settlement)` (preventing multiple attachment).
+    - `runSettlementForAllVendors(periodStart, periodEnd)`: runs settlement across all registered vendors.
+    - `finalizeSettlement(settlementId, adminEmail, adminReferenceNote)`: transitions status from `PENDING` to `SETTLED`, captures timestamp and admin reference note, and records structured `AuditLog` row with before/after state. Throws 409 `CONFLICT` if already settled; throws 400 `BAD_REQUEST` if reference note is blank.
+    - Query methods: `getSettlementById`, `listSettlements` (admin filters), `getVendorSettlements` (vendor view), `getSettlementEntries`.
+- **Scheduler:**
+  - `SettlementScheduler`: `@Scheduled(cron = "#{@appProperties.settlementCron}")` delegating to `settlementService.runSettlementForAllVendors(previousMonday, previousSunday)` using injected `Clock`.
+- **Controllers:**
+  - `AdminSettlementController` (`/api/v1/admin/billing/settlements`, ADMIN RBAC): `POST /run`, `GET`, `GET /{id}`, `PATCH /{id}/finalize`.
+  - `VendorSettlementController` (`/api/v1/vendor/billing/settlements`, FLORIST RBAC): `GET`, `GET /{id}` with cross-vendor isolation (403 when accessing foreign settlement).
+- **Tests:**
+  - `SettlementServiceTest`: 11 unit tests covering netting formulas, direction assignments, zero balance, idempotent re-run, 409 conflict, bad request on invalid period, all-vendor run, finalization lifecycle, and audit log generation.
+  - `SettlementSchedulerTest`: 2 unit tests verifying previous week calculation (Monday to Sunday) across different weekdays and service invocation.
+  - `AdminSettlementControllerTest`: 7 WebMvc slice tests with `RoleBoundaryTester` verifying ADMIN RBAC, single-vendor run, multi-vendor run, pagination, detail, and note validation on finalization.
+  - `VendorSettlementControllerTest`: 4 WebMvc slice tests with `RoleBoundaryTester` verifying FLORIST RBAC, list, detail, and cross-vendor isolation (403).
+  - `SettlementCycleIntegrationTest`: end-to-end integration test against real MySQL 8 Testcontainer verifying full weekly settlement cycle: delivery entries -> settlement generation -> entry attachment -> idempotent replay -> finalize with admin note -> balance netting to 0.00 -> 409 conflict guards.
+
 
 

@@ -20,6 +20,15 @@ public class AppProperties {
     private int paymentExpiryMinutes = 30;
 
     /**
+     * Cron expression for the weekly settlement job (plan Phase 10, task 10.4).
+     * Defaults to Sunday midnight UTC ("0 0 0 * * 0"). Override with
+     * {@code APP_SETTLEMENT_CRON} or {@code app.settlement-cron}. Set to {@code -}
+     * (Spring's {@code CRON_DISABLED}) to turn the job off.
+     */
+    private String settlementCron = "0 0 0 * * 0";
+
+
+    /**
      * Cron expression for the notification SSE heartbeat (plan task 9.5). The
      * heartbeat keeps live event streams open and sweeps out stale/disconnected
      * emitters. Override with {@code APP_NOTIFICATION_SSE_HEARTBEAT_CRON} or
@@ -262,5 +271,13 @@ public class AppProperties {
 
     public void setSseMaxConnectionsPerUser(int sseMaxConnectionsPerUser) {
         this.sseMaxConnectionsPerUser = sseMaxConnectionsPerUser;
+    }
+
+    public String getSettlementCron() {
+        return settlementCron;
+    }
+
+    public void setSettlementCron(String settlementCron) {
+        this.settlementCron = settlementCron;
     }
 }
