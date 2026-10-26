@@ -1,34 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  useLocation,
-  useNavigate,
-  useCommittedRef,
-} from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffectOnce } from "@/motion/UseEffectOnce";
-import { AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { clearVendorCache, useVendorProfile } from "@/features/vendor/queries";
-import { VendorErrorState } from "@/features/vendor/components/VendorErrorState";
-import { VendorStatusBanner } from "@/features/vendor/components/VendorStatusBanner";
-import { countOpenDays } from "@/features/vendor/format";
-import { FlowerLoader } from "@/motion/FlowerLoader";
-import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
-import { useVendorProfile } from "@/features/vendor/queries";
-import { formatLocalDate } from "@/features/vendor/format";
-import { toApiError } from "@/shared/lib/api-error";
-import { FLASH_OUT } from "@/motion/FlowerLoader";
-import { useId } from "react";
-
-interface ProductTileProps {
-  productId: number;
-  name: string;
-  price: number;
-  available: number;
-  expired: boolean;
-  expiredReason?: string;
-  disabled?: boolean;
-}
+import { PRESSABLE } from "@/motion/pressable";
 
 interface Product {
   productId: number;
@@ -36,6 +11,8 @@ interface Product {
   basePrice: number;
   expiryDate?: string;
   status?: string;
+  expired?: boolean;
+  expiredReason?: string;
 }
 
 interface TicketItem {
@@ -44,6 +21,8 @@ interface TicketItem {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  available?: number;
+  expired?: boolean;
 }
 
 interface TicketState {
@@ -53,42 +32,19 @@ interface TicketState {
   total: number;
 }
 
-interface ProductSearchResult {
-  productId: number;
-  name: string;
-  price: number;
-  available: number;
-  expired: boolean;
-}
-
-interface TicketAction {
-  type: "add" | "remove" | "set";
-  productId: number;
-  quantity: number;
-}
-
-interface IdempotencyState {
-  key: string | null;
-  setKey: (key: string | null) => void;
-  isValid: boolean;
-  isSaving: boolean;
-}
-
-interface PrintReceiptProps {
-  transaction: {
-    transactionId: string;
-    vendorName: string;
-    createdAt: string;
-    paymentMethod: string;
-    lines: Array<{
-      productId: number;
-      productName: string;
-      unitPrice: number;
-      quantity: number;
-      lineTotal: number;
-    }>;
-    total: number;
-  };
+interface PrintReceiptData {
+  transactionId: string;
+  vendorName: string;
+  createdAt: string;
+  paymentMethod: string;
+  lines: Array<{
+    productId: number;
+    productName: string;
+    unitPrice: number;
+    quantity: number;
+    lineTotal: number;
+  }>;
+  total: number;
 }
 
 const CART_MAX_QUANTITY = 99;
@@ -97,8 +53,7 @@ export function VendorPosPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const logout = useAuthStore((state) => state.logout);
-  const { data: profile, isPending, error: profileError, refetch: refetchProfile } =
-    useVendorProfile();
+  const { data: profile } = useVendorProfile();
 
   const handleLogout = () => {
     clearVendorCache(queryClient);
@@ -116,22 +71,22 @@ export function VendorPosPage() {
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
-  const [printReceipt, setPrintReceipt] = useState<string | null>(null);
+  const [printReceipt, setPrintReceipt] = useState<PrintReceiptData | null>(null);
+  const [printWindow, setPrintWindow] = useState<Window | null>(null);
 
   // Product grid state
   const [searchQuery, setSearchQuery] = useState("");
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   // Error state
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
 
-  // Product data from API (would come from API calls in production)
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  // Product data from API (simulated for initial view)
+  const [products] = useState<Product[]>([]);
 
   // --- Product Search & Filter ---
-  const filtered = filteredProducts.filter((p) => {
+  const filteredProducts = products.filter((p) => {
     const searchMatch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.name.toLowerCase().includes((searchQuery || "").toLowerCase().substring(0, 3));
@@ -141,11 +96,7 @@ export function VendorPosPage() {
 
   // --- Idempotency Key Management ---
   const generateIdempotencyKey = (): string => {
-    return "pos-" + Math.random().toString(36).substr(2, 20);
-  };
-
-  const handleKeyChange = (newKey: string | null) => {
-    setIdempotencyKey(newKey);
+    return "pos-" + Math.random().toString(36).substring(2, 22);
   };
 
   const isKeyValid = () => {
@@ -162,50 +113,65 @@ export function VendorPosPage() {
     const existing = ticket.items.find((i) => i.productId === productId);
     if (existing) {
       const newQty = Math.min(existing.quantity + 1, CART_MAX_QUANTITY);
+      const newItems = ticket.items.map((i) =>
+        i.productId === productId
+          ? { ...i, quantity: newQty, lineTotal: Number((newQty * i.unitPrice).toFixed(2)) }
+          : i
+      );
+      const newSubtotal = Number(newItems.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2));
       setTicket({
         ...ticket,
-        items: ticket.items.map((i) =>
-          i.productId === productId ? { ...i, quantity: newQty } : i
-        ),
+        items: newItems,
+        subtotal: newSubtotal,
+        total: newSubtotal,
       });
     } else {
+      const newItems = [
+        ...ticket.items,
+        {
+          productId,
+          productName,
+          quantity: 1,
+          unitPrice: price,
+          lineTotal: price,
+        },
+      ];
+      const newSubtotal = Number(newItems.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2));
       setTicket({
         ...ticket,
-        items: [
-          ...ticket.items,
-          {
-            productId,
-            productName,
-            quantity: 1,
-            unitPrice: price,
-            lineTotal: price,
-          },
-        ],
+        items: newItems,
+        subtotal: newSubtotal,
+        total: newSubtotal,
       });
     }
   };
 
   const removeItem = (productId: number) => {
+    const newItems = ticket.items.filter((i) => i.productId !== productId);
+    const newSubtotal = Number(newItems.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2));
     setTicket({
       ...ticket,
-      items: ticket.items.filter((i) => i.productId !== productId),
+      items: newItems,
+      subtotal: newSubtotal,
+      total: newSubtotal,
     });
   };
 
   const setQuantity = (productId: number, quantity: number) => {
+    const newQty = Math.min(Math.max(1, quantity), CART_MAX_QUANTITY);
+    const newItems = ticket.items.map((i) =>
+      i.productId === productId
+        ? { ...i, quantity: newQty, lineTotal: Number((newQty * i.unitPrice).toFixed(2)) }
+        : i
+    );
+    const newSubtotal = Number(newItems.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2));
     setTicket({
       ...ticket,
-      items: ticket.items.map((i) =>
-        i.productId === productId ? { ...i, quantity: Math.max(1, quantity) } : i
-      ),
+      items: newItems,
+      subtotal: newSubtotal,
+      total: newSubtotal,
     });
   };
-
-  const subtotal = ticket.items.reduce(
-    (sum, item) => sum + item.lineTotal,
-    0
-  );
-  const total = ticket.items.length > 0 ? subtotal : 0;
 
   // --- Payment Selection ---
   const handlePaymentChange = (payment: "CASH" | "CARD" | "UPI") => {
@@ -218,11 +184,10 @@ export function VendorPosPage() {
       setIsSubmitting(true);
       setError(null);
 
-      // Simulate API call - in production would call /api/v1/pos/sales
-      setTimeout(async () => {
+      // Simulate API call - in production calls /api/v1/pos/sales
+      setTimeout(() => {
         setIsSubmitting(false);
-        // Simulate successful sale
-        const saleResponse: PrintReceiptProps["transaction"] = {
+        const saleResponse: PrintReceiptData = {
           transactionId: "pos-" + Date.now(),
           vendorName: profile?.businessName || "Florist",
           createdAt: new Date().toISOString(),
@@ -237,9 +202,7 @@ export function VendorPosPage() {
           total: ticket.total,
         };
 
-        setPrintReceipt(
-          JSON.stringify(saleResponse, null, 2)
-        );
+        setPrintReceipt(saleResponse);
         setShowPrint(true);
 
         // Reset ticket and generate new key
@@ -254,17 +217,6 @@ export function VendorPosPage() {
     }
   };
 
-  // --- 409 Shortage Handling ---
-  const handleShortage = (shortProduct: { productId: number; name: string }) => {
-    setError(
-      `Insufficient stock for ${shortProduct.name}. Only ${
-        ticket.items.find((i) => i.productId === shortProduct.productId)
-          ?.available ?? 0
-        } units available.`
-    );
-    // Retain ticket - do not clear
-  };
-
   // --- Print Receipt ---
   const handlePrint = () => {
     if (printReceipt && !printWindow) {
@@ -274,13 +226,14 @@ export function VendorPosPage() {
         printWindowRef.document.write(`
           <html>
             <head>
+              <title>POS Receipt</title>
               <style>
                 @media print {
-                  body {font-family: sans-serif; margin: 0; padding: 0;}
-                  .pos-receipt {width: 320px; padding: 10px; font-size: 12px;}
-                  .header {border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px;}
-                  .total {font-weight: bold; text-align: right; margin-top: 20px;}
-                  .item {margin: 5px 0;}
+                  body { font-family: sans-serif; margin: 0; padding: 0; }
+                  .pos-receipt { width: 320px; padding: 10px; font-size: 12px; }
+                  .header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
+                  .total { font-weight: bold; text-align: right; margin-top: 20px; }
+                  .item { margin: 5px 0; }
                 }
               </style>
             </head>
@@ -296,9 +249,9 @@ export function VendorPosPage() {
                     (line) => `<tr><td>${line.productName}</td><td>${line.quantity}x ${line.unitPrice}</td><td>${line.lineTotal}</td></tr>`
                   ).join("")}
                 </table>
-                <div class="total">Total: ${printReceipt.total}</div>
-                <button onClick="window.print()">Print Receipt</button>
-                <button onClick="window.close()">Close</button>
+                <div class="total">Total: $${printReceipt.total.toFixed(2)}</div>
+                <button onclick="window.print()">Print Receipt</button>
+                <button onclick="window.close()">Close</button>
               </div>
             </body>
           </html>`
@@ -309,8 +262,6 @@ export function VendorPosPage() {
 
   // --- Render ---
   const hasItems = ticket.items.length > 0;
-  const isOOS = ticket.items.some((i) => i.available === 0);
-  const expiredItems = ticket.items.filter((i) => i.expired);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -347,7 +298,7 @@ export function VendorPosPage() {
               <input
                 type="text"
                 value={searchQuery}
-                onChange=(e) => setSearchQuery(e.target.value)
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products..."
                 className="w-full px-3 py-2 rounded-md border border-slate-400 focus:ring-slate-300"
                 disabled={isLoading}
@@ -355,29 +306,31 @@ export function VendorPosPage() {
               {isLoading && (
                 <span className="absolute right-2 text-slate-500 text-xs">Loading...</span>
               )}
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-2 text-slate-400 text-sm select-none"
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              )}
             </div>
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2 text-slate-400 text-sm select-none"
-              title="Clear search"
-            >
-              ×
-            }
           </div>
 
           {/* Product Grid */}
           <div className="grid grid-cols-2 gap-3 px-1">
             {filteredProducts.map((product) => {
-              const isExpired =
-                product.expired &&
-                !searchQuery;
-              const available = product.basePrice > 0 ? 999 : 0; // Simulated
-              const disabled = isExpired || (product.basePrice <= 0);
+              const isExpired = product.expired && !searchQuery;
+              const available = product.basePrice > 0 ? 999 : 0;
+              const disabled = isExpired || product.basePrice <= 0;
 
               return (
                 <div
                   key={product.productId}
-                  className={`group rounded border border-slate-400 p-2 hover:bg-slate-800 transition-colors ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className={`group rounded border border-slate-400 p-2 hover:bg-slate-800 transition-colors ${
+                    disabled ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                 >
                   <div className="h-24 flex items-center justify-center">
                     <span className="text-sm text-slate-300">
@@ -388,24 +341,24 @@ export function VendorPosPage() {
                     <span className="font-medium">{product.name}</span>
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-slate-100">${product.basePrice.toFixed(
-                      2
-                    )}</span>
-                    <span className="text-xs text-slate-400">/${available} avail</span>
+                    <span className="font-bold text-slate-100">
+                      ${product.basePrice.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-slate-400">/{available} avail</span>
                   </div>
+                  {isExpired && (
+                    <span className="text-xs text-slate-400 block mt-1">
+                      {product.expiredReason || "Expired"}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => addItem(product.productId, product.name, product.basePrice)}
+                    disabled={disabled || isSubmitting}
+                    className={`mt-1 w-full rounded border border-slate-400 px-2 py-1 text-sm text-slate-100 hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
+                  >
+                    Quick Add
+                  </button>
                 </div>
-                {isExpired && (
-                  <span className="text-xs text-slate-400 block mt-1">
-                    {product.expiredReason || "Expired"}
-                  </span>
-                )}
-                <button
-                  onClick={() => addItem(product.productId, product.name, product.basePrice)}
-                  disabled={disabled || isSubmitting}
-                  className="mt-1 w-full rounded border border-slate-400 px-2 py-1 text-sm text-slate-100 hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}"
-                >
-                  Quick Add
-                </button>
               );
             })}
           </div>
@@ -426,8 +379,8 @@ export function VendorPosPage() {
                 <span className="text-xs text-slate-300">{item.productName}</span>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setQuantity(item.productId, 1)}
-                    className="${PRESSABLE} rounded border border-slate-300 px-1 py-0.5 text-xs"
+                    onClick={() => setQuantity(item.productId, item.quantity + 1)}
+                    className={`${PRESSABLE} rounded border border-slate-300 px-1 py-0.5 text-xs`}
                   >
                     +
                   </button>
@@ -443,7 +396,7 @@ export function VendorPosPage() {
                   />
                   <button
                     onClick={() => removeItem(item.productId)}
-                    className="${PRESSABLE} rounded border border-slate-300 px-1 py-0.5 text-xs"
+                    className={`${PRESSABLE} rounded border border-slate-300 px-1 py-0.5 text-xs`}
                   >
                     −
                   </button>
@@ -452,7 +405,7 @@ export function VendorPosPage() {
             ))}
           </div>
 
-          {/* Total -->
+          {/* Total */}
           <div className="mt-3 pt-3 border-t border-slate-500">
             <div className="flex justify-between text-sm text-slate-300">
               <span>Subtotal</span>
@@ -467,35 +420,32 @@ export function VendorPosPage() {
         {/* Payment Selection */}
         <div className="p-4 border-t border-slate-600">
           <div className="flex gap-2">
-            <label
-              className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 checked={ticket.payment === "CASH"}
                 onChange={() => handlePaymentChange("CASH")}
                 className="w-4 h-4 rounded border-slate-400 focus:ring-slate-300"
               />
-              <span>CASH</span>
+              <span className="text-slate-200">CASH</span>
             </label>
-            <label
-              className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 checked={ticket.payment === "CARD"}
                 onChange={() => handlePaymentChange("CARD")}
                 className="w-4 h-4 rounded border-slate-400 focus:ring-slate-300"
               />
-              <span>CARD</span>
+              <span className="text-slate-200">CARD</span>
             </label>
-            <label
-              className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 checked={ticket.payment === "UPI"}
                 onChange={() => handlePaymentChange("UPI")}
                 className="w-4 h-4 rounded border-slate-400 focus:ring-slate-300"
               />
-              <span>UPI</span>
+              <span className="text-slate-200">UPI</span>
             </label>
           </div>
         </div>
@@ -505,7 +455,7 @@ export function VendorPosPage() {
           <button
             onClick={handleSale}
             disabled={isSubmitting || !isKeyValid() || !hasItems}
-            className="w-full rounded border border-slate-300 px-4 py-2 text-lg font-medium text-slate-100 hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}"
+            className={`w-full rounded border border-slate-300 px-4 py-2 text-lg font-medium text-slate-100 hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
           >
             {isSubmitting ? "Processing..." : "Charge"}
           </button>
@@ -521,14 +471,25 @@ export function VendorPosPage() {
         {/* Print Receipt State */}
         {showPrint && printReceipt && (
           <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="rounded-md bg-slate-800 p-6 max-w-print">
+            <div className="rounded-md bg-slate-800 p-6 max-w-sm w-full">
               <h2 className="text-xl font-bold text-slate-100 mb-4">Receipt</h2>
-              <pre className="text-xs text-slate-300 whitespace-pre">{printReceipt}</pre>
-              <div className="mt-4 flex justify-end">
-                <button onClick={() => { setShowPrint(false); setPrintWindow(null); }} className="ml-2 rounded border border-slate-400 px-3 py-1 text-sm text-slate-300">
+              <pre className="text-xs text-slate-300 whitespace-pre">
+                {JSON.stringify(printReceipt, null, 2)}
+              </pre>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowPrint(false);
+                    setPrintWindow(null);
+                  }}
+                  className="rounded border border-slate-400 px-3 py-1 text-sm text-slate-300"
+                >
                   Close
                 </button>
-                <button onClick={() => window.print()} className="ml-2 rounded border border-slate-400 px-3 py-1 text-sm text-slate-300">
+                <button
+                  onClick={handlePrint}
+                  className="rounded border border-slate-400 px-3 py-1 text-sm text-slate-300"
+                >
                   Print
                 </button>
               </div>
