@@ -20,6 +20,7 @@ import { VendorInventoryPage } from "@/features/vendor/pages/VendorInventoryPage
 import { VendorOrderBoardPage } from "@/features/vendor/orders/pages/VendorOrderBoardPage";
 import { VendorDisputesPage } from "@/features/vendor/disputes/pages/VendorDisputesPage";
 import { VendorBillingPage } from "@/features/vendor/pages/VendorBillingPage";
+import { VendorPosPage } from "@/features/vendor/pages/VendorPosPage";
 import { CartPage } from "@/features/cart/pages/CartPage";
 import { CheckoutPage } from "@/features/checkout/pages/CheckoutPage";
 import { BrowsePage } from "@/features/customer/pages/BrowsePage";
@@ -240,6 +241,7 @@ export const router = createBrowserRouter([
           { path: "orders", element: <VendorOrderBoardPage /> },
           { path: "disputes", element: <VendorDisputesPage /> },
           { path: "billing", element: <VendorBillingPage /> },
+          { path: "pos", element: gated(<VendorPosPage />) },
         ],
       },
       {

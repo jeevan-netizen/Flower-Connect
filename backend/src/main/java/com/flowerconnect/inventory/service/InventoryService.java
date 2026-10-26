@@ -376,6 +376,60 @@ public class InventoryService {
                 "Order cancelled - stock restocked");
     }
 
+    /**
+     * Deducts available stock for a POS walk-in sale (plan Phase 11, task 11.3).
+     * For every item, {@code quantity -= q} with a {@code SALE_POS} movement.
+     * Validates {@code available = quantity - reserved_quantity >= q} under the
+     * lock so the sale never consumes units reserved for pending orders.
+     * Inventory rows are locked in ascending product-id order to avoid
+     * deadlocks, consistent with every other stock writer (D-24).
+     *
+     * @param deltas     one entry per product to deduct, quantity is positive
+     * @param referenceId the POS transaction id, stored on each movement
+     * @param referenceType {@code pos-transaction}
+     * @param actor      the authenticated vendor
+     */
+    @Transactional
+    public void deductPosStock(List<StockDelta> deltas, Long referenceId, String referenceType, User actor) {
+        Map<Long, Inventory> locked = lockInventoriesAscending(deltas);
+        validatePosAvailability(locked, deltas);
+        applyPosStockChanges(locked, deltas, referenceId, referenceType, actor);
+    }
+
+    private void validatePosAvailability(Map<Long, Inventory> locked, List<StockDelta> deltas) {
+        for (StockDelta delta : deltas) {
+            Inventory inventory = locked.get(delta.productId());
+            int available = inventory.getAvailable();
+            if (available < delta.quantity()) {
+                Product product = requireProduct(delta.productId());
+                throw BusinessException.insufficientStock(
+                        "Only " + available + " unit(s) of '" + product.getName() +
+                                "' are available, " + delta.quantity() + " requested");
+            }
+        }
+    }
+
+    private void applyPosStockChanges(Map<Long, Inventory> locked, List<StockDelta> deltas,
+                                      Long referenceId, String referenceType, User actor) {
+        for (StockDelta delta : deltas) {
+            Inventory inventory = locked.get(delta.productId());
+            Product product = requireProduct(delta.productId());
+
+            inventory.setQuantity(inventory.getQuantity() - delta.quantity());
+            inventoryRepository.saveAndFlush(inventory);
+
+            stockMovementRepository.save(StockMovement.builder()
+                    .product(product)
+                    .movementType(StockMovement.MovementType.SALE_POS)
+                    .quantityDelta(-delta.quantity())
+                    .reason("POS walk-in sale")
+                    .referenceId(referenceId)
+                    .referenceType(referenceType)
+                    .actor(actor)
+                    .build());
+        }
+    }
+
     // ------------------------------------------------------------------
     // Validation
     // ------------------------------------------------------------------

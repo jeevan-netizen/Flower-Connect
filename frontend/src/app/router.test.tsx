@@ -236,6 +236,7 @@ describe("application router", () => {
       "orders",
       "disputes",
       "billing",
+      "pos",
     ]);
   });
 
