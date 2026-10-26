@@ -1022,5 +1022,37 @@ ew_value (VARCHAR(500) NULL) to udit_log, and seeded commission_rate_default = 
   - `VendorSettlementControllerTest`: 4 WebMvc slice tests with `RoleBoundaryTester` verifying FLORIST RBAC, list, detail, and cross-vendor isolation (403).
   - `SettlementCycleIntegrationTest`: end-to-end integration test against real MySQL 8 Testcontainer verifying full weekly settlement cycle: delivery entries -> settlement generation -> entry attachment -> idempotent replay -> finalize with admin note -> balance netting to 0.00 -> 409 conflict guards.
 
+### Stage 5 (Task 10.5: Vendor Billing UI & CSV Statements) - COMPLETE (2026-10-26)
+
+- **Backend Statement Generation & Endpoints:**
+  - `StatementService`:
+    - `generateVendorStatementCsv(vendorId, periodStart, periodEnd)`: generates official CSV account statement.
+    - Strict OWASP formula injection protection: any cell beginning with `=`, `+`, `-`, `@`, `\t`, or `\r` is escaped by prepending `'` inside double quotes (`"'=cmd|' /C..."`). Quotes are escaped by doubling (`""`).
+    - Outputs metadata header (business name, period, generation timestamp), formatted transaction rows (`Entry ID`, `Date`, `Type`, `Order ID`, `Dispute ID`, `Reference`, `Amount`), and grand total row.
+  - `VendorBillingLedgerController`: added `GET /api/v1/vendor/billing/statement` returning CSV file attachment (`Content-Disposition: attachment; filename="statement-vendor-...csv"`).
+  - `AdminBillingLedgerController`: added `GET /api/v1/admin/billing/statement` returning CSV file attachment for specified vendor.
+- **Frontend Vendor Billing UI (`/vendor/billing`):**
+  - Types & API (`frontend/src/features/vendor/billing/`):
+    - `types.ts`: TypeScript contracts for rate, balance, settlements, ledger entries, and pagination envelopes.
+    - `api.ts`: API clients for `fetchVendorBillingRate`, `fetchVendorOutstandingBalance`, `fetchVendorLedger`, `fetchVendorSettlements`, `fetchVendorSettlementDetail`, and `downloadVendorStatementCsv` (creates and clicks temporary blob anchor).
+    - `queries.ts`: TanStack React Query hooks with structured cache keys (`VENDOR_BILLING_KEYS`).
+  - Components (`frontend/src/features/vendor/billing/components/`):
+    - `OutstandingBalanceCard`: visual gradient card displaying unattached balance in INR with badge states ("Platform Owes You", "Remittance Due", "Settled").
+    - `CommissionRateCard`: effective marketplace commission rate percentage with subtotal scope guidance.
+    - `StatementDownloadCard`: date range picker with validation, loading indicator, and OWASP formula protection notice.
+    - `SettlementHistoryTable`: weekly cycle netting table displaying period, total credits, total dues, net amount, direction, status badges (`PENDING` / `SETTLED`), admin reference note, and "View Entries" drilldown affordance.
+    - `SettlementDetailModal`: modal displaying attached transactions and summary for a selected settlement cycle.
+    - `LedgerTransactionTable`: double-entry transaction log with type filtering (`ONLINE_ORDER_CREDIT`, `COD_DUES`, `DISPUTE_ADJUSTMENT`, `SETTLEMENT_PAYMENT`), signed amounts (+ green, - amber), order/dispute links, and pagination controls.
+  - Pages & Routing:
+    - `VendorBillingPage` (`frontend/src/features/vendor/pages/VendorBillingPage.tsx`): composed dashboard page with error handling and retry affordance.
+    - Registered route `/vendor/billing` in `frontend/src/app/router.tsx`.
+    - Added "Billing & Payouts" navigation item in `frontend/src/features/vendor/components/VendorLayout.tsx`.
+    - Configured `pool: "forks"` in `frontend/vite.config.ts` for fast, reliable vitest execution on Windows.
+- **Verification:**
+  - Backend tests: `StatementServiceTest` (4/4), `VendorBillingLedgerControllerTest` (5/5), `AdminBillingLedgerControllerTest` (5/5) — 14/14 passed.
+  - Frontend tests: `api.test.ts` (6/6), `VendorBillingPage.test.tsx` (4/4) — 10/10 passed.
+  - Frontend typecheck (`npm run typecheck`), lint (`npm run lint`), and production build (`npm run build`) all passed cleanly.
+
+
 
 

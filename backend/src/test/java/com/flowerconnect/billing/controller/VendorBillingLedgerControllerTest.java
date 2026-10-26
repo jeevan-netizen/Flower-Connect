@@ -19,6 +19,7 @@ package com.flowerconnect.billing.controller;
 import com.flowerconnect.billing.domain.SettlementEntry;
 import com.flowerconnect.billing.domain.SettlementEntryType;
 import com.flowerconnect.billing.service.BillingLedgerService;
+import com.flowerconnect.billing.service.StatementService;
 import com.flowerconnect.config.TestClockConfig;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
@@ -85,6 +86,9 @@ class VendorBillingLedgerControllerTest {
 
     @MockBean
     private BillingLedgerService billingLedgerService;
+
+    @MockBean
+    private StatementService statementService;
 
     private RoleBoundaryTester roleBoundaryTester;
     private User vendorUser;
@@ -166,5 +170,21 @@ class VendorBillingLedgerControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.vendorId").value(20))
                 .andExpect(jsonPath("$.outstandingBalance").value(70.00));
+    }
+
+    @Test
+    @WithMockUser(username = "florist@test.com", roles = {"FLORIST"})
+    @DisplayName("GET /api/v1/vendor/billing/statement returns CSV file attachment")
+    void getStatementReturnsCsv() throws Exception {
+        byte[] sampleCsv = "\"Entry ID\",\"Amount\"\r\n\"1\",\"100.00\"\r\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        when(statementService.generateVendorStatementCsv(eq(20L), any(), any())).thenReturn(sampleCsv);
+
+        mockMvc.perform(get("/api/v1/vendor/billing/statement")
+                        .param("periodStart", "2026-10-01")
+                        .param("periodEnd", "2026-10-07"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Type", "text/csv; charset=UTF-8"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "attachment; filename=\"statement-vendor-20-2026-10-01-2026-10-07.csv\""))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(sampleCsv));
     }
 }

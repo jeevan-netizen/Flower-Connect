@@ -21,6 +21,7 @@ import com.flowerconnect.billing.domain.SettlementEntryType;
 import com.flowerconnect.billing.dto.OutstandingBalanceResponse;
 import com.flowerconnect.billing.dto.SettlementEntryPageResponse;
 import com.flowerconnect.billing.service.BillingLedgerService;
+import com.flowerconnect.billing.service.StatementService;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
@@ -54,6 +55,7 @@ public class VendorBillingLedgerController {
     private final VendorProfileRepository vendorProfileRepository;
     private final UserRepository userRepository;
     private final BillingLedgerService billingLedgerService;
+    private final StatementService statementService;
 
     @GetMapping("/ledger")
     public ResponseEntity<SettlementEntryPageResponse> getLedger(
@@ -86,5 +88,26 @@ public class VendorBillingLedgerController {
                 .vendorId(vendor.getId())
                 .outstandingBalance(balance)
                 .build());
+    }
+
+    @GetMapping("/statement")
+    public ResponseEntity<byte[]> getStatement(
+            Authentication authentication,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate periodStart,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate periodEnd) {
+
+        User caller = userRepository.findByEmailWithRole(authentication.getName())
+                .orElseThrow(() -> BusinessException.unauthorized("Authenticated user not found"));
+
+        VendorProfile vendor = vendorProfileRepository.findByUserEmail(caller.getEmail())
+                .orElseThrow(() -> BusinessException.notFound("Vendor profile not found"));
+
+        byte[] csv = statementService.generateVendorStatementCsv(vendor.getId(), periodStart, periodEnd);
+        String filename = "statement-vendor-" + vendor.getId() + "-" + periodStart + "-" + periodEnd + ".csv";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                .body(csv);
     }
 }

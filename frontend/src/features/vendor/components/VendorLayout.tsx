@@ -34,6 +34,7 @@ const NAV_ITEMS: VendorNavItem[] = [
   { to: "/vendor/orders", label: "Orders" },
   { to: "/vendor/catalog", label: "Catalog", requiresApproval: true },
   { to: "/vendor/inventory", label: "Inventory", requiresApproval: true },
+  { to: "/vendor/billing", label: "Billing & Payouts" },
   { to: "/vendor/profile", label: "Profile" },
   { to: "/vendor/settings", label: "Delivery settings" },
   { to: "/vendor/hours", label: "Operating hours" },

@@ -21,6 +21,7 @@ import com.flowerconnect.billing.domain.SettlementEntryType;
 import com.flowerconnect.billing.dto.OutstandingBalanceResponse;
 import com.flowerconnect.billing.dto.SettlementEntryPageResponse;
 import com.flowerconnect.billing.service.BillingLedgerService;
+import com.flowerconnect.billing.service.StatementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -47,6 +48,7 @@ import java.time.LocalDateTime;
 public class AdminBillingLedgerController {
 
     private final BillingLedgerService billingLedgerService;
+    private final StatementService statementService;
 
     @GetMapping("/ledger")
     public ResponseEntity<SettlementEntryPageResponse> getAllLedger(
@@ -67,5 +69,20 @@ public class AdminBillingLedgerController {
                 .vendorId(vendorId)
                 .outstandingBalance(balance)
                 .build());
+    }
+
+    @GetMapping("/statement")
+    public ResponseEntity<byte[]> getStatement(
+            @RequestParam Long vendorId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate periodStart,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate periodEnd) {
+
+        byte[] csv = statementService.generateVendorStatementCsv(vendorId, periodStart, periodEnd);
+        String filename = "statement-vendor-" + vendorId + "-" + periodStart + "-" + periodEnd + ".csv";
+
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                .body(csv);
     }
 }
