@@ -17,6 +17,7 @@ import com.flowerconnect.checkout.dto.CheckoutShopQuote;
 import com.flowerconnect.checkout.repository.CheckoutIdempotencyRepository;
 import com.flowerconnect.config.AppProperties;
 import com.flowerconnect.config.CheckoutProperties;
+import com.flowerconnect.billing.service.CommissionRateService;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
@@ -71,11 +72,11 @@ import java.util.stream.Collectors;
  *
  * <p>Validations per shop (vendor):
  * <ol>
- *   <li>Vendor is {@code APPROVED} and {@code acceptingOrders = true} — 403/409.</li>
- *   <li>Address is within {@code delivery_radius_km} — 400 if not.</li>
- *   <li>Subtotal meets {@code min_order_amount} — 400 {@code MINIMUM_ORDER} if not.</li>
- *   <li>Selected slot is valid and has capacity — 409 {@code SLOT_FULL} if not.</li>
- *   <li>Per-item available stock ≥ cart quantity — 409 {@code INSUFFICIENT_STOCK} if not.</li>
+ *   <li>Vendor is {@code APPROVED} and {@code acceptingOrders = true} â€” 403/409.</li>
+ *   <li>Address is within {@code delivery_radius_km} â€” 400 if not.</li>
+ *   <li>Subtotal meets {@code min_order_amount} â€” 400 {@code MINIMUM_ORDER} if not.</li>
+ *   <li>Selected slot is valid and has capacity â€” 409 {@code SLOT_FULL} if not.</li>
+ *   <li>Per-item available stock â‰¥ cart quantity â€” 409 {@code INSUFFICIENT_STOCK} if not.</li>
  * </ol>
  *
  * <p>Price calculation (decision C-1): the {@code priceSnapshot} on each cart
@@ -86,7 +87,7 @@ import java.util.stream.Collectors;
  * can proceed.
  *
  * <p>All monetary arithmetic uses {@code BigDecimal} with {@code HALF_UP}
- * scale 2. Prices are tax-inclusive (D-3) — no tax line is added.
+ * scale 2. Prices are tax-inclusive (D-3) â€” no tax line is added.
  */
 @Slf4j
 @Service
@@ -102,6 +103,7 @@ public class CheckoutService {
     private final UserRepository userRepository;
     private final AddressRepository addressRepository;
     private final CheckoutProperties checkoutProperties;
+private final CommissionRateService commissionRateService;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
@@ -510,7 +512,7 @@ public class CheckoutService {
             }
         }
 
-        // 13. Process each vendor — reserve stock, check slot capacity, create orders
+        // 13. Process each vendor â€” reserve stock, check slot capacity, create orders
         List<CheckoutResponse.OrderSummary> orderSummaries = new ArrayList<>();
         BigDecimal grandTotal = BigDecimal.ZERO;
         LocalDateTime now = LocalDateTime.now(clock);
@@ -630,7 +632,7 @@ public class CheckoutService {
                     .deliveryFee(deliveryFee)
                     .platformFee(platformFee)
                     .total(shopTotal)
-                    .commissionRate(vendor.getCommissionRate() != null ? vendor.getCommissionRate() : checkoutProperties.getDefaultCommissionRate())
+                    .commissionRate(commissionRateService.toPercentage(commissionRateService.resolveRate(vendor)))
                     .deliveryAddressLine1(address.getLine1())
                     .deliveryAddressLine2(address.getLine2())
                     .deliveryServiceLocation(address.getServiceLocation())
@@ -748,7 +750,7 @@ public class CheckoutService {
             paymentIntentRepository.saveAndFlush(intent);
         }
 
-        // 13. Complete the idempotency record — only set after all orders are written
+        // 13. Complete the idempotency record â€” only set after all orders are written
         idempotencyRecord.setCompletedAt(LocalDateTime.now(clock));
         idempotencyRepository.saveAndFlush(idempotencyRecord);
 
@@ -788,7 +790,7 @@ public class CheckoutService {
      */
     private CheckoutIdempotency handleIdempotency(Long userId, String clientOrderId,
                                                    String checkoutFingerprint) {
-        // 1. Check if record already exists — fast read path for idempotent replays
+        // 1. Check if record already exists â€” fast read path for idempotent replays
         Optional<CheckoutIdempotency> existingOpt = idempotencyRepository.findByUserIdAndClientOrderId(userId, clientOrderId);
         if (existingOpt.isPresent()) {
             CheckoutIdempotency existing = existingOpt.get();
@@ -798,7 +800,7 @@ public class CheckoutService {
                         "A checkout with this clientOrderId is already in progress. Please wait and retry.");
             }
 
-            // Completed — verify fingerprint using constant-time comparison to prevent timing attacks
+            // Completed â€” verify fingerprint using constant-time comparison to prevent timing attacks
             if (!MessageDigest.isEqual(
                     existing.getCheckoutFingerprint().getBytes(StandardCharsets.UTF_8),
                     checkoutFingerprint.getBytes(StandardCharsets.UTF_8))) {
@@ -810,7 +812,7 @@ public class CheckoutService {
             return existing;
         }
 
-        // 2. Not present — attempt to insert pending record in current transaction
+        // 2. Not present â€” attempt to insert pending record in current transaction
         try {
             CheckoutIdempotency record = CheckoutIdempotency.builder()
                     .userId(userId)
@@ -1047,7 +1049,7 @@ public class CheckoutService {
 
     /**
      * Calculates the delivery fee for a vendor.
-     * Formula: baseFee + perKmFee × distanceKm, or 0 if subtotal ≥ freeDeliveryAbove.
+     * Formula: baseFee + perKmFee Ã— distanceKm, or 0 if subtotal â‰¥ freeDeliveryAbove.
      */
     private BigDecimal calculateDeliveryFee(VendorProfile vendor, BigDecimal subtotal, BigDecimal distanceKm) {
         if (vendor.getFreeDeliveryAbove() != null &&

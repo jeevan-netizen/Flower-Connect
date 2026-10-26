@@ -43,6 +43,12 @@ public class AuditLog {
     @Column(name = "reason", length = 500)
     private String reason;
 
+    @Column(name = "previous_value", length = 500)
+    private String previousValue;
+
+    @Column(name = "new_value", length = 500)
+    private String newValue;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

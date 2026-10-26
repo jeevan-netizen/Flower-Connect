@@ -928,3 +928,30 @@ neither is claimed as passed. No implementation change was made for this, and no
 artifact was left in the tree (a scratch `tests/e2e/notification-sse-flow.test.ts` was
 created and removed).
 
+
+## Phase 10: Billing, Commissions, and Settlement Ledger
+
+### Stage 1 (Task 10.1: Commission Rates) - COMPLETE (2026-10-26)
+
+- **Schema Migrations:**
+  - V26__commission_rate_percentage_schema.sql: modified endor_profiles.commission_rate and orders.commission_rate to DECIMAL(5,2) with CHECK (commission_rate IS NULL OR (commission_rate >= 0 AND commission_rate <= 100)).
+  - V27__billing_settings_and_audit_columns.sql: added previous_value and 
+ew_value (VARCHAR(500) NULL) to udit_log, and seeded commission_rate_default = '10.00' in platform_config.
+- **Service & Domain:**
+  - CommissionRateService: implements resolution order (vendor override -> platform default -> CheckoutProperties legacy fallback), multiplier conversion (0.0000-1.0000), percentage conversion (0.00-100.00), and strict validation (0.00 to 100.00 inclusive, max 2 decimal places).
+  - PlatformConfigService: admin-driven read and update of platform_config.commission_rate_default with audit logging.
+  - AuditLog, VendorProfile, Order, CheckoutService updated for percentage precision and rate resolution.
+- **Endpoints:**
+  - GET /api/v1/admin/platform-settings/commission-rate (ADMIN)
+  - PATCH /api/v1/admin/platform-settings/commission-rate (ADMIN)
+  - GET /api/v1/admin/vendors/{id}/commission-rate (ADMIN)
+  - PATCH /api/v1/admin/vendors/{id}/commission-rate (ADMIN)
+  - DELETE /api/v1/admin/vendors/{id}/commission-rate (ADMIN - clear override)
+  - GET /api/v1/vendor/billing/rate (FLORIST - authenticated vendor effective rate)
+- **Tests:**
+  - CommissionRateServiceTest: 10 unit tests covering override precedence, platform default, legacy fallback, boundary rates (0.00% and 100.00%), out-of-bounds, scale, and conversions.
+  - PlatformConfigServiceTest: 5 unit tests covering reads, writes, audit logs, and validation.
+  - AdminCommissionRateControllerTest: 10 WebMvc slice tests with RoleBoundaryTester, validating RBAC, input checks, audit writes, and 404 handling.
+  - VendorBillingRateControllerTest: 3 WebMvc slice tests with RoleBoundaryTester validating vendor scoping and RBAC.
+  - CommissionRateIntegrationTest: 1 full integration test against real MySQL on Testcontainers testing the end-to-end lifecycle.
+

@@ -14,6 +14,8 @@ import com.flowerconnect.checkout.dto.CheckoutRequest;
 import com.flowerconnect.checkout.dto.CheckoutResponse;
 import com.flowerconnect.checkout.dto.CheckoutShopQuote;
 import com.flowerconnect.config.CheckoutProperties;
+import com.flowerconnect.config.PlatformConfigRepository;
+import com.flowerconnect.billing.service.CommissionRateService;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.ServiceLocation;
 import com.flowerconnect.domain.User;
@@ -72,6 +74,10 @@ class CheckoutServiceTest {
     private ServiceLocationRepository serviceLocationRepository;
     @Mock
     private CheckoutProperties checkoutProperties;
+    @Mock
+    private PlatformConfigRepository platformConfigRepository;
+    @Mock
+    private CommissionRateService commissionRateService;
     @Mock
     private com.flowerconnect.order.repository.OrderRepository orderRepository;
     @Mock
@@ -457,9 +463,9 @@ class CheckoutServiceTest {
         CheckoutQuoteResponse response = checkoutService.generateQuote("customer@test.com", sampleRequest());
 
         CheckoutShopQuote shop = response.getShops().get(0);
-        // 2 × 299.00 = 598.00 subtotal
+        // 2 Ã— 299.00 = 598.00 subtotal
         assertThat(shop.getSubtotal()).isEqualByComparingTo(new BigDecimal("598.00"));
-        // Delivery fee = base (30) + perKm (5) × distance
+        // Delivery fee = base (30) + perKm (5) Ã— distance
         assertThat(shop.getDeliveryFee()).isNotNull();
         assertThat(shop.getDeliveryFee().compareTo(BigDecimal.ZERO)).isGreaterThan(0);
         // Total = subtotal + deliveryFee + platformFee (0)

@@ -77,7 +77,7 @@ public class Order {
     @Column(name = "total", precision = 10, scale = 2, nullable = false)
     private BigDecimal total;
 
-    @Column(name = "commission_rate", precision = 5, scale = 4)
+    @Column(name = "commission_rate", precision = 5, scale = 2)
     private BigDecimal commissionRate;
 
     @Column(name = "delivery_address_line1", length = 255, nullable = false)
@@ -136,3 +136,4 @@ public class Order {
         PENDING, PAID, COLLECTED, FAILED, REFUND_PENDING, REFUNDED
     }
 }
+

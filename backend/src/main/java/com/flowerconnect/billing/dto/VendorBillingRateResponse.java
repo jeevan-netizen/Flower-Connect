@@ -1,0 +1,39 @@
+/*
+ * Copyright 2026 FlowerConnect
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.flowerconnect.billing.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+
+/**
+ * Vendor's effective commission rate view (Option A).
+ *
+ * <p>Percentage 0-100 with 2 dp, e.g. {@code 10.00} means 10%.
+ */
+@Getter
+@NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
+@AllArgsConstructor
+@Builder
+public class VendorBillingRateResponse {
+
+    /** Stored as a percentage (0-100), not a 0-1 multiplier. */
+    private BigDecimal rate;
+}

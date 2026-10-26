@@ -57,7 +57,7 @@ public class VendorProfile {
     @Column(name = "status", nullable = false)
     private Status status;
 
-    @Column(name = "commission_rate", precision = 5, scale = 4)
+    @Column(name = "commission_rate", precision = 5, scale = 2)
     private BigDecimal commissionRate;
 
     @Column(name = "avg_rating", precision = 3, scale = 2)
@@ -102,3 +102,4 @@ public class VendorProfile {
         PENDING_APPROVAL, APPROVED, REJECTED, SUSPENDED
     }
 }
+
