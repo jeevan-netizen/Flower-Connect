@@ -94,6 +94,7 @@ public class DisputeService {
     private final AuditLogRepository auditLogRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
+    private final com.flowerconnect.billing.service.BillingLedgerService billingLedgerService;
 
     /**
      * Raises a dispute for the given order on behalf of the authenticated customer.
@@ -447,6 +448,9 @@ public class DisputeService {
         dispute.setResolvedAt(now);
         dispute.setRefundAmount(refundAmount);
         disputeRepository.saveAndFlush(dispute);
+
+        // Phase 10: atomically create dispute adjustment in settlement ledger
+        billingLedgerService.recordDisputeAdjustment(dispute, newStatus, refundAmount);
 
         // Coordinate with PaymentService for online payments
         // Only refund outcomes (RESOLVED_REFUND / RESOLVED_PARTIAL) touch payment;

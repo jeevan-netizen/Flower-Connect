@@ -52,6 +52,7 @@ public class CommissionService {
     private final CommissionRepository commissionRepository;
     private final OrderRepository orderRepository;
     private final CommissionRateService commissionRateService;
+    private final BillingLedgerService billingLedgerService;
 
     /** Idempotent read/create of the commission row for a DELIVERED order. */
     @Transactional
@@ -61,7 +62,12 @@ public class CommissionService {
         }
 
         if (commissionRepository.existsByOrderId(order.getId())) {
-            return commissionRepository.findByOrderId(order.getId()).orElse(null);
+            Commission existing = commissionRepository.findByOrderId(order.getId()).orElse(null);
+            if (existing != null) {
+                Order reloaded = orderRepository.findById(order.getId()).orElse(order);
+                billingLedgerService.recordOrderDelivery(reloaded, existing);
+            }
+            return existing;
         }
 
         Order reloaded = orderRepository.findById(order.getId()).orElse(order);
@@ -92,12 +98,17 @@ public class CommissionService {
                     .build();
 
             Commission saved = commissionRepository.saveAndFlush(commission);
+            billingLedgerService.recordOrderDelivery(reloaded, saved);
             log.info("Commission {} created for order {} (vendor {}%, amount {})",
                     saved.getId(), reloaded.getId(), saved.getCommissionRate(), saved.getCommissionAmount());
             return saved;
         } catch (DataIntegrityViolationException ex) {
             log.warn("Commission for order {} was created concurrently; returning existing", order.getId());
-            return commissionRepository.findByOrderId(order.getId()).orElse(null);
+            Commission existing = commissionRepository.findByOrderId(order.getId()).orElse(null);
+            if (existing != null) {
+                billingLedgerService.recordOrderDelivery(reloaded, existing);
+            }
+            return existing;
         }
     }
 

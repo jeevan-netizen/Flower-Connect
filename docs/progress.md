@@ -968,4 +968,29 @@ ew_value (VARCHAR(500) NULL) to udit_log, and seeded commission_rate_default = 
   - `CommissionIntegrationTest`: 5 integration tests against real MySQL on Testcontainers verifying delivery-time rate snapshot (pre-delivery rate changes reflected; post-delivery rate changes ignored), subtotal 333.33 at 7.5% rounding and fee exclusion, duplicate call idempotency, cancellation/rejection exclusion, and backfill idempotency.
   - `OrderStateMachineTest`: updated mock dependency and verified all 333 test cases pass.
 
+### Stage 3 (Task 10.3: Settlement Ledger) - COMPLETE (2026-10-26)
+
+- **Schema Migration:**
+  - `V29__create_settlement_ledger_tables.sql`: creates `settlements` and `settlement_entries` tables with foreign keys, unique constraints (`uq_settlements_vendor_period`, `uq_settlement_entries_order`, `uq_settlement_entries_dispute`), native `ENUM` types for `direction`, `status`, and `type` (`ONLINE_ORDER_CREDIT`, `COD_DUES`, `DISPUTE_ADJUSTMENT`, `SETTLEMENT_PAYMENT`), `DECIMAL(12,2)` signed amounts, and composite indexes.
+- **Domain & Service:**
+  - Domain models: `SettlementEntry`, `Settlement`, `SettlementEntryType`, `SettlementDirection`, and top-level `SettlementStatus`.
+  - Immutability: `SettlementEntry` is append-only with no setters except `attachToSettlement` which has single-attachment validation.
+  - Repositories: `SettlementEntryRepository` (with `calculateOutstandingBalance` using `LEFT JOIN se.settlement s` to accurately include unattached and `PENDING` settlement entries while excluding `SETTLED` ones; `findEligibleUnattachedForSettlement`, `findByVendorIdAndDateRange`), `SettlementRepository`.
+  - `BillingLedgerService`:
+    - `recordOrderDelivery(order, commission)`: creates `ONLINE_ORDER_CREDIT = +(subtotal - commission + deliveryFee)` for online orders; creates `COD_DUES = -(commission + platformFee)` for COD orders. Non-delivered orders are rejected. Idempotent via `order_id` unique constraint.
+    - `recordDisputeAdjustment(dispute, newStatus, refundAmount)`: creates `DISPUTE_ADJUSTMENT = -refundAmount` (reverses original credit for full refund). Idempotent via `dispute_id` unique constraint.
+    - `getOutstandingBalance(vendorId)`: computes signed net balance across unattached and pending entries.
+    - `getVendorLedger` and `getAllLedger`: paginated queries supporting date and entry type filters.
+  - Integrated into `CommissionService` inside the order delivery transaction and into `DisputeService` in `resolveDispute` before commit.
+- **Controllers & DTOs:**
+  - `VendorBillingLedgerController`: `GET /api/v1/vendor/billing/ledger` and `GET /api/v1/vendor/billing/outstanding` (FLORIST RBAC).
+  - `AdminBillingLedgerController`: `GET /api/v1/admin/billing/ledger` and `GET /api/v1/admin/billing/outstanding/{vendorId}` (ADMIN RBAC).
+  - DTOs: `SettlementEntryResponse`, `SettlementEntryPageResponse`, `OutstandingBalanceResponse`.
+- **Tests:**
+  - `BillingLedgerServiceTest`: 10 unit tests covering formulas, worked examples (online credit, COD dues), dispute adjustments, non-delivered order rejection, immutability, and balance netting.
+  - `VendorBillingLedgerControllerTest`: 4 WebMvc slice tests with `RoleBoundaryTester` validating FLORIST RBAC and 200 responses.
+  - `AdminBillingLedgerControllerTest`: 4 WebMvc slice tests with `RoleBoundaryTester` validating ADMIN RBAC and 200 responses.
+  - `SettlementLedgerIntegrationTest`: 3 integration tests against real MySQL on Testcontainers testing delivered order entries, dispute adjustments, balance netting, and cancellation/rejection exclusion.
+
+
 

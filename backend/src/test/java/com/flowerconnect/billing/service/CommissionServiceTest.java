@@ -49,6 +49,8 @@ class CommissionServiceTest {
     private OrderRepository orderRepository;
     @Mock
     private CommissionRateService commissionRateService;
+    @Mock
+    private BillingLedgerService billingLedgerService;
 
     private CommissionService commissionService;
 
@@ -58,7 +60,7 @@ class CommissionServiceTest {
 
     @BeforeEach
     void setUp() {
-        commissionService = new CommissionService(commissionRepository, orderRepository, commissionRateService);
+        commissionService = new CommissionService(commissionRepository, orderRepository, commissionRateService, billingLedgerService);
 
         vendor = VendorProfile.builder()
                 .id(1L)
