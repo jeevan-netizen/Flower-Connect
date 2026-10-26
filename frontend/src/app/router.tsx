@@ -38,6 +38,7 @@ import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
 import { AdminUsersPage } from "@/features/admin/pages/AdminUsersPage";
+import { AdminBillingPage } from "@/features/admin/pages/AdminBillingPage";
 
 /** Seeded role name for customers (V3__seed_roles.sql). */
 const CUSTOMER_ROLE = "CUSTOMER";
@@ -259,6 +260,7 @@ export const router = createBrowserRouter([
           { path: "refunds", element: <AdminRefundsPage /> },
           { path: "orders/lookup", element: <AdminOrderLookupPage /> },
           { path: "disputes", element: <AdminDisputesPage /> },
+          { path: "billing", element: <AdminBillingPage /> },
         ],
       },
     ],

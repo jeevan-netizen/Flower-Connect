@@ -22,6 +22,7 @@ const NAV_ITEMS: AdminNavItem[] = [
   { to: "/admin", label: "Dashboard", end: true },
   { to: "/admin/vendors", label: "Vendors" },
   { to: "/admin/users", label: "Users" },
+  { to: "/admin/billing", label: "Billing & Settlements" },
 ];
 
 function navClass({ isActive }: { isActive: boolean }): string {

@@ -1053,6 +1053,29 @@ ew_value (VARCHAR(500) NULL) to udit_log, and seeded commission_rate_default = 
   - Frontend tests: `api.test.ts` (6/6), `VendorBillingPage.test.tsx` (4/4) — 10/10 passed.
   - Frontend typecheck (`npm run typecheck`), lint (`npm run lint`), and production build (`npm run build`) all passed cleanly.
 
+### Stage 6 (Task 10.6: Admin Billing UI) - COMPLETE (2026-10-26)
+
+- **Frontend Admin Billing UI (`/admin/billing`):**
+  - Types & API (`frontend/src/features/admin/billing/`):
+    - `types.ts`: TypeScript contracts for platform default commission rate, vendor override rate, manual settlement run request, finalization request, and filter interfaces.
+    - `api.ts`: API clients for `fetchPlatformCommissionRate`, `updatePlatformCommissionRate`, `updateVendorCommissionRate`, `fetchAdminVendorOutstanding`, `fetchAdminSettlements`, `fetchAdminSettlementDetail`, `runAdminSettlement`, `finalizeAdminSettlement`, `fetchAdminLedger`, and `downloadAdminStatementCsv`.
+    - `queries.ts`: TanStack React Query hooks and mutations (`usePlatformCommissionRate`, `useUpdatePlatformCommissionRate`, `useUpdateVendorCommissionRate`, `useAdminVendorOutstanding`, `useAdminSettlements`, `useAdminSettlementDetail`, `useRunAdminSettlement`, `useFinalizeAdminSettlement`, `useAdminLedger`).
+  - Components (`frontend/src/features/admin/billing/components/`):
+    - `PlatformCommissionCard`: displays platform default rate percentage with inline editor to update default rate (`PATCH /api/v1/admin/platform-settings/commission-rate`).
+    - `VendorRateOverrideCard`: vendor lookup card displaying vendor unattached signed balance and providing form to set custom commission rate override (`PATCH /api/v1/admin/vendors/{vendorId}/commission-rate`).
+    - `RunSettlementModal`: dialog to trigger manual settlement cycles for a date range with optional vendor ID filter (`POST /api/v1/admin/billing/settlements/run`).
+    - `FinalizeSettlementModal`: dialog capturing required admin reference note (`@NotBlank`) to transition pending settlements to `SETTLED` (`PATCH /api/v1/admin/billing/settlements/{id}/finalize`).
+    - `AdminSettlementTable`: filterable table of weekly settlements with status badges, pagination, manual run trigger, and finalize action.
+    - `AdminLedgerTable`: all-vendor double-entry transaction log with type filtering, vendor ID filter, and date-range CSV statement download form.
+  - Pages & Routing:
+    - `AdminBillingPage` (`frontend/src/features/admin/pages/AdminBillingPage.tsx`): composed admin dashboard page with error handling and retry affordance.
+    - Registered route `/admin/billing` in `frontend/src/app/router.tsx`.
+    - Added "Billing & Settlements" navigation item in `frontend/src/features/admin/components/AdminLayout.tsx`.
+- **Verification:**
+  - Frontend tests: `src/features/admin/billing/api.test.ts` (10/10), `src/features/admin/pages/AdminBillingPage.test.tsx` (6/6) — 16/16 passed.
+  - Frontend typecheck (`npm run typecheck`), lint (`npm run lint`), and production build (`npm run build`) all passed cleanly.
+
+
 
 
 
