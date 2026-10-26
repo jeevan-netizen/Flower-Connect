@@ -27,6 +27,12 @@ public class AppProperties {
      */
     private String settlementCron = "0 0 0 * * 0";
 
+    /**
+     * Threshold in days before unattached negative dues are considered overdue (plan task 10.7).
+     * Defaults to 30 days. Override with {@code APP_BILLING_OVERDUE_DAYS} or {@code app.overdue-days}.
+     */
+    private int overdueDays = 30;
+
 
     /**
      * Cron expression for the notification SSE heartbeat (plan task 9.5). The
@@ -279,5 +285,13 @@ public class AppProperties {
 
     public void setSettlementCron(String settlementCron) {
         this.settlementCron = settlementCron;
+    }
+
+    public int getOverdueDays() {
+        return overdueDays;
+    }
+
+    public void setOverdueDays(int overdueDays) {
+        this.overdueDays = overdueDays;
     }
 }

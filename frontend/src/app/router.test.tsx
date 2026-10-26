@@ -235,6 +235,7 @@ describe("application router", () => {
       "inventory",
       "orders",
       "disputes",
+      "billing",
     ]);
   });
 
@@ -598,6 +599,7 @@ describe("admin route protection", () => {
       "refunds",
       "orders/lookup",
       "disputes",
+      "billing",
     ]);
   });
 

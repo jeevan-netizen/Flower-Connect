@@ -81,4 +81,23 @@ public interface SettlementEntryRepository extends JpaRepository<SettlementEntry
            "ORDER BY se.createdAt ASC")
     List<SettlementEntry> findByVendorIdAndDateRange(
             @Param("vendorId") Long vendorId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    /**
+     * Finds distinct vendor IDs that have open (unattached or PENDING) negative ledger entries.
+     */
+    @Query("SELECT DISTINCT se.vendor.id FROM SettlementEntry se " +
+           "LEFT JOIN se.settlement s " +
+           "WHERE (s IS NULL OR s.status = com.flowerconnect.billing.domain.SettlementStatus.PENDING) " +
+           "AND se.amount < 0")
+    List<Long> findDistinctVendorIdsWithOpenNegativeEntries();
+
+    /**
+     * Finds the creation timestamp of the oldest open (unattached or PENDING) negative ledger entry for a vendor.
+     */
+    @Query("SELECT MIN(se.createdAt) FROM SettlementEntry se " +
+           "LEFT JOIN se.settlement s " +
+           "WHERE se.vendor.id = :vendorId " +
+           "AND (s IS NULL OR s.status = com.flowerconnect.billing.domain.SettlementStatus.PENDING) " +
+           "AND se.amount < 0")
+    Optional<LocalDateTime> findOldestOpenNegativeEntryDate(@Param("vendorId") Long vendorId);
 }

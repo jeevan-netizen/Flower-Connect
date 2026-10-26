@@ -19,12 +19,13 @@ import { PageHeading } from "@/features/vendor/components/StatCard";
 import { AdminErrorState } from "@/features/admin/components/AdminErrorState";
 import { PlatformCommissionCard } from "../billing/components/PlatformCommissionCard";
 import { VendorRateOverrideCard } from "../billing/components/VendorRateOverrideCard";
+import { OverdueVendorsCard } from "../billing/components/OverdueVendorsCard";
 import { AdminSettlementTable } from "../billing/components/AdminSettlementTable";
 import { AdminLedgerTable } from "../billing/components/AdminLedgerTable";
 import { RunSettlementModal } from "../billing/components/RunSettlementModal";
 import { FinalizeSettlementModal } from "../billing/components/FinalizeSettlementModal";
 import { SettlementDetailModal } from "@/features/vendor/billing/components/SettlementDetailModal";
-import { useAdminLedger, useAdminSettlements } from "../billing/queries";
+import { useAdminLedger, useAdminOverdueVendors, useAdminSettlements } from "../billing/queries";
 import type { SettlementEntryType, SettlementResponse, SettlementStatus } from "../billing/types";
 
 export function AdminBillingPage() {
@@ -71,6 +72,11 @@ export function AdminBillingPage() {
     vendorId: parsedLedgerVendorId,
   });
 
+  const {
+    data: overdueData,
+    isLoading: overdueLoading,
+  } = useAdminOverdueVendors();
+
   if (settlementsError || ledgerError) {
     return (
       <AdminErrorState
@@ -95,6 +101,16 @@ export function AdminBillingPage() {
         <PlatformCommissionCard />
         <VendorRateOverrideCard />
       </div>
+
+      {/* Overdue Accounts Notice (v1 Advisory Policy) */}
+      <OverdueVendorsCard
+        overdueVendors={overdueData}
+        isLoading={overdueLoading}
+        onFilterVendor={(vId) => {
+          setLedgerVendorId(String(vId));
+          setLedgerPage(0);
+        }}
+      />
 
       {/* Settlements Table Section */}
       <div>

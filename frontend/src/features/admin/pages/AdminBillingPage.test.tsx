@@ -33,6 +33,7 @@ vi.mock("../billing/api", () => ({
   finalizeAdminSettlement: vi.fn(),
   fetchAdminLedger: vi.fn(),
   downloadAdminStatementCsv: vi.fn(),
+  fetchAdminOverdueVendors: vi.fn(),
 }));
 
 const mockPlatformRate = { configKey: "commission_rate_default", rate: 10.0 };
@@ -91,6 +92,7 @@ function setupSuccessful() {
   vi.mocked(adminBillingApi.fetchPlatformCommissionRate).mockResolvedValue(mockPlatformRate);
   vi.mocked(adminBillingApi.fetchAdminSettlements).mockResolvedValue(mockSettlements);
   vi.mocked(adminBillingApi.fetchAdminLedger).mockResolvedValue(mockLedger);
+  vi.mocked(adminBillingApi.fetchAdminOverdueVendors).mockResolvedValue([]);
   return renderWithProviders(<AdminBillingPage />);
 }
 
@@ -193,5 +195,37 @@ describe("AdminBillingPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Billing & Settlements" })).toBeInTheDocument();
     });
+  });
+
+  it("renders overdue accounts notice and filters ledger when View Ledger clicked", async () => {
+    vi.mocked(adminBillingApi.fetchPlatformCommissionRate).mockResolvedValue(mockPlatformRate);
+    vi.mocked(adminBillingApi.fetchAdminSettlements).mockResolvedValue(mockSettlements);
+    vi.mocked(adminBillingApi.fetchAdminLedger).mockResolvedValue(mockLedger);
+    vi.mocked(adminBillingApi.fetchAdminOverdueVendors).mockResolvedValue([
+      {
+        vendorId: 10,
+        vendorBusinessName: "Rose Garden",
+        outstandingBalance: -150.0,
+        outstandingDues: 150.0,
+        daysOverdue: 35,
+        oldestDuesDate: "2026-09-21T10:00:00Z",
+      },
+    ]);
+
+    renderWithProviders(<AdminBillingPage />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("overdue-vendors-card")).toBeInTheDocument();
+      expect(screen.getByText("Rose Garden")).toBeInTheDocument();
+      expect(screen.getByText("35 days")).toBeInTheDocument();
+      expect(screen.getByText("₹150.00")).toBeInTheDocument();
+    });
+
+    const viewLedgerBtn = screen.getByRole("button", { name: /view ledger/i });
+    await userEvent.click(viewLedgerBtn);
+
+    const ledgerCard = screen.getByTestId("admin-ledger-table");
+    const vendorInput = ledgerCard.querySelector("input[type='number']") as HTMLInputElement;
+    expect(vendorInput.value).toBe("10");
   });
 });

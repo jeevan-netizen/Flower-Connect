@@ -49,6 +49,7 @@ public class AdminBillingLedgerController {
 
     private final BillingLedgerService billingLedgerService;
     private final StatementService statementService;
+    private final com.flowerconnect.billing.service.OverdueDuesService overdueDuesService;
 
     @GetMapping("/ledger")
     public ResponseEntity<SettlementEntryPageResponse> getAllLedger(
@@ -69,6 +70,11 @@ public class AdminBillingLedgerController {
                 .vendorId(vendorId)
                 .outstandingBalance(balance)
                 .build());
+    }
+
+    @GetMapping("/overdue")
+    public ResponseEntity<java.util.List<com.flowerconnect.billing.dto.OverdueVendorResponse>> getOverdueVendors() {
+        return ResponseEntity.ok(overdueDuesService.getOverdueVendors());
     }
 
     @GetMapping("/statement")

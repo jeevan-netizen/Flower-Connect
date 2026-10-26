@@ -77,3 +77,12 @@ export interface AdminLedgerFilters {
   to?: string;
   type?: SettlementEntryType;
 }
+
+export interface OverdueVendorResponse {
+  vendorId: number;
+  vendorBusinessName: string;
+  outstandingBalance: number;
+  outstandingDues: number;
+  daysOverdue: number;
+  oldestDuesDate: string;
+}

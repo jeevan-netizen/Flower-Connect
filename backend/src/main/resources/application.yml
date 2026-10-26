@@ -89,8 +89,10 @@ app:
   auto-reject-cron: "0 0 * * * ?"
   auto-reject-batch-size: 100
   settlement-cron: ${APP_SETTLEMENT_CRON:0 0 0 * * 0}
+  overdue-days: ${APP_BILLING_OVERDUE_DAYS:30}
 
   billing:
+    overdue-days: ${APP_BILLING_OVERDUE_DAYS:30}
     backfill:
       enabled: ${APP_BILLING_BACKFILL_ENABLED:false}
 

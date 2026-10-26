@@ -19,6 +19,7 @@ import api from "@/shared/lib/api";
 import {
   downloadAdminStatementCsv,
   fetchAdminLedger,
+  fetchAdminOverdueVendors,
   fetchAdminSettlementDetail,
   fetchAdminSettlements,
   fetchAdminVendorOutstanding,
@@ -165,5 +166,25 @@ describe("Admin Billing API", () => {
     expect(result).toBeDefined();
 
     clickSpy.mockRestore();
+  });
+
+  it("fetches overdue vendors list", async () => {
+    const mockOverdue = [
+      {
+        vendorId: 10,
+        vendorBusinessName: "Rose Garden",
+        outstandingBalance: -150.0,
+        outstandingDues: 150.0,
+        daysOverdue: 35,
+        oldestDuesDate: "2026-09-21T10:00:00",
+      },
+    ];
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockOverdue });
+
+    const result = await fetchAdminOverdueVendors();
+    expect(api.get).toHaveBeenCalledWith("/admin/billing/overdue", {
+      signal: undefined,
+    });
+    expect(result).toEqual(mockOverdue);
   });
 });

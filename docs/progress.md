@@ -1075,6 +1075,30 @@ ew_value (VARCHAR(500) NULL) to udit_log, and seeded commission_rate_default = 
   - Frontend tests: `src/features/admin/billing/api.test.ts` (10/10), `src/features/admin/pages/AdminBillingPage.test.tsx` (6/6) — 16/16 passed.
   - Frontend typecheck (`npm run typecheck`), lint (`npm run lint`), and production build (`npm run build`) all passed cleanly.
 
+### Stage 7 (Task 10.7: Overdue Dues Policy) - COMPLETE (2026-10-26)
+
+- **Configuration & Properties:**
+  - `AppProperties.java`: added `overdueDays` (default 30) with getter and setter.
+  - `application.yml`: mapped `app.overdue-days` and `app.billing.overdue-days` to `${APP_BILLING_OVERDUE_DAYS:30}`.
+- **Repository Queries (`SettlementEntryRepository`):**
+  - `findDistinctVendorIdsWithOpenNegativeEntries()`: finds distinct vendor IDs with open (unattached or PENDING) negative ledger entries (`amount < 0`).
+  - `findOldestOpenNegativeEntryDate(vendorId)`: finds `MIN(se.createdAt)` among open negative entries for a vendor.
+- **Domain Service & DTOs:**
+  - `OverdueVendorResponse`: DTO carrying `vendorId`, `vendorBusinessName`, signed `outstandingBalance`, positive `outstandingDues`, `daysOverdue`, and `oldestDuesDate`.
+  - `OverdueDuesService`: computes overdue accounts based on negative net outstanding balance (`balance < 0`) and age of oldest unpaid negative entry exceeding `overdueDays` threshold. Returns list sorted by `daysOverdue DESC`, then `vendorId ASC`.
+  - Follows approved v1 advisory policy (flag-and-review admin report; no automatic suspension).
+- **Controller:**
+  - `AdminBillingLedgerController`: added `GET /api/v1/admin/billing/overdue` endpoint returning `List<OverdueVendorResponse>` with ADMIN RBAC.
+- **Frontend UI (`/admin/billing`):**
+  - `OverdueVendorsCard`: visual card displaying overdue dues notice with count badge, advisory explanation, and table showing vendor, dues amount, negative balance, days overdue badge, oldest dues date, and "View Ledger" quick-filter action.
+  - Integrated into `AdminBillingPage.tsx` with live query `useAdminOverdueVendors()`.
+  - Updated `src/app/router.test.tsx` for new `billing` routes under vendor and admin namespaces.
+- **Verification:**
+  - Backend tests: `OverdueDuesServiceTest` (5/5) and `AdminBillingLedgerControllerTest` (7/7) — 12/12 passed.
+  - Frontend tests: `api.test.ts` (11/11), `AdminBillingPage.test.tsx` (7/7), `router.test.tsx` (44/44) — all passed.
+  - Frontend typecheck (`npm run typecheck`), lint (`npm run lint`), and production build (`npm run build`) all passed cleanly.
+
+
 
 
 

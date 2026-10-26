@@ -19,6 +19,7 @@ import type {
   AdminLedgerFilters,
   AdminSettlementFilters,
   OutstandingBalanceResponse,
+  OverdueVendorResponse,
   PlatformCommissionRateResponse,
   RunSettlementRequest,
   SettlementDetailResponse,
@@ -157,3 +158,14 @@ export async function downloadAdminStatementCsv(
 
   return blob;
 }
+
+/** `GET /api/v1/admin/billing/overdue` — vendors with overdue billing dues. */
+export async function fetchAdminOverdueVendors(
+  signal?: AbortSignal,
+): Promise<OverdueVendorResponse[]> {
+  const response = await api.get<OverdueVendorResponse[]>("/admin/billing/overdue", {
+    signal,
+  });
+  return response.data;
+}
+

@@ -17,6 +17,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchAdminLedger,
+  fetchAdminOverdueVendors,
   fetchAdminSettlementDetail,
   fetchAdminSettlements,
   fetchAdminVendorOutstanding,
@@ -39,6 +40,7 @@ export const ADMIN_BILLING_KEYS = {
     [...ADMIN_BILLING_KEYS.all, "settlement", id] as const,
   ledger: (filters?: AdminLedgerFilters) =>
     [...ADMIN_BILLING_KEYS.all, "ledger", filters] as const,
+  overdue: () => [...ADMIN_BILLING_KEYS.all, "overdue"] as const,
 };
 
 export function usePlatformCommissionRate() {
@@ -122,3 +124,11 @@ export function useAdminLedger(filters?: AdminLedgerFilters) {
     queryFn: ({ signal }) => fetchAdminLedger(filters, signal),
   });
 }
+
+export function useAdminOverdueVendors() {
+  return useQuery({
+    queryKey: ADMIN_BILLING_KEYS.overdue(),
+    queryFn: ({ signal }) => fetchAdminOverdueVendors(signal),
+  });
+}
+

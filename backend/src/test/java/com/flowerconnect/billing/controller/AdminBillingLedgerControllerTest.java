@@ -79,6 +79,9 @@ class AdminBillingLedgerControllerTest {
     @MockBean
     private StatementService statementService;
 
+    @MockBean
+    private com.flowerconnect.billing.service.OverdueDuesService overdueDuesService;
+
     private RoleBoundaryTester roleBoundaryTester;
 
     @BeforeEach
@@ -155,5 +158,38 @@ class AdminBillingLedgerControllerTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Type", "text/csv; charset=UTF-8"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", "attachment; filename=\"statement-vendor-20-2026-10-01-2026-10-07.csv\""))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(sampleCsv));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/admin/billing/overdue enforces ADMIN RBAC")
+    void overdueRbacBoundary() {
+        when(overdueDuesService.getOverdueVendors()).thenReturn(List.of());
+
+        roleBoundaryTester.assertUnauthenticated("/api/v1/admin/billing/overdue", HttpMethod.GET, 401);
+        roleBoundaryTester.assertAllRoles("/api/v1/admin/billing/overdue", HttpMethod.GET, 403, 403, 200);
+    }
+
+    @Test
+    @WithMockUser(username = "admin@test.com", roles = {"ADMIN"})
+    @DisplayName("GET /api/v1/admin/billing/overdue returns 200 with list of overdue vendors")
+    void getOverdueVendorsReturns200() throws Exception {
+        com.flowerconnect.billing.dto.OverdueVendorResponse item = com.flowerconnect.billing.dto.OverdueVendorResponse.builder()
+                .vendorId(10L)
+                .vendorBusinessName("Rose Garden")
+                .outstandingBalance(new BigDecimal("-150.00"))
+                .outstandingDues(new BigDecimal("150.00"))
+                .daysOverdue(35)
+                .oldestDuesDate(LocalDateTime.of(2026, 9, 21, 10, 0))
+                .build();
+
+        when(overdueDuesService.getOverdueVendors()).thenReturn(List.of(item));
+
+        mockMvc.perform(get("/api/v1/admin/billing/overdue"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].vendorId").value(10))
+                .andExpect(jsonPath("$[0].vendorBusinessName").value("Rose Garden"))
+                .andExpect(jsonPath("$[0].outstandingBalance").value(-150.00))
+                .andExpect(jsonPath("$[0].outstandingDues").value(150.00))
+                .andExpect(jsonPath("$[0].daysOverdue").value(35));
     }
 }
