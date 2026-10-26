@@ -953,3 +953,4 @@ Stage 1 (task 11.1: POS entities) complete on branch `phase-11-pos`.
 
 No code conflicts with the plan found. `SALE_POS` movement type already exists
 (StockMovement.java:77); no enum migration needed. Role name is FLORIST (D-11).
+### Stage 2 — POS Quick-Sale API and Inventory Sync (Phase 11, tasks 11.2–11.3)

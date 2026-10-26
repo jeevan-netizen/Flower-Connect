@@ -2830,3 +2830,8 @@ Plan section 6.4 states POS is commission-free and outside the marketplace ledge
 - **No ledger footprint.** A POS sale creates only `pos_transactions` and `pos_items`. It calls neither the order state machine nor `PaymentService`, and creates no commission, settlement-entry, payment, order or order-item row.
 - **Separate reporting.** POS revenue is reported in its own APIs/UI, labeled "commission-free", and is never netted into marketplace revenue (commission + platform fees from `orders`/`settlement_entries`).
 - **Payment methods are labels only.** `CASH`, `CARD`, `UPI` are stored as a `payment_method` label; no gateway, card, UPI or refund processing exists in v1.
+# #   D - 6 3 :   P O S   i d e m p o t e n c y   s e m a n t i c s   ( P h a s e   1 1   t a s k   1 1 . 2 )  
+ # #   D - 6 4 :   P O S   a v a i l a b l e - s t o c k   r u l e   ( P h a s e   1 1   t a s k   1 1 . 3 )  
+ # #   D - 6 5 :   P O S   s u m m a r y   t i m e - z o n e   r u l e   ( P h a s e   1 1   t a s k   1 1 . 5 )  
+ # #   D - 6 6 :   P O S   c o m m i s s i o n - f r e e   s e p a r a t i o n   ( P h a s e   1 1   t a s k   1 1 . 5 )  
+ 

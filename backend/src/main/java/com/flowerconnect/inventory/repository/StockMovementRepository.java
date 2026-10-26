@@ -1,6 +1,7 @@
 package com.flowerconnect.inventory.repository;
 
 import com.flowerconnect.inventory.domain.StockMovement;
+import com.flowerconnect.inventory.domain.StockMovement.MovementType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,4 +34,6 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     Page<StockMovement> findByProductId(Long productId, Pageable pageable);
 
     long countByProductId(Long productId);
+
+    long countByProductIdAndMovementType(Long productId, MovementType movementType);
 }

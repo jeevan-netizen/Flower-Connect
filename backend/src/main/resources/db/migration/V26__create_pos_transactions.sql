@@ -26,6 +26,7 @@ CREATE TABLE pos_transactions (
     total               DECIMAL(10,2) NOT NULL,
     payment_method      VARCHAR(16)  NOT NULL,
     created_at          DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    completed_at        DATETIME(6)  NULL,
     CONSTRAINT pk_pos_transactions PRIMARY KEY (id),
     CONSTRAINT fk_pos_transactions_vendor FOREIGN KEY (vendor_id) REFERENCES vendor_profiles (id) ON DELETE CASCADE,
     CONSTRAINT uq_pos_transactions_vendor_idempotency UNIQUE (vendor_id, idempotency_key)

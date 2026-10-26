@@ -50,6 +50,9 @@ public class PosTransaction {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "completed_at", nullable = true)
+    private LocalDateTime completedAt;
+
     @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PosItem> items = new ArrayList<>();
 }
