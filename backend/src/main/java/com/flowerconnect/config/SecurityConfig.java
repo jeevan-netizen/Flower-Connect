@@ -114,6 +114,9 @@ public class SecurityConfig {
                  .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/cancel")
                      .hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")
                  .requestMatchers("/api/v1/orders/**").hasRole("CUSTOMER")
+                 // Phase 12 customer review retrieval (task 12.2): a customer
+                 // fetches their own review; ownership is enforced in the service.
+                 .requestMatchers("/api/v1/reviews/**").hasRole("CUSTOMER")
 // Slot discovery endpoint - CUSTOMER only with address ownership and vendor approval checks in handler.
                   // The path must be written in the same shape as the controller's own mapping
                   // (SlotController: @RequestMapping("/api/v1/vendors") + @GetMapping("/{vendorId}/slots")).
@@ -146,6 +149,9 @@ public class SecurityConfig {
                 // These exceptions must precede the /api/v1/vendors/** FLORIST rule.
                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{id}/storefront").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/products/{id}").permitAll()
+                // Phase 12 public vendor reviews (task 12.2): readable without
+                // authentication for approved vendors; hidden reviews excluded.
+                .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/reviews").permitAll()
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
 // Phase 8 refund queue (task 8.3): admin-only listing of
                   // REFUND_PENDING payments and mark-refunded endpoint.

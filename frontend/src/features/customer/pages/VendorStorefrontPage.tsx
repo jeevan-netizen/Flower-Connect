@@ -6,10 +6,13 @@ import { PRODUCT_ROUTE_IDS, useProductOverlay } from "@/features/customer/naviga
 import { ProductGrid } from "@/features/customer/components/ProductGrid";
 import { StorefrontHours } from "@/features/customer/components/StorefrontHours";
 import { CustomerErrorState } from "@/features/customer/components/CustomerErrorState";
-import { formatCustomerRating, formatMoney, formatPrepTime } from "@/features/customer/format";
+import { formatMoney, formatPrepTime } from "@/features/customer/format";
+import { StarRating } from "@/features/review/components/StarRating";
+import { usePublicVendorReviews } from "@/features/review/queries";
 import { Pagination } from "@/shared/components/Pagination";
 import { FadeIn } from "@/motion/FadeIn";
 import { FOCUS_RING } from "@/motion/pressable";
+import type { ReviewResponse } from "@/features/review/types";
 
 /**
  * The 404 a malformed florist id is answered with.
@@ -45,6 +48,7 @@ export function VendorStorefrontPage() {
   const numericVendorId = Number(vendorId);
   const validVendorId = Number.isFinite(numericVendorId) && numericVendorId > 0;
   const [page, setPage] = useState(0);
+  const [reviewPage, setReviewPage] = useState(0);
 
   const selected = useSelectedLocation();
 
@@ -62,6 +66,12 @@ export function VendorStorefrontPage() {
     validVendorId ? numericVendorId : 0,
     page,
     validVendorId && !standaloneProduct,
+  );
+
+  // Public reviews for this vendor, newest first. Disabled for malformed ids.
+  const publicReviews = usePublicVendorReviews(
+    validVendorId ? numericVendorId : 0,
+    reviewPage,
   );
 
   const outletContext = useMemo(
@@ -131,7 +141,10 @@ export function VendorStorefrontPage() {
           <div>
             <dt className="text-xs uppercase tracking-wide text-slate-500">Rating</dt>
             <dd className="font-medium text-slate-900">
-              {formatCustomerRating(shop.avgRating, shop.reviewCount)}
+              <StarRating
+                rating={shop.avgRating}
+                reviewCount={shop.reviewCount}
+              />
             </dd>
           </div>
           <div>
@@ -193,6 +206,67 @@ export function VendorStorefrontPage() {
             </FadeIn>
           )}
         </aside>
+      </div>
+
+      {/* Customer reviews for this vendor */}
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Customer reviews</h2>
+        {publicReviews.isPending ? (
+          <FadeIn role="status" aria-busy="true" className="text-sm text-slate-600">
+            Loading reviews…
+          </FadeIn>
+        ) : publicReviews.error ? (
+          <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-800">
+            Could not load reviews. Please try again later.
+          </div>
+        ) : publicReviews.data?.content.length === 0 ? (
+          <p className="text-sm text-slate-600">
+            No reviews yet. Be the first to review this shop after a delivered order.
+          </p>
+        ) : (
+          <ul className="space-y-4">
+            {(publicReviews.data?.content as ReviewResponse[]).map((review) => (
+              <li
+                key={review.id}
+                className="flex flex-col gap-2 pt-4 border-t border-slate-100 first:pt-0 first:border-0"
+              >
+                <div className="flex items-center gap-2">
+                  <StarRating
+                    rating={review.rating}
+                    reviewCount={1}
+                    className="text-sm"
+                  />
+                  <span className="text-xs font-medium text-slate-900">
+                    {review.customerName}
+                  </span>
+                </div>
+                {review.comment && (
+                  <p className="text-sm text-slate-700">{review.comment}</p>
+                )}
+                {review.vendorReply && (
+                  <div className="mt-1 rounded-lg border border-brand-100 bg-brand-50 p-2 text-sm">
+                    <p className="text-xs font-semibold text-brand-900">
+                      {shop.businessName}:
+                    </p>
+                    <p className="mt-0.5 text-brand-700">{review.vendorReply}</p>
+                  </div>
+                )}
+                <p className="text-xs text-slate-500">
+                  {new Date(review.createdAt).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {publicReviews.data && !publicReviews.isPending && !publicReviews.error && (
+          <div className="mt-4">
+            <Pagination page={publicReviews.data} onPageChange={setReviewPage} />
+          </div>
+        )}
       </div>
 
       <Outlet context={outletContext} />

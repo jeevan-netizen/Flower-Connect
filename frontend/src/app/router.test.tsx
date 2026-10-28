@@ -237,6 +237,7 @@ describe("application router", () => {
       "disputes",
       "billing",
       "pos",
+      "reviews",
     ]);
   });
 
@@ -601,6 +602,8 @@ describe("admin route protection", () => {
       "orders/lookup",
       "disputes",
       "billing",
+      "reviews",
+      "analytics",
     ]);
   });
 

@@ -32,6 +32,7 @@ interface VendorNavItem {
 const NAV_ITEMS: VendorNavItem[] = [
   { to: "/vendor", label: "Dashboard", end: true },
   { to: "/vendor/orders", label: "Orders" },
+  { to: "/vendor/reviews", label: "Reviews" },
   { to: "/vendor/catalog", label: "Catalog", requiresApproval: true },
   { to: "/vendor/inventory", label: "Inventory", requiresApproval: true },
   { to: "/vendor/billing", label: "Billing & Payouts" },

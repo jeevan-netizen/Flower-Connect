@@ -1167,3 +1167,49 @@ Stage 4 (task 11.5: POS reports) complete on branch `phase-11-pos`.
 - `PosReportIntegrationTest`: 16/16 pass against real MySQL/Testcontainers.
 - Combined POS integration suite: 34/34 pass in a single failsafe execution.
 - Backend unit test suite: 1258/1258 pass (0 failures, 0 errors, 0 skipped).
+
+## Phase 12 (Ratings & Reviews) - COMPLETE (2026-10-28)
+
+Phase 12 implements customer ratings and reviews with vendor replies and admin moderation, on branch `phase-12-reviews-analytics`.
+
+### Stage 1 (Task 12.1: Review Data Model) - COMPLETE
+
+- **Migration:** `V31__create_reviews.sql` creates `reviews` table with `id`, `order_id` (unique FK), `vendor_id` (FK), `customer_id` (FK), `rating` (INT 1-5), `comment` (VARCHAR 2000), `vendor_reply` (VARCHAR 1000), `vendor_replied_at`, `hidden` (BIT default false), `hidden_reason`, `hidden_by`, `hidden_at`, `created_at`, `updated_at`.
+- **Domain:** `Review` entity with inner `ReviewStatus` not needed; `ReviewRepository` with `findByVendorIdAndHiddenFalseOrderByCreatedAtDesc`, `findByVendorIdOrderByCreatedAtDesc`, `findByHiddenOrderByCreatedAtDesc`, `findByCustomerIdAndOrderId`, `countByVendorIdAndHiddenFalse`, `avgRatingByVendorIdAndHiddenFalse`, `ratingDistributionByVendorIdAndHiddenFalse`.
+- **Service:** `ReviewService` with `submitReview`, `getCustomerReview`, `listVendorReviews`, `getVendorReviewSummary`, `listPublicVendorReviews`, `replyToReview`, `hideReview`, `unhideReview`, `listAdminReviews`. One review per order enforced via `uq_reviews_order` unique constraint + service pre-check. One vendor reply per review enforced similarly.
+
+### Stage 2 (Task 12.2: Review API) - COMPLETE
+
+- **Endpoints:**
+  - `POST /api/v1/reviews` (CUSTOMER) - submit a review for a delivered order
+  - `GET /api/v1/reviews/me` (CUSTOMER) - get the caller's own review
+  - `GET /api/v1/vendors/reviews` (FLORIST) - vendor's own reviews (including hidden)
+  - `GET /api/v1/vendors/reviews/summary` (FLORIST) - aggregate rating and distribution
+  - `GET /api/v1/vendors/{id}/reviews` (public) - visible (non-hidden) reviews
+  - `POST /api/v1/vendors/reviews/{id}/reply` (FLORIST) - vendor replies to a review
+  - `POST /api/v1/admin/reviews/{id}/hide` (ADMIN) - hide a review with reason
+  - `POST /api/v1/admin/reviews/{id}/unhide` (ADMIN) - unhide a review
+  - `GET /api/v1/admin/reviews` (ADMIN) - paginated admin listing with optional hidden filter
+- **Security:** `/api/v1/reviews/**` → CUSTOMER, `/api/v1/vendors/reviews/**` → FLORIST, `/api/v1/admin/reviews/**` → ADMIN in `SecurityConfig`.
+
+### Stage 3 (Task 12.3: Review UI) - COMPLETE
+
+- **Frontend (`src/features/review/`):** `types.ts`, `api.ts`, `queries.ts`, `StarRating.tsx` component.
+- **Storefront:** `VendorStorefrontPage` shows reviews section with `StarRating` aggregate and per-review listing.
+- **Customer:** `ReviewForm` on `OrderDetailPage` for DELIVERED orders, post-delivery prompt.
+- **Vendor:** `VendorReviewsPage` at `/vendor/reviews` with reply UI.
+- **Admin:** `AdminReviewsPage` at `/admin/reviews` with hide/unhide and hidden filter.
+- **Routing:** Routes added in `router.tsx`; nav links in `VendorLayout` and `AdminLayout`.
+- **Verification:** Frontend typecheck clean, lint clean, 853 tests pass across 81 files, production build clean.
+
+### Stage 4 (Task 12.4: E2E Verification) - COMPLETE
+
+- **E2E test:** `frontend/tests/e2e/review-flow.test.ts` - full flow: customer registers, vendor registers & gets approved, category + product + stock, checkout → accept → prepare → out-for-delivery → deliver, customer submits review, vendor replies, admin hides review, verify summary reflects hidden state.
+- **Verification:** E2E test passes in Chromium against real backend + MySQL.
+
+### Pre-existing Frontend Failures (not caused by Phase 12)
+
+- `AdminVendorsPage.test.tsx`: 2 pre-existing failures confirmed on clean `main` (identical file content between `main` and `phase-12-reviews-analytics`):
+  1. "rejects a reason longer than the backend allows, before sending it" - test timeout (30s)
+  2. "suspends an approved vendor with a reason" - reason string mismatch
+- These failures exist on `main` before Phase 12 changes and are not related to reviews/analytics.

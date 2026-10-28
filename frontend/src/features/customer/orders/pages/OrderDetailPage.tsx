@@ -25,6 +25,7 @@ import { OrderStatusStepper } from "@/features/customer/orders/components/OrderS
 import { CancelOrderDialog } from "@/features/customer/orders/components/CancelOrderDialog";
 import { formatMoney } from "@/features/vendor/format";
 import { formatDateTime } from "@/features/vendor/format";
+import { ReviewForm } from "@/features/customer/orders/components/ReviewForm";
 import { CustomerErrorState } from "@/features/customer/components/CustomerErrorState";
 import { PageHeading } from "@/features/vendor/components/StatCard";
 import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
@@ -282,6 +283,11 @@ export function OrderDetailPage() {
           </tbody>
         </table>
       </Card>
+
+      {/* Review: shown once the order is DELIVERED */}
+      {order.status === "DELIVERED" && (
+        <ReviewForm orderId={order.id} />
+      )}
 
       {/* Fee breakdown */}
       <Card title="Fees">

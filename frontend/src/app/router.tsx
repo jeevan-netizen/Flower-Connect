@@ -21,6 +21,7 @@ import { VendorOrderBoardPage } from "@/features/vendor/orders/pages/VendorOrder
 import { VendorDisputesPage } from "@/features/vendor/disputes/pages/VendorDisputesPage";
 import { VendorBillingPage } from "@/features/vendor/pages/VendorBillingPage";
 import { VendorPosPage } from "@/features/vendor/pages/VendorPosPage";
+import { VendorReviewsPage } from "@/features/vendor/pages/VendorReviewsPage";
 import { CartPage } from "@/features/cart/pages/CartPage";
 import { CheckoutPage } from "@/features/checkout/pages/CheckoutPage";
 import { BrowsePage } from "@/features/customer/pages/BrowsePage";
@@ -40,6 +41,8 @@ import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
 import { AdminUsersPage } from "@/features/admin/pages/AdminUsersPage";
 import { AdminBillingPage } from "@/features/admin/pages/AdminBillingPage";
+import { AdminReviewsPage } from "@/features/admin/pages/AdminReviewsPage";
+import { AdminAnalyticsPage } from "@/features/admin/pages/AdminAnalyticsPage";
 
 /** Seeded role name for customers (V3__seed_roles.sql). */
 const CUSTOMER_ROLE = "CUSTOMER";
@@ -242,6 +245,10 @@ export const router = createBrowserRouter([
           { path: "disputes", element: <VendorDisputesPage /> },
           { path: "billing", element: <VendorBillingPage /> },
           { path: "pos", element: gated(<VendorPosPage />) },
+          // Phase 12 vendor reviews (task 12.2): the vendor's own reviews and
+          // replies. FLORIST role only; the backend enforces per-review
+          // ownership, and a suspended vendor can still reply (D-6).
+          { path: "reviews", element: <VendorReviewsPage /> },
         ],
       },
       {
@@ -263,6 +270,11 @@ export const router = createBrowserRouter([
           { path: "orders/lookup", element: <AdminOrderLookupPage /> },
           { path: "disputes", element: <AdminDisputesPage /> },
           { path: "billing", element: <AdminBillingPage /> },
+          // Phase 12 review moderation and analytics (task 12.4). ADMIN only;
+          // `SecurityConfig` matches `/api/v1/admin/reviews/**` with
+          // `hasRole("ADMIN")` on every request.
+          { path: "reviews", element: <AdminReviewsPage /> },
+          { path: "analytics", element: <AdminAnalyticsPage /> },
         ],
       },
     ],
