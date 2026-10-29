@@ -397,3 +397,57 @@ export const INVENTORY_MAX_PAGE_SIZE = 100;
  * `StockWriteOffRequest`. One source so the four dialogs cannot drift apart.
  */
 export const STOCK_REASON_MAX_LENGTH = 500;
+
+/* -------------------------------------------------------------------------- */
+/* Analytics (plan task 12.5)                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Mirrors `VendorAnalyticsOverviewResponse`. All marketplace figures use
+ * delivered orders; the POS section is commission-free and reported
+ * separately, never mixed into marketplace counts or revenue.
+ */
+export interface VendorAnalyticsOverview {
+  deliveredOrders: number;
+  marketplaceRevenue: number;
+  onlineOrders: number;
+  onlineRevenue: number;
+  codOrders: number;
+  codRevenue: number;
+  cancelledOrders: number;
+  cancelledRevenue: number;
+  /** `null` when there are no delivered-order customers. */
+  repeatCustomerRate: number | null;
+  topProductsByUnits: VendorTopProduct[];
+  topProductsByRevenue: VendorTopProduct[];
+  pos: PosSection;
+}
+
+export interface VendorTopProduct {
+  productId: number;
+  productName: string;
+  quantitySold: number;
+  revenue: number;
+}
+
+export interface PosSection {
+  transactionCount: number;
+  totalRevenue: number;
+  breakdownByPaymentMethod: PosPaymentBreakdown[];
+}
+
+export interface PosPaymentBreakdown {
+  paymentMethod: string;
+  transactionCount: number;
+  revenue: number;
+}
+
+/**
+ * One daily trend data point from `GET /api/v1/vendor/analytics/daily-trends`.
+ * Days with no activity are zero-filled by the server.
+ */
+export interface VendorAnalyticsDailyTrend {
+  date: string; // `LocalDate` (`yyyy-MM-dd`)
+  orderCount: number;
+  revenue: number;
+}

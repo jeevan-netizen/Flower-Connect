@@ -3,6 +3,8 @@ package com.flowerconnect.order.repository;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.Order.OrderStatus;
 import com.flowerconnect.order.domain.OrderStatusHistory;
+import com.flowerconnect.vendor.analytics.dto.CancelledOrderDto;
+import com.flowerconnect.vendor.analytics.dto.OrderDeliveryDto;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -152,4 +154,53 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT o FROM Order o WHERE o.status = 'DELIVERED' AND NOT EXISTS (SELECT c FROM Commission c WHERE c.order.id = o.id)")
     List<Order> findDeliveredOrdersWithoutCommission();
+
+    // ------------------------------------------------------------------
+    // Phase 12: vendor analytics (task 12.5)
+    // ------------------------------------------------------------------
+
+    /**
+     * Delivered orders for a vendor whose delivered timestamp (the
+     * {@code order_status_history} row where {@code to_status = 'DELIVERED'})
+     * falls within the half-open interval {@code [from, to)}, expressed in UTC
+     * wall time. Each row carries the order id, customer id, payment method,
+     * total, delivered timestamp and item lines.
+     */
+    @Query("SELECT new com.flowerconnect.vendor.analytics.dto.OrderDeliveryDto(" +
+            "o.id, o.user.id, o.paymentMethod, o.total, " +
+            "(SELECT MAX(osh.createdAt) FROM OrderStatusHistory osh " +
+            "  WHERE osh.order.id = o.id AND osh.toStatus = 'DELIVERED')) " +
+            "FROM Order o " +
+            "WHERE o.vendor.id = :vendorId " +
+            "AND o.status = 'DELIVERED' " +
+            "AND (SELECT MAX(osh.createdAt) FROM OrderStatusHistory osh " +
+            "  WHERE osh.order.id = o.id AND osh.toStatus = 'DELIVERED') >= :from " +
+            "AND (SELECT MAX(osh.createdAt) FROM OrderStatusHistory osh " +
+            "  WHERE osh.order.id = o.id AND osh.toStatus = 'DELIVERED') < :to")
+    List<OrderDeliveryDto> findDeliveredWithTimestampBetween(
+            @Param("vendorId") Long vendorId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
+
+    /**
+     * Cancelled orders for a vendor whose cancelled timestamp (the
+     * {@code order_status_history} row where {@code to_status IN ('CANCELLED','REJECTED')})
+     * falls within the half-open interval {@code [from, to)}, expressed in UTC
+     * wall time.
+     */
+    @Query("SELECT new com.flowerconnect.vendor.analytics.dto.CancelledOrderDto(" +
+            "o.id, o.total, " +
+            "(SELECT MAX(osh.createdAt) FROM OrderStatusHistory osh " +
+            "  WHERE osh.order.id = o.id AND osh.toStatus IN ('CANCELLED','REJECTED'))) " +
+            "FROM Order o " +
+            "WHERE o.vendor.id = :vendorId " +
+            "AND o.status IN ('CANCELLED','REJECTED') " +
+            "AND (SELECT MAX(osh.createdAt) FROM OrderStatusHistory osh " +
+            "  WHERE osh.order.id = o.id AND osh.toStatus IN ('CANCELLED','REJECTED')) >= :from " +
+            "AND (SELECT MAX(osh.createdAt) FROM OrderStatusHistory osh " +
+            "  WHERE osh.order.id = o.id AND osh.toStatus IN ('CANCELLED','REJECTED')) < :to")
+    List<CancelledOrderDto> findCancelledWithTimestampBetween(
+            @Param("vendorId") Long vendorId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
 }

@@ -11,6 +11,8 @@ import {
   fetchProductImages,
   fetchProducts,
   fetchStockMovements,
+  fetchVendorAnalyticsOverview,
+  fetchVendorDailyTrends,
   reorderProductImages,
   setPrimaryProductImage,
   stockIn,
@@ -39,6 +41,8 @@ import {
   type StockInRequest,
   type StockOutRequest,
   type StockWriteOffRequest,
+  type VendorAnalyticsDailyTrend,
+  type VendorAnalyticsOverview,
   type VendorProfile,
   type VendorProfileUpdateRequest,
 } from "@/features/vendor/types";
@@ -69,6 +73,13 @@ export const vendorKeys = {
     /** Prefix for every page of the low-stock list, so a stock change can drop them all. */
     lowStockRoot: ["vendor", "inventory", "low-stock"] as const,
     lowStock: (page: number) => ["vendor", "inventory", "low-stock", page] as const,
+  },
+  analytics: {
+    all: ["vendor", "analytics"] as const,
+    overview: (fromDate: string | undefined, toDate: string | undefined) =>
+      ["vendor", "analytics", "overview", fromDate, toDate] as const,
+    dailyTrends: (fromDate: string | undefined, toDate: string | undefined) =>
+      ["vendor", "analytics", "daily-trends", fromDate, toDate] as const,
   },
 };
 
@@ -423,4 +434,33 @@ export function useInventorySettings() {
   });
 
   return { threshold, expiryDate };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Analytics (plan task 12.5)                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `GET /api/v1/vendor/analytics/overview` — marketplace and POS metrics.
+ *
+ * `fromDate` and `toDate` are optional; when both are absent the backend
+ * defaults to the trailing 30 days ending on vendor-local today. The query key
+ * carries the exact params so different ranges cache separately.
+ */
+export function useVendorAnalyticsOverview(fromDate?: string, toDate?: string) {
+  return useQuery<VendorAnalyticsOverview>({
+    queryKey: vendorKeys.analytics.overview(fromDate, toDate),
+    queryFn: ({ signal }) => fetchVendorAnalyticsOverview({ fromDate, toDate }, signal),
+  });
+}
+
+/**
+ * `GET /api/v1/vendor/analytics/daily-trends` — the daily delivered-order
+ * series, zero-filled on empty days.
+ */
+export function useVendorDailyTrends(fromDate?: string, toDate?: string) {
+  return useQuery<VendorAnalyticsDailyTrend[]>({
+    queryKey: vendorKeys.analytics.dailyTrends(fromDate, toDate),
+    queryFn: ({ signal }) => fetchVendorDailyTrends({ fromDate, toDate }, signal),
+  });
 }

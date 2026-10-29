@@ -128,11 +128,16 @@ public class SecurityConfig {
                    .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/slots").hasRole("CUSTOMER")
                    // Phase 8 customer disputes (task 8.4): customer raises/views own disputes.
                    .requestMatchers("/api/v1/disputes/**").hasRole("CUSTOMER")
-                   // Phase 6 vendor order API (task 6.2/6.4): the order action, list and summary
-                   // routes live under the singular /api/v1/vendor/ base, so they need their own
-                   // FLORIST rule alongside the plural /api/v1/vendors/** namespace used by the
-                   // catalog, inventory, profile and slots routes.
-                   .requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")
+                    // Phase 12 vendor analytics (task 12.5): the vendor's own
+                    // marketplace and POS analytics. FLORIST only; no approval
+                    // gate -- a suspended vendor can still read historical
+                    // analytics (D-6).
+                    .requestMatchers("/api/v1/vendor/analytics/**").hasRole("FLORIST")
+                    // Phase 6 vendor order API (task 6.2/6.4): the order action, list and summary
+                    // routes live under the singular /api/v1/vendor/ base, so they need their own
+                    // FLORIST rule alongside the plural /api/v1/vendors/** namespace used by the
+                    // catalog, inventory, profile and slots routes.
+                    .requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")
                    // Phase 8 vendor disputes (task 8.4): vendor views/responds to disputes on their orders.
                    .requestMatchers("/api/v1/vendor/disputes/**").hasRole("FLORIST")
                     // Phase 9 in-app notifications (task 9.2): every authenticated

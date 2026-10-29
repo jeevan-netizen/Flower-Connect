@@ -15,6 +15,8 @@ import type {
   StockMovementPageResponse,
   StockOutRequest,
   StockWriteOffRequest,
+  VendorAnalyticsDailyTrend,
+  VendorAnalyticsOverview,
   VendorProfile,
   VendorProfileUpdateRequest,
 } from "@/features/vendor/types";
@@ -337,5 +339,43 @@ export async function updateExpiryDate(
     `/vendors/products/${productId}/inventory/expiry-date`,
     payload,
   );
+  return response.data;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Analytics (plan task 12.5)                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `GET /api/v1/vendor/analytics/overview` — marketplace and POS metrics for
+ * the authenticated vendor's date range.
+ *
+ * The vendor is resolved from the JWT subject; no vendor id is accepted from
+ * the request, so a vendor can only read their own analytics. Requires
+ * `ROLE_FLORIST`; suspended vendors may read (D-6).
+ */
+export async function fetchVendorAnalyticsOverview(
+  params?: { fromDate?: string; toDate?: string },
+  signal?: AbortSignal,
+): Promise<VendorAnalyticsOverview> {
+  const response = await api.get<VendorAnalyticsOverview>("/vendor/analytics/overview", {
+    params,
+    signal,
+  });
+  return response.data;
+}
+
+/**
+ * `GET /api/v1/vendor/analytics/daily-trends` — the daily delivered-order
+ * series for the vendor's date range, zero-filled on empty days.
+ */
+export async function fetchVendorDailyTrends(
+  params?: { fromDate?: string; toDate?: string },
+  signal?: AbortSignal,
+): Promise<VendorAnalyticsDailyTrend[]> {
+  const response = await api.get<VendorAnalyticsDailyTrend[]>("/vendor/analytics/daily-trends", {
+    params,
+    signal,
+  });
   return response.data;
 }

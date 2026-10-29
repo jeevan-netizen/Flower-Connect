@@ -237,6 +237,7 @@ describe("application router", () => {
       "disputes",
       "billing",
       "pos",
+      "analytics",
       "reviews",
     ]);
   });

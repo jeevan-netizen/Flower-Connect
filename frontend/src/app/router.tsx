@@ -20,6 +20,7 @@ import { VendorInventoryPage } from "@/features/vendor/pages/VendorInventoryPage
 import { VendorOrderBoardPage } from "@/features/vendor/orders/pages/VendorOrderBoardPage";
 import { VendorDisputesPage } from "@/features/vendor/disputes/pages/VendorDisputesPage";
 import { VendorBillingPage } from "@/features/vendor/pages/VendorBillingPage";
+import { VendorAnalyticsPage } from "@/features/vendor/pages/VendorAnalyticsPage";
 import { VendorPosPage } from "@/features/vendor/pages/VendorPosPage";
 import { VendorReviewsPage } from "@/features/vendor/pages/VendorReviewsPage";
 import { CartPage } from "@/features/cart/pages/CartPage";
@@ -245,6 +246,10 @@ export const router = createBrowserRouter([
           { path: "disputes", element: <VendorDisputesPage /> },
           { path: "billing", element: <VendorBillingPage /> },
           { path: "pos", element: gated(<VendorPosPage />) },
+          // Phase 12 vendor analytics (task 12.5): marketplace and POS metrics
+          // for the vendor's own date range. FLORIST role only; suspended
+          // vendors can read (D-6).
+          { path: "analytics", element: <VendorAnalyticsPage /> },
           // Phase 12 vendor reviews (task 12.2): the vendor's own reviews and
           // replies. FLORIST role only; the backend enforces per-review
           // ownership, and a suspended vendor can still reply (D-6).
