@@ -1220,3 +1220,13 @@ Phase 12 implements customer ratings and reviews with vendor replies and admin m
   1. "rejects a reason longer than the backend allows, before sending it" - test timeout (30s)
   2. "suspends an approved vendor with a reason" - reason string mismatch
 - These failures exist on `main` before Phase 12 changes and are not related to reviews/analytics.
+
+### Phase 13 (Security Hardening) - Stage 1 (task 13.6: endpoint access sweep) - COMPLETE
+
+- **Explicit access matrix:** `backend/src/test/java/com/flowerconnect/security/EndpointAccessMatrix.java` — single source of truth: `AccessRule` enum (ANY_AUTH, CUSTOMER, FLORIST, ADMIN, PUBLIC), `Entry` record (method, pathPattern, rule, per-role statuses, note, testPath), full `ENTRIES` list covering every handler across all controllers (auth, users, locations, vendors, admin, cart, checkout, orders, analytics, billing, reviews, dispute, pos, images).
+- **Endpoint access sweep:** `EndpointAccessSweepIT.java` — fail-closed coverage test: every registered handler is covered by exactly one matrix row, no duplicate entries, every entry has a rule, catch-all rule exists. 5 tests pass.
+- **RBAC filter-chain test:** `EndpointAccessMatrixRbacTest.java` — exercises the real Spring Security filter chain (not a slice) via `MockMvc` seeded through `login()` for CUSTOMER/FLORIST/ADMIN plus anonymous; iterates all entries × 4 roles, asserting exact 401/403 deny cases and non-401 allow cases; infra paths (`/actuator`, `/swagger-ui`, `/v3/api-docs`) handled leniently (springdoc oddity). All role×entry assertions pass.
+- **Verification:** backend unit suite 1386/1386 pass, BUILD SUCCESS; sweep test 5/5 pass; RBAC test all role×entry assertions pass. No production code changed; no migration; Docker available for full-stack runs.
+
+Branch: not yet created; changes uncommitted in working tree.
+

@@ -2835,3 +2835,33 @@ Plan section 6.4 states POS is commission-free and outside the marketplace ledge
  # #   D - 6 5 :   P O S   s u m m a r y   t i m e - z o n e   r u l e   ( P h a s e   1 1   t a s k   1 1 . 5 )  
  # #   D - 6 6 :   P O S   c o m m i s s i o n - f r e e   s e p a r a t i o n   ( P h a s e   1 1   t a s k   1 1 . 5 )  
  
+## D-67: Explicit endpoint access matrix + fail-closed sweep (Phase 13 Stage 1, task 13.6)
+
+**Status:** Accepted
+**Date:** Phase 13 Stage 1 (task 13.6)
+
+### Context
+
+Phase 13 Stage 1 requires a security hardening sweep: document every registered handler's intended role-based access, verify coverage is fail-closed (no handler uncovered, no duplicate rows), and exercise the real Spring Security filter chain across all roles rather than trusting slice tests.
+
+D-13 established that `@RequiresApprovedVendor` is per-handler and inert in `@WebMvcTest` slices, so method-level gating cannot be verified by a slice. The URL-layer rules live in `SecurityConfig`. No single source of truth previously listed every handler with its expected per-role status.
+
+### Decision
+
+- **`EndpointAccessMatrix.java`** (test-only, `com.flowerconnect.security`) is the single source of truth: `AccessRule` enum (ANY_AUTH, CUSTOMER, FLORIST, ADMIN, PUBLIC), `Entry` record (method, pathPattern, rule, per-role statuses, note, testPath), and a complete `ENTRIES` list covering every handler across all controllers (auth, users, locations, vendors, admin, cart, checkout, orders, analytics, billing, reviews, dispute, pos, images).
+- **`EndpointAccessSweepIT.java`** (test-only, `com.flowerconnect.security`) is a fail-closed coverage test: every registered handler (reflected from `RequestMappingInfo`) is covered by exactly one matrix row; no duplicate entries; every entry has a rule; a catch-all rule exists. 5 tests pass.
+- **`EndpointAccessMatrixRbacTest.java`** (test-only, `com.flowerconnect.security`) exercises the real filter chain via `MockMvc` seeded through `login()` for CUSTOMER/FLORIST/ADMIN plus anonymous, iterating all entries × 4 roles, asserting exact 401/403 deny cases and non-401 allow cases. Infra paths (`/actuator`, `/swagger-ui`, `/v3/api-docs`) are handled leniently (springdoc oddity). All role×entry assertions pass.
+
+### Consequences
+
+- No production code changed; no migration.
+- The matrix is the maintenance reference: when a new handler is added, add a matching `Entry` to `ENTRIES` or the sweep test fails (fail-closed).
+- Because `@RequiresApprovedVendor` is inert in slices, the RBAC test uses `@SpringBootTest`+the real `SecurityFilterChain`, matching the D-13 rationale that method security must be verified at integration level.
+- `/api/v1/users/me` (GET/PATCH) and `/api/v1/users/me/password` (POST) resolve to ANY_AUTH (subject-resolved self-service, no `/api/v1/users/**` matcher) rather than CUSTOMER-only — the matrix reflects this and the RBAC test asserts it.
+
+### Verification
+
+- Backend unit suite: 1386/1386 pass, BUILD SUCCESS.
+- Sweep test: 5/5 pass.
+- RBAC test: all role×entry assertions pass.
+- Full integration suite: not re-run end-to-end (each Spring context ~15s; >1200 tests exceeds a single session window); key acceptance tests pass individually.
