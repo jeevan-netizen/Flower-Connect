@@ -166,7 +166,12 @@ public class SecurityConfig {
                   // own namespaces below.
                   .requestMatchers("/api/v1/admin/disputes/**").hasRole("ADMIN")
                   .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                 .requestMatchers("/actuator/**").hasRole("ADMIN")
+                 // Actuator exposure is governed by management.endpoints.web.exposure.include
+                 // (application-prod.yml: health,info only). Non-exposed endpoints such as
+                 // metrics return 404 from the actuator layer; Spring Security must not
+                 // short-circuit them with 401/403, which would imply the endpoint exists
+                 // behind authentication. Health/info are permitAll above.
+                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex

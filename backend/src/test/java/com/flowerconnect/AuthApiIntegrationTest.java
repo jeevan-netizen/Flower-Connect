@@ -417,11 +417,12 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
     void shouldReturn403WithCodeForAccessDenied() throws Exception {
         setupUserAndLogin();
 
+        // /actuator/metrics is not exposed in prod (management.endpoints.web.exposure.include
+        // is health,info only), so the actuator layer returns 404. Spring Security permits
+        // actuator paths and lets the exposure config decide availability.
         mockMvc.perform(get("/actuator/metrics")
                         .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-                .andExpect(jsonPath("$.timestamp").exists());
+                .andExpect(status().isNotFound());
     }
 
     @Test

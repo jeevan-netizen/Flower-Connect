@@ -364,6 +364,48 @@ These cost real debugging time and will recur if forgotten:
 | 030 | Security | Auth tokens (access + refresh) are persisted to `localStorage` via Zustand `persist`, contradicting the memory-only intent (issue 022 still open) | Open | See issue 022; any fix must coordinate with the Axios single-flight refresh and 401 retry path. |
 | 031 | Security | No security headers / CSP configured on responses | Open | Add a `HeaderWriterFilter`/CSP config in `SecurityConfig` before production exposure. |
 
+## Testing Gotchas (Phase 13 — security hardening)
+
+- **Spring Security 6.1 path-matching API.** `RequestMappingInfo.getPathsCondition()` no longer exists; use
+  `getPathPatternsCondition().getPatterns()` (returns `Set<String>` with `{}` placeholders) and
+  `getMethodsCondition().getMethods()` (returns `Set<RequestMethod>`). `EndpointAccessSweepIT` uses the
+  current API; do not backport to older Spring versions without adjusting.
+- **`@RequiresApprovedVendor` is inert in `@WebMvcTest` slices** (D-13, restated). The RBAC sweep uses
+  `@SpringBootTest`+real `SecurityFilterChain` precisely because slices load their own filter chain and
+  never load production `SecurityConfig`, so method security never runs in a slice.
+
+| 029 | Security | Rate limiting filter exists (`RateLimitFilter` keyed by email+IP on `/auth/login`, `/auth/register`,
+  `/auth/forgot-password`, `/auth/reset-password`) but is conditional on `app.rate-limit.enabled=true`, which is never set in any profile — so these endpoints are not rate-limited in dev or prod | Open | Set `APP_RATE_LIMIT_ENABLED=true` and tune bucket/capacity in `application.yml`/production env before exposing to untrusted clients. |
+| 030 | Security | Auth tokens (access + refresh) are persisted to `localStorage` via Zustand `persist`, contradicting the memory-only intent (issue 022 still open) | Open | See issue 022; any fix must coordinate with the Axios single-flight refresh and 401 retry path. |
+| 031 | Security | No security headers / CSP configured on responses | Open | Add a `HeaderWriterFilter`/CSP config in `SecurityConfig` before production exposure. |
+
+## Phase 13 Stage 2 Findings (task 13.8: secrets, actuator, and dependency scan)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| 13.8-02 | Dev webhook secret | `application-dev.yml` has hardcoded dev webhook secret default | Low | `application-dev.yml:58`: `webhook-secret: ${APP_WEBHOOK_SECRET:dev-webhook-secret-key-for-testing-at-least-32-characters-long}` | Remove hardcoded default in dev; make it required or empty | Open |
+| 13.8-03 | Base config weak DB defaults | `application.yml` has `DB_PASS:flowerconnect` / `DB_USER:flowerconnect` defaults | Medium | `application.yml:17-18` | Prod overrides with no-default placeholders (`application-prod.yml:9-10`); prod is fail-fast. Document that dev defaults must not leak into prod. | Open (informational) |
+| 13.8-04 | Test credentials in repo | Test files contain hardcoded `password123`, `AdminPass123!`, test JWT/webhook secrets | Low | `git grep` found in ~35 backend test files + `frontend/tests/e2e/review-flow.test.ts` | Document; test-only credentials, not production secrets. Rotate if any were ever real. | Open (informational) |
+| 13.8-05 | Git history secrets | Historical commits contain hardcoded passwords | Low | `git log -p --all` scan found `password123` in many commits, `AdminPass123!` in commit `41b97a9` | Do not rewrite history (per rules). Recommend rotation if any were ever real. | Open (informational) |
+| 13.8-06 | Swagger available in prod | `/v3/api-docs` returns 200, `/swagger-ui.html` returns 302 in prod | High | `ProductionProfileActuatorSwaggerTest` (pre-fix) | Fixed: added `springdoc.api-docs.enabled: false` and `springdoc.swagger-ui.enabled: false` to `application-prod.yml` | Fixed |
+| 13.8-07 | Actuator metrics not disabled | `/actuator/metrics` returned 401 (ADMIN auth) instead of 404 in prod | Medium | `ProductionProfileActuatorSwaggerTest` | Fixed: changed `SecurityConfig` `/actuator/**` from `hasRole("ADMIN")` to `permitAll()` so the actuator exposure config (`include: health,info`) is the sole gatekeeper; metrics now returns 404 | Fixed |
+
+## Dependency Triage (npm audit)
+
+Frontend `npm audit`: 12 vulnerabilities (2 critical, 5 high, 5 moderate). Scan completed successfully; no API key required. Mostly dev dependencies.
+
+| Package | Severity | Direct? | Fixed Version | Reachability | Proposed Action | Status |
+|---------|----------|---------|---------------|--------------|-----------------|--------|
+| vitest | critical | Yes | — | Dev dependency (test runner; UI server arbitrary file read/execution) | Stop — major version upgrade risk, ask before upgrading | Blocked |
+| tinypool | critical | No | — | Dev dependency (vitest worker pool; prototype pollution → RCE) | Stop — major version upgrade risk, ask before upgrading | Blocked |
+| vite | high | Yes | — | Dev dependency (build tool; path traversal in optimized deps) | Stop — major version upgrade risk, ask before upgrading | Blocked |
+| zod | high | Yes | — | Direct dependency (schema validation; memory exhaustion via oversized collections) | Stop — major version upgrade risk, ask before upgrading | Blocked |
+| brace-expansion | high | No | — | Indirect (transitive; CPU DoS via quadratic expansion) | Stop — ask before upgrading | Blocked |
+| follow-redirects | high | No | — | Indirect (transitive; cross-origin credential stripping bypass) | Stop — ask before upgrading | Blocked |
+| source-map-js | high | No | — | Indirect (transitive; event-loop DoS) | Stop — ask before upgrading | Blocked |
+
+Backend dependency scan: OWASP Dependency-Check not available (requires network access + NVD API key). Used `mvn dependency:tree` to list dependency versions instead. No known vulnerable versions identified from version listing alone; CVE lookup requires dependency-check-maven or equivalent with NVD access.
+
 ## Deprecation Notices
 
 _None._

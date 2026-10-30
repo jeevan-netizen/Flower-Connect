@@ -1228,5 +1228,44 @@ Phase 12 implements customer ratings and reviews with vendor replies and admin m
 - **RBAC filter-chain test:** `EndpointAccessMatrixRbacTest.java` — exercises the real Spring Security filter chain (not a slice) via `MockMvc` seeded through `login()` for CUSTOMER/FLORIST/ADMIN plus anonymous; iterates all entries × 4 roles, asserting exact 401/403 deny cases and non-401 allow cases; infra paths (`/actuator`, `/swagger-ui`, `/v3/api-docs`) handled leniently (springdoc oddity). All role×entry assertions pass.
 - **Verification:** backend unit suite 1386/1386 pass, BUILD SUCCESS; sweep test 5/5 pass; RBAC test all role×entry assertions pass. No production code changed; no migration; Docker available for full-stack runs.
 
-Branch: not yet created; changes uncommitted in working tree.
+Branch: `phase-13-security-hardening`, committed as `94851d4` and pushed to origin.
+
+### Phase 13 (Security Hardening) - Stage 2 (task 13.8: secrets, actuator, and dependency scan) - COMPLETE
+
+**Secret handling:**
+- `.env` is gitignored and untracked; `.env.example` is tracked with `CHANGE_ME_*` placeholders only.
+- `application-dev.yml` contains a hardcoded dev webhook secret default (finding 13.8-02, open).
+- `application.yml` base has weak `DB_PASS:flowerconnect` / `DB_USER:flowerconnect` defaults; `application-prod.yml` overrides with no-default placeholders (prod is fail-fast).
+- Test files contain hardcoded test credentials (`password123`, `AdminPass123!`, test JWT/webhook secrets) — test-only, not production secrets (finding 13.8-04, open).
+- Git history contains historical hardcoded passwords — not rewritten per rules (finding 13.8-05, open).
+
+**Production configuration fail-fast:**
+- `JwtService.init()` (@PostConstruct): validates JWT_SECRET ≥32 chars, throws `IllegalStateException` — tested by `JwtServiceTest.shouldThrowWhenSecretTooShort`.
+- `WebhookSecretValidator` (@Profile("prod")): validates webhook secret ≥32 bytes — tested by `WebhookSecretValidatorTest`.
+- `application-prod.yml`: no defaults for `DB_URL`, `DB_USER`, `DB_PASS`, `JWT_SECRET`, `APP_WEBHOOK_SECRET`, `MAIL_PASSWORD` — config-level fail-fast.
+- No new fail-fast code needed; existing guards are unit-tested.
+
+**Actuator, API docs, simulator, dev-only exposure in prod:**
+- **Finding 13.8-06 (fixed):** Swagger/OpenAPI was available in prod (`/v3/api-docs` → 200, `/swagger-ui.html` → 302). Fixed by adding `springdoc.api-docs.enabled: false` and `springdoc.swagger-ui.enabled: false` to `application-prod.yml`.
+- `SpringDocConfig` is `@Profile("dev")` — Swagger bean only created in dev.
+- `SimulatorProdAbsenceIntegrationTest` — verifies simulated payment provider and controller are absent in prod (already existed).
+- Actuator: `application-prod.yml` exposes only `health,info` with `show-details: never`. Spring Security permits actuator paths and lets the actuator exposure config be the sole gatekeeper, so non-exposed endpoints such as metrics return 404 rather than 401/403. SecurityConfig was changed from `/actuator/**` → `hasRole("ADMIN")` to `/actuator/**` → `permitAll()` for this reason.
+- New test: `ProductionProfileActuatorSwaggerTest` — verifies Swagger disabled (404), health available (200), metrics not available (404) in prod.
+
+**Dependency scan:**
+- `npm audit` (frontend): 12 vulnerabilities (2 critical, 5 high, 5 moderate). Mostly dev dependencies (vite, vitest, zod, tinypool, etc.). No automatic fixes applied — major version upgrades could break compatibility; stopping and asking before upgrading.
+- OWASP Dependency-Check for Maven: not available (requires network access + NVD API key). Used `mvn dependency:tree` to list dependency versions instead.
+
+**Files changed:**
+- Modified: `backend/src/main/resources/application-prod.yml` (springdoc disabled in prod)
+- Added: `backend/src/test/java/com/flowerconnect/config/ProductionProfileActuatorSwaggerTest.java`
+- Modified: `docs/progress.md`, `docs/known-issues.md`
+
+**Verification:**
+- `ProductionProfileActuatorSwaggerTest`: 4/4 pass
+- `AuthApiIntegrationTest.shouldReturn403WithCodeForAccessDenied`: updated to assert 404 for metrics (passes)
+- `EndpointAccessSweepIT` + `EndpointAccessMatrixRbacTest`: pass after SecurityConfig change (real filter chain)
+- Backend compile: clean
+
+Branch: `phase-13-security-hardening`, committed as `94851d4` and pushed to origin.
 
