@@ -10,14 +10,12 @@ import lombok.*;
 public class AuthResponse {
 
     private String accessToken;
-    private String refreshToken;
     private String tokenType = "Bearer";
     private Long expiresIn;
 
-    public static AuthResponse of(String accessToken, String refreshToken, long expiresInMillis) {
+    public static AuthResponse of(String accessToken, long expiresInMillis) {
         return AuthResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .expiresIn(expiresInMillis)
                 .build();

@@ -182,6 +182,7 @@ public class SecurityConfig {
             http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         }
         http.addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(new SecurityHeadersFilter(), JwtAuthenticationFilter.class);
 
         return http.build();
     }
@@ -208,7 +209,7 @@ public class SecurityConfig {
                 .toList();
         config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-FlowerConnect-Client"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

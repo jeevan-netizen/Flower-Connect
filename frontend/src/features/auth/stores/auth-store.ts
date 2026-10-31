@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { AuthResponse, UserResponse } from "@/features/auth/types";
 import {
   fetchCurrentUser,
@@ -29,7 +28,6 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>()(
-  persist(
     (set, get) => ({
       accessToken: null,
       user: null,
@@ -123,16 +121,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
     }),
-    {
-      name: "fc-auth",
-      partialize: (state) => ({
-        accessToken: state.accessToken,
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
-    },
-  ),
-);
+  );
 
 function extractErrorMessage(e: unknown): string {
   const err = e as { response?: { data?: { message?: string } }; message?: string };

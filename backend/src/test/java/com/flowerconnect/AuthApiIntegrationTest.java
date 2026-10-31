@@ -117,7 +117,6 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.expiresIn").value(900000))
                 .andExpect(header().string("Set-Cookie", containsString("refresh_token=")))
@@ -208,7 +207,6 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(header().string("Set-Cookie", containsString("refresh_token=")))
                 .andExpect(header().string("Set-Cookie", containsString("HttpOnly")))
@@ -439,8 +437,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").value(org.hamcrest.Matchers.not(oldRefreshToken)));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist());
     }
 
     @Test
@@ -458,9 +455,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String firstResponseBody = firstRefreshResult.getResponse().getContentAsString();
-        AuthResponse firstRefreshResponse = objectMapper.readValue(firstResponseBody, AuthResponse.class);
-        String firstNewRefreshToken = firstRefreshResponse.getRefreshToken();
+        String firstNewRefreshToken = extractRefreshToken(firstRefreshResult);
 
         // Second refresh with the SAME old (now-revoked) token within grace window
         MvcResult secondRefreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
@@ -469,9 +464,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String secondResponseBody = secondRefreshResult.getResponse().getContentAsString();
-        AuthResponse secondRefreshResponse = objectMapper.readValue(secondResponseBody, AuthResponse.class);
-        String secondNewRefreshToken = secondRefreshResponse.getRefreshToken();
+        String secondNewRefreshToken = extractRefreshToken(secondRefreshResult);
 
         // Each reuse within grace gets its own valid new token (not the same cached token)
         assertNotEquals(firstNewRefreshToken, secondNewRefreshToken,
@@ -484,8 +477,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest1)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty());
+                .andExpect(status().isOk());
 
         RefreshRequest refreshRequest2 = RefreshRequest.builder()
                 .refreshToken(secondNewRefreshToken)
@@ -493,8 +485,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest2)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty());
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -579,15 +570,14 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String liveRefreshToken = mockMvc.perform(post("/api/v1/auth/refresh")
+        MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(RefreshRequest.builder()
                         .refreshToken(oldRefreshToken)
                         .build())))
                 .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        AuthResponse refreshResponse = objectMapper.readValue(liveRefreshToken, AuthResponse.class);
-        liveRefreshToken = refreshResponse.getRefreshToken();
+                .andReturn();
+        String liveRefreshToken = extractRefreshToken(refreshResult);
 
         mockMvc.perform(post("/api/v1/auth/logout")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -679,7 +669,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         String responseBody = registerResult.getResponse().getContentAsString();
         AuthResponse registerResponse = objectMapper.readValue(responseBody, AuthResponse.class);
         String initialAccessToken = registerResponse.getAccessToken();
-        String initialRefreshToken = registerResponse.getRefreshToken();
+        String initialRefreshToken = extractRefreshToken(registerResult);
 
         // Verify user created with lowercase email
         User savedUser = userRepository.findByEmail(testEmail).orElseThrow();
@@ -711,7 +701,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         responseBody = loginResult.getResponse().getContentAsString();
         AuthResponse loginResponse = objectMapper.readValue(responseBody, AuthResponse.class);
         String loginAccessToken = loginResponse.getAccessToken();
-        String loginRefreshToken = loginResponse.getRefreshToken();
+        String loginRefreshToken = extractRefreshToken(loginResult);
 
         // Verify new refresh token created (login creates new token with NEW family_id)
         List<Map<String, Object>> loginTokens = jdbcTemplate.queryForList(
@@ -738,7 +728,7 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         responseBody = refreshResult.getResponse().getContentAsString();
         AuthResponse refreshResponse = objectMapper.readValue(responseBody, AuthResponse.class);
         String newAccessToken = refreshResponse.getAccessToken();
-        String newRefreshToken = refreshResponse.getRefreshToken();
+        String newRefreshToken = extractRefreshToken(refreshResult);
 
         // Verify rotation: old token revoked, new token created with same family_id as login
         List<Map<String, Object>> refreshTokens = jdbcTemplate.queryForList(
@@ -918,8 +908,9 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         String responseBody = result.getResponse().getContentAsString();
         AuthResponse response = objectMapper.readValue(responseBody, AuthResponse.class);
         assertNotNull(response.getAccessToken());
-        assertNotNull(response.getRefreshToken());
-        assertNotEquals(oldRefreshToken, response.getRefreshToken(),
+        String rotatedRefreshToken = extractRefreshToken(result);
+        assertNotNull(rotatedRefreshToken);
+        assertNotEquals(oldRefreshToken, rotatedRefreshToken,
                 "Refresh via cookie should rotate to a new token");
     }
 
@@ -1216,6 +1207,18 @@ class AuthApiIntegrationTest extends AbstractIntegrationTest {
         String responseBody = result.getResponse().getContentAsString();
         AuthResponse authResponse = objectMapper.readValue(responseBody, AuthResponse.class);
         accessToken = authResponse.getAccessToken();
-        refreshToken = authResponse.getRefreshToken();
+        refreshToken = extractRefreshToken(result);
+    }
+
+    private String extractRefreshToken(MvcResult result) {
+        String setCookie = result.getResponse().getHeader("Set-Cookie");
+        if (setCookie == null) {
+            return null;
+        }
+        String cookiePart = setCookie.split(";")[0];
+        if (cookiePart.startsWith("refresh_token=")) {
+            return cookiePart.substring("refresh_token=".length());
+        }
+        return null;
     }
 }

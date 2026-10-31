@@ -361,23 +361,8 @@ These cost real debugging time and will recur if forgotten:
 
 | 029 | Security | Rate limiting filter exists (`RateLimitFilter` keyed by email+IP on `/auth/login`, `/auth/register`,
   `/auth/forgot-password`, `/auth/reset-password`) but is conditional on `app.rate-limit.enabled=true`, which is never set in any profile — so these endpoints are not rate-limited in dev or prod | Open | Set `APP_RATE_LIMIT_ENABLED=true` and tune bucket/capacity in `application.yml`/production env before exposing to untrusted clients. |
-| 030 | Security | Auth tokens (access + refresh) are persisted to `localStorage` via Zustand `persist`, contradicting the memory-only intent (issue 022 still open) | Open | See issue 022; any fix must coordinate with the Axios single-flight refresh and 401 retry path. |
-| 031 | Security | No security headers / CSP configured on responses | Open | Add a `HeaderWriterFilter`/CSP config in `SecurityConfig` before production exposure. |
-
-## Testing Gotchas (Phase 13 — security hardening)
-
-- **Spring Security 6.1 path-matching API.** `RequestMappingInfo.getPathsCondition()` no longer exists; use
-  `getPathPatternsCondition().getPatterns()` (returns `Set<String>` with `{}` placeholders) and
-  `getMethodsCondition().getMethods()` (returns `Set<RequestMethod>`). `EndpointAccessSweepIT` uses the
-  current API; do not backport to older Spring versions without adjusting.
-- **`@RequiresApprovedVendor` is inert in `@WebMvcTest` slices** (D-13, restated). The RBAC sweep uses
-  `@SpringBootTest`+real `SecurityFilterChain` precisely because slices load their own filter chain and
-  never load production `SecurityConfig`, so method security never runs in a slice.
-
-| 029 | Security | Rate limiting filter exists (`RateLimitFilter` keyed by email+IP on `/auth/login`, `/auth/register`,
-  `/auth/forgot-password`, `/auth/reset-password`) but is conditional on `app.rate-limit.enabled=true`, which is never set in any profile — so these endpoints are not rate-limited in dev or prod | Open | Set `APP_RATE_LIMIT_ENABLED=true` and tune bucket/capacity in `application.yml`/production env before exposing to untrusted clients. |
-| 030 | Security | Auth tokens (access + refresh) are persisted to `localStorage` via Zustand `persist`, contradicting the memory-only intent (issue 022 still open) | Open | See issue 022; any fix must coordinate with the Axios single-flight refresh and 401 retry path. |
-| 031 | Security | No security headers / CSP configured on responses | Open | Add a `HeaderWriterFilter`/CSP config in `SecurityConfig` before production exposure. |
+| 030 | Security | Auth tokens (access + refresh) persisted to `localStorage` via Zustand `persist`, contradicting memory-only intent | Fixed | Removed `persist` middleware from `auth-store.ts`; access token now memory-only. Session restored via HttpOnly refresh cookie + refresh flow on reload. | Fixed |
+| 031 | Security | No security headers / CSP configured on responses | Fixed | Added `SecurityHeadersFilter` with `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`, `Cache-Control: no-store` on auth/authenticated responses. CSP added to `frontend/server.mjs`. | Fixed |
 
 ## Phase 13 Stage 2 Findings (task 13.8: secrets, actuator, and dependency scan)
 
@@ -405,6 +390,17 @@ Frontend `npm audit`: 12 vulnerabilities (2 critical, 5 high, 5 moderate). Scan 
 | source-map-js | high | No | — | Indirect (transitive; event-loop DoS) | Stop — ask before upgrading | Blocked |
 
 Backend dependency scan: OWASP Dependency-Check not available (requires network access + NVD API key). Used `mvn dependency:tree` to list dependency versions instead. No known vulnerable versions identified from version listing alone; CVE lookup requires dependency-check-maven or equivalent with NVD access.
+
+## Phase 13 Stage 3 Findings (tasks 13.3, 13.4)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| 13.3-01 | Token storage | `accessToken` persisted to `localStorage` via Zustand `persist` middleware (`name: "fc-auth"`) | High | `auth-store.ts` used `persist()` with `partialize` including `accessToken` | Removed `persist` middleware; access token memory-only | Fixed |
+| 13.3-02 | AuthResponse contract | `refreshToken` field in `AuthResponse` DTO sent in response body in addition to HttpOnly cookie | High | `AuthResponse.java:13` had `refreshToken` field; `AuthController` set cookie AND returned body | Removed `refreshToken` from response body — refresh token now issued only via HttpOnly cookie. Frontend `AuthResponse` interface and `setAuth()` updated to read only `accessToken`. | Fixed |
+| 13.3-03 | CORS | `config.setAllowedHeaders(List.of("*"))` with `setAllowCredentials(true)` — wildcard headers incompatible with credentials | Medium | `SecurityConfig.java` CORS configuration | Replaced `*` with explicit list: `Authorization`, `Content-Type`, `X-FlowerConnect-Client` | Fixed |
+| 13.3-04 | Security headers | No `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `HSTS`, `Cache-Control: no-store`, or CSP | High | No matches found in codebase | Added `SecurityHeadersFilter` | Fixed |
+| 13.3-05 | CSP | CSP headers configured in `frontend/server.mjs` serving the SPA. No CSP on backend API responses (not needed for JSON). Policy: `default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://localhost:8080; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Medium | Built frontend inspection (`dist/index.html`): same-origin JS/CSS, Google Fonts origins, API at `http://localhost:8080` | CSP configured in `server.mjs`. Production deployments must set `VITE_API_BASE_URL` to actual backend origin for `connect-src`. | Fixed |
+| 13.3-06 | Browser verification | Stage 3 e2e test (`stage3-security.test.ts`): 1/1 pass against running Docker stack — login succeeds, no token in web storage, reload restores session via refresh cookie, logout redirects to login, no CSP violations. Vendor and admin flows not verified (no admin credentials available). | Medium | Playwright test against Docker stack (all 4 containers healthy) | Vendor/admin browser verification requires `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars | Open |
 
 ## Deprecation Notices
 

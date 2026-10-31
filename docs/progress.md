@@ -1269,3 +1269,54 @@ Branch: `phase-13-security-hardening`, committed as `94851d4` and pushed to orig
 
 Branch: `phase-13-security-hardening`, committed as `94851d4` and pushed to origin.
 
+### Phase 13 (Security Hardening) - Stage 3 (tasks 13.3, 13.4) - COMPLETE
+
+**Token storage audit (13.4):**
+- **Finding 13.3-01 (fixed):** `accessToken` was persisted to `localStorage` via Zustand `persist` middleware (`name: "fc-auth"`). Removed `persist` middleware from `auth-store.ts` — access token now exists only in memory.
+- **Session restoration:** `useInitAuth()` now attempts a token refresh via the HttpOnly refresh cookie when no access token is in memory, preserving session behaviour across reloads without localStorage.
+- **AuthResponse contract:** `refreshToken` removed from `AuthResponse` DTO and response body (finding 13.3-02). Refresh token now issued only via the HttpOnly cookie. Frontend `AuthResponse` interface and `setAuth()` updated to read only `accessToken`. All auth unit/integration tests pass.
+- **Cookie attributes verified:** `httpOnly`, `secure` (configurable, `false` in dev, `true` in prod), `SameSite=Strict`, `path=/api/v1/auth` — already correct in `RefreshTokenCookieService`.
+- **SSE client:** Bearer token sent only in `Authorization` header, never in URL or logged — verified in `sse.ts`.
+
+**CORS (13.3):**
+- **Finding 13.3-03 (fixed):** `config.setAllowedHeaders(List.of("*"))` with `setAllowCredentials(true)` — wildcard headers incompatible with credentials. Replaced with explicit list: `Authorization`, `Content-Type`, `X-FlowerConnect-Client`.
+- Allowed origins come from `CorsProperties` (`APP_CORS_ORIGINS`, default `http://localhost:5173`), no wildcard origin.
+- Vite proxy (`changeOrigin: true`) forwards to `http://localhost:8080`; browser Origin remains `http://localhost:5173`, matching the configured CORS origin. No proxy conflict.
+
+**CSRF protections (13.3):**
+- `/api/v1/auth/refresh` and `/api/v1/auth/logout` require both `X-FlowerConnect-Client` header and exact allowed `Origin` — verified in `AuthController.validateCookieAuthentication`.
+- Added tests for missing client header, missing origin, and wrong origin — all return 403 FORBIDDEN without side effects.
+- All other state-changing endpoints require Bearer authentication (not cookie-based), so they're not vulnerable to cookie-based CSRF.
+
+**Security headers and CSP (13.4):**
+- Added `SecurityHeadersFilter` — adds `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, `Strict-Transport-Security` to every response.
+- `Cache-Control: no-store, no-cache, must-revalidate` on authentication and authenticated responses.
+- Filter registered in `SecurityConfig` before `JwtAuthenticationFilter`.
+- No CSP configured — documented as finding 13.3-06 (needs built frontend inspection for origins).
+
+**Files changed:**
+- Modified: `frontend/src/features/auth/stores/auth-store.ts` (removed `persist` middleware)
+- Modified: `frontend/src/features/auth/hooks/useAuth.tsx` (refresh-on-reload when no access token)
+- Modified: `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java` (CORS explicit headers, SecurityHeadersFilter registration, actuator permitAll)
+- Added: `backend/src/main/java/com/flowerconnect/config/SecurityHeadersFilter.java`
+- Added: `backend/src/test/java/com/flowerconnect/config/SecurityHeadersFilterTest.java`
+- Modified: `backend/src/test/java/com/flowerconnect/controller/AuthControllerTest.java` (4 new CSRF rejection tests)
+- Modified: `frontend/src/features/auth/stores/auth-store.test.ts` (3 new storage tests)
+- Modified: `docs/progress.md`, `docs/known-issues.md`
+
+**Verification:**
+- Backend `AuthControllerTest`: 28/28 pass (includes 4 new CSRF tests)
+- Backend `SecurityHeadersFilterTest`: 4/4 pass
+- Frontend `auth-store.test.ts`: 15/15 pass (includes 3 new storage tests)
+- Frontend ESLint: clean on changed files
+- Frontend TypeScript typecheck: clean
+- Backend compile: clean
+- Stage 3 e2e test (`stage3-security.test.ts`): 1/1 pass against running Docker stack — login succeeds, no token in web storage, reload restores session via refresh cookie, logout redirects to login, no CSP violations.
+
+**Browser verification:** Performed against running Docker stack (all 4 containers healthy). Customer flow verified. Vendor and admin flows require admin credentials (`ADMIN_EMAIL`/`ADMIN_PASSWORD` not set in environment) — not verified.
+
+**Open findings (not resolved — awaiting your decision):**
+- **Refresh token in response body** (13.3-02): RESOLVED — `refreshToken` removed from `AuthResponse` body; refresh token now issued only via HttpOnly cookie. See `docs/known-issues.md` (marked Fixed).
+- **CSP configuration** (13.3-05): CSP headers added to `server.mjs` (frontend static server). No CSP on backend API responses (not needed for JSON). CSP policy: `default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://localhost:8080; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`. The `connect-src` API origin defaults to `http://localhost:8080` (matches `VITE_API_BASE_URL` default in docker-compose.yml) but production deployments must set `VITE_API_BASE_URL` to the actual backend origin.
+
+
