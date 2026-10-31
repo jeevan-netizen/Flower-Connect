@@ -1319,4 +1319,46 @@ Branch: `phase-13-security-hardening`, committed as `94851d4` and pushed to orig
 - **Refresh token in response body** (13.3-02): RESOLVED — `refreshToken` removed from `AuthResponse` body; refresh token now issued only via HttpOnly cookie. See `docs/known-issues.md` (marked Fixed).
 - **CSP configuration** (13.3-05): CSP headers added to `server.mjs` (frontend static server). No CSP on backend API responses (not needed for JSON). CSP policy: `default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://localhost:8080; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`. The `connect-src` API origin defaults to `http://localhost:8080` (matches `VITE_API_BASE_URL` default in docker-compose.yml) but production deployments must set `VITE_API_BASE_URL` to the actual backend origin.
 
+### Phase 13 (Security Hardening) - Stage 4 (task 13.1: rate-limit review and extension) - COMPLETE (2026-10-31)
+
+**Audit findings (recorded before fixes):**
+| id | area | description | severity | status |
+|----|------|-------------|----------|--------|
+| R-1 | Config | Rate-limit filter inactive in dev/prod/default-test (`app.rate-limit.enabled` never set; `matchIfMissing=false`). Active only in the dedicated `rate-limit-test` profile. | High | Fixed |
+| R-2 | Filter | Client IP resolved by blindly trusting `X-Forwarded-For`/`X-Real-IP` — any client can spoof its IP to evade IP-based limits or frame another IP. | High | Fixed |
+| R-3 | Filter | Full request body (incl. passwords) logged via `log.info(..., "request body={}")`. | High | Fixed |
+| R-4 | Filter | Auth endpoints bypass rate limiting entirely when the body has no email. | High | Fixed |
+| R-5 | Coverage | Only login/register/forgot/reset/webhook rate-limited. Sensitive mutating endpoints unprotected. | High | Fixed |
+| R-6 | Keys | No authenticated-user keying; all limits email-or-IP. | Medium | Fixed |
+| R-7 | Ordering | Rate-limit filter ran before `JwtAuthenticationFilter`, so `SecurityContext` was empty — could not key by authenticated user. | Medium | Fixed |
+
+**Implementation:**
+- `RateLimitProperties` (`app.rate-limit`): added `enabled` (default false), `trustedProxies` (default empty), existing `auth` limits and `webhookRequestsPerHour`, plus a new `sensitive` block with per-endpoint per-hour limits (checkout 30, checkout/quote 60, dispute create 10, review submit 20, address create 20, cart mutation 60, image upload 30, POS sale 300). All thresholds/windows are configuration only; none hard-coded in the filter or services.
+- `RateLimitFilter`: gated by `enabled`; sensitive endpoints keyed by the authenticated principal (JWT subject/email) with a client-IP fallback for unauthenticated calls; anonymous endpoints keyed by email-from-body-plus-IP (missing email no longer bypasses — falls back to IP); webhook keyed by IP. Runs after `JwtAuthenticationFilter` so the principal is available. No body/password logging; multipart upload bodies are never buffered. Trusted proxies only: forwarded headers (`X-Forwarded-For`/`X-Real-IP`) are honored only when `remoteAddr` is in `trustedProxies` (empty by default → safe-by-default, no IP spoofing). Returns structured 429 (`ErrorResponse` with `code=RATE_LIMITED`, `Retry-After` header).
+- `SecurityConfig`: rate-limit filter registered before `UsernamePasswordAuthenticationFilter` (which has a registered order), after `SecurityHeadersFilter` and `JwtAuthenticationFilter`, so order is `SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF`.
+- Profile activation: `enabled: true` added to base `application.yml` (dev) and `application-prod.yml` (prod); `application-test.yml` keeps `enabled: false` (existing integration tests unaffected); dedicated `application-rate-limit-test.yml` keeps `enabled: true` with low sensitive limits (2/hour) for fast tests.
+- Sensitive endpoints added: `POST /api/v1/checkout`, `POST /api/v1/checkout/quote`, `POST /api/v1/disputes/orders/{orderId}`, `POST /api/v1/orders/{orderId}/reviews`, `POST /api/v1/addresses`, `POST/PATCH/DELETE /api/v1/cart/items{,/{id}}`, `DELETE /api/v1/cart`, `POST /api/v1/vendors/products/{productId}/images`, `POST /api/v1/pos/sales`. Existing login/register/forgot/reset/webhook protections preserved.
+
+**Files changed:**
+- Modified: `backend/src/main/java/com/flowerconnect/config/RateLimitProperties.java`
+- Modified: `backend/src/main/java/com/flowerconnect/config/RateLimitFilter.java`
+- Modified: `backend/src/main/java/com/flowerconnect/config/RateLimitConfig.java` (inject `ObjectMapper` into filter)
+- Modified: `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java` (filter ordering)
+- Modified: `backend/src/main/resources/application.yml` (enabled: true)
+- Modified: `backend/src/main/resources/application-prod.yml` (enabled: true)
+- Modified: `backend/src/test/resources/application-rate-limit-test.yml` (sensitive limits, low values)
+- Modified: `backend/src/test/java/com/flowerconnect/RateLimitIntegrationTest.java` (sensitive endpoint + IP isolation tests)
+- Added: `backend/src/test/java/com/flowerconnect/config/RateLimitFilterUnitTest.java`
+
+**Verification:**
+- Backend unit suite: **1402 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw test`) — includes the 8 new `RateLimitFilterUnitTest` tests covering disabled pass-through, under/over limit, 429 body + Retry-After, authenticated-user key isolation, IP key isolation, trusted proxy honoring `X-Forwarded-For`, untrusted proxy ignoring it, multipart passthrough.
+- Backend integration: `RateLimitIntegrationTest` **8/8 pass** against real MySQL + production filter chain (`./mvnw verify -Pintegration -Dit.test=RateLimitIntegrationTest`) — covering sensitive endpoint rate limiting by authenticated user, user key isolation, anonymous IP isolation, 429 status + `Retry-After` + `RATE_LIMITED` code, and regression of existing auth rate limits.
+- Backend compile: clean.
+
+**Unresolved questions / workflow impact:**
+- Rate limiting is now active in dev and prod (was previously off). Limits are starting values (e.g. checkout 30/h, POS sale 300/h) chosen to avoid blocking normal workflows, but POS sale bursts or heavy cart usage in dev could hit them; all values are configurable via `app.rate-limit.sensitive.*` and `app.rate-limit.auth.*` with no code change.
+- No shared store / Redis added (per plan, only considered for multi-instance deployments). Per-instance Caffeine buckets mean limits are not globally consistent across multiple backend instances — acceptable for v1 single-instance, revisit if the service scales to multiple instances.
+- No CAPTCHA added (out of scope).
+
+Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 4 changes; no commit/push per instructions).
 

@@ -2865,3 +2865,37 @@ D-13 established that `@RequiresApprovedVendor` is per-handler and inert in `@We
 - Sweep test: 5/5 pass.
 - RBAC test: all roleÃ—entry assertions pass.
 - Full integration suite: not re-run end-to-end (each Spring context ~15s; >1200 tests exceeds a single session window); key acceptance tests pass individually.
+
+
+## D-68: Rate limiting — per-profile activation, per-user/IP keys, config-driven limits, Caffeine per-instance
+
+**Status:** Accepted
+**Date:** Phase 13 Stage 4 (task 13.1)
+
+### Context
+
+Phase 13 Stage 1 required a rate-limit review and extension (plan §13). The Phase 1 `RateLimitFilter` existed but was inactive by default (`app.rate-limit.enabled` never set; `matchIfMissing=false`), only covered login/register/forgot-reset/webhook, trusted `X-Forwarded-For`/`X-Real-IP` unconditionally (IP spoofing), logged full request bodies (including passwords), bypassed entirely when the body had no email, and ran before `JwtAuthenticationFilter` so it could not key by authenticated user. Sensitive mutating endpoints (checkout, dispute creation, review submission, address creation, cart mutations, image uploads, POS sale) had no rate limit at all.
+
+### Decision
+
+- **Per-profile activation:** `app.rate-limit.enabled` gates the filter via `@ConditionalOnProperty`. Set to `true` in base `application.yml` (dev) and `application-prod.yml` (prod); `application-test.yml` keeps it `false` so existing integration tests are unaffected; the dedicated `application-rate-limit-test.yml` enables it with low limits for fast tests.
+- **Key strategy:** sensitive endpoints are keyed by the authenticated principal (JWT subject/email) so each user has an independent bucket, with a client-IP fallback for unauthenticated calls. Anonymous endpoints (login/register/forgot/reset) are keyed by email-from-body plus IP; a missing email no longer bypasses — it falls back to IP. Webhook is keyed by IP. Keys are SHA-256 hashes of the identifier (never raw email/token in logs or tests).
+- **Trusted proxies only:** `app.rate-limit.trusted-proxies` (default empty) lists proxy IPs/CIDRs whose `X-Forwarded-For`/`X-Real-IP` are honored. Empty by default ? `remoteAddr` is used ? safe-by-default, no IP spoofing via forged headers.
+- **No body logging:** the filter never logs request bodies or emails; only path and hashed key at debug.
+- **No multipart buffering:** upload bodies are never read or buffered by the filter; they pass through untouched.
+- **Filter ordering:** rate-limit filter registered before `UsernamePasswordAuthenticationFilter` (which has a registered order), after `SecurityHeadersFilter` and `JwtAuthenticationFilter`, so order is `SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF` and the principal is available at rate-limit time.
+- **Limits in configuration only:** every threshold and window is a `RateLimitProperties` field (`app.rate-limit.auth.*`, `app.rate-limit.webhookRequestsPerHour`, `app.rate-limit.sensitive.*`). None are hard-coded in the filter or services. Sensitive endpoints: checkout 30/h, checkout/quote 60/h, dispute create 10/h, review submit 20/h, address create 20/h, cart mutation 60/h, image upload 30/h, POS sale 300/h. These are starting values chosen to avoid blocking normal workflows; they are documented as tunable and may be revisited with real usage.
+- **No shared store / Redis:** per-instance Caffeine buckets (expire-after-access 2h, max 10k). Limits are not globally consistent across multiple backend instances — acceptable for v1 single-instance, revisit if the service scales. No CAPTCHA (out of scope).
+
+### Consequences
+
+- Rate limiting is now active in dev and prod (was previously off). Limits are starting values; POS sale bursts or heavy cart usage in dev could hit them, but all are configurable with no code change.
+- `@RequiresApprovedVendor` remains inert in `@WebMvcTest` slices (D-13); rate-limit behavior is verified at integration level against the real filter chain.
+- No Flyway migration; no production code behavior change beyond activating and extending rate limiting.
+
+### Verification
+
+- `RateLimitFilterUnitTest` (8 tests): disabled pass-through, under/over limit, 429 body + `Retry-After`, authenticated-user key isolation, IP key isolation, trusted proxy honoring `X-Forwarded-For`, untrusted proxy ignoring it, multipart passthrough — all pass.
+- `RateLimitIntegrationTest` (8 tests) against real MySQL + production filter chain: sensitive endpoint rate limiting by authenticated user, user key isolation, anonymous IP isolation, 429 status + `Retry-After` + `RATE_LIMITED` code, regression of existing auth rate limits — all pass.
+- Backend unit suite: 1402/1402 pass, BUILD SUCCESS.
+

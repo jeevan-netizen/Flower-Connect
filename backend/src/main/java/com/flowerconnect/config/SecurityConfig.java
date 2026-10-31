@@ -178,11 +178,17 @@ public class SecurityConfig {
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler)
             );
+        // Custom filters are all registered relative to UsernamePasswordAuthenticationFilter,
+        // which has a registered order (unlike the custom JwtAuthenticationFilter class).
+        // Call order determines the final sequence, so RateLimitFilter is added last so it
+        // runs after JWT authentication and can key sensitive endpoints by the authenticated
+        // principal rather than only by IP:
+        //   SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF
+        http.addFilterBefore(new SecurityHeadersFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
         if (rateLimitFilter != null) {
             http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         }
-        http.addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
-        http.addFilterBefore(new SecurityHeadersFilter(), JwtAuthenticationFilter.class);
 
         return http.build();
     }

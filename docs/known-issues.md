@@ -360,7 +360,7 @@ These cost real debugging time and will recur if forgotten:
   never load production `SecurityConfig`, so method security never runs in a slice.
 
 | 029 | Security | Rate limiting filter exists (`RateLimitFilter` keyed by email+IP on `/auth/login`, `/auth/register`,
-  `/auth/forgot-password`, `/auth/reset-password`) but is conditional on `app.rate-limit.enabled=true`, which is never set in any profile — so these endpoints are not rate-limited in dev or prod | Open | Set `APP_RATE_LIMIT_ENABLED=true` and tune bucket/capacity in `application.yml`/production env before exposing to untrusted clients. |
+  `/auth/forgot-password`, `/auth/reset-password`) but is conditional on `app.rate-limit.enabled=true`, which is never set in any profile — so these endpoints are not rate-limited in dev or prod | Fixed | `app.rate-limit.enabled` set to `true` in base `application.yml` (dev) and `application-prod.yml` (prod). Extended to sensitive endpoints (checkout, dispute creation, review submission, address creation, cart mutations, image uploads, POS sale) keyed by authenticated user or trusted client IP. All limits configurable; no Redis/shared store. |
 | 030 | Security | Auth tokens (access + refresh) persisted to `localStorage` via Zustand `persist`, contradicting memory-only intent | Fixed | Removed `persist` middleware from `auth-store.ts`; access token now memory-only. Session restored via HttpOnly refresh cookie + refresh flow on reload. | Fixed |
 | 031 | Security | No security headers / CSP configured on responses | Fixed | Added `SecurityHeadersFilter` with `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`, `Cache-Control: no-store` on auth/authenticated responses. CSP added to `frontend/server.mjs`. | Fixed |
 
@@ -401,6 +401,23 @@ Backend dependency scan: OWASP Dependency-Check not available (requires network 
 | 13.3-04 | Security headers | No `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `HSTS`, `Cache-Control: no-store`, or CSP | High | No matches found in codebase | Added `SecurityHeadersFilter` | Fixed |
 | 13.3-05 | CSP | CSP headers configured in `frontend/server.mjs` serving the SPA. No CSP on backend API responses (not needed for JSON). Policy: `default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://localhost:8080; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` | Medium | Built frontend inspection (`dist/index.html`): same-origin JS/CSS, Google Fonts origins, API at `http://localhost:8080` | CSP configured in `server.mjs`. Production deployments must set `VITE_API_BASE_URL` to actual backend origin for `connect-src`. | Fixed |
 | 13.3-06 | Browser verification | Stage 3 e2e test (`stage3-security.test.ts`): 1/1 pass against running Docker stack — login succeeds, no token in web storage, reload restores session via refresh cookie, logout redirects to login, no CSP violations. Vendor and admin flows not verified (no admin credentials available). | Medium | Playwright test against Docker stack (all 4 containers healthy) | Vendor/admin browser verification requires `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars | Open |
+
+## Phase 13 Stage 4 Findings (task 13.1: rate-limit review and extension)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| R-1 | Config | Rate-limit filter inactive in dev/prod/default-test (`app.rate-limit.enabled` never set; `matchIfMissing=false`). | High | `RateLimitIntegrationTest` context only loads under `rate-limit-test` profile | `enabled: true` set in base `application.yml` and `application-prod.yml` | Fixed |
+| R-2 | Filter | Client IP resolved by blindly trusting `X-Forwarded-For`/`X-Real-IP` — any client can spoof its IP to evade IP-based limits or frame another IP. | High | `RateLimitFilter.getClientIp` read forwarded headers unconditionally | Added `app.rate-limit.trusted-proxies`; forwarded headers honored only when `remoteAddr` is a trusted proxy (empty by default → safe-by-default) | Fixed |
+| R-3 | Filter | Full request body (incl. passwords) logged via `log.info(..., "request body={}")`. | High | `RateLimitFilter.doFilterInternal` logged the body | Removed body/email logging; only path + hashed key logged at debug | Fixed |
+| R-4 | Filter | Auth endpoints bypass rate limiting entirely when the body has no email. | High | `RateLimitFilter` passed through when email absent on non-webhook auth paths | Missing email now falls back to IP-keyed bucket instead of bypassing | Fixed |
+| R-5 | Coverage | Only login/register/forgot/reset/webhook rate-limited. Sensitive mutating endpoints unprotected. | High | Endpoint audit | Added per-endpoint per-hour limits for checkout, checkout/quote, dispute create, review submit, address create, cart mutations, image upload, POS sale | Fixed |
+| R-6 | Keys | No authenticated-user keying; all limits email-or-IP. | Medium | `RateLimitFilter` keyed by email/IP only | Sensitive endpoints keyed by authenticated principal (JWT subject), IP fallback for unauthenticated calls | Fixed |
+| R-7 | Ordering | Rate-limit filter ran before `JwtAuthenticationFilter`, so `SecurityContext` was empty — could not key by authenticated user. | Medium | Filter order in `SecurityConfig.filterChain` | Rate-limit filter registered after `JwtAuthenticationFilter` (order: `SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF`) | Fixed |
+
+**Workflow impact / open notes:**
+- Rate limiting is now active in dev and prod (was previously off). Limits are starting values (checkout 30/h, checkout/quote 60/h, dispute create 10/h, review submit 20/h, address create 20/h, cart mutation 60/h, image upload 30/h, POS sale 300/h) chosen to avoid blocking normal workflows, but POS sale bursts or heavy cart usage in dev could hit them; all values are configurable via `app.rate-limit.sensitive.*` and `app.rate-limit.auth.*` with no code change.
+- No shared store / Redis added (per plan, only considered for multi-instance deployments). Per-instance Caffeine buckets mean limits are not globally consistent across multiple backend instances — acceptable for v1 single-instance, revisit if the service scales to multiple instances.
+- No CAPTCHA added (out of scope).
 
 ## Deprecation Notices
 

@@ -2,6 +2,7 @@ package com.flowerconnect.config;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
 import io.github.bucket4j.TimeMeter;
@@ -28,8 +29,9 @@ public class RateLimitConfig {
     @ConditionalOnProperty(name = "app.rate-limit.enabled", havingValue = "true", matchIfMissing = false)
     public RateLimitFilter rateLimitFilter(Cache<String, Bucket> bucketCache,
                                            RateLimitProperties rateLimitProperties,
-                                           Clock clock) {
-        return new RateLimitFilter(bucketCache, rateLimitProperties, clock);
+                                           Clock clock,
+                                           ObjectMapper objectMapper) {
+        return new RateLimitFilter(bucketCache, rateLimitProperties, clock, objectMapper);
     }
 
     public static String buildKey(String endpoint, String hashedEmail, String ip) {
