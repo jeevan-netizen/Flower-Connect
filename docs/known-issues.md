@@ -419,6 +419,33 @@ Backend dependency scan: OWASP Dependency-Check not available (requires network 
 - No shared store / Redis added (per plan, only considered for multi-instance deployments). Per-instance Caffeine buckets mean limits are not globally consistent across multiple backend instances — acceptable for v1 single-instance, revisit if the service scales to multiple instances.
 - No CAPTCHA added (out of scope).
 
+## Phase 13 Stage 5 Findings (task 13.2: upload security audit and fixes)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| U-1 | Upload auth & gating | Upload route protected by JWT (`hasRole("FLORIST")`), `@RequiresApprovedVendor`, ownership via `requireOwnedProduct`, rate-limited 30/h (Stage 4) | Info | `VendorProductImageController.java:55-57`, `RateLimitFilter.java` | None needed — already secure | Resolved |
+| U-2 | Content validation | Magic-byte sniffing; filename and `Content-Type` ignored; polyglots rejected by decode | Info | `ImageTypeDetector.java`, `ImageProcessor.java:84-116` | None needed — already secure | Resolved |
+| U-3 | Size limits | Container `max-file-size: 5MB`/`max-request-size: 6MB`; service re-checks `max-file-size-bytes: 5242880` | Info | `application.yml:40-41,79`, `ProductImageService.java:234` | None needed — already secure | Resolved |
+| U-4 | Rejections | Empty (400), non-decodable (400), unsupported (415), oversized (413) all rejected before any write | Info | `ProductImageService.java:227-242`, `ImageProcessor.java:77-117` | None needed — already secure | Resolved |
+| U-5 | Image processing | Decode → dimensions → pixel budget → scale → re-encode; EXIF/GPS dropped; WebP→JPEG | Info | `ImageProcessor.java` | None needed — already secure | Resolved |
+| U-6 | Image count limit | Max 8/product, enforced under row lock | Info | `ProductImageService.java:244-249`, `application.yml:80` | None needed — already secure | Resolved |
+| U-7 | Storage keys | Server-generated `product-images/{productId}/{uuid}.{ext}`; filename never a path | Info | `ProductImageService.java:340-342` | None needed — already secure | Resolved |
+| U-8 | Path traversal | `resolve()` rejects backslash, absolute, `~`, escaping root | Info | `LocalDiskStorageService.java:107-127` | None needed — already secure | Resolved |
+| U-9 | Atomic writes | `.part` + `ATOMIC_MOVE`; cleanup on failure; row-first/object-second deletes | Info | `LocalDiskStorageService.java:63-77`, `ProductImageService.java:319-333` | None needed — already secure | Resolved |
+| U-10 | Error disclosure | `StorageException` → `handleGeneral` → 500 generic, no path/credential disclosure | Info | `GlobalExceptionHandler.java:126-131` | None needed — already secure | Resolved |
+| U-11 | S3 backend | Declared stub throws on all methods; only behind `s3` profile; prod uses local disk | Info | `S3StorageService.java`, `application-prod.yml` | None needed — already secure | Resolved |
+| U-12 | Upload rate-limit test coverage | Stage 4 added upload endpoint to rate-limited routes but `RateLimitIntegrationTest` didn't test it | Low | `RateLimitIntegrationTest.java` | Add upload rate limiting test | Fixed |
+
+**Implementation:**
+- No production code changes needed — the upload pipeline was already secure. All 11 findings are pre-existing controls verified correct.
+- Added upload rate-limiting coverage to `RateLimitFilterUnitTest` (3 new tests): upload endpoint rate-limited by authenticated vendor, unauthenticated uploads keyed by IP, multipart body never buffered by the filter.
+
+**Verification:**
+- Backend unit suite: **1405 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw test`).
+- `ProductImageIntegrationTest`: **36/36 pass** against real MySQL + production security chain + real filesystem.
+- `RateLimitIntegrationTest`: **8/8 pass** against real MySQL + production filter chain.
+- Upload-related unit tests: **54/54 pass** (`ImageProcessorTest`, `ImageTypeDetectorTest`, `LocalDiskStorageServiceTest`, `S3StorageServiceTest`, `RateLimitFilterUnitTest`).
+
 ## Deprecation Notices
 
 _None._

@@ -1362,3 +1362,42 @@ Branch: `phase-13-security-hardening`, committed as `94851d4` and pushed to orig
 
 Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 4 changes; no commit/push per instructions).
 
+
+### Phase 13 (Security Hardening) - Stage 5 (task 13.2: upload security audit and fixes) - COMPLETE (2026-11-01)
+
+**Audit findings (recorded before fixes):**
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| U-1 | Upload auth & gating | `POST /api/v1/vendors/products/{productId}/images` protected by JWT (`hasRole("FLORIST")`), `@RequiresApprovedVendor`, ownership via `requireOwnedProduct`, rate-limited 30/h (Stage 4) | Info | `VendorProductImageController.java:55-57`, `RateLimitFilter.java` | None needed — already secure | Resolved |
+| U-2 | Content validation | Magic-byte sniffing; filename and `Content-Type` ignored; polyglots rejected by decode | Info | `ImageTypeDetector.java`, `ImageProcessor.java:84-116` | None needed — already secure | Resolved |
+| U-3 | Size limits | Container `max-file-size: 5MB`/`max-request-size: 6MB`; service re-checks `max-file-size-bytes: 5242880` | Info | `application.yml:40-41,79`, `ProductImageService.java:234` | None needed — already secure | Resolved |
+| U-4 | Rejections | Empty (400), non-decodable (400), unsupported (415), oversized (413) all rejected before any write | Info | `ProductImageService.java:227-242`, `ImageProcessor.java:77-117` | None needed — already secure | Resolved |
+| U-5 | Image processing | Decode → dimensions → pixel budget → scale → re-encode; EXIF/GPS dropped; WebP→JPEG | Info | `ImageProcessor.java` | None needed — already secure | Resolved |
+| U-6 | Image count limit | Max 8/product, enforced under row lock | Info | `ProductImageService.java:244-249`, `application.yml:80` | None needed — already secure | Resolved |
+| U-7 | Storage keys | Server-generated `product-images/{productId}/{uuid}.{ext}`; filename never a path | Info | `ProductImageService.java:340-342` | None needed — already secure | Resolved |
+| U-8 | Path traversal | `resolve()` rejects backslash, absolute, `~`, escaping root | Info | `LocalDiskStorageService.java:107-127` | None needed — already secure | Resolved |
+| U-9 | Atomic writes | `.part` + `ATOMIC_MOVE`; cleanup on failure; row-first/object-second deletes | Info | `LocalDiskStorageService.java:63-77`, `ProductImageService.java:319-333` | None needed — already secure | Resolved |
+| U-10 | Error disclosure | `StorageException` → `handleGeneral` → 500 generic, no path/credential disclosure | Info | `GlobalExceptionHandler.java:126-131` | None needed — already secure | Resolved |
+| U-11 | S3 backend | Declared stub throws on all methods; only behind `s3` profile; prod uses local disk | Info | `S3StorageService.java`, `application-prod.yml` | None needed — already secure | Resolved |
+| U-12 | Upload rate-limit test coverage | Stage 4 added upload endpoint to rate-limited routes but `RateLimitIntegrationTest` didn't test it | Low | `RateLimitIntegrationTest.java` | Add upload rate limiting test | Fixed |
+
+**Implementation:**
+- No production code changes needed — the upload pipeline was already secure. All 11 findings are pre-existing controls verified correct.
+- Added upload rate-limiting coverage to `RateLimitFilterUnitTest` (3 new tests): upload endpoint rate-limited by authenticated vendor, unauthenticated uploads keyed by IP, multipart body never buffered by the filter.
+
+**Files changed:**
+- Modified: `backend/src/test/java/com/flowerconnect/config/RateLimitFilterUnitTest.java` (3 new upload rate-limiting tests)
+
+**Verification:**
+- Backend unit suite: **1405 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw test`) — includes all upload-related unit tests.
+- `ProductImageIntegrationTest`: **36/36 pass** against real MySQL + production security chain + real filesystem (`./mvnw verify -Pintegration -Dit.test=ProductImageIntegrationTest`).
+- `RateLimitIntegrationTest`: **8/8 pass** against real MySQL + production filter chain (`./mvnw verify -Pintegration -Dit.test=RateLimitIntegrationTest`).
+- Upload-related unit tests: **54/54 pass** (`ImageProcessorTest`, `ImageTypeDetectorTest`, `LocalDiskStorageServiceTest`, `S3StorageServiceTest`, `RateLimitFilterUnitTest`).
+- Backend compile: clean.
+
+**Unresolved questions / workflow impact:**
+- None. The upload pipeline was already secure; no code changes were required.
+- Rate limits for uploads (30/h per authenticated user) are configurable via `app.rate-limit.sensitive.upload-requests-per-hour` with no code change.
+
+Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 5 changes; no commit/push per instructions).
+

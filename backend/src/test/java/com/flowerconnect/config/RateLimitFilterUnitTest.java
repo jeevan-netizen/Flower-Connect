@@ -57,6 +57,7 @@ class RateLimitFilterUnitTest {
         properties.setEnabled(true);
         properties.getAuth().setLoginRequestsPerHour(5);
         properties.getSensitive().setCheckoutRequestsPerHour(2);
+        properties.getSensitive().setUploadRequestsPerHour(2);
         clock = new MutableClock(Instant.now());
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
@@ -107,6 +108,60 @@ class RateLimitFilterUnitTest {
         String body = writer.toString();
         assertTrue(body.contains("RATE_LIMITED"), "expected RATE_LIMITED code, got: " + body);
         assertTrue(body.contains("Try again in"), body);
+    }
+
+    @Test
+    void uploadEndpointIsRateLimitedByAuthenticatedUser() throws Exception {
+        // Under the 2/hour limit: passes rate limiting, reaches the controller, not 429
+        authenticatedUpload("1.2.3.4", "vendor-a@test.com");
+        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain, times(2)).doFilter(same(request), same(response));
+        verify(response, never()).setStatus(429);
+
+        // 3rd upload from the same vendor -> rate limited
+        filter.doFilterInternal(request, response, filterChain);
+        verify(response).setStatus(429);
+        String body = writer.toString();
+        assertTrue(body.contains("RATE_LIMITED"), body);
+
+        // A different authenticated vendor has an independent bucket -> not rate limited
+        writer.getBuffer().setLength(0);
+        authenticatedUpload("1.2.3.4", "vendor-b@test.com");
+        filter.doFilterInternal(request, response, filterChain);
+        verify(filterChain, atLeastOnce()).doFilter(same(request), same(response));
+        assertFalse(writer.toString().contains("RATE_LIMITED"));
+    }
+
+    @Test
+    void unauthenticatedUploadIsKeyedByIp() throws Exception {
+        SecurityContextHolder.clearContext();
+        unauthenticatedUpload("1.2.3.4");
+        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilterInternal(request, response, filterChain); // limit reached
+
+        filter.doFilterInternal(request, response, filterChain);
+        verify(response).setStatus(429);
+
+        // different IP -> independent bucket
+        writer.getBuffer().setLength(0);
+        unauthenticatedUpload("5.6.7.8");
+        filter.doFilterInternal(request, response, filterChain);
+        assertFalse(writer.toString().contains("RATE_LIMITED"));
+    }
+
+    @Test
+    void multipartUploadBodyIsNeverBufferedByTheFilter() throws Exception {
+        authenticatedUpload("1.2.3.4", "vendor-a@test.com");
+        when(request.getContentType()).thenReturn("multipart/form-data; boundary=----");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        // The wrapper is only used for ANON_EMAIL endpoints; AUTH_USER endpoints pass
+        // the original request through, so the multipart body is never read here.
+        verify(filterChain).doFilter(same(request), same(response));
+        verify(response, never()).setStatus(429);
     }
 
     @Test
@@ -212,6 +267,23 @@ class RateLimitFilterUnitTest {
         SecurityContextHolder.clearContext();
         when(request.getMethod()).thenReturn("POST");
         when(request.getRequestURI()).thenReturn("/api/v1/checkout");
+        when(request.getRemoteAddr()).thenReturn(remoteAddr);
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+    }
+
+    private void authenticatedUpload(String remoteAddr, String principal) {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/v1/vendors/products/42/images");
+        when(request.getRemoteAddr()).thenReturn(remoteAddr);
+        when(request.getHeader("X-Forwarded-For")).thenReturn(null);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of()));
+    }
+
+    private void unauthenticatedUpload(String remoteAddr) {
+        SecurityContextHolder.clearContext();
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/v1/vendors/products/42/images");
         when(request.getRemoteAddr()).thenReturn(remoteAddr);
         when(request.getHeader("X-Forwarded-For")).thenReturn(null);
     }
