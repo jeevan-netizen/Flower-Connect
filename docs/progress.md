@@ -1399,5 +1399,82 @@ Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 4
 - None. The upload pipeline was already secure; no code changes were required.
 - Rate limits for uploads (30/h per authenticated user) are configurable via `app.rate-limit.sensitive.upload-requests-per-hour` with no code change.
 
-Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 5 changes; no commit/push per instructions).
+
+### Phase 13 (Security Hardening) - Stage 6 (task 13.5: audit-log coverage) - COMPLETE (2026-11-01)
+
+**Audit coverage inventory:**
+
+| Action | Entity | Audited Before? | Audited After? | Actor Source |
+|--------|--------|-----------------|----------------|--------------|
+| Vendor approval/reject/suspend/reinstate | VENDOR_PROFILE | Yes | Yes | JWT subject (admin) |
+| User status change (suspend/reactivate/disable) | USER | Yes | Yes | JWT subject (admin) |
+| Category create/update/delete | CATEGORY | Yes | Yes | JWT subject (admin) |
+| Platform commission rate change | PLATFORM_CONFIG | Yes | Yes | JWT subject (admin) |
+| Vendor commission rate change/clear | VENDOR_PROFILE | Yes | Yes | JWT subject (admin) |
+| Payment mark refunded | PAYMENT | Yes | Yes | JWT subject (admin) |
+| Review hide/unhide | REVIEW | Yes | Yes | JWT subject (admin) |
+| Dispute resolve | DISPUTE | Yes | Yes | JWT subject (admin) |
+| Settlement finalize | SETTLEMENT | Yes | Yes | JWT subject (admin) |
+| **Settlement run (new cycle)** | SETTLEMENT | **No** | **Yes** | JWT subject (admin) / SYSTEM for scheduled runs |
+| **Mark refund pending (PAID→REFUND_PENDING)** | PAYMENT | **No** | **Yes** | JWT subject (cancellation actor) |
+| **Collect COD payment (PENDING→COLLECTED)** | PAYMENT | **No** | **Yes** | JWT subject (vendor) |
+| Dispute raise / vendor respond | DISPUTE | No | No | Customer/vendor (self-service) — intentionally unaudited |
+| Order status transitions | order_status_history | Yes (separate table) | Yes (unchanged) | ActorType + actorUserId |
+| Review submit / vendor reply | REVIEW | No | No | Customer/vendor (self-service) — intentionally unaudited |
+| Order placement / POS sale | ORDER / POS_TRANSACTION | No | No | Customer/vendor (business action) — intentionally unaudited |
+
+**Findings fixed:**
+| id | area | description | severity | status |
+|----|------|-------------|----------|--------|
+| A-1 | SettlementService.runSettlement | Admin creates settlement cycle but no audit_log row; scheduled runs unaudited | Medium | Fixed — `SETTLEMENT_CREATED` audit row written; admin runs as USER, scheduled runs as SYSTEM |
+| A-2 | PaymentService.markRefundPending | Marks payment PAID→REFUND_PENDING but no audit_log row | Medium | Fixed — `PAYMENT_REFUND_PENDING` audit row written |
+| A-3 | PaymentService.collectPayment | Vendor collects COD payment but no audit_log row | Medium | Fixed — `PAYMENT_COLLECTED` audit row written |
+
+**Implementation (typed actor model):**
+- Migration `V32__add_audit_log_actor_type.sql`: adds `actor_type ENUM('USER','SYSTEM') NOT NULL DEFAULT 'USER'` to `audit_log`, makes `actor_user_id` nullable, and adds CHECK constraint `ck_audit_log_actor_user_consistency` enforcing `actor_type='USER' → actor_user_id NOT NULL` and `actor_type='SYSTEM' → actor_user_id IS NULL`. Existing rows default to USER; no data migration needed.
+- New enum `com.flowerconnect.domain.AuditActorType` (`USER`, `SYSTEM`).
+- `AuditLog` entity: added `actorType` field (`@Enumerated(EnumType.STRING)`), made `actor` optional (`nullable = true`).
+- `SettlementService.runSettlement` / `runSettlementForAllVendors`: added overloaded methods accepting `AuditActorType` + nullable `User actor`. Default (no-actor) overloads use SYSTEM. Admin-initiated runs pass USER + real user; scheduled scheduler runs pass SYSTEM + null actor. Every newly created settlement writes a `SETTLEMENT_CREATED` audit row.
+- `PaymentService.markRefundPending` / `collectPayment`: overloaded methods accepting actor email; writes `PAYMENT_REFUND_PENDING` / `PAYMENT_COLLECTED` audit rows as USER when an actor email is present.
+- `AdminSettlementController.runSettlement`: resolves the authenticated admin `User` and passes `AuditActorType.USER`.
+- `SettlementScheduler.runWeeklySettlement`: uses the SYSTEM-defaulting overload, so every scheduled settlement run is now audited.
+- `CancellationService.cancel` / `OrderStateMachine.transition`: pass the authenticated actor to `markRefundPending` / `collectPayment` (USER).
+- All existing `AuditLog.builder()` call sites (DisputeService, PlatformConfigService, CategoryService, VendorAdminService, ReviewService, UserStatusService, AdminCommissionRateController) now explicitly set `actorType=AuditActorType.USER`.
+- All audit writes use the existing `AuditLogRepository`, `AuditLog` entity, injected `Clock`, and append-only behavior. Audit failures join the same transaction (rollback on business transaction rollback).
+
+**Files changed:**
+- Added: `backend/src/main/resources/db/migration/V32__add_audit_log_actor_type.sql`
+- Added: `backend/src/main/java/com/flowerconnect/domain/AuditActorType.java`
+- Modified: `backend/src/main/java/com/flowerconnect/domain/AuditLog.java` (actorType field, nullable actor)
+- Modified: `backend/src/main/java/com/flowerconnect/billing/service/SettlementService.java` (typed actor params, SYSTEM/USER audit writes)
+- Modified: `backend/src/main/java/com/flowerconnect/billing/controller/AdminSettlementController.java` (resolve admin User, pass USER)
+- Modified: `backend/src/main/java/com/flowerconnect/payment/service/PaymentService.java` (USER audit in markRefundPending/collectPayment/markRefunded)
+- Modified: `backend/src/main/java/com/flowerconnect/dispute/service/DisputeService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/billing/service/PlatformConfigService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/catalog/service/CategoryService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/vendor/service/VendorAdminService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/review/service/ReviewService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/security/UserStatusService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/billing/controller/AdminCommissionRateController.java` (actorType=USER)
+- Modified: `backend/src/test/java/com/flowerconnect/billing/service/SettlementServiceTest.java` (USER + SYSTEM audit tests)
+- Modified: `backend/src/test/java/com/flowerconnect/payment/service/PaymentServiceTest.java` (audit tests)
+- Modified: `backend/src/test/java/com/flowerconnect/order/service/CancellationServiceTest.java` (updated markRefundPending verifications)
+- Modified: `backend/src/test/java/com/flowerconnect/order/service/OrderStateMachineTest.java` (updated collectPayment mock)
+- Modified: `backend/src/test/java/com/flowerconnect/billing/controller/AdminSettlementControllerTest.java` (updated stubs for new signatures)
+- Modified: `backend/src/test/java/com/flowerconnect/billing/integration/SettlementCycleIntegrationTest.java` (2-audit-row assertion, actorType assertions, CHECK constraint test)
+
+**Verification:**
+- Backend unit suite: **2822 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw test`)
+- SettlementCycleIntegrationTest: **2/2 pass** against real MySQL (end-to-end cycle + CHECK constraint rejection)
+- PaymentIntegrationTest: **7/7 pass** against real MySQL
+- Backend compile: clean
+
+**Unresolved gaps (intentionally unaudited):**
+- Dispute raise / vendor respond: customer/vendor self-service actions; the dispute entity itself records the action with timestamps. Audit coverage for these would require schema or workflow changes.
+- Review submit / vendor reply: same rationale — self-service actions with entity-level timestamps.
+- Order placement / POS sale: POS is commission-free and outside the marketplace ledger (D-66); order placement creates order rows with created_at timestamps.
+- Order status transitions: recorded in `order_status_history` (separate append-only table), not `audit_log`. This is the existing design.
+
+Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 6 changes; no commit/push per instructions).
+
 

@@ -1,5 +1,7 @@
 package com.flowerconnect.review.service;
 
+import com.flowerconnect.domain.AuditActorType;
+import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
@@ -252,8 +254,9 @@ public class ReviewService {
 
         recomputeAggregate(review.getVendor().getId());
 
-        auditLogRepository.save(com.flowerconnect.domain.AuditLog.builder()
+        auditLogRepository.save(AuditLog.builder()
                 .actor(admin)
+                .actorType(AuditActorType.USER)
                 .actionType("REVIEW_HIDDEN")
                 .entityType("REVIEW")
                 .entityId(review.getId())
@@ -289,8 +292,9 @@ public class ReviewService {
 
         recomputeAggregate(review.getVendor().getId());
 
-        auditLogRepository.save(com.flowerconnect.domain.AuditLog.builder()
+        auditLogRepository.save(AuditLog.builder()
                 .actor(admin)
+                .actorType(AuditActorType.USER)
                 .actionType("REVIEW_UNHIDDEN")
                 .entityType("REVIEW")
                 .entityId(review.getId())

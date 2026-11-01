@@ -23,6 +23,7 @@ import com.flowerconnect.billing.domain.SettlementEntryType;
 import com.flowerconnect.billing.domain.SettlementStatus;
 import com.flowerconnect.billing.repository.SettlementEntryRepository;
 import com.flowerconnect.billing.repository.SettlementRepository;
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
@@ -352,5 +353,73 @@ class SettlementServiceTest {
         assertThatThrownBy(() -> settlementService.finalizeSettlement(500L, "admin@flowerconnect.com", "   "))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Admin reference note is required");
+    }
+
+    @Test
+    @DisplayName("runSettlement writes SETTLEMENT_CREATED audit log for admin-initiated run")
+    void runSettlement_writesAuditLog() {
+        when(vendorProfileRepository.findById(10L)).thenReturn(Optional.of(vendor));
+        when(settlementRepository.findByVendorIdAndPeriodStartAndPeriodEnd(eq(10L), eq(start), eq(end)))
+                .thenReturn(Optional.empty());
+        when(settlementEntryRepository.findEligibleUnattachedForSettlement(any(), any())).thenReturn(List.of());
+        Settlement saved = Settlement.builder()
+                .id(100L)
+                .vendor(vendor)
+                .periodStart(start)
+                .periodEnd(end)
+                .status(SettlementStatus.PENDING)
+                .build();
+        when(settlementRepository.save(any(Settlement.class))).thenReturn(saved);
+
+        Settlement result = settlementService.runSettlement(10L, start, end, AuditActorType.USER, adminUser);
+
+        assertThat(result.getStatus()).isEqualTo(SettlementStatus.PENDING);
+        assertThat(result.getVendor().getId()).isEqualTo(10L);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog audit = auditCaptor.getValue();
+        assertThat(audit.getActor()).isEqualTo(adminUser);
+        assertThat(audit.getActorType()).isEqualTo(AuditActorType.USER);
+        assertThat(audit.getActionType()).isEqualTo("SETTLEMENT_CREATED");
+        assertThat(audit.getEntityType()).isEqualTo("SETTLEMENT");
+        assertThat(audit.getEntityId()).isEqualTo(result.getId());
+        assertThat(audit.getReason()).contains("Settlement " + result.getId() + " for vendor 10");
+        assertThat(audit.getPreviousValue()).isNull();
+        assertThat(audit.getNewValue()).isEqualTo("PENDING");
+    }
+
+    @Test
+    @DisplayName("runSettlement writes SYSTEM audit log (no user FK) for system-initiated run")
+    void runSettlement_writesSystemAuditWhenSystemInitiated() {
+        when(vendorProfileRepository.findById(10L)).thenReturn(Optional.of(vendor));
+        when(settlementRepository.findByVendorIdAndPeriodStartAndPeriodEnd(eq(10L), eq(start), eq(end)))
+                .thenReturn(Optional.empty());
+        when(settlementEntryRepository.findEligibleUnattachedForSettlement(any(), any())).thenReturn(List.of());
+        Settlement saved = Settlement.builder()
+                .id(100L)
+                .vendor(vendor)
+                .periodStart(start)
+                .periodEnd(end)
+                .status(SettlementStatus.PENDING)
+                .build();
+        when(settlementRepository.save(any(Settlement.class))).thenReturn(saved);
+
+        Settlement result = settlementService.runSettlement(10L, start, end, AuditActorType.SYSTEM, null);
+
+        assertThat(result.getStatus()).isEqualTo(SettlementStatus.PENDING);
+        assertThat(result.getVendor().getId()).isEqualTo(10L);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog audit = auditCaptor.getValue();
+        assertThat(audit.getActor()).isNull();
+        assertThat(audit.getActorType()).isEqualTo(AuditActorType.SYSTEM);
+        assertThat(audit.getActionType()).isEqualTo("SETTLEMENT_CREATED");
+        assertThat(audit.getEntityType()).isEqualTo("SETTLEMENT");
+        assertThat(audit.getEntityId()).isEqualTo(result.getId());
+        assertThat(audit.getReason()).contains("Settlement " + result.getId() + " for vendor 10");
+        assertThat(audit.getPreviousValue()).isNull();
+        assertThat(audit.getNewValue()).isEqualTo("PENDING");
     }
 }

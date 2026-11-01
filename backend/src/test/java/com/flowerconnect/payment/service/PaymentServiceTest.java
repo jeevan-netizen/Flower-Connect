@@ -1,12 +1,22 @@
 package com.flowerconnect.payment.service;
 
+import com.flowerconnect.domain.AuditLog;
+import com.flowerconnect.domain.Role;
+import com.flowerconnect.domain.User;
+import com.flowerconnect.inventory.service.InventoryService;
+import com.flowerconnect.order.domain.ActorType;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.Order.OrderStatus;
 import com.flowerconnect.order.domain.Order.PaymentMethod;
 import com.flowerconnect.order.domain.Order.PaymentStatus;
+import com.flowerconnect.order.domain.OrderItem;
 import com.flowerconnect.order.domain.OrderStatusHistory;
-import com.flowerconnect.order.domain.ActorType;
+import com.flowerconnect.order.event.OrderCancelled;
+import com.flowerconnect.order.event.OrderDelivered;
+import com.flowerconnect.order.event.OrderStatusChanged;
+import com.flowerconnect.order.repository.OrderItemRepository;
 import com.flowerconnect.order.repository.OrderRepository;
+import com.flowerconnect.order.repository.OrderStatusHistoryRepository;
 import com.flowerconnect.order.service.OrderStateMachine;
 import com.flowerconnect.payment.domain.Payment;
 import com.flowerconnect.payment.domain.PaymentIntent;
@@ -19,14 +29,19 @@ import com.flowerconnect.payment.repository.PaymentEventRepository;
 import com.flowerconnect.payment.repository.PaymentIntentRepository;
 import com.flowerconnect.payment.repository.PaymentRepository;
 import com.flowerconnect.exception.BusinessException;
+import com.flowerconnect.repository.AuditLogRepository;
+import com.flowerconnect.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.math.BigDecimal;
@@ -65,6 +80,12 @@ class PaymentServiceTest {
     private OrderStateMachine orderStateMachine;
     @Mock
     private ObjectProvider<OrderStateMachine> orderStateMachineProvider;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private AuditLogRepository auditLogRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
     @Mock
     private Clock clock;
 
@@ -159,6 +180,127 @@ class PaymentServiceTest {
         assertThat(codOrder.getPaymentStatus()).isEqualTo(PaymentStatus.COLLECTED);
         verify(paymentRepository).saveAndFlush(codPayment);
         verify(orderRepository).saveAndFlush(codOrder);
+    }
+
+    @Test
+    void collectPaymentWritesAuditLogWithActorEmail() {
+        Order codOrder = Order.builder()
+                .id(100L)
+                .paymentMethod(PaymentMethod.COD)
+                .paymentStatus(PaymentStatus.PENDING)
+                .user(customerUser)
+                .build();
+        Payment codPayment = Payment.builder()
+                .id(1L)
+                .order(codOrder)
+                .method(com.flowerconnect.payment.domain.Payment.PaymentMethod.COD)
+                .provider("cod")
+                .amount(new BigDecimal("643.00"))
+                .status(com.flowerconnect.payment.domain.Payment.PaymentStatus.PENDING)
+                .collectedAt(null)
+                .build();
+        when(orderRepository.findById(100L)).thenReturn(Optional.of(codOrder));
+        when(paymentRepository.findByOrderIdForUpdate(100L)).thenReturn(Optional.of(codPayment));
+        when(userRepository.findByEmailWithRole("vendor@t.com")).thenReturn(
+                Optional.of(com.flowerconnect.domain.User.builder().id(11L).email("vendor@t.com").build()));
+
+        Payment result = paymentService.collectPayment(100L, "vendor@t.com");
+
+        assertThat(result.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.COLLECTED);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog audit = auditCaptor.getValue();
+        assertThat(audit.getActionType()).isEqualTo("PAYMENT_COLLECTED");
+        assertThat(audit.getEntityType()).isEqualTo("PAYMENT");
+        assertThat(audit.getEntityId()).isEqualTo(1L);
+    }
+
+    @Test
+    void collectPaymentWritesNoAuditWhenActorEmailNull() {
+        Order codOrder = Order.builder()
+                .id(100L)
+                .paymentMethod(PaymentMethod.COD)
+                .paymentStatus(PaymentStatus.PENDING)
+                .user(customerUser)
+                .build();
+        Payment codPayment = Payment.builder()
+                .id(1L)
+                .order(codOrder)
+                .method(com.flowerconnect.payment.domain.Payment.PaymentMethod.COD)
+                .provider("cod")
+                .amount(new BigDecimal("643.00"))
+                .status(com.flowerconnect.payment.domain.Payment.PaymentStatus.PENDING)
+                .collectedAt(null)
+                .build();
+        when(orderRepository.findById(100L)).thenReturn(Optional.of(codOrder));
+        when(paymentRepository.findByOrderIdForUpdate(100L)).thenReturn(Optional.of(codPayment));
+
+        Payment result = paymentService.collectPayment(100L, null);
+
+        assertThat(result.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.COLLECTED);
+        verify(auditLogRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("markRefundPending writes PAYMENT_REFUND_PENDING audit log")
+    void markRefundPendingWritesAuditLog() {
+        Order onlineOrder = Order.builder()
+                .id(200L)
+                .paymentMethod(PaymentMethod.ONLINE)
+                .paymentStatus(PaymentStatus.PAID)
+                .user(customerUser)
+                .build();
+        Payment onlinePayment = Payment.builder()
+                .id(2L)
+                .order(onlineOrder)
+                .method(com.flowerconnect.payment.domain.Payment.PaymentMethod.ONLINE)
+                .provider("simulated")
+                .amount(new BigDecimal("643.00"))
+                .status(com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID)
+                .build();
+        when(orderRepository.findById(200L)).thenReturn(Optional.of(onlineOrder));
+        when(paymentRepository.findByOrderIdForUpdate(200L)).thenReturn(Optional.of(onlinePayment));
+        when(userRepository.findByEmailWithRole("customer@t.com")).thenReturn(
+                Optional.of(com.flowerconnect.domain.User.builder().id(12L).email("customer@t.com").build()));
+
+        Payment result = paymentService.markRefundPending(200L, "customer@t.com");
+
+        assertThat(result.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.REFUND_PENDING);
+        assertThat(onlineOrder.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_PENDING);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(auditCaptor.capture());
+        AuditLog audit = auditCaptor.getValue();
+        assertThat(audit.getActionType()).isEqualTo("PAYMENT_REFUND_PENDING");
+        assertThat(audit.getEntityType()).isEqualTo("PAYMENT");
+        assertThat(audit.getEntityId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("markRefundPending writes no audit when actor email is null")
+    void markRefundPendingNoAuditWhenNullActor() {
+        Order onlineOrder = Order.builder()
+                .id(200L)
+                .paymentMethod(PaymentMethod.ONLINE)
+                .paymentStatus(PaymentStatus.PAID)
+                .user(customerUser)
+                .build();
+        Payment onlinePayment = Payment.builder()
+                .id(2L)
+                .order(onlineOrder)
+                .method(com.flowerconnect.payment.domain.Payment.PaymentMethod.ONLINE)
+                .provider("simulated")
+                .amount(new BigDecimal("643.00"))
+                .status(com.flowerconnect.payment.domain.Payment.PaymentStatus.PAID)
+                .build();
+        when(orderRepository.findById(200L)).thenReturn(Optional.of(onlineOrder));
+        when(paymentRepository.findByOrderIdForUpdate(200L)).thenReturn(Optional.of(onlinePayment));
+
+        Payment result = paymentService.markRefundPending(200L, null);
+
+        assertThat(result.getStatus()).isEqualTo(com.flowerconnect.payment.domain.Payment.PaymentStatus.REFUND_PENDING);
+        verify(auditLogRepository, never()).save(any());
     }
 
     @Test

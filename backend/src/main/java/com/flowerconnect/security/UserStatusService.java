@@ -1,5 +1,6 @@
 package com.flowerconnect.security;
 
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.BusinessException;
@@ -85,6 +86,7 @@ public class UserStatusService {
 
         auditLogRepository.save(AuditLog.builder()
                 .actor(actor)
+                .actorType(AuditActorType.USER)
                 .actionType(actionFor(newStatus))
                 .entityType(ENTITY_TYPE)
                 .entityId(target.getId())

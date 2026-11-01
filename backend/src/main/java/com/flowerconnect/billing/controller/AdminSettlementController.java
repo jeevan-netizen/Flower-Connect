@@ -26,6 +26,9 @@ import com.flowerconnect.billing.dto.SettlementEntryResponse;
 import com.flowerconnect.billing.dto.SettlementPageResponse;
 import com.flowerconnect.billing.dto.SettlementResponse;
 import com.flowerconnect.billing.service.SettlementService;
+import com.flowerconnect.domain.AuditActorType;
+import com.flowerconnect.domain.User;
+import com.flowerconnect.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,20 +61,25 @@ import java.util.List;
 public class AdminSettlementController {
 
     private final SettlementService settlementService;
+    private final UserRepository userRepository;
 
     @PostMapping("/run")
     public ResponseEntity<List<SettlementResponse>> runSettlement(
-            @Valid @RequestBody RunSettlementRequest request) {
+            @Valid @RequestBody RunSettlementRequest request,
+            Authentication authentication) {
         log.info("Admin triggered settlement run: vendorId={}, periodStart={}, periodEnd={}",
                 request.getVendorId(), request.getPeriodStart(), request.getPeriodEnd());
+        User admin = userRepository.findByEmailWithRole(authentication.getName())
+                .orElseThrow(() -> new IllegalStateException("Authenticated admin not found"));
 
         if (request.getVendorId() != null) {
             Settlement settlement = settlementService.runSettlement(
-                    request.getVendorId(), request.getPeriodStart(), request.getPeriodEnd());
+                    request.getVendorId(), request.getPeriodStart(), request.getPeriodEnd(),
+                    AuditActorType.USER, admin);
             return ResponseEntity.ok(List.of(SettlementResponse.fromEntity(settlement)));
         } else {
             List<Settlement> list = settlementService.runSettlementForAllVendors(
-                    request.getPeriodStart(), request.getPeriodEnd());
+                    request.getPeriodStart(), request.getPeriodEnd(), AuditActorType.USER, admin);
             return ResponseEntity.ok(list.stream().map(SettlementResponse::fromEntity).toList());
         }
     }

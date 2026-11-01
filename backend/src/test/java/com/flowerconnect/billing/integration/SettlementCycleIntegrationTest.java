@@ -25,6 +25,7 @@ import com.flowerconnect.billing.repository.SettlementEntryRepository;
 import com.flowerconnect.billing.repository.SettlementRepository;
 import com.flowerconnect.billing.service.BillingLedgerService;
 import com.flowerconnect.billing.service.SettlementService;
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.ServiceLocation;
@@ -51,6 +52,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
@@ -227,12 +230,16 @@ class SettlementCycleIntegrationTest extends AbstractIntegrationTest {
         BigDecimal settledBalance = billingLedgerService.getOutstandingBalance(vendor.getId());
         assertThat(settledBalance).isEqualByComparingTo(BigDecimal.ZERO);
 
-        // 10. Audit log verified
+        // 10. Audit log verified: one SETTLEMENT_CREATED (system run) + one SETTLEMENT_FINALIZED (admin finalize)
         List<AuditLog> audits = auditLogRepository.findByEntityTypeAndEntityIdOrderByIdAsc("SETTLEMENT", settlement.getId());
-        assertThat(audits).hasSize(1);
-        AuditLog audit = audits.get(0);
+        assertThat(audits).hasSize(2);
+        AuditLog audit = audits.stream()
+                .filter(a -> "SETTLEMENT_FINALIZED".equals(a.getActionType()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected a SETTLEMENT_FINALIZED audit row"));
         assertThat(audit.getActionType()).isEqualTo("SETTLEMENT_FINALIZED");
         assertThat(audit.getActor().getId()).isEqualTo(adminUser.getId());
+        assertThat(audit.getActorType()).isEqualTo(AuditActorType.USER);
         assertThat(audit.getReason()).isEqualTo(refNote);
         assertThat(audit.getPreviousValue()).isEqualTo("PENDING");
         assertThat(audit.getNewValue()).isEqualTo("SETTLED");
@@ -283,5 +290,43 @@ class SettlementCycleIntegrationTest extends AbstractIntegrationTest {
             digits.append((int) (Math.random() * 10));
         }
         return digits.toString();
+    }
+
+    @Test
+    @DisplayName("audit_log actor_type CHECK constraint rejects invalid user-reference combinations")
+    void auditLogActorTypeConstraintRejectsInvalidCombinations() {
+        String entityType = "AUDIT_CONSTRAINT_TEST";
+        Long entityId = -1L;
+
+        // USER with a real user FK is allowed.
+        jdbcTemplate.update(
+                "INSERT INTO audit_log (actor_user_id, actor_type, action_type, entity_type, entity_id, reason, created_at) " +
+                        "VALUES (?, 'USER', 'TEST_ACTION', ?, ?, 'valid USER row', NOW(6))",
+                vendorUser.getId(), entityType, entityId);
+
+        // SYSTEM with no user FK is allowed.
+        jdbcTemplate.update(
+                "INSERT INTO audit_log (actor_user_id, actor_type, action_type, entity_type, entity_id, reason, created_at) " +
+                        "VALUES (NULL, 'SYSTEM', 'TEST_ACTION', ?, ?, 'valid SYSTEM row', NOW(6))",
+                entityType, entityId);
+
+        // USER with a null user FK must be rejected by the CHECK constraint.
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "INSERT INTO audit_log (actor_user_id, actor_type, action_type, entity_type, entity_id, reason, created_at) " +
+                        "VALUES (NULL, 'USER', 'TEST_ACTION', ?, ?, 'invalid: USER with null user', NOW(6))",
+                entityType, entityId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("Check constraint 'ck_audit_log_actor_user_consistency' is violated");
+
+        // SYSTEM with a non-null user FK must be rejected by the CHECK constraint.
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "INSERT INTO audit_log (actor_user_id, actor_type, action_type, entity_type, entity_id, reason, created_at) " +
+                        "VALUES (?, 'SYSTEM', 'TEST_ACTION', ?, ?, 'invalid: SYSTEM with user', NOW(6))",
+                vendorUser.getId(), entityType, entityId))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("Check constraint 'ck_audit_log_actor_user_consistency' is violated");
+
+        // Clean up the valid rows inserted for this constraint test.
+        jdbcTemplate.update("DELETE FROM audit_log WHERE entity_type = ?", entityType);
     }
 }

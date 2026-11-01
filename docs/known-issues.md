@@ -446,6 +446,36 @@ Backend dependency scan: OWASP Dependency-Check not available (requires network 
 - `RateLimitIntegrationTest`: **8/8 pass** against real MySQL + production filter chain.
 - Upload-related unit tests: **54/54 pass** (`ImageProcessorTest`, `ImageTypeDetectorTest`, `LocalDiskStorageServiceTest`, `S3StorageServiceTest`, `RateLimitFilterUnitTest`).
 
+## Phase 13 Stage 6 Findings (task 13.5: audit-log coverage)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| A-1 | SettlementService.runSettlement | Admin creates settlement cycle (PENDING) but no audit_log row; scheduled runs unaudited | Medium | `SettlementService.java` — no `auditLogRepository.save()` in `runSettlement` | Add `SETTLEMENT_CREATED` audit row; admin runs as USER, scheduled runs as SYSTEM | Fixed |
+| A-2 | PaymentService.markRefundPending | Marks payment PAID→REFUND_PENDING after cancellation but no audit_log row. Only `markRefunded` was audited. | Medium | `PaymentService.java:178-202` — no `auditLogRepository.save()` in `markRefundPending` | Add `PAYMENT_REFUND_PENDING` audit row with actor email | Fixed |
+| A-3 | PaymentService.collectPayment | Vendor collects COD payment at delivery but no audit_log row. | Medium | `PaymentService.java:140-168` — no `auditLogRepository.save()` in `collectPayment` | Add `PAYMENT_COLLECTED` audit row with vendor actor email | Fixed |
+
+**Implementation (typed actor model):**
+- Migration `V32__add_audit_log_actor_type.sql`: adds `actor_type ENUM('USER','SYSTEM') NOT NULL DEFAULT 'USER'` to `audit_log`, makes `actor_user_id` nullable, and adds CHECK constraint `ck_audit_log_actor_user_consistency` enforcing `actor_type='USER' → actor_user_id NOT NULL` and `actor_type='SYSTEM' → actor_user_id IS NULL`. Existing rows default to USER; no data migration needed.
+- New enum `com.flowerconnect.domain.AuditActorType` (`USER`, `SYSTEM`).
+- `AuditLog` entity: added `actorType` field (`@Enumerated(EnumType.STRING)`), made `actor` optional (`nullable = true`).
+- `SettlementService.runSettlement` / `runSettlementForAllVendors`: added overloaded methods accepting `AuditActorType` + nullable `User actor`. Default (no-actor) overloads use SYSTEM. Admin-initiated runs pass USER + real user; scheduled scheduler runs pass SYSTEM + null actor. Every newly created settlement writes a `SETTLEMENT_CREATED` audit row.
+- `PaymentService.markRefundPending` / `collectPayment`: overloaded methods accepting actor email; writes `PAYMENT_REFUND_PENDING` / `PAYMENT_COLLECTED` audit rows as USER when an actor email is present.
+- `AdminSettlementController.runSettlement`: resolves the authenticated admin `User` and passes `AuditActorType.USER`.
+- `SettlementScheduler.runWeeklySettlement`: uses the SYSTEM-defaulting overload, so every scheduled settlement run is now audited.
+- `CancellationService.cancel` / `OrderStateMachine.transition`: pass the authenticated actor to `markRefundPending` / `collectPayment` (USER).
+- All existing `AuditLog.builder()` call sites (DisputeService, PlatformConfigService, CategoryService, VendorAdminService, ReviewService, UserStatusService, AdminCommissionRateController) now explicitly set `actorType=AuditActorType.USER`.
+
+**Verification:**
+- Backend unit suite: **2822 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw test`).
+- SettlementCycleIntegrationTest: **2/2 pass** against real MySQL (end-to-end cycle + CHECK constraint rejection).
+- PaymentIntegrationTest: **7/7 pass** against real MySQL.
+
+**Intentionally unaudited gaps:**
+- Dispute raise / vendor respond: customer/vendor self-service actions with entity-level timestamps.
+- Review submit / vendor reply: same rationale — self-service actions.
+- Order placement / POS sale: POS is commission-free (D-66); order placement creates order rows with timestamps.
+- Order status transitions: recorded in `order_status_history` (separate append-only table), not `audit_log`.
+
 ## Deprecation Notices
 
 _None._

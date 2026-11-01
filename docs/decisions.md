@@ -2899,3 +2899,43 @@ Phase 13 Stage 1 required a rate-limit review and extension (plan §13). The Phas
 - `RateLimitIntegrationTest` (8 tests) against real MySQL + production filter chain: sensitive endpoint rate limiting by authenticated user, user key isolation, anonymous IP isolation, 429 status + `Retry-After` + `RATE_LIMITED` code, regression of existing auth rate limits — all pass.
 - Backend unit suite: 1402/1402 pass, BUILD SUCCESS.
 
+
+## D-69: Audit-log coverage — typed actor model (USER / SYSTEM) for settlement run, refund pending, COD collection
+
+**Status:** Accepted
+**Date:** Phase 13 Stage 6 (task 13.5)
+
+### Context
+
+Phase 13 Stage 6 requires an audit-log coverage sweep. The existing `audit_log` table (V6 migration) is written by admin operations: vendor approval/rejection/suspension/reinstatement, user status changes, category mutations, platform and vendor commission rate changes, payment refunds, review hide/unhide, dispute resolution, and settlement finalization. Three security-sensitive mutations lacked audit rows: settlement cycle creation (`runSettlement`), payment refund-pending marking (`markRefundPending`), and COD payment collection (`collectPayment`). In addition, the weekly scheduled settlement run (via `SettlementScheduler`) had no audit row at all, which the plan's rule that "admin and settlement actions appear in the audit log" (plan §13, §14) requires to be closed.
+
+### Decision
+
+**Typed actor model:** audit rows carry an explicit `actor_type` (`USER` or `SYSTEM`) rather than inferring the actor from a nullable email. This avoids hiding missing user attribution behind a null email.
+
+- **Migration `V32__add_audit_log_actor_type.sql`:** adds `actor_type ENUM('USER','SYSTEM') NOT NULL DEFAULT 'USER'` to `audit_log`, makes `actor_user_id` nullable, and adds CHECK constraint `ck_audit_log_actor_user_consistency` enforcing `actor_type='USER' ? actor_user_id NOT NULL` and `actor_type='SYSTEM' ? actor_user_id IS NULL`. Existing rows default to USER; no data migration needed.
+- **New enum `com.flowerconnect.domain.AuditActorType`** (`USER`, `SYSTEM`).
+- **`AuditLog` entity:** added `actorType` field (`@Enumerated(EnumType.STRING)`), made `actor` optional (`nullable = true`).
+- **Settlement run:** `SettlementService.runSettlement` / `runSettlementForAllVendors` gained overloaded methods accepting `AuditActorType` + nullable `User actor`. Default (no-actor) overloads use SYSTEM. Admin-initiated runs pass USER + real user; scheduled scheduler runs pass SYSTEM + null actor. Every newly created settlement writes a `SETTLEMENT_CREATED` audit row. No fake or login-capable SYSTEM user is created.
+- **Refund pending:** `PaymentService.markRefundPending` gained an overloaded method accepting `String actorEmail`. Writes `PAYMENT_REFUND_PENDING` audit row as USER when actor email is non-null. Called from `CancellationService.cancel` with the authenticated caller's email.
+- **COD collection:** `PaymentService.collectPayment` gained an overloaded method accepting `String actorEmail`. Writes `PAYMENT_COLLECTED` audit row as USER when actor email is non-null. Called from `OrderStateMachine.transition` during DELIVERED (actor always a VENDOR user, non-null).
+- **Actor resolution:** from `userRepository.findByEmailWithRole(email)`. All audit writes join the same transaction; rollback on business transaction rollback.
+- **Intentionally unaudited:** dispute raise/respond, review submit/reply, order placement, POS sale (commission-free, D-66), and order status transitions (recorded in `order_status_history`, a separate append-only table). These are customer/vendor self-service actions or business actions with their own entity-level timestamps; adding audit rows would require schema or workflow changes and was deemed out of scope for this stage.
+
+### Consequences
+
+- Three new audit action types: `SETTLEMENT_CREATED`, `PAYMENT_REFUND_PENDING`, `PAYMENT_COLLECTED` (entity types `SETTLEMENT`, `PAYMENT`, `PAYMENT`).
+- Additive Flyway migration `V32`; no schema change to existing data; no existing audit behavior modified (all existing rows remain USER).
+- Actor email is nullable to accommodate system-initiated runs (settlement scheduler) where no real user exists.
+- Audit failures behave consistently with existing code — they join the same transaction and roll back with it.
+- All existing `AuditLog.builder()` call sites (DisputeService, PlatformConfigService, CategoryService, VendorAdminService, ReviewService, UserStatusService, AdminCommissionRateController) now explicitly set `actorType=AuditActorType.USER`.
+
+### Verification
+
+- `SettlementServiceTest`: new audit tests (admin-initiated run writes `SETTLEMENT_CREATED` as USER; system-initiated run writes `SETTLEMENT_CREATED` as SYSTEM with no user FK).
+- `PaymentServiceTest`: new audit tests (`collectPayment` with/without actor email; `markRefundPending` with/without actor email).
+- `SettlementCycleIntegrationTest`: 2/2 pass against real MySQL (end-to-end cycle writes both USER finalize and SYSTEM create audits; CHECK constraint rejects invalid actor_type/user-reference combinations).
+- `PaymentIntegrationTest`: 7/7 pass against real MySQL.
+- Backend unit suite: 2822/2822 pass, BUILD SUCCESS.
+- Backend compile: clean.
+

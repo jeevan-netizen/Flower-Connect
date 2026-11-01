@@ -20,6 +20,7 @@ import com.flowerconnect.billing.dto.AdminCommissionRateRequest;
 import com.flowerconnect.billing.dto.AdminCommissionRateResponse;
 import com.flowerconnect.billing.service.CommissionRateService;
 import com.flowerconnect.billing.service.PlatformConfigService;
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
@@ -138,6 +139,7 @@ public class AdminCommissionRateController {
 
         auditLogRepository.save(AuditLog.builder()
                 .actor(admin)
+                .actorType(AuditActorType.USER)
                 .actionType(ACTION_VENDOR_COMMISSION_RATE_CHANGED)
                 .entityType(ENTITY_TYPE_VENDOR_PROFILE)
                 .entityId(vendor.getId())
@@ -169,6 +171,7 @@ public class AdminCommissionRateController {
 
         auditLogRepository.save(AuditLog.builder()
                 .actor(admin)
+                .actorType(AuditActorType.USER)
                 .actionType(ACTION_VENDOR_COMMISSION_RATE_CLEARED)
                 .entityType(ENTITY_TYPE_VENDOR_PROFILE)
                 .entityId(vendor.getId())

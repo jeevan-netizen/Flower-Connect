@@ -22,6 +22,7 @@ import com.flowerconnect.billing.domain.SettlementEntry;
 import com.flowerconnect.billing.domain.SettlementStatus;
 import com.flowerconnect.billing.repository.SettlementEntryRepository;
 import com.flowerconnect.billing.repository.SettlementRepository;
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
@@ -49,11 +50,21 @@ import java.util.Optional;
 /**
  * Service managing weekly settlement cycles, netting calculations, entry attachment,
  * and admin finalization.
+ *
+ * <p>Settlement runs write an {@code audit_log} row for every newly created
+ * settlement. Admin-initiated runs are audited as {@link AuditActorType#USER}
+ * with the real user foreign key; system/scheduled runs are audited as
+ * {@link AuditActorType#SYSTEM} with no user reference (no fake or login-capable
+ * SYSTEM user is created).
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SettlementService {
+
+    public static final String ENTITY_TYPE_SETTLEMENT = "SETTLEMENT";
+    public static final String ACTION_SETTLEMENT_CREATED = "SETTLEMENT_CREATED";
+    public static final String ACTION_SETTLEMENT_FINALIZED = "SETTLEMENT_FINALIZED";
 
     private final SettlementRepository settlementRepository;
     private final SettlementEntryRepository settlementEntryRepository;
@@ -65,6 +76,8 @@ public class SettlementService {
     /**
      * Runs or retrieves a settlement cycle for a single vendor across the specified date period.
      * Idempotent: returns existing PENDING settlement if already created, or raises 409 Conflict if already SETTLED.
+     * <p>Defaults to a {@link AuditActorType#SYSTEM} actor with no user reference, so a call made
+     * without an authenticated caller is recorded as a system-initiated event.
      *
      * @param vendorId the vendor ID
      * @param periodStart the start date of the period
@@ -73,6 +86,26 @@ public class SettlementService {
      */
     @Transactional
     public Settlement runSettlement(Long vendorId, LocalDate periodStart, LocalDate periodEnd) {
+        return runSettlement(vendorId, periodStart, periodEnd, AuditActorType.SYSTEM, null);
+    }
+
+    /**
+     * Runs or retrieves a settlement cycle for a single vendor across the specified date period,
+     * writing an {@code audit_log} row when a new settlement is created.
+     * <p>When {@code actorType} is {@link AuditActorType#USER}, {@code actor} must be non-null and
+     * the audit row records the real user foreign key. When {@code actorType} is
+     * {@link AuditActorType#SYSTEM}, {@code actor} must be null and the audit row records no user.
+     *
+     * @param vendorId the vendor ID
+     * @param periodStart the start date of the period
+     * @param periodEnd the end date of the period (inclusive)
+     * @param actorType the actor type (USER or SYSTEM)
+     * @param actor the authenticated user, or null for system-initiated runs
+     * @return the created or existing settlement
+     */
+    @Transactional
+    public Settlement runSettlement(Long vendorId, LocalDate periodStart, LocalDate periodEnd,
+                                    AuditActorType actorType, User actor) {
         if (vendorId == null) {
             throw BusinessException.badRequest("vendorId is required");
         }
@@ -82,6 +115,7 @@ public class SettlementService {
         if (periodStart.isAfter(periodEnd)) {
             throw BusinessException.badRequest("periodStart must be on or before periodEnd");
         }
+        validateActor(actorType, actor);
 
         VendorProfile vendor = vendorProfileRepository.findById(vendorId)
                 .orElseThrow(() -> BusinessException.notFound("Vendor not found: " + vendorId));
@@ -162,11 +196,15 @@ public class SettlementService {
         log.info("Created settlement {} for vendor {} (period {} to {}): credits={}, dues={}, net={}, entries={}",
                 settlement.getId(), vendorId, periodStart, periodEnd, totalCredits, totalDues, netAmount, unattachedEntries.size());
 
+        writeAudit(actorType, actor, ACTION_SETTLEMENT_CREATED, settlement, null,
+                SettlementStatus.PENDING.name());
+
         return settlement;
     }
 
     /**
      * Runs settlement generation for all vendors across the specified date period.
+     * <p>Defaults to a {@link AuditActorType#SYSTEM} actor with no user reference.
      *
      * @param periodStart the start date
      * @param periodEnd the end date
@@ -174,11 +212,31 @@ public class SettlementService {
      */
     @Transactional
     public List<Settlement> runSettlementForAllVendors(LocalDate periodStart, LocalDate periodEnd) {
+        return runSettlementForAllVendors(periodStart, periodEnd, AuditActorType.SYSTEM, null);
+    }
+
+    /**
+     * Runs settlement generation for all vendors across the specified date period,
+     * writing an {@code audit_log} row for each newly created settlement.
+     * <p>When {@code actorType} is {@link AuditActorType#USER}, {@code actor} must be non-null and
+     * each audit row records the real user foreign key. When {@code actorType} is
+     * {@link AuditActorType#SYSTEM}, {@code actor} must be null and each audit row records no user.
+     *
+     * @param periodStart the start date
+     * @param periodEnd the end date
+     * @param actorType the actor type (USER or SYSTEM)
+     * @param actor the authenticated user, or null for system-initiated runs
+     * @return list of generated settlements
+     */
+    @Transactional
+    public List<Settlement> runSettlementForAllVendors(LocalDate periodStart, LocalDate periodEnd,
+                                                       AuditActorType actorType, User actor) {
+        validateActor(actorType, actor);
         List<VendorProfile> vendors = vendorProfileRepository.findAll();
         List<Settlement> results = new ArrayList<>();
         for (VendorProfile vendor : vendors) {
             try {
-                results.add(runSettlement(vendor.getId(), periodStart, periodEnd));
+                results.add(runSettlement(vendor.getId(), periodStart, periodEnd, actorType, actor));
             } catch (Exception ex) {
                 log.error("Failed to run settlement for vendor {}: {}", vendor.getId(), ex.getMessage(), ex);
             }
@@ -218,8 +276,9 @@ public class SettlementService {
 
         auditLogRepository.save(AuditLog.builder()
                 .actor(admin)
-                .actionType("SETTLEMENT_FINALIZED")
-                .entityType("SETTLEMENT")
+                .actorType(AuditActorType.USER)
+                .actionType(ACTION_SETTLEMENT_FINALIZED)
+                .entityType(ENTITY_TYPE_SETTLEMENT)
                 .entityId(saved.getId())
                 .reason(adminReferenceNote.trim())
                 .previousValue(SettlementStatus.PENDING.name())
@@ -230,6 +289,31 @@ public class SettlementService {
                 saved.getId(), adminEmail, adminReferenceNote.trim());
 
         return saved;
+    }
+
+    private void validateActor(AuditActorType actorType, User actor) {
+        if (actorType == AuditActorType.USER && actor == null) {
+            throw new IllegalStateException("USER audit actor must be non-null");
+        }
+        if (actorType == AuditActorType.SYSTEM && actor != null) {
+            throw new IllegalStateException("SYSTEM audit actor must be null");
+        }
+    }
+
+    private void writeAudit(AuditActorType actorType, User actor, String actionType, Settlement settlement,
+                            String previousValue, String newValue) {
+        auditLogRepository.save(AuditLog.builder()
+                .actor(actor)
+                .actorType(actorType)
+                .actionType(actionType)
+                .entityType(ENTITY_TYPE_SETTLEMENT)
+                .entityId(settlement.getId())
+                .reason("Settlement " + settlement.getId() + " for vendor "
+                        + settlement.getVendor().getId() + " (period "
+                        + settlement.getPeriodStart() + " to " + settlement.getPeriodEnd() + ")")
+                .previousValue(previousValue)
+                .newValue(newValue)
+                .build());
     }
 
     /**

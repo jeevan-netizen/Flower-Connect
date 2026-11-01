@@ -73,7 +73,7 @@ class CancellationServiceTest {
         assertThat(res.isRefundPending()).isFalse();
         verify(stateMachine).transition(eq(1L), eq(OrderStatus.CANCELLED), eq(ActorType.CUSTOMER),
             eq(customer.getId()), eq(null));
-        verify(payments, never()).markRefundPending(anyLong());
+        verify(payments, never()).markRefundPending(anyLong(), anyString());
     }
 
     @Test
@@ -158,7 +158,7 @@ class CancellationServiceTest {
         assertThat(res.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         assertThat(res.isRefundPending()).isTrue();
         assertThat(res.getPaymentStatus()).isEqualTo(PaymentStatus.REFUND_PENDING);
-        verify(payments).markRefundPending(6L);
+        verify(payments).markRefundPending(6L, "customer@t.com");
     }
 
     @Test
@@ -176,7 +176,7 @@ class CancellationServiceTest {
 
         assertThat(res.isRefundPending()).isFalse();
         assertThat(res.getPaymentStatus()).isEqualTo(PaymentStatus.PENDING);
-        verify(payments, never()).markRefundPending(anyLong());
+        verify(payments, never()).markRefundPending(anyLong(), anyString());
     }
 
     @Test
