@@ -476,6 +476,27 @@ Backend dependency scan: OWASP Dependency-Check not available (requires network 
 - Order placement / POS sale: POS is commission-free (D-66); order placement creates order rows with timestamps.
 - Order status transitions: recorded in `order_status_history` (separate append-only table), not `audit_log`.
 
+## Phase 13 Stage 7 Findings (task 13.7: validation and error hygiene)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| V-1 | CustomerDisputeController | Missing `@Validated` class annotation; `@PathVariable Long orderId` and `disputeId` not validated (negative/zero IDs pass through) | Medium | `CustomerDisputeController.java:21,42,61` | Add `@Validated` + `@Positive` on path variables | Fixed |
+| V-2 | VendorDisputeController | Missing `@Validated` class annotation; `@PathVariable Long disputeId` not validated | Medium | `VendorDisputeController.java:22,42,61` | Add `@Validated` + `@Positive` on `disputeId` | Fixed |
+| V-3 | AdminDisputeController | Has `@Validated` but `@PathVariable Long disputeId` missing `@Positive` | Low | `AdminDisputeController.java:36,78` | Add `@Positive` on `disputeId` | Fixed |
+| E-1 | GlobalExceptionHandler.handleGeneral | Logs `ex.getMessage()` with full stack trace at error level - could leak SQL/file paths/internal details in logs | Medium | `GlobalExceptionHandler.java:128` | Log generic message only, no exception message/stack trace | Fixed |
+| E-2 | SmtpEmailSender.send | Logs recipient email `to` (PII) with exception message and stack trace | Medium | `SmtpEmailSender.java:37` | Remove email from log message | Fixed |
+
+**Implementation:**
+- `CustomerDisputeController`: added `@Slf4j`, `@Validated` class annotation, `@Positive` on `orderId` and `disputeId` path variables
+- `VendorDisputeController`: added `@Slf4j`, `@Validated` class annotation, `@Positive` on `disputeId` path variables
+- `AdminDisputeController`: added `@Positive` on `disputeId` path variables
+- `GlobalExceptionHandler.handleGeneral`: changed from `log.error("Unexpected error: {}", ex.getMessage(), ex)` to `log.error("Unexpected error processing request")` — no exception message or stack trace in logs
+- `SmtpEmailSender.send`: changed from `log.error("Failed to send email to {}: {}", to, ex.getMessage(), ex)` to `log.error("Failed to send email: {}", ex.getMessage())` — recipient email (PII) no longer logged
+**Verification:**
+- Full backend unit suite: **1431 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw clean test`).
+- New focused tests: **20/20 pass** (CustomerDisputeControllerTest 6, VendorDisputeControllerTest 5, 
+AdminDisputeControllerTest 5, GlobalExceptionHandlerTest 2, SmtpEmailSenderTest 2).
+
 ## Deprecation Notices
 
 _None._

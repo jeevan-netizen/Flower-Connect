@@ -1478,3 +1478,51 @@ Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 4
 Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 6 changes; no commit/push per instructions).
 
 
+### Phase 13 (Security Hardening) - Stage 7 (task 13.7: validation and error hygiene) - COMPLETE (2026-11-01)
+
+**Validation findings:**
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| V-1 | CustomerDisputeController | Missing `@Validated` class annotation; `@PathVariable Long orderId` and `disputeId` not validated (negative/zero IDs pass through) | Medium | `CustomerDisputeController.java:21,42,61` | Add `@Validated` + `@Positive` on path variables | Fixed |
+| V-2 | VendorDisputeController | Missing `@Validated` class annotation; `@PathVariable Long disputeId` not validated | Medium | `VendorDisputeController.java:22,42,61` | Add `@Validated` + `@Positive` on `disputeId` | Fixed |
+| V-3 | AdminDisputeController | Has `@Validated` but `@PathVariable Long disputeId` missing `@Positive` | Low | `AdminDisputeController.java:36,78` | Add `@Positive` on `disputeId` | Fixed |
+
+**Error handling findings:**
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| E-1 | GlobalExceptionHandler.handleGeneral | Logs `ex.getMessage()` with full stack trace at error level - could leak SQL/file paths/internal details in logs | Medium | `GlobalExceptionHandler.java:128` | Log generic message only, no exception message/stack trace | Fixed |
+| E-2 | SmtpEmailSender.send | Logs recipient email `to` (PII) with exception message and stack trace | Medium | `SmtpEmailSender.java:37` | Remove email from log message | Fixed |
+
+**Implementation:**
+- `CustomerDisputeController`: added `@Slf4j`, `@Validated` class annotation, `@Positive(message = "Order id must be positive")` on `orderId` path variable, `@Positive(message = "Dispute id must be positive")` on `disputeId` path variable
+- `VendorDisputeController`: added `@Slf4j`, `@Validated` class annotation, `@Positive(message = "Dispute id must be positive")` on `disputeId` path variables (both `getDispute` and `respond`)
+- `AdminDisputeController`: added `@Positive(message = "Dispute id must be positive")` on `disputeId` path variables (both `getDispute` and `resolveDispute`)
+- `GlobalExceptionHandler.handleGeneral`: changed from `log.error("Unexpected error: {}", ex.getMessage(), ex)` to `log.error("Unexpected error processing request")` — no exception message or stack trace in logs; response remains generic `500 Internal Server Error` with `code=null` and `message="An unexpected error occurred"`
+- `SmtpEmailSender.send`: changed from `log.error("Failed to send email to {}: {}", to, ex.getMessage(), ex)` to `log.error("Failed to send email: {}", ex.getMessage())` — recipient email (PII) no longer logged
+
+**Files changed:**
+- Modified: `backend/src/main/java/com/flowerconnect/dispute/controller/CustomerDisputeController.java`
+- Modified: `backend/src/main/java/com/flowerconnect/dispute/controller/VendorDisputeController.java`
+- Modified: `backend/src/main/java/com/flowerconnect/dispute/controller/AdminDisputeController.java`
+- Modified: `backend/src/main/java/com/flowerconnect/controller/exception/GlobalExceptionHandler.java`
+- Modified: `backend/src/main/java/com/flowerconnect/notification/email/SmtpEmailSender.java`
+- Added: `backend/src/test/java/com/flowerconnect/dispute/controller/CustomerDisputeControllerTest.java` (6 tests: validation + RBAC)
+- Added: `backend/src/test/java/com/flowerconnect/dispute/controller/VendorDisputeControllerTest.java` (5 tests: validation + RBAC)
+- Added: `backend/src/test/java/com/flowerconnect/dispute/controller/AdminDisputeControllerTest.java` (5 tests: validation + RBAC)
+- Added: `backend/src/test/java/com/flowerconnect/controller/exception/GlobalExceptionHandlerTest.java` (2 tests: generic error, no leakage)
+- Added: `backend/src/test/java/com/flowerconnect/notification/email/SmtpEmailSenderTest.java` (2 tests: swallow exceptions)
+
+**Verification:**
+- Full backend unit suite: **1431 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw clean test`)
+- New focused tests: **20/20 pass** (CustomerDisputeControllerTest 6, VendorDisputeControllerTest 5, 
+AdminDisputeControllerTest 5, GlobalExceptionHandlerTest 2, SmtpEmailSenderTest 2)
+- Backend compile: clean
+
+**Unresolved contract questions:**
+- None. All fixes are low-risk and preserve existing user-visible behavior; no response shapes, accepted inputs, or endpoint behavior changed.
+
+Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 7 changes; no commit/push per instructions).
+
+

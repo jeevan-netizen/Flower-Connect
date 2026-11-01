@@ -5,11 +5,14 @@ import com.flowerconnect.dispute.dto.DisputePageResponse;
 import com.flowerconnect.dispute.dto.VendorDisputeResponseRequest;
 import com.flowerconnect.dispute.service.DisputeService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -19,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
  * A suspended vendor may still respond to an in-flight dispute (D-6).
  * Base path: {@code /api/v1/vendor/disputes}
  */
+@Slf4j
+@Validated
 @RestController
 @RequestMapping("/api/v1/vendor/disputes")
 @RequiredArgsConstructor
@@ -42,7 +47,7 @@ public class VendorDisputeController {
     @GetMapping("/{disputeId}")
     public ResponseEntity<DisputeDetailResponse> getDispute(
             Authentication authentication,
-            @PathVariable Long disputeId) {
+            @PathVariable @Positive(message = "Dispute id must be positive") Long disputeId) {
         return ResponseEntity.ok(disputeService.getVendorDispute(authentication.getName(), disputeId));
     }
 
@@ -61,7 +66,7 @@ public class VendorDisputeController {
     @PostMapping("/{disputeId}/respond")
     public ResponseEntity<DisputeDetailResponse> respond(
             Authentication authentication,
-            @PathVariable Long disputeId,
+            @PathVariable @Positive(message = "Dispute id must be positive") Long disputeId,
             @Valid @RequestBody VendorDisputeResponseRequest request) {
         return ResponseEntity.ok(disputeService.respondToDispute(authentication.getName(), disputeId, request));
     }
