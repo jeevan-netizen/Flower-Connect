@@ -1220,3 +1220,309 @@ Phase 12 implements customer ratings and reviews with vendor replies and admin m
   1. "rejects a reason longer than the backend allows, before sending it" - test timeout (30s)
   2. "suspends an approved vendor with a reason" - reason string mismatch
 - These failures exist on `main` before Phase 12 changes and are not related to reviews/analytics.
+
+### Phase 13 (Security Hardening) - Stage 1 (task 13.6: endpoint access sweep) - COMPLETE
+
+- **Explicit access matrix:** `backend/src/test/java/com/flowerconnect/security/EndpointAccessMatrix.java` — single source of truth: `AccessRule` enum (ANY_AUTH, CUSTOMER, FLORIST, ADMIN, PUBLIC), `Entry` record (method, pathPattern, rule, per-role statuses, note, testPath), full `ENTRIES` list covering every handler across all controllers (auth, users, locations, vendors, admin, cart, checkout, orders, analytics, billing, reviews, dispute, pos, images).
+- **Endpoint access sweep:** `EndpointAccessSweepIT.java` — fail-closed coverage test: every registered handler is covered by exactly one matrix row, no duplicate entries, every entry has a rule, catch-all rule exists. 5 tests pass.
+- **RBAC filter-chain test:** `EndpointAccessMatrixRbacTest.java` — exercises the real Spring Security filter chain (not a slice) via `MockMvc` seeded through `login()` for CUSTOMER/FLORIST/ADMIN plus anonymous; iterates all entries × 4 roles, asserting exact 401/403 deny cases and non-401 allow cases; infra paths (`/actuator`, `/swagger-ui`, `/v3/api-docs`) handled leniently (springdoc oddity). All role×entry assertions pass.
+- **Verification:** backend unit suite 1386/1386 pass, BUILD SUCCESS; sweep test 5/5 pass; RBAC test all role×entry assertions pass. No production code changed; no migration; Docker available for full-stack runs.
+
+Branch: `phase-13-security-hardening`, committed as `94851d4` and pushed to origin.
+
+### Phase 13 (Security Hardening) - Stage 2 (task 13.8: secrets, actuator, and dependency scan) - COMPLETE
+
+**Secret handling:**
+- `.env` is gitignored and untracked; `.env.example` is tracked with `CHANGE_ME_*` placeholders only.
+- `application-dev.yml` contains a hardcoded dev webhook secret default (finding 13.8-02, open).
+- `application.yml` base has weak `DB_PASS:flowerconnect` / `DB_USER:flowerconnect` defaults; `application-prod.yml` overrides with no-default placeholders (prod is fail-fast).
+- Test files contain hardcoded test credentials (`password123`, `AdminPass123!`, test JWT/webhook secrets) — test-only, not production secrets (finding 13.8-04, open).
+- Git history contains historical hardcoded passwords — not rewritten per rules (finding 13.8-05, open).
+
+**Production configuration fail-fast:**
+- `JwtService.init()` (@PostConstruct): validates JWT_SECRET ≥32 chars, throws `IllegalStateException` — tested by `JwtServiceTest.shouldThrowWhenSecretTooShort`.
+- `WebhookSecretValidator` (@Profile("prod")): validates webhook secret ≥32 bytes — tested by `WebhookSecretValidatorTest`.
+- `application-prod.yml`: no defaults for `DB_URL`, `DB_USER`, `DB_PASS`, `JWT_SECRET`, `APP_WEBHOOK_SECRET`, `MAIL_PASSWORD` — config-level fail-fast.
+- No new fail-fast code needed; existing guards are unit-tested.
+
+**Actuator, API docs, simulator, dev-only exposure in prod:**
+- **Finding 13.8-06 (fixed):** Swagger/OpenAPI was available in prod (`/v3/api-docs` → 200, `/swagger-ui.html` → 302). Fixed by adding `springdoc.api-docs.enabled: false` and `springdoc.swagger-ui.enabled: false` to `application-prod.yml`.
+- `SpringDocConfig` is `@Profile("dev")` — Swagger bean only created in dev.
+- `SimulatorProdAbsenceIntegrationTest` — verifies simulated payment provider and controller are absent in prod (already existed).
+- Actuator: `application-prod.yml` exposes only `health,info` with `show-details: never`. Spring Security permits actuator paths and lets the actuator exposure config be the sole gatekeeper, so non-exposed endpoints such as metrics return 404 rather than 401/403. SecurityConfig was changed from `/actuator/**` → `hasRole("ADMIN")` to `/actuator/**` → `permitAll()` for this reason.
+- New test: `ProductionProfileActuatorSwaggerTest` — verifies Swagger disabled (404), health available (200), metrics not available (404) in prod.
+
+**Dependency scan:**
+- `npm audit` (frontend): 12 vulnerabilities (2 critical, 5 high, 5 moderate). Mostly dev dependencies (vite, vitest, zod, tinypool, etc.). No automatic fixes applied — major version upgrades could break compatibility; stopping and asking before upgrading.
+- OWASP Dependency-Check for Maven: not available (requires network access + NVD API key). Used `mvn dependency:tree` to list dependency versions instead.
+
+**Files changed:**
+- Modified: `backend/src/main/resources/application-prod.yml` (springdoc disabled in prod)
+- Added: `backend/src/test/java/com/flowerconnect/config/ProductionProfileActuatorSwaggerTest.java`
+- Modified: `docs/progress.md`, `docs/known-issues.md`
+
+**Verification:**
+- `ProductionProfileActuatorSwaggerTest`: 4/4 pass
+- `AuthApiIntegrationTest.shouldReturn403WithCodeForAccessDenied`: updated to assert 404 for metrics (passes)
+- `EndpointAccessSweepIT` + `EndpointAccessMatrixRbacTest`: pass after SecurityConfig change (real filter chain)
+- Backend compile: clean
+
+Branch: `phase-13-security-hardening`, committed as `94851d4` and pushed to origin.
+
+### Phase 13 (Security Hardening) - Stage 3 (tasks 13.3, 13.4) - COMPLETE
+
+**Token storage audit (13.4):**
+- **Finding 13.3-01 (fixed):** `accessToken` was persisted to `localStorage` via Zustand `persist` middleware (`name: "fc-auth"`). Removed `persist` middleware from `auth-store.ts` — access token now exists only in memory.
+- **Session restoration:** `useInitAuth()` now attempts a token refresh via the HttpOnly refresh cookie when no access token is in memory, preserving session behaviour across reloads without localStorage.
+- **AuthResponse contract:** `refreshToken` removed from `AuthResponse` DTO and response body (finding 13.3-02). Refresh token now issued only via the HttpOnly cookie. Frontend `AuthResponse` interface and `setAuth()` updated to read only `accessToken`. All auth unit/integration tests pass.
+- **Cookie attributes verified:** `httpOnly`, `secure` (configurable, `false` in dev, `true` in prod), `SameSite=Strict`, `path=/api/v1/auth` — already correct in `RefreshTokenCookieService`.
+- **SSE client:** Bearer token sent only in `Authorization` header, never in URL or logged — verified in `sse.ts`.
+
+**CORS (13.3):**
+- **Finding 13.3-03 (fixed):** `config.setAllowedHeaders(List.of("*"))` with `setAllowCredentials(true)` — wildcard headers incompatible with credentials. Replaced with explicit list: `Authorization`, `Content-Type`, `X-FlowerConnect-Client`.
+- Allowed origins come from `CorsProperties` (`APP_CORS_ORIGINS`, default `http://localhost:5173`), no wildcard origin.
+- Vite proxy (`changeOrigin: true`) forwards to `http://localhost:8080`; browser Origin remains `http://localhost:5173`, matching the configured CORS origin. No proxy conflict.
+
+**CSRF protections (13.3):**
+- `/api/v1/auth/refresh` and `/api/v1/auth/logout` require both `X-FlowerConnect-Client` header and exact allowed `Origin` — verified in `AuthController.validateCookieAuthentication`.
+- Added tests for missing client header, missing origin, and wrong origin — all return 403 FORBIDDEN without side effects.
+- All other state-changing endpoints require Bearer authentication (not cookie-based), so they're not vulnerable to cookie-based CSRF.
+
+**Security headers and CSP (13.4):**
+- Added `SecurityHeadersFilter` — adds `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`, `Strict-Transport-Security` to every response.
+- `Cache-Control: no-store, no-cache, must-revalidate` on authentication and authenticated responses.
+- Filter registered in `SecurityConfig` before `JwtAuthenticationFilter`.
+- No CSP configured — documented as finding 13.3-06 (needs built frontend inspection for origins).
+
+**Files changed:**
+- Modified: `frontend/src/features/auth/stores/auth-store.ts` (removed `persist` middleware)
+- Modified: `frontend/src/features/auth/hooks/useAuth.tsx` (refresh-on-reload when no access token)
+- Modified: `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java` (CORS explicit headers, SecurityHeadersFilter registration, actuator permitAll)
+- Added: `backend/src/main/java/com/flowerconnect/config/SecurityHeadersFilter.java`
+- Added: `backend/src/test/java/com/flowerconnect/config/SecurityHeadersFilterTest.java`
+- Modified: `backend/src/test/java/com/flowerconnect/controller/AuthControllerTest.java` (4 new CSRF rejection tests)
+- Modified: `frontend/src/features/auth/stores/auth-store.test.ts` (3 new storage tests)
+- Modified: `docs/progress.md`, `docs/known-issues.md`
+
+**Verification:**
+- Backend `AuthControllerTest`: 28/28 pass (includes 4 new CSRF tests)
+- Backend `SecurityHeadersFilterTest`: 4/4 pass
+- Frontend `auth-store.test.ts`: 15/15 pass (includes 3 new storage tests)
+- Frontend ESLint: clean on changed files
+- Frontend TypeScript typecheck: clean
+- Backend compile: clean
+- Stage 3 e2e test (`stage3-security.test.ts`): 1/1 pass against running Docker stack — login succeeds, no token in web storage, reload restores session via refresh cookie, logout redirects to login, no CSP violations.
+
+**Browser verification:** Performed against running Docker stack (all 4 containers healthy). Customer flow verified. Vendor and admin flows require admin credentials (`ADMIN_EMAIL`/`ADMIN_PASSWORD` not set in environment) — not verified.
+
+**Open findings (not resolved — awaiting your decision):**
+- **Refresh token in response body** (13.3-02): RESOLVED — `refreshToken` removed from `AuthResponse` body; refresh token now issued only via HttpOnly cookie. See `docs/known-issues.md` (marked Fixed).
+- **CSP configuration** (13.3-05): CSP headers added to `server.mjs` (frontend static server). No CSP on backend API responses (not needed for JSON). CSP policy: `default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://localhost:8080; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`. The `connect-src` API origin defaults to `http://localhost:8080` (matches `VITE_API_BASE_URL` default in docker-compose.yml) but production deployments must set `VITE_API_BASE_URL` to the actual backend origin.
+
+### Phase 13 (Security Hardening) - Stage 4 (task 13.1: rate-limit review and extension) - COMPLETE (2026-10-31)
+
+**Audit findings (recorded before fixes):**
+| id | area | description | severity | status |
+|----|------|-------------|----------|--------|
+| R-1 | Config | Rate-limit filter inactive in dev/prod/default-test (`app.rate-limit.enabled` never set; `matchIfMissing=false`). Active only in the dedicated `rate-limit-test` profile. | High | Fixed |
+| R-2 | Filter | Client IP resolved by blindly trusting `X-Forwarded-For`/`X-Real-IP` — any client can spoof its IP to evade IP-based limits or frame another IP. | High | Fixed |
+| R-3 | Filter | Full request body (incl. passwords) logged via `log.info(..., "request body={}")`. | High | Fixed |
+| R-4 | Filter | Auth endpoints bypass rate limiting entirely when the body has no email. | High | Fixed |
+| R-5 | Coverage | Only login/register/forgot/reset/webhook rate-limited. Sensitive mutating endpoints unprotected. | High | Fixed |
+| R-6 | Keys | No authenticated-user keying; all limits email-or-IP. | Medium | Fixed |
+| R-7 | Ordering | Rate-limit filter ran before `JwtAuthenticationFilter`, so `SecurityContext` was empty — could not key by authenticated user. | Medium | Fixed |
+
+**Implementation:**
+- `RateLimitProperties` (`app.rate-limit`): added `enabled` (default false), `trustedProxies` (default empty), existing `auth` limits and `webhookRequestsPerHour`, plus a new `sensitive` block with per-endpoint per-hour limits (checkout 30, checkout/quote 60, dispute create 10, review submit 20, address create 20, cart mutation 60, image upload 30, POS sale 300). All thresholds/windows are configuration only; none hard-coded in the filter or services.
+- `RateLimitFilter`: gated by `enabled`; sensitive endpoints keyed by the authenticated principal (JWT subject/email) with a client-IP fallback for unauthenticated calls; anonymous endpoints keyed by email-from-body-plus-IP (missing email no longer bypasses — falls back to IP); webhook keyed by IP. Runs after `JwtAuthenticationFilter` so the principal is available. No body/password logging; multipart upload bodies are never buffered. Trusted proxies only: forwarded headers (`X-Forwarded-For`/`X-Real-IP`) are honored only when `remoteAddr` is in `trustedProxies` (empty by default → safe-by-default, no IP spoofing). Returns structured 429 (`ErrorResponse` with `code=RATE_LIMITED`, `Retry-After` header).
+- `SecurityConfig`: rate-limit filter registered before `UsernamePasswordAuthenticationFilter` (which has a registered order), after `SecurityHeadersFilter` and `JwtAuthenticationFilter`, so order is `SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF`.
+- Profile activation: `enabled: true` added to base `application.yml` (dev) and `application-prod.yml` (prod); `application-test.yml` keeps `enabled: false` (existing integration tests unaffected); dedicated `application-rate-limit-test.yml` keeps `enabled: true` with low sensitive limits (2/hour) for fast tests.
+- Sensitive endpoints added: `POST /api/v1/checkout`, `POST /api/v1/checkout/quote`, `POST /api/v1/disputes/orders/{orderId}`, `POST /api/v1/orders/{orderId}/reviews`, `POST /api/v1/addresses`, `POST/PATCH/DELETE /api/v1/cart/items{,/{id}}`, `DELETE /api/v1/cart`, `POST /api/v1/vendors/products/{productId}/images`, `POST /api/v1/pos/sales`. Existing login/register/forgot/reset/webhook protections preserved.
+
+**Files changed:**
+- Modified: `backend/src/main/java/com/flowerconnect/config/RateLimitProperties.java`
+- Modified: `backend/src/main/java/com/flowerconnect/config/RateLimitFilter.java`
+- Modified: `backend/src/main/java/com/flowerconnect/config/RateLimitConfig.java` (inject `ObjectMapper` into filter)
+- Modified: `backend/src/main/java/com/flowerconnect/config/SecurityConfig.java` (filter ordering)
+- Modified: `backend/src/main/resources/application.yml` (enabled: true)
+- Modified: `backend/src/main/resources/application-prod.yml` (enabled: true)
+- Modified: `backend/src/test/resources/application-rate-limit-test.yml` (sensitive limits, low values)
+- Modified: `backend/src/test/java/com/flowerconnect/RateLimitIntegrationTest.java` (sensitive endpoint + IP isolation tests)
+- Added: `backend/src/test/java/com/flowerconnect/config/RateLimitFilterUnitTest.java`
+
+**Verification:**
+- Backend unit suite: **1402 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw test`) — includes the 8 new `RateLimitFilterUnitTest` tests covering disabled pass-through, under/over limit, 429 body + Retry-After, authenticated-user key isolation, IP key isolation, trusted proxy honoring `X-Forwarded-For`, untrusted proxy ignoring it, multipart passthrough.
+- Backend integration: `RateLimitIntegrationTest` **8/8 pass** against real MySQL + production filter chain (`./mvnw verify -Pintegration -Dit.test=RateLimitIntegrationTest`) — covering sensitive endpoint rate limiting by authenticated user, user key isolation, anonymous IP isolation, 429 status + `Retry-After` + `RATE_LIMITED` code, and regression of existing auth rate limits.
+- Backend compile: clean.
+
+**Unresolved questions / workflow impact:**
+- Rate limiting is now active in dev and prod (was previously off). Limits are starting values (e.g. checkout 30/h, POS sale 300/h) chosen to avoid blocking normal workflows, but POS sale bursts or heavy cart usage in dev could hit them; all values are configurable via `app.rate-limit.sensitive.*` and `app.rate-limit.auth.*` with no code change.
+- No shared store / Redis added (per plan, only considered for multi-instance deployments). Per-instance Caffeine buckets mean limits are not globally consistent across multiple backend instances — acceptable for v1 single-instance, revisit if the service scales to multiple instances.
+- No CAPTCHA added (out of scope).
+
+Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 4 changes; no commit/push per instructions).
+
+
+### Phase 13 (Security Hardening) - Stage 5 (task 13.2: upload security audit and fixes) - COMPLETE (2026-11-01)
+
+**Audit findings (recorded before fixes):**
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| U-1 | Upload auth & gating | `POST /api/v1/vendors/products/{productId}/images` protected by JWT (`hasRole("FLORIST")`), `@RequiresApprovedVendor`, ownership via `requireOwnedProduct`, rate-limited 30/h (Stage 4) | Info | `VendorProductImageController.java:55-57`, `RateLimitFilter.java` | None needed — already secure | Resolved |
+| U-2 | Content validation | Magic-byte sniffing; filename and `Content-Type` ignored; polyglots rejected by decode | Info | `ImageTypeDetector.java`, `ImageProcessor.java:84-116` | None needed — already secure | Resolved |
+| U-3 | Size limits | Container `max-file-size: 5MB`/`max-request-size: 6MB`; service re-checks `max-file-size-bytes: 5242880` | Info | `application.yml:40-41,79`, `ProductImageService.java:234` | None needed — already secure | Resolved |
+| U-4 | Rejections | Empty (400), non-decodable (400), unsupported (415), oversized (413) all rejected before any write | Info | `ProductImageService.java:227-242`, `ImageProcessor.java:77-117` | None needed — already secure | Resolved |
+| U-5 | Image processing | Decode → dimensions → pixel budget → scale → re-encode; EXIF/GPS dropped; WebP→JPEG | Info | `ImageProcessor.java` | None needed — already secure | Resolved |
+| U-6 | Image count limit | Max 8/product, enforced under row lock | Info | `ProductImageService.java:244-249`, `application.yml:80` | None needed — already secure | Resolved |
+| U-7 | Storage keys | Server-generated `product-images/{productId}/{uuid}.{ext}`; filename never a path | Info | `ProductImageService.java:340-342` | None needed — already secure | Resolved |
+| U-8 | Path traversal | `resolve()` rejects backslash, absolute, `~`, escaping root | Info | `LocalDiskStorageService.java:107-127` | None needed — already secure | Resolved |
+| U-9 | Atomic writes | `.part` + `ATOMIC_MOVE`; cleanup on failure; row-first/object-second deletes | Info | `LocalDiskStorageService.java:63-77`, `ProductImageService.java:319-333` | None needed — already secure | Resolved |
+| U-10 | Error disclosure | `StorageException` → `handleGeneral` → 500 generic, no path/credential disclosure | Info | `GlobalExceptionHandler.java:126-131` | None needed — already secure | Resolved |
+| U-11 | S3 backend | Declared stub throws on all methods; only behind `s3` profile; prod uses local disk | Info | `S3StorageService.java`, `application-prod.yml` | None needed — already secure | Resolved |
+| U-12 | Upload rate-limit test coverage | Stage 4 added upload endpoint to rate-limited routes but `RateLimitIntegrationTest` didn't test it | Low | `RateLimitIntegrationTest.java` | Add upload rate limiting test | Fixed |
+
+**Implementation:**
+- No production code changes needed — the upload pipeline was already secure. All 11 findings are pre-existing controls verified correct.
+- Added upload rate-limiting coverage to `RateLimitFilterUnitTest` (3 new tests): upload endpoint rate-limited by authenticated vendor, unauthenticated uploads keyed by IP, multipart body never buffered by the filter.
+
+**Files changed:**
+- Modified: `backend/src/test/java/com/flowerconnect/config/RateLimitFilterUnitTest.java` (3 new upload rate-limiting tests)
+
+**Verification:**
+- Backend unit suite: **1405 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw test`) — includes all upload-related unit tests.
+- `ProductImageIntegrationTest`: **36/36 pass** against real MySQL + production security chain + real filesystem (`./mvnw verify -Pintegration -Dit.test=ProductImageIntegrationTest`).
+- `RateLimitIntegrationTest`: **8/8 pass** against real MySQL + production filter chain (`./mvnw verify -Pintegration -Dit.test=RateLimitIntegrationTest`).
+- Upload-related unit tests: **54/54 pass** (`ImageProcessorTest`, `ImageTypeDetectorTest`, `LocalDiskStorageServiceTest`, `S3StorageServiceTest`, `RateLimitFilterUnitTest`).
+- Backend compile: clean.
+
+**Unresolved questions / workflow impact:**
+- None. The upload pipeline was already secure; no code changes were required.
+- Rate limits for uploads (30/h per authenticated user) are configurable via `app.rate-limit.sensitive.upload-requests-per-hour` with no code change.
+
+
+### Phase 13 (Security Hardening) - Stage 6 (task 13.5: audit-log coverage) - COMPLETE (2026-11-01)
+
+**Audit coverage inventory:**
+
+| Action | Entity | Audited Before? | Audited After? | Actor Source |
+|--------|--------|-----------------|----------------|--------------|
+| Vendor approval/reject/suspend/reinstate | VENDOR_PROFILE | Yes | Yes | JWT subject (admin) |
+| User status change (suspend/reactivate/disable) | USER | Yes | Yes | JWT subject (admin) |
+| Category create/update/delete | CATEGORY | Yes | Yes | JWT subject (admin) |
+| Platform commission rate change | PLATFORM_CONFIG | Yes | Yes | JWT subject (admin) |
+| Vendor commission rate change/clear | VENDOR_PROFILE | Yes | Yes | JWT subject (admin) |
+| Payment mark refunded | PAYMENT | Yes | Yes | JWT subject (admin) |
+| Review hide/unhide | REVIEW | Yes | Yes | JWT subject (admin) |
+| Dispute resolve | DISPUTE | Yes | Yes | JWT subject (admin) |
+| Settlement finalize | SETTLEMENT | Yes | Yes | JWT subject (admin) |
+| **Settlement run (new cycle)** | SETTLEMENT | **No** | **Yes** | JWT subject (admin) / SYSTEM for scheduled runs |
+| **Mark refund pending (PAID→REFUND_PENDING)** | PAYMENT | **No** | **Yes** | JWT subject (cancellation actor) |
+| **Collect COD payment (PENDING→COLLECTED)** | PAYMENT | **No** | **Yes** | JWT subject (vendor) |
+| Dispute raise / vendor respond | DISPUTE | No | No | Customer/vendor (self-service) — intentionally unaudited |
+| Order status transitions | order_status_history | Yes (separate table) | Yes (unchanged) | ActorType + actorUserId |
+| Review submit / vendor reply | REVIEW | No | No | Customer/vendor (self-service) — intentionally unaudited |
+| Order placement / POS sale | ORDER / POS_TRANSACTION | No | No | Customer/vendor (business action) — intentionally unaudited |
+
+**Findings fixed:**
+| id | area | description | severity | status |
+|----|------|-------------|----------|--------|
+| A-1 | SettlementService.runSettlement | Admin creates settlement cycle but no audit_log row; scheduled runs unaudited | Medium | Fixed — `SETTLEMENT_CREATED` audit row written; admin runs as USER, scheduled runs as SYSTEM |
+| A-2 | PaymentService.markRefundPending | Marks payment PAID→REFUND_PENDING but no audit_log row | Medium | Fixed — `PAYMENT_REFUND_PENDING` audit row written |
+| A-3 | PaymentService.collectPayment | Vendor collects COD payment but no audit_log row | Medium | Fixed — `PAYMENT_COLLECTED` audit row written |
+
+**Implementation (typed actor model):**
+- Migration `V32__add_audit_log_actor_type.sql`: adds `actor_type ENUM('USER','SYSTEM') NOT NULL DEFAULT 'USER'` to `audit_log`, makes `actor_user_id` nullable, and adds CHECK constraint `ck_audit_log_actor_user_consistency` enforcing `actor_type='USER' → actor_user_id NOT NULL` and `actor_type='SYSTEM' → actor_user_id IS NULL`. Existing rows default to USER; no data migration needed.
+- New enum `com.flowerconnect.domain.AuditActorType` (`USER`, `SYSTEM`).
+- `AuditLog` entity: added `actorType` field (`@Enumerated(EnumType.STRING)`), made `actor` optional (`nullable = true`).
+- `SettlementService.runSettlement` / `runSettlementForAllVendors`: added overloaded methods accepting `AuditActorType` + nullable `User actor`. Default (no-actor) overloads use SYSTEM. Admin-initiated runs pass USER + real user; scheduled scheduler runs pass SYSTEM + null actor. Every newly created settlement writes a `SETTLEMENT_CREATED` audit row.
+- `PaymentService.markRefundPending` / `collectPayment`: overloaded methods accepting actor email; writes `PAYMENT_REFUND_PENDING` / `PAYMENT_COLLECTED` audit rows as USER when an actor email is present.
+- `AdminSettlementController.runSettlement`: resolves the authenticated admin `User` and passes `AuditActorType.USER`.
+- `SettlementScheduler.runWeeklySettlement`: uses the SYSTEM-defaulting overload, so every scheduled settlement run is now audited.
+- `CancellationService.cancel` / `OrderStateMachine.transition`: pass the authenticated actor to `markRefundPending` / `collectPayment` (USER).
+- All existing `AuditLog.builder()` call sites (DisputeService, PlatformConfigService, CategoryService, VendorAdminService, ReviewService, UserStatusService, AdminCommissionRateController) now explicitly set `actorType=AuditActorType.USER`.
+- All audit writes use the existing `AuditLogRepository`, `AuditLog` entity, injected `Clock`, and append-only behavior. Audit failures join the same transaction (rollback on business transaction rollback).
+
+**Files changed:**
+- Added: `backend/src/main/resources/db/migration/V32__add_audit_log_actor_type.sql`
+- Added: `backend/src/main/java/com/flowerconnect/domain/AuditActorType.java`
+- Modified: `backend/src/main/java/com/flowerconnect/domain/AuditLog.java` (actorType field, nullable actor)
+- Modified: `backend/src/main/java/com/flowerconnect/billing/service/SettlementService.java` (typed actor params, SYSTEM/USER audit writes)
+- Modified: `backend/src/main/java/com/flowerconnect/billing/controller/AdminSettlementController.java` (resolve admin User, pass USER)
+- Modified: `backend/src/main/java/com/flowerconnect/payment/service/PaymentService.java` (USER audit in markRefundPending/collectPayment/markRefunded)
+- Modified: `backend/src/main/java/com/flowerconnect/dispute/service/DisputeService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/billing/service/PlatformConfigService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/catalog/service/CategoryService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/vendor/service/VendorAdminService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/review/service/ReviewService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/security/UserStatusService.java` (actorType=USER)
+- Modified: `backend/src/main/java/com/flowerconnect/billing/controller/AdminCommissionRateController.java` (actorType=USER)
+- Modified: `backend/src/test/java/com/flowerconnect/billing/service/SettlementServiceTest.java` (USER + SYSTEM audit tests)
+- Modified: `backend/src/test/java/com/flowerconnect/payment/service/PaymentServiceTest.java` (audit tests)
+- Modified: `backend/src/test/java/com/flowerconnect/order/service/CancellationServiceTest.java` (updated markRefundPending verifications)
+- Modified: `backend/src/test/java/com/flowerconnect/order/service/OrderStateMachineTest.java` (updated collectPayment mock)
+- Modified: `backend/src/test/java/com/flowerconnect/billing/controller/AdminSettlementControllerTest.java` (updated stubs for new signatures)
+- Modified: `backend/src/test/java/com/flowerconnect/billing/integration/SettlementCycleIntegrationTest.java` (2-audit-row assertion, actorType assertions, CHECK constraint test)
+
+**Verification:**
+- Backend unit suite: **2822 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw test`)
+- SettlementCycleIntegrationTest: **2/2 pass** against real MySQL (end-to-end cycle + CHECK constraint rejection)
+- PaymentIntegrationTest: **7/7 pass** against real MySQL
+- Backend compile: clean
+
+**Unresolved gaps (intentionally unaudited):**
+- Dispute raise / vendor respond: customer/vendor self-service actions; the dispute entity itself records the action with timestamps. Audit coverage for these would require schema or workflow changes.
+- Review submit / vendor reply: same rationale — self-service actions with entity-level timestamps.
+- Order placement / POS sale: POS is commission-free and outside the marketplace ledger (D-66); order placement creates order rows with created_at timestamps.
+- Order status transitions: recorded in `order_status_history` (separate append-only table), not `audit_log`. This is the existing design.
+
+Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 6 changes; no commit/push per instructions).
+
+
+### Phase 13 (Security Hardening) - Stage 7 (task 13.7: validation and error hygiene) - COMPLETE (2026-11-01)
+
+**Validation findings:**
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| V-1 | CustomerDisputeController | Missing `@Validated` class annotation; `@PathVariable Long orderId` and `disputeId` not validated (negative/zero IDs pass through) | Medium | `CustomerDisputeController.java:21,42,61` | Add `@Validated` + `@Positive` on path variables | Fixed |
+| V-2 | VendorDisputeController | Missing `@Validated` class annotation; `@PathVariable Long disputeId` not validated | Medium | `VendorDisputeController.java:22,42,61` | Add `@Validated` + `@Positive` on `disputeId` | Fixed |
+| V-3 | AdminDisputeController | Has `@Validated` but `@PathVariable Long disputeId` missing `@Positive` | Low | `AdminDisputeController.java:36,78` | Add `@Positive` on `disputeId` | Fixed |
+
+**Error handling findings:**
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| E-1 | GlobalExceptionHandler.handleGeneral | Logs `ex.getMessage()` with full stack trace at error level - could leak SQL/file paths/internal details in logs | Medium | `GlobalExceptionHandler.java:128` | Log generic message only, no exception message/stack trace | Fixed |
+| E-2 | SmtpEmailSender.send | Logs recipient email `to` (PII) with exception message and stack trace | Medium | `SmtpEmailSender.java:37` | Remove email from log message | Fixed |
+
+**Implementation:**
+- `CustomerDisputeController`: added `@Slf4j`, `@Validated` class annotation, `@Positive(message = "Order id must be positive")` on `orderId` path variable, `@Positive(message = "Dispute id must be positive")` on `disputeId` path variable
+- `VendorDisputeController`: added `@Slf4j`, `@Validated` class annotation, `@Positive(message = "Dispute id must be positive")` on `disputeId` path variables (both `getDispute` and `respond`)
+- `AdminDisputeController`: added `@Positive(message = "Dispute id must be positive")` on `disputeId` path variables (both `getDispute` and `resolveDispute`)
+- `GlobalExceptionHandler.handleGeneral`: changed from `log.error("Unexpected error: {}", ex.getMessage(), ex)` to `log.error("Unexpected error processing request")` — no exception message or stack trace in logs; response remains generic `500 Internal Server Error` with `code=null` and `message="An unexpected error occurred"`
+- `SmtpEmailSender.send`: changed from `log.error("Failed to send email to {}: {}", to, ex.getMessage(), ex)` to `log.error("Failed to send email: {}", ex.getMessage())` — recipient email (PII) no longer logged
+
+**Files changed:**
+- Modified: `backend/src/main/java/com/flowerconnect/dispute/controller/CustomerDisputeController.java`
+- Modified: `backend/src/main/java/com/flowerconnect/dispute/controller/VendorDisputeController.java`
+- Modified: `backend/src/main/java/com/flowerconnect/dispute/controller/AdminDisputeController.java`
+- Modified: `backend/src/main/java/com/flowerconnect/controller/exception/GlobalExceptionHandler.java`
+- Modified: `backend/src/main/java/com/flowerconnect/notification/email/SmtpEmailSender.java`
+- Added: `backend/src/test/java/com/flowerconnect/dispute/controller/CustomerDisputeControllerTest.java` (6 tests: validation + RBAC)
+- Added: `backend/src/test/java/com/flowerconnect/dispute/controller/VendorDisputeControllerTest.java` (5 tests: validation + RBAC)
+- Added: `backend/src/test/java/com/flowerconnect/dispute/controller/AdminDisputeControllerTest.java` (5 tests: validation + RBAC)
+- Added: `backend/src/test/java/com/flowerconnect/controller/exception/GlobalExceptionHandlerTest.java` (2 tests: generic error, no leakage)
+- Added: `backend/src/test/java/com/flowerconnect/notification/email/SmtpEmailSenderTest.java` (2 tests: swallow exceptions)
+
+**Verification:**
+- Full backend unit suite: **1431 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw clean test`)
+- New focused tests: **20/20 pass** (CustomerDisputeControllerTest 6, VendorDisputeControllerTest 5, 
+AdminDisputeControllerTest 5, GlobalExceptionHandlerTest 2, SmtpEmailSenderTest 2)
+- Backend compile: clean
+
+**Unresolved contract questions:**
+- None. All fixes are low-risk and preserve existing user-visible behavior; no response shapes, accepted inputs, or endpoint behavior changed.
+
+Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 7 changes; no commit/push per instructions).
+
+

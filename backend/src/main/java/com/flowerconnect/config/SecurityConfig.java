@@ -166,17 +166,29 @@ public class SecurityConfig {
                   // own namespaces below.
                   .requestMatchers("/api/v1/admin/disputes/**").hasRole("ADMIN")
                   .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                 .requestMatchers("/actuator/**").hasRole("ADMIN")
+                 // Actuator exposure is governed by management.endpoints.web.exposure.include
+                 // (application-prod.yml: health,info only). Non-exposed endpoints such as
+                 // metrics return 404 from the actuator layer; Spring Security must not
+                 // short-circuit them with 401/403, which would imply the endpoint exists
+                 // behind authentication. Health/info are permitAll above.
+                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler)
             );
+        // Custom filters are all registered relative to UsernamePasswordAuthenticationFilter,
+        // which has a registered order (unlike the custom JwtAuthenticationFilter class).
+        // Call order determines the final sequence, so RateLimitFilter is added last so it
+        // runs after JWT authentication and can key sensitive endpoints by the authenticated
+        // principal rather than only by IP:
+        //   SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF
+        http.addFilterBefore(new SecurityHeadersFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
         if (rateLimitFilter != null) {
             http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         }
-        http.addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -203,7 +215,7 @@ public class SecurityConfig {
                 .toList();
         config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-FlowerConnect-Client"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

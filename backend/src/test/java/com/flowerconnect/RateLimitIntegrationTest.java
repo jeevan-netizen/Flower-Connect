@@ -22,6 +22,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -253,6 +255,116 @@ class RateLimitIntegrationTest extends AbstractIntegrationTest {
 
         // 7th request after window reset - should succeed (200)
         mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                LoginRequest.builder().email(userEmail).password(password).build())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Sensitive checkout endpoint is rate limited by authenticated user")
+    void sensitiveCheckoutEndpointRateLimitedByAuthenticatedUser() throws Exception {
+        // Under the 2/hour limit: passes rate limiting, reaches the controller, not 429
+        MvcResult result = mockMvc.perform(post("/api/v1/checkout")
+                        .with(SecurityMockMvcRequestPostProcessors.user("customer-a@test.com").roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andReturn();
+        assertNotEquals(429, result.getResponse().getStatus());
+
+        result = mockMvc.perform(post("/api/v1/checkout")
+                        .with(SecurityMockMvcRequestPostProcessors.user("customer-a@test.com").roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andReturn();
+        assertNotEquals(429, result.getResponse().getStatus());
+
+        // 3rd request from the same user -> rate limited
+        mockMvc.perform(post("/api/v1/checkout")
+                        .with(SecurityMockMvcRequestPostProcessors.user("customer-a@test.com").roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+
+        // A different authenticated user has an independent bucket -> not rate limited
+        result = mockMvc.perform(post("/api/v1/checkout")
+                        .with(SecurityMockMvcRequestPostProcessors.user("customer-b@test.com").roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andReturn();
+        assertNotEquals(429, result.getResponse().getStatus());
+    }
+
+    @Test
+    @DisplayName("Sensitive dispute endpoint is rate limited by authenticated user")
+    void sensitiveDisputeEndpointRateLimitedByAuthenticatedUser() throws Exception {
+        // Under the 2/hour limit: passes rate limiting, reaches the controller, not 429
+        MvcResult result = mockMvc.perform(post("/api/v1/disputes/orders/1")
+                        .with(SecurityMockMvcRequestPostProcessors.user("customer-a@test.com").roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reasonCode\":\"OTHER\",\"description\":\"test\"}"))
+                .andReturn();
+        assertNotEquals(429, result.getResponse().getStatus());
+
+        result = mockMvc.perform(post("/api/v1/disputes/orders/1")
+                        .with(SecurityMockMvcRequestPostProcessors.user("customer-a@test.com").roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reasonCode\":\"OTHER\",\"description\":\"test\"}"))
+                .andReturn();
+        assertNotEquals(429, result.getResponse().getStatus());
+
+        // 3rd request from the same user -> rate limited
+        mockMvc.perform(post("/api/v1/disputes/orders/1")
+                        .with(SecurityMockMvcRequestPostProcessors.user("customer-a@test.com").roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reasonCode\":\"OTHER\",\"description\":\"test\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+
+        // A different authenticated user has an independent bucket -> not rate limited
+        result = mockMvc.perform(post("/api/v1/disputes/orders/1")
+                        .with(SecurityMockMvcRequestPostProcessors.user("customer-b@test.com").roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reasonCode\":\"OTHER\",\"description\":\"test\"}"))
+                .andReturn();
+        assertNotEquals(429, result.getResponse().getStatus());
+    }
+
+    @Test
+    @DisplayName("Anonymous auth endpoint buckets are isolated by client IP")
+    void anonymousAuthEndpointBucketsIsolatedByIp() throws Exception {
+        // Exhaust IP 1.2.3.4's login bucket (5/hour)
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .with(request -> {
+                                request.setRemoteAddr("1.2.3.4");
+                                return request;
+                            })
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    LoginRequest.builder().email(userEmail).password(password).build())))
+                    .andExpect(status().isOk());
+        }
+        // 6th from the same IP -> rate limited
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .with(request -> {
+                            request.setRemoteAddr("1.2.3.4");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                LoginRequest.builder().email(userEmail).password(password).build())))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+
+        // A different IP still has its own bucket -> not rate limited
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .with(request -> {
+                            request.setRemoteAddr("5.6.7.8");
+                            return request;
+                        })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 LoginRequest.builder().email(userEmail).password(password).build())))

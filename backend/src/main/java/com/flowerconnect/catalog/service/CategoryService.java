@@ -6,6 +6,7 @@ import com.flowerconnect.catalog.dto.CategoryRequest;
 import com.flowerconnect.catalog.dto.CategoryResponse;
 import com.flowerconnect.catalog.mapper.CategoryMapper;
 import com.flowerconnect.catalog.repository.CategoryRepository;
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.BusinessException;
@@ -269,6 +270,7 @@ public class CategoryService {
                 .orElseThrow(() -> new IllegalStateException("Authenticated admin not found"));
         auditLogRepository.save(AuditLog.builder()
                 .actor(admin)
+                .actorType(AuditActorType.USER)
                 .actionType(action)
                 .entityType(ENTITY_TYPE)
                 .entityId(category.getId())

@@ -52,14 +52,14 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        AuthResponse response = authService.register(request);
-        return responseWithRefreshCookie(response);
+        AuthService.AuthTokens tokens = authService.register(request);
+        return responseWithRefreshCookie(tokens.response(), tokens.refreshToken());
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
-        return responseWithRefreshCookie(response);
+        AuthService.AuthTokens tokens = authService.login(request);
+        return responseWithRefreshCookie(tokens.response(), tokens.refreshToken());
     }
 
     @PostMapping("/refresh")
@@ -72,14 +72,14 @@ public class AuthController {
             throw BusinessException.badRequest("Refresh token is required");
         }
 
-        AuthResponse response = authService.refresh(rawToken);
-        ResponseCookie refreshCookie = cookieService.buildRefreshCookie(response.getRefreshToken());
+        AuthService.AuthTokens tokens = authService.refresh(rawToken);
+        ResponseCookie refreshCookie = cookieService.buildRefreshCookie(tokens.refreshToken());
 
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.SET_COOKIE, refreshCookie.toString());
         return ResponseEntity.ok()
                 .headers(headers)
-                .body(response);
+                .body(tokens.response());
     }
 
     @PostMapping("/logout")
@@ -126,8 +126,8 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
-    private ResponseEntity<AuthResponse> responseWithRefreshCookie(AuthResponse response) {
-        ResponseCookie refreshCookie = cookieService.buildRefreshCookie(response.getRefreshToken());
+    private ResponseEntity<AuthResponse> responseWithRefreshCookie(AuthResponse response, String refreshToken) {
+        ResponseCookie refreshCookie = cookieService.buildRefreshCookie(refreshToken);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(response);

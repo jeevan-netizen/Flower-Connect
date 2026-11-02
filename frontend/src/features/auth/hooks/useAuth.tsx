@@ -17,15 +17,20 @@ export function useInitAuth() {
   const hasLoadedInitial = useAuthStore((state) => state.hasLoadedInitial);
   const loadCurrentUser = useAuthStore((state) => state.loadCurrentUser);
   const setHasLoadedInitial = useAuthStore((state) => state.setHasLoadedInitial);
+  const refresh = useAuthStore((state) => state.refresh);
+  const setError = useAuthStore((state) => state.setError);
 
   useEffect(() => {
     if (hasLoadedInitial) return;
     if (accessToken) {
       void loadCurrentUser();
     } else {
-      setHasLoadedInitial(true);
+      // No access token in memory. Attempt to restore the session from the
+      // HttpOnly refresh cookie via the refresh endpoint. If refresh fails
+      // (no cookie, expired, or invalid), the session is genuinely over.
+      void refresh().catch(() => setError(null)).finally(() => setHasLoadedInitial(true));
     }
-  }, [accessToken, hasLoadedInitial, loadCurrentUser, setHasLoadedInitial]);
+  }, [accessToken, hasLoadedInitial, loadCurrentUser, refresh, setHasLoadedInitial, setError]);
 
   return { hasLoadedInitial };
 }

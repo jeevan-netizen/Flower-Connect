@@ -20,6 +20,7 @@ import com.flowerconnect.payment.gateway.PaymentGateway;
 import com.flowerconnect.payment.repository.PaymentEventRepository;
 import com.flowerconnect.payment.repository.PaymentIntentRepository;
 import com.flowerconnect.payment.repository.PaymentRepository;
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.BusinessException;
@@ -138,6 +139,25 @@ public class PaymentService {
      */
     @Transactional
     public Payment collectPayment(Long orderId) {
+        return collectPayment(orderId, null);
+    }
+
+    /**
+     * Collects payment for a delivered COD order: transitions
+     * {@code payments.status} and {@code orders.payment_status} from
+     * {@code PENDING} to {@code COLLECTED} in a single transaction and stamps
+     * {@code collected_at} from the injected clock.
+     *
+     * @param orderId the order whose payment to collect
+     * @param actorEmail the authenticated vendor's email, or {@code null} when
+     *        no audit row should be written
+     * @return the updated payment record
+     * @throws BusinessException 404 if the order or payment is missing,
+     *         409 {@code CONFLICT} if the order is not COD or the payment is
+     *         not in {@code PENDING} state (illegal transition)
+     */
+    @Transactional
+    public Payment collectPayment(Long orderId, String actorEmail) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
 
@@ -163,6 +183,10 @@ public class PaymentService {
         paymentRepository.saveAndFlush(payment);
         orderRepository.saveAndFlush(order);
 
+        if (actorEmail != null) {
+            writeAudit(AuditActorType.USER, actorEmail, "PAYMENT_COLLECTED", payment, order);
+        }
+
         log.info("Collected COD payment {} for order {} at {}", payment.getId(), orderId, now);
         return payment;
     }
@@ -174,9 +198,32 @@ public class PaymentService {
      * or rejected. No money is moved in v1: an admin marks the refund
      * complete through the refund queue (Phase 8 task 8.3). Rejected with
      * 409 when the payment is not {@code PAID}.
+     *
+     * @param orderId the order whose payment to mark refund-pending
+     * @return the updated payment record
+     * @throws BusinessException 404 if missing, 409 if wrong state
      */
     @Transactional
     public Payment markRefundPending(Long orderId) {
+        return markRefundPending(orderId, null);
+    }
+
+    /**
+     * Marks a paid online order's payment as awaiting a refund
+     * ({@code payments.status} and {@code orders.payment_status} move
+     * {@code PAID &#8594; REFUND_PENDING}) after the order has been cancelled
+     * or rejected. No money is moved in v1: an admin marks the refund
+     * complete through the refund queue (Phase 8 task 8.3). Rejected with
+     * 409 when the payment is not {@code PAID}.
+     *
+     * @param orderId the order whose payment to mark refund-pending
+     * @param actorEmail the authenticated actor's email, or {@code null} when
+     *        no audit row should be written (system-initiated)
+     * @return the updated payment record
+     * @throws BusinessException 404 if missing, 409 if wrong state
+     */
+    @Transactional
+    public Payment markRefundPending(Long orderId, String actorEmail) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
         Payment payment = paymentRepository.findByOrderIdForUpdate(orderId)
@@ -193,6 +240,10 @@ public class PaymentService {
 
         paymentRepository.saveAndFlush(payment);
         orderRepository.saveAndFlush(order);
+
+        if (actorEmail != null) {
+            writeAudit(AuditActorType.USER, actorEmail, "PAYMENT_REFUND_PENDING", payment, order);
+        }
 
         log.info("Marked payment for order {} refund-pending", orderId);
         publishAfterCommit(new PaymentRefundPending(this, orderId, order.getUser().getId(),
@@ -308,6 +359,7 @@ public class PaymentService {
 
         auditLogRepository.save(AuditLog.builder()
                 .actor(actor)
+                .actorType(AuditActorType.USER)
                 .actionType("PAYMENT_REFUNDED")
                 .entityType("PAYMENT")
                 .entityId(payment.getId())
@@ -671,6 +723,20 @@ public class PaymentService {
     private User requireActor(String adminEmail) {
         return userRepository.findByEmailWithRole(adminEmail)
                 .orElseThrow(() -> new IllegalStateException("Authenticated admin not found"));
+    }
+
+    private void writeAudit(AuditActorType actorType, String actorEmail, String actionType, Payment payment, Order order) {
+        User actor = userRepository.findByEmailWithRole(actorEmail)
+                .orElseThrow(() -> new IllegalStateException("Authenticated actor not found for audit: " + actorEmail));
+        auditLogRepository.save(AuditLog.builder()
+                .actor(actor)
+                .actorType(actorType)
+                .actionType(actionType)
+                .entityType("PAYMENT")
+                .entityId(payment.getId())
+                .reason("Payment " + payment.getId() + " for order " + order.getId()
+                        + ": " + order.getPaymentMethod() + " payment state change")
+                .build());
     }
 
     /**

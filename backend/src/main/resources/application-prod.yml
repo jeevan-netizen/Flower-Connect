@@ -52,6 +52,13 @@ app:
   webhook-secret: ${APP_WEBHOOK_SECRET}
   cors:
     origins: ${APP_CORS_ORIGINS}
+  rate-limit:
+    enabled: true
+    auth:
+      login-requests-per-hour: 5
+      register-requests-per-hour: 5
+      forgot-password-requests-per-hour: 5
+      reset-password-requests-per-hour: 5
   storage:
     # The local-disk backend is what runs when the 's3' profile is absent, which
     # is the state of this build: the S3StorageService behind that profile is a
@@ -78,6 +85,11 @@ management:
       show-details: never
       probes:
         enabled: true
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 logging:
   level:

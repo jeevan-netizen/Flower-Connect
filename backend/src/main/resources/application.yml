@@ -65,6 +65,7 @@ app:
   cors:
     origins: ${APP_CORS_ORIGINS:http://localhost:5173}
   rate-limit:
+    enabled: true
     auth:
       login-requests-per-hour: 5
       register-requests-per-hour: 5

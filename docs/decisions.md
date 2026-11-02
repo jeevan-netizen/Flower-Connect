@@ -2835,3 +2835,107 @@ Plan section 6.4 states POS is commission-free and outside the marketplace ledge
  # #   D - 6 5 :   P O S   s u m m a r y   t i m e - z o n e   r u l e   ( P h a s e   1 1   t a s k   1 1 . 5 )  
  # #   D - 6 6 :   P O S   c o m m i s s i o n - f r e e   s e p a r a t i o n   ( P h a s e   1 1   t a s k   1 1 . 5 )  
  
+## D-67: Explicit endpoint access matrix + fail-closed sweep (Phase 13 Stage 1, task 13.6)
+
+**Status:** Accepted
+**Date:** Phase 13 Stage 1 (task 13.6)
+
+### Context
+
+Phase 13 Stage 1 requires a security hardening sweep: document every registered handler's intended role-based access, verify coverage is fail-closed (no handler uncovered, no duplicate rows), and exercise the real Spring Security filter chain across all roles rather than trusting slice tests.
+
+D-13 established that `@RequiresApprovedVendor` is per-handler and inert in `@WebMvcTest` slices, so method-level gating cannot be verified by a slice. The URL-layer rules live in `SecurityConfig`. No single source of truth previously listed every handler with its expected per-role status.
+
+### Decision
+
+- **`EndpointAccessMatrix.java`** (test-only, `com.flowerconnect.security`) is the single source of truth: `AccessRule` enum (ANY_AUTH, CUSTOMER, FLORIST, ADMIN, PUBLIC), `Entry` record (method, pathPattern, rule, per-role statuses, note, testPath), and a complete `ENTRIES` list covering every handler across all controllers (auth, users, locations, vendors, admin, cart, checkout, orders, analytics, billing, reviews, dispute, pos, images).
+- **`EndpointAccessSweepIT.java`** (test-only, `com.flowerconnect.security`) is a fail-closed coverage test: every registered handler (reflected from `RequestMappingInfo`) is covered by exactly one matrix row; no duplicate entries; every entry has a rule; a catch-all rule exists. 5 tests pass.
+- **`EndpointAccessMatrixRbacTest.java`** (test-only, `com.flowerconnect.security`) exercises the real filter chain via `MockMvc` seeded through `login()` for CUSTOMER/FLORIST/ADMIN plus anonymous, iterating all entries Ã— 4 roles, asserting exact 401/403 deny cases and non-401 allow cases. Infra paths (`/actuator`, `/swagger-ui`, `/v3/api-docs`) are handled leniently (springdoc oddity). All roleÃ—entry assertions pass.
+
+### Consequences
+
+- No production code changed; no migration.
+- The matrix is the maintenance reference: when a new handler is added, add a matching `Entry` to `ENTRIES` or the sweep test fails (fail-closed).
+- Because `@RequiresApprovedVendor` is inert in slices, the RBAC test uses `@SpringBootTest`+the real `SecurityFilterChain`, matching the D-13 rationale that method security must be verified at integration level.
+- `/api/v1/users/me` (GET/PATCH) and `/api/v1/users/me/password` (POST) resolve to ANY_AUTH (subject-resolved self-service, no `/api/v1/users/**` matcher) rather than CUSTOMER-only â€” the matrix reflects this and the RBAC test asserts it.
+
+### Verification
+
+- Backend unit suite: 1386/1386 pass, BUILD SUCCESS.
+- Sweep test: 5/5 pass.
+- RBAC test: all roleÃ—entry assertions pass.
+- Full integration suite: not re-run end-to-end (each Spring context ~15s; >1200 tests exceeds a single session window); key acceptance tests pass individually.
+
+
+## D-68: Rate limiting — per-profile activation, per-user/IP keys, config-driven limits, Caffeine per-instance
+
+**Status:** Accepted
+**Date:** Phase 13 Stage 4 (task 13.1)
+
+### Context
+
+Phase 13 Stage 1 required a rate-limit review and extension (plan §13). The Phase 1 `RateLimitFilter` existed but was inactive by default (`app.rate-limit.enabled` never set; `matchIfMissing=false`), only covered login/register/forgot-reset/webhook, trusted `X-Forwarded-For`/`X-Real-IP` unconditionally (IP spoofing), logged full request bodies (including passwords), bypassed entirely when the body had no email, and ran before `JwtAuthenticationFilter` so it could not key by authenticated user. Sensitive mutating endpoints (checkout, dispute creation, review submission, address creation, cart mutations, image uploads, POS sale) had no rate limit at all.
+
+### Decision
+
+- **Per-profile activation:** `app.rate-limit.enabled` gates the filter via `@ConditionalOnProperty`. Set to `true` in base `application.yml` (dev) and `application-prod.yml` (prod); `application-test.yml` keeps it `false` so existing integration tests are unaffected; the dedicated `application-rate-limit-test.yml` enables it with low limits for fast tests.
+- **Key strategy:** sensitive endpoints are keyed by the authenticated principal (JWT subject/email) so each user has an independent bucket, with a client-IP fallback for unauthenticated calls. Anonymous endpoints (login/register/forgot/reset) are keyed by email-from-body plus IP; a missing email no longer bypasses — it falls back to IP. Webhook is keyed by IP. Keys are SHA-256 hashes of the identifier (never raw email/token in logs or tests).
+- **Trusted proxies only:** `app.rate-limit.trusted-proxies` (default empty) lists proxy IPs/CIDRs whose `X-Forwarded-For`/`X-Real-IP` are honored. Empty by default ? `remoteAddr` is used ? safe-by-default, no IP spoofing via forged headers.
+- **No body logging:** the filter never logs request bodies or emails; only path and hashed key at debug.
+- **No multipart buffering:** upload bodies are never read or buffered by the filter; they pass through untouched.
+- **Filter ordering:** rate-limit filter registered before `UsernamePasswordAuthenticationFilter` (which has a registered order), after `SecurityHeadersFilter` and `JwtAuthenticationFilter`, so order is `SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF` and the principal is available at rate-limit time.
+- **Limits in configuration only:** every threshold and window is a `RateLimitProperties` field (`app.rate-limit.auth.*`, `app.rate-limit.webhookRequestsPerHour`, `app.rate-limit.sensitive.*`). None are hard-coded in the filter or services. Sensitive endpoints: checkout 30/h, checkout/quote 60/h, dispute create 10/h, review submit 20/h, address create 20/h, cart mutation 60/h, image upload 30/h, POS sale 300/h. These are starting values chosen to avoid blocking normal workflows; they are documented as tunable and may be revisited with real usage.
+- **No shared store / Redis:** per-instance Caffeine buckets (expire-after-access 2h, max 10k). Limits are not globally consistent across multiple backend instances — acceptable for v1 single-instance, revisit if the service scales. No CAPTCHA (out of scope).
+
+### Consequences
+
+- Rate limiting is now active in dev and prod (was previously off). Limits are starting values; POS sale bursts or heavy cart usage in dev could hit them, but all are configurable with no code change.
+- `@RequiresApprovedVendor` remains inert in `@WebMvcTest` slices (D-13); rate-limit behavior is verified at integration level against the real filter chain.
+- No Flyway migration; no production code behavior change beyond activating and extending rate limiting.
+
+### Verification
+
+- `RateLimitFilterUnitTest` (8 tests): disabled pass-through, under/over limit, 429 body + `Retry-After`, authenticated-user key isolation, IP key isolation, trusted proxy honoring `X-Forwarded-For`, untrusted proxy ignoring it, multipart passthrough — all pass.
+- `RateLimitIntegrationTest` (8 tests) against real MySQL + production filter chain: sensitive endpoint rate limiting by authenticated user, user key isolation, anonymous IP isolation, 429 status + `Retry-After` + `RATE_LIMITED` code, regression of existing auth rate limits — all pass.
+- Backend unit suite: 1402/1402 pass, BUILD SUCCESS.
+
+
+## D-69: Audit-log coverage — typed actor model (USER / SYSTEM) for settlement run, refund pending, COD collection
+
+**Status:** Accepted
+**Date:** Phase 13 Stage 6 (task 13.5)
+
+### Context
+
+Phase 13 Stage 6 requires an audit-log coverage sweep. The existing `audit_log` table (V6 migration) is written by admin operations: vendor approval/rejection/suspension/reinstatement, user status changes, category mutations, platform and vendor commission rate changes, payment refunds, review hide/unhide, dispute resolution, and settlement finalization. Three security-sensitive mutations lacked audit rows: settlement cycle creation (`runSettlement`), payment refund-pending marking (`markRefundPending`), and COD payment collection (`collectPayment`). In addition, the weekly scheduled settlement run (via `SettlementScheduler`) had no audit row at all, which the plan's rule that "admin and settlement actions appear in the audit log" (plan §13, §14) requires to be closed.
+
+### Decision
+
+**Typed actor model:** audit rows carry an explicit `actor_type` (`USER` or `SYSTEM`) rather than inferring the actor from a nullable email. This avoids hiding missing user attribution behind a null email.
+
+- **Migration `V32__add_audit_log_actor_type.sql`:** adds `actor_type ENUM('USER','SYSTEM') NOT NULL DEFAULT 'USER'` to `audit_log`, makes `actor_user_id` nullable, and adds CHECK constraint `ck_audit_log_actor_user_consistency` enforcing `actor_type='USER' ? actor_user_id NOT NULL` and `actor_type='SYSTEM' ? actor_user_id IS NULL`. Existing rows default to USER; no data migration needed.
+- **New enum `com.flowerconnect.domain.AuditActorType`** (`USER`, `SYSTEM`).
+- **`AuditLog` entity:** added `actorType` field (`@Enumerated(EnumType.STRING)`), made `actor` optional (`nullable = true`).
+- **Settlement run:** `SettlementService.runSettlement` / `runSettlementForAllVendors` gained overloaded methods accepting `AuditActorType` + nullable `User actor`. Default (no-actor) overloads use SYSTEM. Admin-initiated runs pass USER + real user; scheduled scheduler runs pass SYSTEM + null actor. Every newly created settlement writes a `SETTLEMENT_CREATED` audit row. No fake or login-capable SYSTEM user is created.
+- **Refund pending:** `PaymentService.markRefundPending` gained an overloaded method accepting `String actorEmail`. Writes `PAYMENT_REFUND_PENDING` audit row as USER when actor email is non-null. Called from `CancellationService.cancel` with the authenticated caller's email.
+- **COD collection:** `PaymentService.collectPayment` gained an overloaded method accepting `String actorEmail`. Writes `PAYMENT_COLLECTED` audit row as USER when actor email is non-null. Called from `OrderStateMachine.transition` during DELIVERED (actor always a VENDOR user, non-null).
+- **Actor resolution:** from `userRepository.findByEmailWithRole(email)`. All audit writes join the same transaction; rollback on business transaction rollback.
+- **Intentionally unaudited:** dispute raise/respond, review submit/reply, order placement, POS sale (commission-free, D-66), and order status transitions (recorded in `order_status_history`, a separate append-only table). These are customer/vendor self-service actions or business actions with their own entity-level timestamps; adding audit rows would require schema or workflow changes and was deemed out of scope for this stage.
+
+### Consequences
+
+- Three new audit action types: `SETTLEMENT_CREATED`, `PAYMENT_REFUND_PENDING`, `PAYMENT_COLLECTED` (entity types `SETTLEMENT`, `PAYMENT`, `PAYMENT`).
+- Additive Flyway migration `V32`; no schema change to existing data; no existing audit behavior modified (all existing rows remain USER).
+- Actor email is nullable to accommodate system-initiated runs (settlement scheduler) where no real user exists.
+- Audit failures behave consistently with existing code — they join the same transaction and roll back with it.
+- All existing `AuditLog.builder()` call sites (DisputeService, PlatformConfigService, CategoryService, VendorAdminService, ReviewService, UserStatusService, AdminCommissionRateController) now explicitly set `actorType=AuditActorType.USER`.
+
+### Verification
+
+- `SettlementServiceTest`: new audit tests (admin-initiated run writes `SETTLEMENT_CREATED` as USER; system-initiated run writes `SETTLEMENT_CREATED` as SYSTEM with no user FK).
+- `PaymentServiceTest`: new audit tests (`collectPayment` with/without actor email; `markRefundPending` with/without actor email).
+- `SettlementCycleIntegrationTest`: 2/2 pass against real MySQL (end-to-end cycle writes both USER finalize and SYSTEM create audits; CHECK constraint rejects invalid actor_type/user-reference combinations).
+- `PaymentIntegrationTest`: 7/7 pass against real MySQL.
+- Backend unit suite: 2822/2822 pass, BUILD SUCCESS.
+- Backend compile: clean.
+

@@ -66,9 +66,10 @@ import jakarta.servlet.http.Cookie;
                 .phone("+1234567890")
                 .build();
 
-        AuthResponse response = AuthResponse.of("access-token", "refresh-token", 900000L);
+        AuthService.AuthTokens tokens = new AuthService.AuthTokens(
+                AuthResponse.of("access-token", 900000L), "refresh-token");
 
-        when(authService.register(any(RegisterRequest.class))).thenReturn(response);
+        when(authService.register(any(RegisterRequest.class))).thenReturn(tokens);
         when(cookieService.buildRefreshCookie("refresh-token"))
                 .thenReturn(ResponseCookie.from("refresh_token", "refresh-token")
                         .httpOnly(true).secure(false).sameSite("Strict")
@@ -79,7 +80,7 @@ import jakarta.servlet.http.Cookie;
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.expiresIn").value(900000))
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=")));
@@ -104,9 +105,10 @@ import jakarta.servlet.http.Cookie;
                 .password("password123")
                 .build();
 
-        AuthResponse response = AuthResponse.of("access-token", "refresh-token", 900000L);
+        AuthService.AuthTokens tokens = new AuthService.AuthTokens(
+                AuthResponse.of("access-token", 900000L), "refresh-token");
 
-        when(authService.login(any(LoginRequest.class))).thenReturn(response);
+        when(authService.login(any(LoginRequest.class))).thenReturn(tokens);
         when(cookieService.buildRefreshCookie("refresh-token"))
                 .thenReturn(ResponseCookie.from("refresh_token", "refresh-token")
                         .httpOnly(true).secure(false).sameSite("Strict")
@@ -189,9 +191,10 @@ import jakarta.servlet.http.Cookie;
     @Test
     void shouldRefreshSuccessfully() throws Exception {
         RefreshRequest request = RefreshRequest.builder().refreshToken("old-refresh-token").build();
-        AuthResponse response = AuthResponse.of("new-access-token", "new-refresh-token", 900000L);
+        AuthService.AuthTokens tokens = new AuthService.AuthTokens(
+                AuthResponse.of("new-access-token", 900000L), "new-refresh-token");
 
-        when(authService.refresh("old-refresh-token")).thenReturn(response);
+        when(authService.refresh("old-refresh-token")).thenReturn(tokens);
         when(cookieService.buildRefreshCookie("new-refresh-token"))
                 .thenReturn(ResponseCookie.from("refresh_token", "new-refresh-token").httpOnly(true).secure(false).sameSite("Strict").path("/api/v1/auth").maxAge(604).build());
 
@@ -200,7 +203,7 @@ import jakarta.servlet.http.Cookie;
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("new-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("refresh_token=new-refresh-token")));
     }
 
@@ -217,6 +220,62 @@ import jakarta.servlet.http.Cookie;
                 .andExpect(jsonPath("$.message").value("Missing or invalid request origin"));
 
         verifyNoInteractions(authService, cookieService);
+    }
+
+    @Test
+    void shouldReturn403ForCookieRefreshWithMissingClientHeader() throws Exception {
+        when(corsProperties.getOrigins()).thenReturn("http://localhost:5173");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", "refresh-token"))
+                        .header(HttpHeaders.ORIGIN, "http://localhost:5173"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid client header"));
+
+        verifyNoInteractions(authService, cookieService);
+    }
+
+    @Test
+    void shouldReturn403ForCookieRefreshWithMissingOrigin() throws Exception {
+        when(corsProperties.getOrigins()).thenReturn("http://localhost:5173");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", "refresh-token"))
+                        .header("X-FlowerConnect-Client", "1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid request origin"));
+
+        verifyNoInteractions(authService, cookieService);
+    }
+
+    @Test
+    void shouldReturn403ForCookieLogoutWithMissingClientHeader() throws Exception {
+        when(corsProperties.getOrigins()).thenReturn("http://localhost:5173");
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie("refresh_token", "refresh-token"))
+                        .header(HttpHeaders.ORIGIN, "http://localhost:5173"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid client header"));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void shouldReturn403ForCookieLogoutWithMissingOrigin() throws Exception {
+        when(corsProperties.getOrigins()).thenReturn("http://localhost:5173");
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .cookie(new Cookie("refresh_token", "refresh-token"))
+                        .header("X-FlowerConnect-Client", "1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Missing or invalid request origin"));
+
+        verifyNoInteractions(authService);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.flowerconnect.vendor.service;
 
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorHours;
@@ -206,6 +207,7 @@ public class VendorAdminService {
                 .orElseThrow(() -> new IllegalStateException("Authenticated admin not found"));
         auditLogRepository.save(AuditLog.builder()
                 .actor(admin)
+                .actorType(AuditActorType.USER)
                 .actionType(action)
                 .entityType(ENTITY_TYPE)
                 .entityId(profile.getId())

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -76,7 +77,7 @@ public class AdminDisputeController {
      * private fields (customer email, vendor response, resolution note, refund amount).
      */
     @GetMapping("/{disputeId}")
-    public ResponseEntity<DisputeDetailResponse> getDispute(@PathVariable Long disputeId) {
+    public ResponseEntity<DisputeDetailResponse> getDispute(@PathVariable @Positive(message = "Dispute id must be positive") Long disputeId) {
         return ResponseEntity.ok(disputeService.getAdminDispute(disputeId));
     }
 
@@ -108,7 +109,7 @@ public class AdminDisputeController {
     @PostMapping("/{disputeId}/resolve")
     public ResponseEntity<DisputeDetailResponse> resolveDispute(
             Authentication authentication,
-            @PathVariable Long disputeId,
+            @PathVariable @Positive(message = "Dispute id must be positive") Long disputeId,
             @Valid @RequestBody ResolveDisputeRequest request) {
         DisputeDetailResponse response = disputeService.resolveDispute(
                 authentication.getName(), disputeId, request);

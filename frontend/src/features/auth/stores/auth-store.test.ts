@@ -34,7 +34,7 @@ describe("Auth Store", () => {
   it("should set auth on setAuth", () => {
     useAuthStore.getState().setAuth({
       accessToken: "access-token",
-      refreshToken: "refresh-token",
+
       tokenType: "Bearer",
       expiresIn: 900000,
     });
@@ -67,7 +67,7 @@ describe("Auth Store", () => {
   it("should login and set tokens on success", async () => {
     (login as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       accessToken: "new-access-token",
-      refreshToken: "new-refresh-token",
+
       tokenType: "Bearer",
       expiresIn: 900000,
     });
@@ -107,7 +107,7 @@ describe("Auth Store", () => {
   it("should register and set tokens on success", async () => {
     (register as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       accessToken: "access-token",
-      refreshToken: "refresh-token",
+
       tokenType: "Bearer",
       expiresIn: 900000,
     });
@@ -139,7 +139,7 @@ describe("Auth Store", () => {
     });
     (refresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       accessToken: "new-access-token",
-      refreshToken: "new-refresh-token",
+
       tokenType: "Bearer",
       expiresIn: 900000,
     });
@@ -231,5 +231,101 @@ describe("Auth Store", () => {
     const state = useAuthStore.getState();
     expect(state.hasLoadedInitial).toBe(true);
     expect(state.user).toBeNull();
+  });
+
+  it("does not write access token to localStorage on setAuth", () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+    useAuthStore.getState().setAuth({
+      accessToken: "access-token",
+
+      tokenType: "Bearer",
+      expiresIn: 900000,
+    });
+
+    const storageCalls = setItemSpy.mock.calls.filter(
+      ([_key]) => _key === "fc-auth" || _key.startsWith("fc-"),
+    );
+    expect(storageCalls).toHaveLength(0);
+    setItemSpy.mockRestore();
+  });
+
+  it("does not write access token to sessionStorage on setAuth", () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+    useAuthStore.getState().setAuth({
+      accessToken: "access-token",
+
+      tokenType: "Bearer",
+      expiresIn: 900000,
+    });
+
+    const sessionStorageCalls = setItemSpy.mock.calls.filter(
+      ([, value]) => typeof value === "string" && value.includes("access-token"),
+    );
+    expect(sessionStorageCalls).toHaveLength(0);
+    setItemSpy.mockRestore();
+  });
+
+  it("does not write tokens to localStorage on login success", async () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    (login as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      accessToken: "new-access-token",
+
+      tokenType: "Bearer",
+      expiresIn: 900000,
+    });
+    (fetchCurrentUser as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: 1,
+      email: "user@test.com",
+      fullName: "Test User",
+      phone: null,
+      role: "CUSTOMER",
+      createdAt: "2024-01-01T00:00:00",
+    });
+
+    await useAuthStore.getState().login("user@test.com", "password123");
+
+    const tokenCalls = setItemSpy.mock.calls.filter(([_key, value]) =>
+      typeof value === "string" &&
+      (value.includes("access-token") || value.includes("refresh-token")),
+    );
+    expect(tokenCalls).toHaveLength(0);
+    setItemSpy.mockRestore();
+  });
+
+  it("does not write tokens to localStorage on refresh success", async () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    useAuthStore.setState({
+      accessToken: "old-access-token",
+      user: null,
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+      hasLoadedInitial: true,
+    });
+    (refresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      accessToken: "new-access-token",
+
+      tokenType: "Bearer",
+      expiresIn: 900000,
+    });
+    (fetchCurrentUser as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: 1,
+      email: "user@test.com",
+      fullName: "Test User",
+      phone: null,
+      role: "CUSTOMER",
+      createdAt: "2024-01-01T00:00:00",
+    });
+
+    await useAuthStore.getState().refresh();
+
+    const tokenCalls = setItemSpy.mock.calls.filter(([_key, value]) =>
+      typeof value === "string" &&
+      (value.includes("access-token") || value.includes("refresh-token")),
+    );
+    expect(tokenCalls).toHaveLength(0);
+    setItemSpy.mockRestore();
   });
 });

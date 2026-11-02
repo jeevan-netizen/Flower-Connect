@@ -5,11 +5,14 @@ import com.flowerconnect.dispute.dto.DisputePageResponse;
 import com.flowerconnect.dispute.dto.RaiseDisputeRequest;
 import com.flowerconnect.dispute.service.DisputeService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -18,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
  * <p>All endpoints require CUSTOMER role and ownership of the order/dispute.
  * Base path: {@code /api/v1/disputes}
  */
+@Slf4j
+@Validated
 @RestController
 @RequestMapping("/api/v1/disputes")
 @RequiredArgsConstructor
@@ -40,7 +45,7 @@ public class CustomerDisputeController {
     @PostMapping("/orders/{orderId}")
     public ResponseEntity<DisputeDetailResponse> raiseDispute(
             Authentication authentication,
-            @PathVariable Long orderId,
+            @PathVariable @Positive(message = "Order id must be positive") Long orderId,
             @Valid @RequestBody RaiseDisputeRequest request) {
         return ResponseEntity.ok(disputeService.raiseDispute(authentication.getName(), orderId, request));
     }
@@ -61,7 +66,7 @@ public class CustomerDisputeController {
     @GetMapping("/{disputeId}")
     public ResponseEntity<DisputeDetailResponse> getDispute(
             Authentication authentication,
-            @PathVariable Long disputeId) {
+            @PathVariable @Positive(message = "Dispute id must be positive") Long disputeId) {
         return ResponseEntity.ok(disputeService.getCustomerDispute(authentication.getName(), disputeId));
     }
 }

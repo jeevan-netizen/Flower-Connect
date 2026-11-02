@@ -163,7 +163,6 @@ describe("Axios API Interceptor", () => {
         return Promise.resolve({
           data: {
             accessToken: "new-access-token",
-            refreshToken: "new-refresh-token",
             tokenType: "Bearer",
             expiresIn: 900000,
           },
@@ -199,7 +198,6 @@ describe("Axios API Interceptor", () => {
   it("should share one refresh request for concurrent 401s", async () => {
     const refreshResponse = {
       accessToken: "new-access-token",
-      refreshToken: "new-refresh-token",
       tokenType: "Bearer",
       expiresIn: 900000,
     };
