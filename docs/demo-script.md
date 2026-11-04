@@ -333,11 +333,11 @@ The Playwright rehearsal suite (`frontend/tests/e2e/demo-rehearsal.test.ts`) aut
 | Customer discovery & browse | Yes (pages load) | No |
 | Product detail & gift note | Yes (dialog opens) | No |
 | Cart management | Yes (page loads) | No |
-| COD checkout — complete order | No — navigates to checkout page only | **Yes** — click "Place Order" manually |
-| Simulated online payment | No | **Yes** — use `/payment/:id` simulator |
+| COD checkout — complete order | **Yes — verified end-to-end in real browser** (login, location, browse, add to cart, COD checkout, order placed, cart cleared) | No |
+| Simulated online payment | Payment page loads ("Awaiting payment"); simulator is backend-only (no frontend button per D-49/D-50) | **Yes** — trigger `POST /api/v1/payments/simulator/{orderId}/pay` with bearer token, or verify manually |
 | Order tracking timeline | Yes (orders page loads) | No |
-| Customer cancellation | No | **Yes** — click "Cancel Order" manually |
-| Vendor order acceptance | No — navigates to order board only | **Yes** — click "Accept Order" manually |
+| Customer cancellation | **Yes — verified end-to-end in real browser** (open PLACED order, submit cancel dialog → `CANCELLED`) | No |
+| Vendor order acceptance | Order board loads with PLACED orders visible; full accept/deliver click-through blocked by framer-motion dialog click-interception in automation | **Yes** — click "Accept Order" manually |
 | Vendor fulfilment to delivery | No | **Yes** — click through Preparing → Out for Delivery → Delivered |
 | COD collection on delivery | No | **Yes** — verify payment_status=COLLECTED |
 | Inventory stock-in | No — navigates to inventory page only | **Yes** — click "Stock In" manually |
@@ -354,6 +354,14 @@ The Playwright rehearsal suite (`frontend/tests/e2e/demo-rehearsal.test.ts`) aut
 cd frontend
 DEMO_PASSWORD=<your-demo-password> ADMIN_PASSWORD=<your-admin-password> \
   npx playwright test tests/e2e/demo-rehearsal.test.ts
+```
+
+**To run the Tier 1 COD + cancel business-action rehearsal:**
+The Tier 1 test (`frontend/tests/e2e/demo-rehearsal-tier1.test.ts`) was executed against an isolated clean-clone rehearsal stack. It is not committed to this branch in this Stage 2 docs-only update; run it from an isolated clone after Stage 1 seed data is loaded.
+```bash
+cd frontend
+DEMO_PASSWORD=<your-demo-password> ADMIN_PASSWORD=<your-admin-password> \
+  npx playwright test tests/e2e/demo-rehearsal-tier1.test.ts -g "Customer: COD checkout complete"
 ```
 
 **To complete the full Tier 1 walkthrough manually:** Follow Steps 1–18 in Section 3, performing the actions marked "Manual Walkthrough Required" above. Screenshots for the automated steps are captured in `docs/rehearsal-materials/screenshots/`.
