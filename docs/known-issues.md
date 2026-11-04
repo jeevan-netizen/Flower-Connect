@@ -504,6 +504,17 @@ AdminDisputeControllerTest 5, GlobalExceptionHandlerTest 2, SmtpEmailSenderTest 
 | D-1 | Seed / Storage | Seeded products include generated JPEG artwork uploaded via `ProductImageService`, but serving of image bytes remains gated by Known Issue #020 (no public route serves image bytes) | Low | `DemoSeedService.java:522`, `Known Issue #020` | Record limitation; UI avoids broken `<img>` tags by rendering metadata per D-31 until dedicated authenticated image serving route is introduced in product roadmap | Documented / Tracked under #020 |
 | D-2 | Seed / Environment | Dev demo seed runner requires `DEMO_PASSWORD` (or `DEMO_USER_PASSWORD` / `app.seed.demo-password`) in the dev environment. If not provided, the runner skips execution with a warning log to prevent hardcoded passwords. | Low | `DemoSeedRunner.java:54` | Set `DEMO_PASSWORD` in dev environment to trigger automatic domain seeding | As designed / Documented |
 
+## Phase 14 Stage 2 Findings (task 14.9 & 14.11: first clean-clone rehearsal)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| R-1 | Build / Docker | Windows CRLF line endings break `./mvnw` inside Linux Docker container (`/bin/sh: ./mvnw: not found`) during `docker compose up --build` | Medium | `backend/Dockerfile:14` | Added `RUN sed -i 's/\r$//' ./mvnw && chmod +x ./mvnw` to Dockerfile; added `.gitattributes` to enforce LF on wrapper scripts | Fixed |
+| R-2 | Docker / Ports | Host MySQL port collision if 3306 is bound by local MySQL service | Low | `docker-compose.yml:8` | Updated `.env.example` default `DB_PORT=3307` so host exposure does not collide with local MySQL 3306 | Fixed |
+| R-3 | Security / Seed | `AdminBootstrap` had default execution order and ran after `DemoSeedRunner` (`@Order(100)`), causing `DemoSeedService` to fail with "No active ADMIN user found" on clean startup | High | `AdminBootstrap.java:23`, `DemoSeedRunner.java:31` | Added `@Order(10)` to `AdminBootstrap` so admin user is guaranteed to exist before demo seed executes | Fixed |
+| R-4 | Frontend / UI | `RejectReasonDialog` (framer-motion) backdrop remains in DOM at `fixed inset-0 z-50` with `animate="hidden"`, intercepting pointer events in E2E automation | Medium | `RejectReasonDialog.tsx:32`, Playwright test logs | Workaround: press Escape or use `navigateClientSide` helper to navigate from vendor order board | Documented / Handled in E2E |
+| R-5 | Security / Test | Dev rate-limiting (`login-requests-per-hour: 5`) throttles demo users during rapid repeated E2E test iterations | Low | `application.yml:111`, HTTP 429 response | Documented: restart backend container to reset in-memory Caffeine rate-limit bucket between rapid E2E runs | Documented |
+| R-6 | Frontend / UI | Product detail modal overlay (`aria-modal="true"`) remains open after "Add to cart", blocking direct clicks to header navigation links | Low | `ProductDetailPage.tsx`, Playwright test logs | Dismiss modal with Escape or navigate client-side to `/cart` | Documented / Handled in E2E |
+
 ## Deprecation Notices
 
 _None._

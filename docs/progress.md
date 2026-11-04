@@ -1613,3 +1613,58 @@ Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 7
 - Full backend integration suite limit: The baseline full integration suite previously timed out at 15 minutes; focused failsafe execution ran in 1m 30s.
 
 Branch: `phase-14-polish-deliverables` (working tree contains uncommitted Stage 1 changes; no commit or push per instructions).
+
+### Phase 14 Stage 2 — Tasks 14.9 & 14.11 (Timed Demo Script and First Clean-Clone Rehearsal) completed
+
+**Implementation Summary:**
+1. **Timed Demo Script (`docs/demo-script.md`):**
+   - Complete timed walkthrough covering Customer, Vendor, and Admin roles.
+   - Structured in Tier 1 (core must-show flows) and Tier 2 (if-time extensions).
+   - Outlines exact UI routes, inputs, expected outputs, and visible confirmations.
+   - Details reset procedures (`docker compose down -v && docker compose up -d`), fallback polling mechanisms, and known limitations (e.g. image-serving #020).
+   - Zero hardcoded passwords; points to dev environment credentials configuration.
+2. **Root Quick-Start Guide (`README.md`):**
+   - Added root quick-start guide to enable zero-friction clean-clone onboarding for rehearsals and reviewers.
+   - Notes that Stage 5 will deliver the comprehensive documentation release.
+3. **Clean-Clone Rehearsal Environment:**
+   - Fresh clone created in isolated directory `C:\Projects\FlowerConnect-rehearsal-1`.
+   - Docker Compose isolated project name: `fc-rehearsal-1` with dedicated network and volumes.
+   - Configured `.env` from `.env.example` with dev credentials and host port `3307` to avoid host port collisions.
+   - All containers built and verified healthy: MySQL 8, MailHog, Spring Boot backend, and Vite frontend.
+   - Seed dataset verified on clean boot: 5 vendors, 27 products, 3 customers, 8 orders, reviews, POS sales, and settlements.
+4. **Automated Playwright Walkthrough & Visual Captures:**
+   - Created E2E rehearsal automation in `frontend/tests/e2e/demo-rehearsal.test.ts`.
+   - Ran in real Chromium browser through Playwright against the clean-clone Docker stack (`http://localhost:5173` / `http://localhost:8080`).
+   - Successfully executed all three demo role test suites in 16.2s:
+     - Test 1 (Customer): Discovery, location select, storefront browsing, product detail modal, gift note, cart management, checkout wizard, order tracking (7.9s).
+     - Test 2 (Vendor): Dashboard overview, order board, inventory management, counter POS (3.6s).
+     - Test 3 (Admin): Dashboard metrics, vendor approval queue, refund management, dispute resolution, billing & settlements (3.7s).
+   - 15 visual screenshot deliverables captured and verified in `docs/rehearsal-materials/screenshots/`:
+     - `01-customer-login.png`
+     - `02-customer-location-browse.png`
+     - `03-customer-product-detail.png`
+     - `04-customer-cart.png`
+     - `05-customer-checkout.png`
+     - `06-customer-order-tracking.png`
+     - `07-vendor-login-dashboard.png`
+     - `08-vendor-order-board.png`
+     - `09-vendor-inventory.png`
+     - `10-vendor-pos.png`
+     - `11-admin-login-dashboard.png`
+     - `12-admin-vendor-approval.png`
+     - `13-admin-refund-queue.png`
+     - `14-admin-disputes.png`
+     - `15-admin-billing-settlements.png`
+5. **Deviations Diagnosed and Resolved:**
+   - R-1: Windows CRLF line endings breaking `./mvnw` inside Linux Docker container (`/bin/sh: ./mvnw: not found`). Fixed via Dockerfile `sed` command and `.gitattributes`.
+   - R-2: Port 3306 binding conflict on host machines running local MySQL. Default changed to `3307` in `.env.example`.
+   - R-3: `AdminBootstrap` execution ordering vs `DemoSeedRunner`. Added `@Order(10)` to ensure admin account is available during demo seed execution.
+   - R-4: `RejectReasonDialog` backdrop intercepting pointer events when animated to hidden. Handled via Escape dismiss and client-side navigation.
+   - R-5: In-memory rate limiting (5 logins/hr) during rapid automated iterations. Documented backend container restart workaround to clear cache.
+   - R-6: Product detail modal overlay intercepting header clicks after cart addition. Handled by dismissing modal prior to navigation.
+
+**Verification:**
+- Playwright E2E suite: **3/3 passed (16.2s)** on clean clone stack (`fc-rehearsal-1`).
+- All 15 screenshots generated, verified, and populated in `docs/rehearsal-materials/screenshots/`.
+- Rehearsal date: 2026-11-04, base commit `39be360`.
+- Branch: `phase-14-polish-deliverables`. No commit or push performed per instructions.

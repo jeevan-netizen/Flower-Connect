@@ -1,0 +1,8 @@
+# Set default behavior, in case users don't have core.autocrlf set.
+* text=auto
+
+# Declare files that should always have LF line endings on checkout.
+*.sh text eol=lf
+mvnw text eol=lf
+*.sql text eol=lf
+

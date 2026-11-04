@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: docker/mysql/Dockerfile
-    container_name: flowerconnect-mysql
+    container_name: ${COMPOSE_PROJECT_NAME:-flowerconnect}-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
@@ -23,7 +23,7 @@ services:
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
-    container_name: flowerconnect-mailhog
+    container_name: ${COMPOSE_PROJECT_NAME:-flowerconnect}-mailhog
     restart: unless-stopped
     ports:
       - "1025:1025"
@@ -39,7 +39,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: flowerconnect-backend
+    container_name: ${COMPOSE_PROJECT_NAME:-flowerconnect}-backend
     restart: unless-stopped
     depends_on:
       mysql:
@@ -66,6 +66,8 @@ services:
       # Empty by default so the bootstrap stays a no-op unless explicitly supplied.
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
     ports:
       - "8080:8080"
     volumes:
@@ -83,7 +85,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
-    container_name: flowerconnect-frontend
+    container_name: ${COMPOSE_PROJECT_NAME:-flowerconnect}-frontend
     restart: unless-stopped
     depends_on:
       backend:
