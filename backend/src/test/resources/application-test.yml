@@ -53,6 +53,8 @@ app:
   billing:
     backfill:
       enabled: false
+  seed:
+    enabled: false
   # Disabled for the same reason; SSE delivery is driven directly in tests rather
   # than by the scheduled heartbeat.
   notification:

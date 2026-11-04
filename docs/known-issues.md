@@ -497,6 +497,13 @@ Backend dependency scan: OWASP Dependency-Check not available (requires network 
 - New focused tests: **20/20 pass** (CustomerDisputeControllerTest 6, VendorDisputeControllerTest 5, 
 AdminDisputeControllerTest 5, GlobalExceptionHandlerTest 2, SmtpEmailSenderTest 2).
 
+## Phase 14 Stage 1 Findings (task 14.5: dev demo seed data)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| D-1 | Seed / Storage | Seeded products include generated JPEG artwork uploaded via `ProductImageService`, but serving of image bytes remains gated by Known Issue #020 (no public route serves image bytes) | Low | `DemoSeedService.java:522`, `Known Issue #020` | Record limitation; UI avoids broken `<img>` tags by rendering metadata per D-31 until dedicated authenticated image serving route is introduced in product roadmap | Documented / Tracked under #020 |
+| D-2 | Seed / Environment | Dev demo seed runner requires `DEMO_PASSWORD` (or `DEMO_USER_PASSWORD` / `app.seed.demo-password`) in the dev environment. If not provided, the runner skips execution with a warning log to prevent hardcoded passwords. | Low | `DemoSeedRunner.java:54` | Set `DEMO_PASSWORD` in dev environment to trigger automatic domain seeding | As designed / Documented |
+
 ## Deprecation Notices
 
 _None._

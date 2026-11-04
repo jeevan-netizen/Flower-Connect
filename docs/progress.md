@@ -1526,3 +1526,90 @@ AdminDisputeControllerTest 5, GlobalExceptionHandlerTest 2, SmtpEmailSenderTest 
 Branch: `phase-13-security-hardening` (working tree contains uncommitted Stage 7 changes; no commit/push per instructions).
 
 
+
+### Phase 14 (Production Readiness & Polish) - Stage 1 (task 14.5: dev demo seed data) - COMPLETE (2026-11-04)
+
+**Implementation Summary:**
+- Implemented a complete, idempotent domain seed orchestrator (`DemoSeedService`) and startup runner (`DemoSeedRunner`) running solely under the `dev` profile behind `@ConditionalOnProperty(name = "app.seed.enabled")`.
+- Excluded from `prod` and `test` environments by configuration and profile boundary assertions (`DemoSeedActivationTest`).
+- Executed entirely through the real service layer and state machines: no raw SQL or direct repository mutations.
+- Uses `java.time.Clock` bean for time-dependent operations, ensuring pending orders (age < 60m auto-reject threshold) and near-expiry catalog items remain valid at application boot.
+- Procedural in-memory image generation (`DemoImageGenerator`) produces valid 400x400 JPEG artwork uploaded via `ProductImageService`, eliminating any external network dependencies or hotlinks (credits and Apache 2.0 license recorded in `docs/credits.md`).
+
+**Demo Dataset Coverage:**
+1. **Vendors (5 total):**
+   - 3 approved:
+     - `vendor-blossom@flowerconnect.test`: Blossom Haven (Koramangala, radius 8.0 km, min ₹200, fee ₹40 + ₹10/km, free > ₹1000, prep 30m)
+     - `vendor-petalcraft@flowerconnect.test`: Petal Craft Florals (Indiranagar, radius 12.0 km, min ₹350, fee ₹50 + ₹12/km, free > ₹1500, prep 45m)
+     - `vendor-gardenia@flowerconnect.test`: Green Gardenia (HSR Layout, radius 6.0 km, min ₹150, fee ₹30 + ₹8/km, free > ₹800, prep 20m)
+   - 1 pending approval: `vendor-orchid@flowerconnect.test`: Orchid Oasis (Jayanagar, radius 10.0 km)
+   - 1 suspended: `vendor-flora@flowerconnect.test`: Flora Boutique (Whitefield, radius 15.0 km)
+2. **Categories:**
+   - 8 child categories created under pre-existing baseline root categories ("Roses", "Bouquets", "Arrangements", "Occasions") via `CategoryService`.
+3. **Products & Inventory (27 total, 9 per approved vendor):**
+   - Active products with stock-in inventory (`quantity`, `available`, `reserved_quantity`).
+   - Low-stock items where `available <= lowStockThreshold` (e.g. Coral Miniature Rose Posy, Crimson Peony Silk Bundle, Petite Desktop Daisy).
+   - Near-expiry items with non-expired future dates (`expiryDate > now`) (e.g. Pure Snow Daisy Bouquet, Exotic Purple Carnations, Fragrant Night Jasmine Bunch).
+   - Generated JPEG flower artwork attached to every product via `ProductImageService`.
+4. **Customers & Addresses (3 demo customers):**
+   - `customer-alice@flowerconnect.test` (Alice Sharma): Home (Koramangala), Office (HSR Layout)
+   - `customer-bob@flowerconnect.test` (Bob Patel): Home (Indiranagar), Office (Koramangala)
+   - `customer-charlie@flowerconnect.test` (Charlie Rao): Home (HSR Layout), Studio (Indiranagar)
+5. **Representative Order History (8 orders covering required states):**
+   - Order 1: Delivered COD order with 5-star customer review and vendor reply (Vendor 1).
+   - Order 2: Delivered simulated-online order via payment simulator with 4-star review (Vendor 2).
+   - Order 3: Recent `PLACED` order awaiting vendor action (0m old < 60m auto-reject threshold).
+   - Order 4: In-progress order (`CONFIRMED -> PREPARING`) (Vendor 2).
+   - Order 5: Customer-cancelled order (`PLACED -> CANCELLED`) (Vendor 1).
+   - Order 6: Vendor-rejected order (`PLACED -> REJECTED` with reason) (Vendor 2).
+   - Order 7: Online order awaiting refund (`PLACED` + `PAID` -> customer cancelled -> `REFUND_PENDING`) (Vendor 3).
+   - Order 8: Delivered order with resolved dispute (`DELIVERED` -> dispute raised -> vendor responded -> admin resolved with `RESOLVED_PARTIAL` 50% refund) (Vendor 3).
+6. **Billing, POS, and Settlements:**
+   - POS sales: Vendor 1 recorded CASH POS sale (₹900.00), Vendor 2 recorded UPI POS sale (₹480.00); commission-free per D-66.
+   - Commissions & Ledger: Delivery created COD dues (`-(commission + platformFee)`) and Online credits (`+(subtotal - commission + deliveryFee)`), plus `DISPUTE_ADJUSTMENT` for partial refund.
+   - Settlements: Vendor 1 finalized `SETTLED` payout; Vendor 2 open `PENDING` cycle.
+7. **Reviews:**
+   - Vendor 1 has 5-star rating with vendor reply.
+   - Vendor 2 has 4-star rating.
+   - Vendor 3 has 0 reviews (unrated).
+
+**Credentials & Environment Configuration:**
+- Admin credentials utilize existing `ADMIN_EMAIL` and `ADMIN_PASSWORD` environment variables (defaults: `admin@flowerconnect.test` / `admin`).
+- Demo customer and vendor accounts utilize `DEMO_PASSWORD` (or `DEMO_USER_PASSWORD` / `app.seed.demo-password`). If not set in the environment, the runner cleanly logs an informational warning and skips execution.
+- No passwords or secrets are committed to git or printed in logs.
+- Reset procedure:
+  ```bash
+  docker compose down -v
+  docker compose up -d
+  ```
+
+**Reconciliation & Idempotency Verification:**
+- Stock reconciliation: across all inventory records, `available + reserved_quantity == quantity`.
+- Billing reconciliation: delivered orders have exact commission records and matching signed ledger entries.
+- Settlement reconciliation: settlement `totalCredits`, `totalDues`, and `netAmount` match the sum of attached ledger entries.
+- Idempotency: re-running `seedAll()` executes with zero row drift across all 13 database tables (`users`, `vendor_profiles`, `categories`, `products`, `inventories`, `addresses`, `orders`, `disputes`, `reviews`, `pos_transactions`, `settlements`, `settlement_entries`, `commissions`).
+
+**Files Changed:**
+- Added: `backend/src/main/java/com/flowerconnect/demo/InMemoryMultipartFile.java`
+- Added: `backend/src/main/java/com/flowerconnect/demo/DemoImageGenerator.java`
+- Added: `backend/src/main/java/com/flowerconnect/demo/DemoSeedProperties.java`
+- Added: `backend/src/main/java/com/flowerconnect/demo/DemoSeedService.java`
+- Added: `backend/src/main/java/com/flowerconnect/demo/DemoSeedRunner.java`
+- Modified: `backend/src/main/resources/application.yml` (`app.seed.enabled: false`)
+- Modified: `backend/src/main/resources/application-dev.yml` (`app.seed.enabled: true`, demo credentials binding)
+- Modified: `backend/src/main/resources/application-prod.yml` (`app.seed.enabled: false`)
+- Modified: `backend/src/test/resources/application-test.yml` (`app.seed.enabled: false`)
+- Added: `backend/src/test/java/com/flowerconnect/demo/DemoSeedActivationTest.java` (4 unit tests)
+- Added: `backend/src/test/java/com/flowerconnect/demo/DemoSeedRunnerUnitTest.java` (3 unit tests)
+- Added: `backend/src/test/java/com/flowerconnect/demo/DemoSeedIntegrationTest.java` (1 comprehensive integration test)
+- Added: `docs/credits.md` (asset credits, generator details, Apache 2.0 license)
+- Modified: `docs/known-issues.md` (recorded Stage 1 demo findings and links to Known Issue #020)
+- Modified: `docs/decisions.md` (recorded Decision D-70)
+- Modified: `docs/progress.md` (updated Stage 1 progress)
+
+**Verification:**
+- Unit tests: **7/7 passed** (`DemoSeedActivationTest` 4, `DemoSeedRunnerUnitTest` 3) via `./mvnw test -Dtest=DemoSeedActivationTest,DemoSeedRunnerUnitTest`.
+- Integration tests: **1/1 passed** (`DemoSeedIntegrationTest`) via `.\mvnw.cmd test-compile failsafe:integration-test failsafe:verify "-Dit.test=DemoSeedIntegrationTest"` against Testcontainers MySQL 8.0.36.
+- Full backend integration suite limit: The baseline full integration suite previously timed out at 15 minutes; focused failsafe execution ran in 1m 30s.
+
+Branch: `phase-14-polish-deliverables` (working tree contains uncommitted Stage 1 changes; no commit or push per instructions).

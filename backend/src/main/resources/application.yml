@@ -107,6 +107,9 @@ app:
     backfill:
       enabled: ${APP_BILLING_BACKFILL_ENABLED:false}
 
+  seed:
+    enabled: false
+
   notification:
     sse:
       # Heartbeat comment sent on every live SSE connection so proxies and the

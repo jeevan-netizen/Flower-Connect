@@ -43,7 +43,7 @@ The database schema needs version-controlled migrations. An initial schema (`rol
 - Use Flyway with `baseline-on-migrate: true` and `baseline-version: 1`.
 - The initial schema is `V1__baseline.sql`.
 - All future schema changes are additive migrations: `V2__`, `V3__`, etc.
-- **Never edit an applied migration** — always write a new one.
+- **Never edit an applied migration** â€” always write a new one.
 - MySQL custom Docker image copies `00-init.sql` to `/docker-entrypoint-initdb.d/` to ensure the database exists before Flyway runs.
 
 ### Consequences
@@ -94,14 +94,14 @@ Adopt a feature-sliced design:
 
 ```
 src/
-├── app/           # App-level providers, routing, styles
-├── pages/         # Route-level components (or colocated in features)
-├── features/      # Feature modules (e.g., auth, catalog, orders)
-│   └── auth/
-│       └── stores/auth-store.ts
-├── shared/        # Reusable utilities, API client, components
-│   └── lib/api.ts
-└── test/          # Test setup and shared test utilities
+â”œâ”€â”€ app/           # App-level providers, routing, styles
+â”œâ”€â”€ pages/         # Route-level components (or colocated in features)
+â”œâ”€â”€ features/      # Feature modules (e.g., auth, catalog, orders)
+â”‚   â””â”€â”€ auth/
+â”‚       â””â”€â”€ stores/auth-store.ts
+â”œâ”€â”€ shared/        # Reusable utilities, API client, components
+â”‚   â””â”€â”€ lib/api.ts
+â””â”€â”€ test/          # Test setup and shared test utilities
 ```
 
 - State management: Zustand for app-level (auth), TanStack Query for server data.
@@ -129,16 +129,16 @@ Kilo AI needs persistent project memory across sessions. The project has no exis
 
 - **`AGENTS.md`** at repository root: permanent coding rules, conventions, and workflow instructions. Written once, rarely changed. Kilo auto-discovers this file.
 - **`CLAUDE.md`** at repository root: compatibility redirect to `AGENTS.md`.
-- **`docs/` directory**: mutable project memory — `architecture.md`, `progress.md`, `decisions.md`, `known-issues.md`. Updated by the agent after each task. `docs/progress.md` is the ground truth for unfinished work.
-- **`kilo.jsonc`** at repository root: Kilo configuration — `instructions` array (auto-loaded files), `agent` definitions (autonomous-engineer, backend-engineer, frontend-engineer), `command` definitions (build-check, self-maintain), and `permission` rules (denies `.env*` reads, asks for git push/rebase/reset).
+- **`docs/` directory**: mutable project memory â€” `architecture.md`, `progress.md`, `decisions.md`, `known-issues.md`. Updated by the agent after each task. `docs/progress.md` is the ground truth for unfinished work.
+- **`kilo.jsonc`** at repository root: Kilo configuration â€” `instructions` array (auto-loaded files), `agent` definitions (autonomous-engineer, backend-engineer, frontend-engineer), `command` definitions (build-check, self-maintain), and `permission` rules (denies `.env*` reads, asks for git push/rebase/reset).
 - `.kilo/agent/*.md` and `.kilo/command/*.md` were attempted but fail YAML frontmatter validation in this Kilo CLI build. Agent and command definitions are consolidated in `kilo.jsonc` instead.
 
 ### Consequences
 
 - New Kilo sessions auto-load `AGENTS.md` + `docs/*.md` via the `instructions` array in `kilo.jsonc`.
-- `AGENTS.md` is write-protected by Kilo — changes require user approval. This enforces stability of core rules.
-- `docs/*.md` files are editable by the agent — they stay current with project state.
-- `kilo.jsonc` is validated against the Kilo JSON schema — invalid configs are rejected.
+- `AGENTS.md` is write-protected by Kilo â€” changes require user approval. This enforces stability of core rules.
+- `docs/*.md` files are editable by the agent â€” they stay current with project state.
+- `kilo.jsonc` is validated against the Kilo JSON schema â€” invalid configs are rejected.
 - `AGENTS.md` is kept concise (~80 lines) to minimize context consumption for limited/free models.
 
 ---
@@ -154,11 +154,11 @@ The project uses Kilo AI with Claude models through OmniRoute, including free or
 
 ### Decision
 
-- **`kilo.jsonc` `instructions` array** loads all essential docs at session start — no wasted exploration time.
-- **`docs/progress.md`** is the primary recovery point — checked at the start of every session via the Session Startup Checklist.
+- **`kilo.jsonc` `instructions` array** loads all essential docs at session start â€” no wasted exploration time.
+- **`docs/progress.md`** is the primary recovery point â€” checked at the start of every session via the Session Startup Checklist.
 - **Autonomous engineer agent** has `steps: 20` max iterations and `temperature: 0.2` for deterministic, focused output.
-- **Agent prompts are trimmed** to concise bullet points (not paragraphs) — the full rules live in `AGENTS.md` and `docs/` to avoid duplicating large instructions in every prompt.
-- **Subagents** (backend-engineer, frontend-engineer) have scoped permissions — they can only edit files in their domain, preventing unwanted cross-contamination and reducing context noise.
+- **Agent prompts are trimmed** to concise bullet points (not paragraphs) â€” the full rules live in `AGENTS.md` and `docs/` to avoid duplicating large instructions in every prompt.
+- **Subagents** (backend-engineer, frontend-engineer) have scoped permissions â€” they can only edit files in their domain, preventing unwanted cross-contamination and reducing context noise.
 - **Workflow commands** (`/build-check`, `/self-maintain`) are self-contained templates that run a specific, bounded sequence of actions.
 - **Commands use `agent: autonomous-engineer`** so slash commands launch the right agent automatically.
 
@@ -228,16 +228,16 @@ forgot-password only.
 
 ### Context
 
-The project uses Flyway with `baseline-on-migrate: true` and an additive-only migration rule (ADR-002). Before the first deployment, the initial schema may need to be corrected — adding columns, constraints, or tables that were missing from V1. The question is whether to fix these issues by editing V1 or by writing a new migration.
+The project uses Flyway with `baseline-on-migrate: true` and an additive-only migration rule (ADR-002). Before the first deployment, the initial schema may need to be corrected â€” adding columns, constraints, or tables that were missing from V1. The question is whether to fix these issues by editing V1 or by writing a new migration.
 
 ### Decision
 
-Migrations are rewritten before the first deployment. The additive-only migration rule (ADR-002) applies from the first deployment onward. Before deployment, V1 through the current version can be replaced entirely. After the first deployment, all migrations are additive — never edit an applied migration.
+Migrations are rewritten before the first deployment. The additive-only migration rule (ADR-002) applies from the first deployment onward. Before deployment, V1 through the current version can be replaced entirely. After the first deployment, all migrations are additive â€” never edit an applied migration.
 
 ### Consequences
 
-- Before deployment: schema corrections are straightforward — replace the migration files and let Flyway apply the corrected schema from scratch.
-- After deployment: corrections must be additive — new V[n+1]__ migrations that fix issues introduced by earlier files. Editing applied migrations is forbidden.
+- Before deployment: schema corrections are straightforward â€” replace the migration files and let Flyway apply the corrected schema from scratch.
+- After deployment: corrections must be additive â€” new V[n+1]__ migrations that fix issues introduced by earlier files. Editing applied migrations is forbidden.
 - Flyway `validate-on-migrate: true` ensures schema drift is caught immediately if the migration files and database state diverge.
 
 ---
@@ -254,7 +254,7 @@ Migrations are rewritten before the first deployment. The additive-only migratio
 ### Decision
 
 - Provide a `Clock` bean (`Clock.systemUTC()`) via `ClockConfig`, injected into `JwtService`, `RefreshTokenService`, `GlobalExceptionHandler`, and used in `JwtAuthenticationFilter` for request timestamps.
-- `JwtServiceTest` uses `Clock.systemUTC()` directly (not a fixed clock) because the `jjwt` `parseClaimsJws` validates token expiry against the real system clock — a fixed clock in the past would cause `ExpiredJwtException` on parsing.
+- `JwtServiceTest` uses `Clock.systemUTC()` directly (not a fixed clock) because the `jjwt` `parseClaimsJws` validates token expiry against the real system clock â€” a fixed clock in the past would cause `ExpiredJwtException` on parsing.
 - `RefreshTokenServiceTest` uses `@Mock Clock` with `FIXED_TIME` so that token expiry dates in test data align with the mocked clock's `LocalDateTime.now(clock)`.
 - - `TestClockConfig` (`@TestConfiguration` with `Clock.fixed(Instant.parse("2025-01-15T10:00:00Z"), UTC)`) is `@Import`-ed by `@WebMvcTest` classes, providing a deterministic fixed-clock `Clock` bean for `GlobalExceptionHandler` timestamps.
 
@@ -262,7 +262,7 @@ Migrations are rewritten before the first deployment. The additive-only migratio
 
 - All time-dependent logic is injectable and testable.
 - `GlobalExceptionHandler` injects `Clock` (resolved via `@MockBean` in `@WebMvcTest` contexts).
-- `ErrorResponse` and `BusinessException` carry an `ErrorCode` enum value rather than a raw HTTP status, allowing the exception handler to map `ErrorCode` → `HttpStatus` centrally.
+- `ErrorResponse` and `BusinessException` carry an `ErrorCode` enum value rather than a raw HTTP status, allowing the exception handler to map `ErrorCode` â†’ `HttpStatus` centrally.
 - `ErrorResponse.errorCode` serialised as JSON `code` via `@JsonProperty("code")` so error bodies expose a `code` field consistently across the entry point, access-denied handler, and exception handler.
 
 ---
@@ -282,7 +282,7 @@ vendor-profile tests, and the seeded role data.
 
 Renaming the role would require a data migration over `users.role_id`, plus coordinated
 changes to the security config, every role-boundary test, and the role assertions in the
-frontend auth store — all to reach the same behaviour under a different string.
+frontend auth store â€” all to reach the same behaviour under a different string.
 
 ### Decision
 
@@ -312,7 +312,7 @@ role *constant* differs from the plan's wording. No rename migration is written.
 Phase 2b created `vendor_profiles` and `vendor_hours` without range constraints, deferring
 the invariant rules to Phase 2c. Those invariants (positive prep time, non-negative money,
 chronological opening hours) must hold for any writer, not just HTTP callers going through
-`VendorService` — scheduled jobs, admin tooling, and direct data fixes all write to these
+`VendorService` â€” scheduled jobs, admin tooling, and direct data fixes all write to these
 tables.
 
 ### Decision
@@ -335,7 +335,7 @@ of a constraint name.
 - MySQL reports a CHECK violation as SQL error 3819, which Hibernate surfaces as
   `JpaSystemException`, **not** `DataIntegrityViolationException`. Tests that assert on these
   constraints must assert the constraint name from the failure chain rather than assuming the
-  Spring translation — `VendorApiIntegrationTest.assertCheckViolation` is the reference
+  Spring translation â€” `VendorApiIntegrationTest.assertCheckViolation` is the reference
   helper.
 - Because constraints fire at the database, tests that deliberately violate one must supply
   otherwise-valid row data, or the constraint under test may not be the one that fires first.
@@ -354,7 +354,7 @@ of a constraint name.
 | 003 | Three-Layer Backend Architecture | Decision | Accepted | Phase 0 |
 | D-8 | Registration duplicate-email behaviour | Decision | Accepted | Phase 1 |
 | D-9 | Migrations rewritten before first deployment | Decision | Accepted | Phase 1 |
-| D-4 | No GPS � locations are chosen from a seeded area table | Decision | Accepted | Phase 2a |
+| D-4 | No GPS — locations are chosen from a seeded area table | Decision | Accepted | Phase 2a |
 | D-6 | A suspended vendor is hidden from discovery immediately, but in-flight orders continue | Decision | Accepted | Phase 2c |
 | D-10 | Injectable Clock for testable time | Decision | Accepted | Phase 0 (Finalize) |
 | D-11 | Vendor role stays `FLORIST` (no `VENDOR` rename) | Decision | Accepted | Phase 2c |
@@ -379,7 +379,7 @@ of a constraint name.
 | D-35 | Full-page cart route accepted over slide-out drawer for multi-vendor layout | Decision | Accepted | Phase 5 (task 5.6) |
 | D-36 | The customer catalogue's product detail is an overlay over its parent surface, and standalone on direct entry | Decision | Accepted | Phase 4 (task 4.9) |
 | D-37 | The overlay is distinguished by explicit navigation state and a per-page-load token | Decision | Accepted | Phase 4 (task 4.9), implemented |
-| D-38 | Location-gated catalogue surfaces versus the storefront's non-blocking area advisory | Decision | Accepted | Phase 4 (tasks 4.6�4.9) |
+| D-38 | Location-gated catalogue surfaces versus the storefront's non-blocking area advisory | Decision | Accepted | Phase 4 (tasks 4.6–4.9) |
 | D-39 | Customer price bounds are two labelled number inputs, not a range slider | Decision | Accepted | Phase 4 (task 4.7) |
 | D-40 | An anonymous add-to-cart redirects to login and does not persist a pending add | Decision | Accepted | Phase 4 (task 4.9) |
 | D-41 | The customer cart is fetched only for a customer, and a 401 without a session does not trigger a refresh | Decision | Accepted | Phase 5 (task 5.T, defect D-1) |
@@ -396,7 +396,7 @@ discovery, and that a suspended vendor is hidden immediately while in-flight ord
 
 Two constraints pull in opposite directions. Role-based authorization is already configured at the
 URL namespace level: `SecurityConfig` maps `/api/v1/vendors/**` to `hasRole("FLORIST")`. A
-`PENDING_APPROVAL` vendor holds that role — the role is granted at registration, before approval —
+`PENDING_APPROVAL` vendor holds that role â€” the role is granted at registration, before approval â€”
 so the namespace rule cannot express "approved". Widening it instead (e.g. a rule that covers only
 some vendor sub-paths) would also lock a pending vendor out of `GET|PUT /api/v1/vendors/profile`,
 which they must be able to use to see why they are not approved and to fix their application.
@@ -467,7 +467,7 @@ user's status. A self-targeting call is the one where a mistake is unrecoverable
 because the acting admin revokes the very credential it is authenticated with and then no admin
 route remains reachable for that account.
 
-Second: should reactivating a user (`SUSPENDED` → `ACTIVE`) revoke refresh tokens too? Revoking on
+Second: should reactivating a user (`SUSPENDED` â†’ `ACTIVE`) revoke refresh tokens too? Revoking on
 every transition is uniform and simple; exempting reactivations keeps a legitimate user logged in.
 The plan requires revocation for `SUSPENDED` and `DISABLED` and is silent on reactivation.
 
@@ -475,7 +475,7 @@ The plan requires revocation for `SUSPENDED` and `DISABLED` and is silent on rea
 
 - **Self-targeting is refused** with `403 FORBIDDEN`. The target id is compared against the JWT
   subject, so the rule holds for every admin, not just the seeded one. Targeting *another* admin is
-  allowed — with one admin account there is no recovery path, but locking that out would make the
+  allowed â€” with one admin account there is no recovery path, but locking that out would make the
   platform unadministrable, and a second admin is created by `AdminBootstrap` or an existing
   registration, not by self-modification.
 - **Every** status change revokes all active refresh tokens for the target, reactivation included.
@@ -546,7 +546,7 @@ without ids, so the profile page can display the stored area but cannot offer a 
   on the same browser cannot see the previous one's profile.
 - **`VENDOR_NOT_APPROVED` (403) is a state, not an error.** The vendor's own profile stays reachable
   while a profile is pending, so the pages render the approval banner and still allow editing the
-  application — the same reasoning as D-13, applied to the client.
+  application â€” the same reasoning as D-13, applied to the client.
 
 ### Consequences
 
@@ -574,7 +574,7 @@ different rules, and the plan does not say which rule the frontend should encode
 
 `VendorAdminService` (task 2.6) enforces a strict transition table through `requireStatus`:
 `PENDING_APPROVAL -> APPROVED | REJECTED`, `APPROVED -> SUSPENDED`, `SUSPENDED -> APPROVED`.
-Anything else is a 409. `UserStatusService` (task 2.8) enforces **no** transition matrix at all �
+Anything else is a 409. `UserStatusService` (task 2.8) enforces **no** transition matrix at all —
 `ACTIVE`, `SUSPENDED` and `DISABLED` are mutually reachable in both directions, and the only rule
 is that an admin may not change their own account (403, D-14). So neither "one generic status
 picker" nor "one shared transition table" is correct for both screens.
@@ -618,7 +618,7 @@ of the filter that is on screen or onto a different page.
 
 ---
 
-## D-4: No GPS � locations are chosen from a seeded area table
+## D-4: No GPS — locations are chosen from a seeded area table
 
 **Status:** Accepted
 **Date:** Phase 2a (Task 2.1)
@@ -626,7 +626,7 @@ of the filter that is on screen or onto a different page.
 ### Context
 
 Customers and vendors both need a location: for delivery address, for delivery radius, and for
-geo discovery. The plan's recommended default is **no browser Geolocation API and no GPS** �
+geo discovery. The plan's recommended default is **no browser Geolocation API and no GPS** —
 a caller picks city / area / pincode from a seeded `service_locations` table for the demo region,
 and the coordinates are that area's centroid. This had to be settled before task 2.1, because
 vendor registration, vendor addresses and discovery all read coordinates from the same place.
@@ -640,7 +640,7 @@ within my delivery radius" ambiguous at the boundary.
 
 - `service_locations` is the **only** source of coordinates in the system. It is seeded by the
   `V4__service_locations.sql` Flyway migration (Bengaluru demo region, 8 areas) and is read-only
-  from the application's point of view � there is no admin CRUD over it in v1.
+  from the application's point of view — there is no admin CRUD over it in v1.
 - No `Geolocation` API call and no geocoding anywhere in the frontend or backend. The browser
   never learns a device position.
 - One row per area, unique on `(city, area)`, with a single centroid for `latitude`/`longitude`.
@@ -682,7 +682,7 @@ second is an explicit promise *not* to hard-stop anything already in progress.
 
 "Suspension" covers two different situations. A vendor suspended for a conduct problem (fraud,
 abuse) should arguably lose access to everything at once. A vendor suspended for an operational
-reason � stock exhausted, a seasonal pause, a pending verification � would strand paying customers
+reason — stock exhausted, a seasonal pause, a pending verification — would strand paying customers
 whose flowers are already arranged if the suspension also killed their order reads and delivery
 tracking. Phase 2 has no way to tell those apart, and the plan does not define a suspension reason
 taxonomy, so a single rule has to cover both.
@@ -699,7 +699,7 @@ list of what a non-approved vendor loses, so an unlisted route is not accidental
 | Order creation | Refused | New work must stop now |
 | Existing order **reads** for that vendor | Allowed | D-6: in-flight orders continue to completion |
 | Delivery tracking / order status updates | Allowed | D-6: an order cannot complete if the vendor cannot see or advance it |
-| The vendor's own `GET\|PUT /api/v1/vendors/profile` | Allowed | See D-13 � the vendor must still be able to read and fix their application |
+| The vendor's own `GET\|PUT /api/v1/vendors/profile` | Allowed | See D-13 — the vendor must still be able to read and fix their application |
 
 In code this is `VendorApprovalGuard` behind `@RequiresApprovedVendor` (D-13), which is a
 per-handler annotation rather than a URL-namespace rule. No Phase 2 route carries it yet, because
@@ -708,7 +708,7 @@ against a test-probe controller under the real `/api/v1/vendors/**` namespace so
 already verified for the Phase 3+ routes that will attach it.
 
 Discovery filtering is `VendorProfileSpecifications.approved()`, a Criteria predicate every
-discovery query must compose � it is not enforced by the guard, because discovery is a read over
+discovery query must compose — it is not enforced by the guard, because discovery is a read over
 many vendors rather than a request from one.
 
 ### Consequences
@@ -741,23 +741,23 @@ many vendors rather than a request from one.
 Plan task 3.1 introduces the `categories` table: a small hierarchical lookup (Roses, Bouquets, Arrangements, Occasions) that is admin-managed CRUD; vendors read and assign products to categories. The read endpoint must be accessible to both vendors (for product assignment) and customers (for browsing/filtering in the future storefront).
 
 Two patterns existed in the codebase:
-- `GET /api/v1/locations` is `permitAll()` � public reference data
-- `GET /api/v1/vendors/profile` requires `FLORIST` role � vendor-private data
+- `GET /api/v1/locations` is `permitAll()` — public reference data
+- `GET /api/v1/vendors/profile` requires `FLORIST` role — vendor-private data
 
 Categories are reference data like locations, not private data like vendor profiles. Making them public aligns with the future storefront (Phase 4.5) where customers browse by category.
 
 ### Decision
 
-- `GET /api/v1/categories` is `permitAll()` � public read access, mirroring `/api/v1/locations`
+- `GET /api/v1/categories` is `permitAll()` — public read access, mirroring `/api/v1/locations`
 - `GET /api/v1/admin/categories` and all mutations (`POST`, `PUT`, `DELETE`) require `ROLE_ADMIN` via the existing `/api/v1/admin/**` rule in `SecurityConfig`
 - The public endpoint returns the **active top-level** categories (`parent_id IS NULL AND active = true`), ordered by `display_order` then `id`, each row carrying `id`, `name`, `slug`, `parentId`, `displayOrder`. Top-level rows have a null parent, and the parent fields stay on the DTO so a client that is later served a child row can place it.
 - The active predicate lives in one repository method, `findByParentIdIsNullAndActiveTrueOrderByDisplayOrderAscIdAsc`, so there is no unfiltered roots-only query to reach for by mistake. The Phase 3 audit found the public read going through an unfiltered roots query while this decision promised active-only; that method no longer exists.
-- The admin listing returns **every** category � roots and children, active and inactive � paginated by `name` then `id`. An absent `parentId` means the whole table, not the roots; a supplied `parentId` means the direct children of that parent. `totalElements`/`totalPages` therefore describe every row an admin manages. The Phase 3 audit found this branch calling a roots-only paged query, which hid admin-created children from ordinary pagination and understated both counts.
+- The admin listing returns **every** category — roots and children, active and inactive — paginated by `name` then `id`. An absent `parentId` means the whole table, not the roots; a supplied `parentId` means the direct children of that parent. `totalElements`/`totalPages` therefore describe every row an admin manages. The Phase 3 audit found this branch calling a roots-only paged query, which hid admin-created children from ordinary pagination and understated both counts.
 
 ### Consequences
 
 - The public read endpoint only returns `active = true` categories; inactive categories are hidden. An inactive parent is not published merely because a child is active
-- Only top-level categories reach the public endpoint, so the storefront category chips (plan 4.7) and the vendor product form's category picker are one level deep � see known issue #025
+- Only top-level categories reach the public endpoint, so the storefront category chips (plan 4.7) and the vendor product form's category picker are one level deep — see known issue #025
 - Admin listing (`/api/v1/admin/categories`) returns all categories (active and inactive) with pagination, including children
 - Future storefront browsing can call the public endpoint without authentication
 - The public read is unpaged by design (it is a small reference list); the admin listing is paged. Both return the same `CategoryPageResponse` envelope
@@ -782,7 +782,7 @@ The `active` boolean flag already exists for soft hiding. Hard delete with child
 - `DELETE /api/v1/admin/categories/{id}` performs a **hard delete** (row removed)
 - If the category has children (`countByParentId > 0`), the delete is refused with 409 CONFLICT
 - To remove a branch, the admin must first delete/reparent all children, or use `PUT` to set `active = false` for a soft hide
-- A category a product still references is **not** guarded by a service check. `fk_products_category` (V8) is the backstop and refuses the delete, but the refusal arrives as a SQL constraint violation rather than a mapped 409 � see known issue #026. The promised "409 for products referencing the category" check was never written, and the Phase 3 audit recorded that as an open gap rather than a settled rule.
+- A category a product still references is **not** guarded by a service check. `fk_products_category` (V8) is the backstop and refuses the delete, but the refusal arrives as a SQL constraint violation rather than a mapped 409 — see known issue #026. The promised "409 for products referencing the category" check was never written, and the Phase 3 audit recorded that as an open gap rather than a settled rule.
 
 ### Consequences
 
@@ -805,13 +805,13 @@ Categories need a unique, URL-friendly identifier (`slug`). The admin should not
 
 - The `slug` field is **not** accepted from the client; it is generated by `CategoryService` from the `name`
 - Generation: lowercase, non-alphanumeric collapsed to single hyphen, trimmed (e.g., "Hybrid Tea" ? "hybrid-tea")
-- If the slug already exists, a numeric suffix `-2`, `-3`� is appended until unique (e.g., "roses" ? "roses-2")
+- If the slug already exists, a numeric suffix `-2`, `-3`… is appended until unique (e.g., "roses" ? "roses-2")
 - The unique constraint on `slug` in the database backs this rule
 - Admin can override by updating the name, which regenerates the slug
 
 ### Consequences
 
-- The request DTO (`CategoryRequest`) has no `slug` field � the service owns it entirely
+- The request DTO (`CategoryRequest`) has no `slug` field — the service owns it entirely
 - Slug collision handling is deterministic and testable
 - The slug is stable unless the admin changes the category name
 
@@ -820,16 +820,16 @@ Categories need a unique, URL-friendly identifier (`slug`). The admin should not
 ## D-20: Enum-typed columns are native MySQL ENUM
 
 **Status:** Accepted
-**Date:** Phase 3b (Tasks 3.2�3.4)
+**Date:** Phase 3b (Tasks 3.2–3.4)
 
 ### Context
 
-Tasks 3.2�3.4 add two enum-typed fields: `products.status`
+Tasks 3.2–3.4 add two enum-typed fields: `products.status`
 (`DRAFT`/`ACTIVE`/`INACTIVE`/`ARCHIVED`) and
 `stock_movements.movement_type` (the nine movement types of
 plan section 6.2). Both are mapped in the entities with
 `@Enumerated(EnumType.STRING)`. The obvious migration column
-type is `VARCHAR(32)` with a `CHECK ... IN (...)` constraint �
+type is `VARCHAR(32)` with a `CHECK ... IN (...)` constraint —
 the pattern used for `movement_type` in the first draft of
 V11. That draft failed Hibernate schema validation at startup:
 
@@ -853,8 +853,8 @@ columns whose values mirror the Java enum constants exactly
 already established by `V1__baseline.sql` (`users.status`)
 and `V5__vendor_profiles.sql` (`vendor_profiles.status`),
 which is why those pass validation. A separate `CHECK ... IN
-(...)` constraint on an ENUM column is redundant � the type
-system itself rejects unknown values � so none is written.
+(...)` constraint on an ENUM column is redundant — the type
+system itself rejects unknown values — so none is written.
 
 ### Consequences
 
@@ -865,7 +865,7 @@ system itself rejects unknown values � so none is written.
 - ENUM comparison in MySQL is case-insensitive, so `'draft'`
   and `'DRAFT'` are equivalent on write
 - Adding a new enum constant requires a new additive migration
-  (`ALTER TABLE ... MODIFY COLUMN ... ENUM(...)`) � ENUM value
+  (`ALTER TABLE ... MODIFY COLUMN ... ENUM(...)`) — ENUM value
   lists are part of the column definition
 - The `stock_movements` vocabulary is enforced by the ENUM
   column; the draft V11 CHECK constraint was dropped
@@ -883,7 +883,7 @@ Task 3.2 requires exactly one primary image per product, and
 the plan asks for a database-level guarantee "if
 MySQL-compatible, otherwise a documented service-level
 invariant". The natural MySQL encoding is a unique key on
-`(product_id, is_primary)` filtered to primary rows � but
+`(product_id, is_primary)` filtered to primary rows — but
 MySQL has no partial/filtered unique indexes. The usual
 workaround is a generated column
 (`is_primary_flag INT GENERATED ALWAYS AS (IF(is_primary, 1, NULL))`)
@@ -895,7 +895,7 @@ generated column depends on `is_primary`, and the table also
 needs `FOREIGN KEY (product_id) REFERENCES products (id)`.
 MySQL rejects any foreign key on a column that a generated
 column depends on (error 1215 "Cannot add foreign key
-constraint" � the FK's referenced/dependent column set
+constraint" — the FK's referenced/dependent column set
 conflicts with the generated-column dependency), so the
 generated-column trick cannot coexist with the required
 `product_id` FK. This was verified against a live MySQL 8
@@ -905,7 +905,7 @@ container before abandoning the approach.
 
 The one-primary-image rule is a **service-level invariant**,
 enforced transactionally when image upload lands (plan task
-3.8, out of scope for 3.2�3.4): within one transaction,
+3.8, out of scope for 3.2–3.4): within one transaction,
 setting an image primary clears the previous primary for the
 same product, and the write is refused if a primary already
 exists. The read side is already in place:
@@ -917,7 +917,7 @@ a plain `BIT(1)` column with no unique constraint.
 
 This follows the precedent of D-12 (invariants enforced in
 both service and database where the database can express
-them) � here the database cannot express the rule, so the
+them) — here the database cannot express the rule, so the
 service is the sole enforcement point, documented here.
 
 ### Consequences
@@ -981,7 +981,7 @@ would either block a vendor correcting their own mistake or refuse to let them r
   makes it enforceable.
 - **`base_price` must be greater than zero**, asserted both by `ProductRequest`'s
   `@DecimalMin(inclusive = false)` (so the client gets a field-level 400) and by a service check
-  (so a non-HTTP writer cannot store a zero) � the two-layer rule of D-12.
+  (so a non-HTTP writer cannot store a zero) — the two-layer rule of D-12.
 
 ### Consequences
 
@@ -1017,13 +1017,13 @@ WHERE p.vendor.id = :vendorId
 ```
 
 When Hibernate compiles `:status IS NULL`, the parameter appears on **both** sides of the comparison
-� one side against an enum column, the other against a literal `null`. Type inference then has to
+— one side against an enum column, the other against a literal `null`. Type inference then has to
 come from somewhere, and with no attribute on the null side it resolves from the other one or fails
 outright. `status` is a native MySQL `ENUM` (D-20), which makes this worse, not better: the dialect
 expects an ENUM-typed parameter and a mis-inferred one surfaces as a Hibernate type error rather
 than a useful message.
 
-A derived query method cannot express "absent" at all � Spring Data binds a null argument to
+A derived query method cannot express "absent" at all — Spring Data binds a null argument to
 `IS NULL`, which for a filter means "match nothing", the opposite of what an omitted filter should
 do. And one derived method per combination would be 2^3 methods to keep in step.
 
@@ -1033,8 +1033,8 @@ Filters are Criteria predicates in `com.flowerconnect.catalog.specification.Prod
 composed onto one mandatory fragment, following the `VendorProfileSpecifications` and
 `UserSpecifications` precedent already in the codebase:
 
-- `forVendor(vendorId)` � mandatory, passed first, never optional.
-- `withStatus`, `inCategory`, `nameContains` � appended with `Specification#and` only when the caller
+- `forVendor(vendorId)` — mandatory, passed first, never optional.
+- `withStatus`, `inCategory`, `nameContains` — appended with `Specification#and` only when the caller
   supplied that filter, so an absent filter contributes no predicate at all.
 - `nameContains` returns `builder.conjunction()` for a null or blank term, so the predicate is total
   and callers may pass the raw query-string value through unchanged.
@@ -1067,7 +1067,7 @@ keeps pagination stable for rows written in the same instant.
 
 Plan section 6.2 prescribes the lock: "pessimistic lock (`SELECT ... FOR UPDATE`) on inventory rows
 **ordered by product id** to avoid deadlocks, for every operation above". Task 3.6 is the first phase
-that actually writes stock, so the discipline is established here rather than inherited � and the
+that actually writes stock, so the discipline is established here rather than inherited — and the
 instruction "unless the existing architecture strongly favors another strategy" asks whether it does.
 It does not: this project has no cache in front of the database (Redis was removed in stage 6, plan
 v2.2) and no eventual-consistency story, so a read-modify-write against a plain `SELECT` is the only
@@ -1140,13 +1140,13 @@ invented here; there is nothing in this phase for it to order.
 - `InventoryService` must be reached through the Spring proxy for the lock to be real: a
   self-invocation inside the class would run outside the transaction and the lock would be held by
   nothing. The service is a single bean with no internal call from a `REQUIRES_NEW` path, so this is
-  currently safe by construction � a future refactor that calls a `@Transactional` method on `this`
+  currently safe by construction — a future refactor that calls a `@Transactional` method on `this`
   would silently break the guarantee.
-- The lock is verified by `InventoryConcurrencyIntegrationTest`, which runs 6�8 real threads against
+- The lock is verified by `InventoryConcurrencyIntegrationTest`, which runs 6–8 real threads against
   one product and asserts only end state: the final quantity equals the sum of the deltas, the
   movement count equals the number of changes, and with one unit of stock and eight contenders exactly
   one thread succeeds while the other seven receive `INSUFFICIENT_STOCK`. A sequential test cannot
-  demonstrate any of this � run one after another, every call sees the previous one's committed level
+  demonstrate any of this — run one after another, every call sees the previous one's committed level
   and the lock's absence is invisible.
 - `reserved_quantity` has no route in this phase (`RESERVE` movements arrive with checkout in Phase 5),
   so the 409 floor is set up in the integration tests by updating the column directly. Without
@@ -1182,7 +1182,7 @@ constraint relaxed.
 **Which products get delisted.** `products.status` has four values (D-22) and no transition
 table; `ProductService.deactivate` already exists as the vendor-facing `ACTIVE ? INACTIVE`
 path, and it resolves a vendor from a JWT subject and is reachable only by an authenticated
-caller � neither of which a scheduled job has.
+caller — neither of which a scheduled job has.
 
 **How a repeated run behaves.** `@Scheduled` runs unattended and repeatedly. A sweep that
 selects "every row whose expiry date has passed" re-selects rows it already processed,
@@ -1203,7 +1203,7 @@ per run. The movement log is append-only and is the audit trail of how a level g
   `reserved_quantity <= quantity` invariant and invalidate pending orders the moment they
   were placed. The consequences for an order are already designed for: section 6.2 has the
   vendor's accept re-check the level, and a shortfall is a 409 that the vendor answers by
-  rejecting. A write-off that leaves nothing available writes no movement at all � a `WASTE`
+  rejecting. A write-off that leaves nothing available writes no movement at all — a `WASTE`
   row with a zero delta would be a movement recording no change, which the vendor's own
   `ADJUSTMENT` path refuses to write.
 - **Delisting is an exclusive transition: `ACTIVE ? INACTIVE`, and nothing else.** A `DRAFT`,
@@ -1220,9 +1220,9 @@ per run. The movement log is append-only and is the audit trail of how a level g
 - **Idempotency comes from the candidate predicate, not from a marker.** Rows are selected
   where the expiry date has passed **and** something still has to change:
   `expiryDate IS NOT NULL AND expiryDate < :today AND (quantity > reservedQuantity OR
-  product.status = :activeStatus)`. Processing a row makes it stop matching � the write-off
+  product.status = :activeStatus)`. Processing a row makes it stop matching — the write-off
   drops `quantity` to `reservedQuantity` and the delist moves the product off `ACTIVE`, and
-  neither is reversible by the sweep � so the next run has nothing to redo. This is why the
+  neither is reversible by the sweep — so the next run has nothing to redo. This is why the
   query joins `products` and compares an enum column: an alternative that selected expired
   rows alone would need a separate "already processed" flag, which is state the sweep would
   have to maintain forever.
@@ -1247,13 +1247,13 @@ per run. The movement log is append-only and is the audit trail of how a level g
   against MySQL so it cannot drift.
 - The sweep never touches reserved units, so an expired product with a pending order shows
   `quantity = reservedQuantity` and `available = 0`. That product is delisted, and its
-  in-flight order continues to the accept/reject decision section 6.2 describes � the same
+  in-flight order continues to the accept/reject decision section 6.2 describes — the same
   split D-6 draws for a suspended vendor.
 - A single failed row fails the whole sweep's transaction and the next run retries it,
   because the predicate is unchanged. Per-row error isolation was not built: with one row per
   failure per run the sweep converges on its own, and swallowing an exception would hide a
   database-level problem in a job nobody watches.
-- Nothing about the sweep is observable over HTTP � no endpoint reports "last swept at" or
+- Nothing about the sweep is observable over HTTP — no endpoint reports "last swept at" or
   "N products expired". Until one exists, an operator's only signal is the log line. A
   metrics endpoint is a reasonable follow-on, not an omission.
 - The test profile disables the schedule (`app.expiry-sweep-cron: "-"`, Spring's
@@ -1289,8 +1289,8 @@ deploy error.
 
 ### Decision
 
-- **`StorageService` knows nothing about images.** It is a flat key/value store �
-  `store`, `delete`, `exists`, `describe` � so product images today and any other binary asset later
+- **`StorageService` knows nothing about images.** It is a flat key/value store —
+  `store`, `delete`, `exists`, `describe` — so product images today and any other binary asset later
   share one abstraction, and swapping the backend changes no call site in the domain layer.
 - **The key contract belongs to the interface, not to one implementation.** A key is always
   server-generated, `/`-separated and relative, and must resolve inside the backend's root. No
@@ -1302,8 +1302,8 @@ deploy error.
   disk because an environment variable was wrong; a profile is already the mechanism this project
   uses for dev/prod differences and is set at deploy time.
 - **The S3 backend is a declared stub that throws on every method.** It replaces the local bean
-  correctly when the profile is active � so the switch is real and every other call site keeps
-  working � but `store`/`delete`/`exists`/`describe` each raise `StorageException` with a message
+  correctly when the profile is active — so the switch is real and every other call site keeps
+  working — but `store`/`delete`/`exists`/`describe` each raise `StorageException` with a message
   naming exactly what is missing. Completing it is self-contained: add the SDK v2 S3 dependency, hold
   an `S3Client` bean, implement the four methods against `putObject`/`getObject`/`deleteObject`/
   `headObject`, and add the bucket/region/prefix/credentials properties the stub documents.
@@ -1311,7 +1311,7 @@ deploy error.
   `<name>.part` sibling and moves it into place with `ATOMIC_MOVE`, so a reader never observes a
   half-written object and a crash mid-write leaves a `.part` file rather than a truncated image the
   catalog believes is intact. `resolve` rejects a blank key, a backslash, an absolute or `~`-rooted
-  path, and anything that normalises outside the root � four checks because they fail differently,
+  path, and anything that normalises outside the root — four checks because they fail differently,
   and the last one is the check that actually catches `../`.
 - **The root is created at startup** (`@PostConstruct`), so a misconfigured or read-only path fails
   on boot rather than on a vendor's first upload.
@@ -1323,7 +1323,7 @@ deploy error.
 ### Consequences
 
 - Two of the two backends work in this build. Production runs local disk, and
-  `application-prod.yml` documents that the directory does not survive a redeploy � a volume must be
+  `application-prod.yml` documents that the directory does not survive a redeploy — a volume must be
   mounted before real uploads are stored there.
 - Activating `s3` in this build fails loudly on the first upload with a 500 naming the gap, instead
   of silently storing nothing. `S3StorageServiceTest` asserts every method throws.
@@ -1331,7 +1331,7 @@ deploy error.
   rejection case against a real temporary directory, and `ProductImageIntegrationTest` covers the
   upload/delete path end to end through HTTP.
 - Storage tests touch the filesystem under `backend/target/`, never the configured `uploads`
-  directory � the test profile points `app.storage.local-directory` at `target/test-uploads/...`.
+  directory — the test profile points `app.storage.local-directory` at `target/test-uploads/...`.
 - A future backend (S3, CloudFront+CDN, anything) implements four methods and touches nothing else.
 
 ---
@@ -1349,7 +1349,7 @@ says whether the bytes are *stored* or *transformed*, and the plan's word "compr
 "resize" as if both were optional tidy-ups.
 
 The gap between validating and trusting is where image uploads go wrong. Magic-byte sniffing alone
-accepts a polyglot � a file with a valid PNG header and a hostile payload. Decoding alone lets the
+accepts a polyglot — a file with a valid PNG header and a hostile payload. Decoding alone lets the
 JDK's pluggable `ImageIO` readers decide what is acceptable, including formats (BMP, TIFF, GIF, PDF-
 rendered-to-bitmap) that have no business in a product catalog. And whatever passes is then stored
 verbatim, re-serving whatever metadata the original carried: EXIF GPS coordinates, camera serials,
@@ -1362,7 +1362,7 @@ stored size, the stored dimensions and the declared `mime_type` can each disagre
 and every consumer of the object has to re-derive that for itself.
 
 The WebP requirement adds a codec problem. `ImageIO` reads JPEG and PNG natively but ships no WebP
-reader, so a WebP upload cannot be decoded at all without a plugin � and an upload pipeline that
+reader, so a WebP upload cannot be decoded at all without a plugin — and an upload pipeline that
 cannot decode a format the plan requires to accept is not validating anything.
 
 ### Decision
@@ -1381,7 +1381,7 @@ cannot decode a format the plan requires to accept is not validating anything.
   dimensions and the stored `mime_type` are all the pipeline's own output.
 - **The pixel ceiling is checked from the header, before the pixels exist.** `max-pixels`
   (40,000,000) is read from `reader.getWidth/getHeight` before `reader.read(0)`, because a few
-  kilobytes can claim 20000�20000 and cost 1.6 GB to decode. The file-size limit is not a memory
+  kilobytes can claim 20000×20000 and cost 1.6 GB to decode. The file-size limit is not a memory
   limit; this is the decompression-bomb bound, and it is rejected with `413` rather than scaled,
   because an image that large is never legitimate.
 - **Largest-edge images are scaled down; smaller ones are not upscaled.** `max-dimension` (1600)
@@ -1397,7 +1397,7 @@ cannot decode a format the plan requires to accept is not validating anything.
 - **Limits are configuration, not constants** (`app.image-upload.*`), because each encodes a
   product or operational decision rather than an implementation detail. The container ceiling
   (`spring.servlet.multipart.max-file-size: 5MB`) and the service ceiling
-  (`max-file-size-bytes`) are set to the same value and must be raised together � the container
+  (`max-file-size-bytes`) are set to the same value and must be raised together — the container
   rejects first, before the request reaches the controller, and `GlobalExceptionHandler` overrides
   `handleMaxUploadSizeExceededException` so that refusal carries the same `ErrorResponse` envelope
   and the same `PAYLOAD_TOO_LARGE` code as the service-level one.
@@ -1447,7 +1447,7 @@ T1: COMMIT                            T2: COMMIT
 
 Depending on interleaving the product ends with two primaries, none, or a primary that no longer
 belongs to the row the client just set. The catalog then has two rows claiming to be the cover, and
-the storefront picks one arbitrarily � a state the invariant exists to prevent and which no single
+the storefront picks one arbitrarily — a state the invariant exists to prevent and which no single
 request can detect, because each one's own write succeeded.
 
 Two secondary questions follow from D-21's promise that the service is the sole enforcement point:
@@ -1459,7 +1459,7 @@ the fact or only maintained by construction.
 - **Every write path that can change `is_primary` runs inside one transaction that first takes a
   pessimistic write lock on the product's image rows.**
   `ProductImageRepository.findByProductIdForUpdate` (`@Lock(PESSIMISTIC_WRITE)`,
-  `ORDER BY sortOrder, id`) is the single way the image service reads a set it is about to modify �
+  `ORDER BY sortOrder, id`) is the single way the image service reads a set it is about to modify —
   the same discipline D-24 applies to inventory, including the same ordering rule.
 - **The ownership check comes before the lock.** As in D-24, a lock taken before the ownership check
   would let any authenticated florist stall another vendor's image set for as long as it liked, just
@@ -1474,7 +1474,7 @@ the fact or only maintained by construction.
   constantly. An explicit `primary=true` on a later upload takes the cover; without it the existing
   cover is left alone.
 - **Deleting the cover promotes the next image** in display order rather than leaving the product
-  with images and no cover. Deleting the last image leaves it with none, which is allowed �
+  with images and no cover. Deleting the last image leaves it with none, which is allowed —
   `expected` is computed as `images == 0 ? 0 : 1` rather than being hard-coded to one.
 - **Reorder requires an exact permutation.** `PUT /order` must name every image of the product
   exactly once; a partial list, a repeated id, or an id from another product is a 400. Guessing
@@ -1484,19 +1484,19 @@ the fact or only maintained by construction.
   is resolved from the already-locked set, so the check cannot race.
 - **The invariant is also asserted, not only maintained.** `requireSinglePrimary` re-counts primaries
   and images after each mutation and raises `IllegalStateException` on a violation. It is a
-  post-condition, not the mechanism � the clear-then-set above is what enforces the rule � but it
+  post-condition, not the mechanism — the clear-then-set above is what enforces the rule — but it
   turns a silent corruption into a failed request.
 - **File and row are not atomic, and the asymmetry is deliberate.** Uploads store the object first
   and delete it again if the row cannot be written; deletes remove the row first and treat a failed
   object removal as a logged orphan. Neither direction can leave a visible row pointing at bytes
-  that are not there � which is the failure a storefront user would actually notice.
+  that are not there — which is the failure a storefront user would actually notice.
 
 ### Consequences
 
 - Two concurrent primary changes on one product serialise; changes on *different* products do not,
   because each locks only its own rows. The common case (uploading a catalogue) stays parallel.
 - The lock is verified by `ProductImageIntegrationTest` with real threads released together by a
-  `CountDownLatch`, asserting only end state � exactly the method that `InventoryConcurrencyIntegrationTest`
+  `CountDownLatch`, asserting only end state — exactly the method that `InventoryConcurrencyIntegrationTest`
   uses for D-24. A sequential test cannot observe the absence of a lock: every request would see the
   previous one's committed rows.
 - `requireSinglePrimary` costs two `COUNT` queries per mutation. That is a deliberate price for
@@ -1504,7 +1504,7 @@ the fact or only maintained by construction.
 - The image count limit is enforced under the same lock as the primary rule, so two concurrent
   uploads at the limit cannot both pass the budget check.
 - `ProductImageService` must be reached through the Spring proxy for the lock to be real, exactly as
-  in D-24 � a self-invocation would run outside the transaction and the lock would be held by
+  in D-24 — a self-invocation would run outside the transaction and the lock would be held by
   nothing. There is no internal call today, so this holds by construction.
 - Because the invariant is service-level only, a writer that bypasses `ProductImageService` (a
   scheduled job, admin tooling, a direct data fix) can still leave two primaries. `requireSinglePrimary`
@@ -1522,7 +1522,7 @@ the fact or only maintained by construction.
 
 D-13 put approval enforcement on the backend, per handler, through
 `@RequiresApprovedVendor`. Task 3.9 is the first screen set behind that gate, so it is the first
-time the question of what the *client* should do with the same rule actually arises � and the
+time the question of what the *client* should do with the same rule actually arises — and the
 options are not equivalent.
 
 The naive frontend versions of the rule all have the same defect: they become a second copy of an
@@ -1546,7 +1546,7 @@ second read of data that is one navigation away from being on screen.
   `ApprovedVendorGate.test.tsx` asserts explicitly rather than leaving implicit.
 - **The gate is UX, not authorization, and it says so in its own doc comment.** Authority stays
   exactly where D-13 put it. Approval state is never copied into the JWT and never inferred client-side,
-  so an admin's approval takes effect on the vendor's next request with no re-login � the same
+  so an admin's approval takes effect on the vendor's next request with no re-login — the same
   guarantee the backend gives, and the reason the gate is allowed to exist at all.
 - **A non-approved vendor sees the layout's own banner inside the gate.** It is the same
   `VendorStatusBanner` component reading the same cache entry, not a second banner with its own state,
@@ -1557,7 +1557,7 @@ second read of data that is one navigation away from being on screen.
   left wondering whether it would work. The dashboard's catalog card is gated the same way.
 - **`@RequiresApprovedVendor` is still the review checklist item.** Omitting it from a future vendor
   route fails *open* on the backend; omitting the gate fails only on the client. The gate is therefore
-  a usability layer that may be forgotten without a security consequence � deliberately the asymmetry.
+  a usability layer that may be forgotten without a security consequence — deliberately the asymmetry.
 
 ### Consequences
 
@@ -1568,7 +1568,7 @@ second read of data that is one navigation away from being on screen.
   enabled. `router.test.tsx` asserts `fetchProducts` was never called, which is the difference between
   "an empty table" and "an explanation".
 - If the approval state ever needs to be consulted by a screen outside the vendor area, the shared
-  query is the place to reach for � not a second endpoint.
+  query is the place to reach for — not a second endpoint.
 - The pending-state banner inside the gate duplicates a visible banner for a vendor who arrived at the
   URL directly. That is intentional and is asserted by role/text rather than by count, so the duplicate
   cannot become an unnoticed triple.
@@ -1593,7 +1593,7 @@ second read of data that is one navigation away from being on screen.
 
 The plan asks for "stock in/out/adjustment/write-off dialogs" without saying how many components that
 is. Four separate dialogs duplicate the quantity field, the reason field, the reserved-floor note and
-the error mapping four times over � and the duplication is exactly where the rules drift. A dialog with
+the error mapping four times over — and the duplication is exactly where the rules drift. A dialog with
 a *required* reason on `stock-in` implies the backend stores one; a dialog with an *optional* reason on
 `write-off` offers a way to be refused.
 
@@ -1623,7 +1623,7 @@ empty string, so "no reason given" stays distinguishable from "a reason that hap
   either place meets identical validation, wording and error handling.
 - **Row buttons carry the product in their accessible name** (`Write off stock for Red Rose
   Bouquet`). A column of identically named buttons is unusable with a screen reader, and it also
-  collides with the open dialog's own confirm button of the same label � a collision the test suite
+  collides with the open dialog's own confirm button of the same label — a collision the test suite
   found before it was designed away.
 
 ### Consequences
@@ -1650,12 +1650,12 @@ empty string, so "no reason given" stays distinguishable from "a reason that hap
 ### Context
 
 `ProductImageResponse` carries `storageKey`, `originalFilename`, `mimeType`, `fileSize`, `sortOrder`
-and `primary`. The bytes exist � task 3.8 wrote them through `StorageService` � but the API has no
+and `primary`. The bytes exist — task 3.8 wrote them through `StorageService` — but the API has no
 endpoint that returns an image's content, and `storageKey` is an opaque backend key
 (`product-images/{productId}/{uuid}.{ext}`) that a client cannot construct a URL for.
 
 The obvious frontend rendering is a grid of `<img>` elements. With no delivery route every one of them
-404s, and the vendor sees broken-image icons where their photos should be � which reads as "my upload
+404s, and the vendor sees broken-image icons where their photos should be — which reads as "my upload
 failed" rather than "this build has no image endpoint".
 
 ### Decision
@@ -1667,7 +1667,7 @@ failed" rather than "this build has no image endpoint".
   the 5 MB ceiling, and the gap is recorded in `docs/known-issues.md` as a missing route rather than
   presented as a UI choice.
 - **Everything else about images works normally.** Upload, cover selection, reorder and delete are all
-  exercised, and the reorder sends the full id permutation the endpoint requires (D-28) � the move
+  exercised, and the reorder sends the full id permutation the endpoint requires (D-28) — the move
   buttons recompute the complete order rather than offering a partial list.
 
 ### Consequences
@@ -1679,7 +1679,7 @@ failed" rather than "this build has no image endpoint".
   to manage a catalogue and is not enough to sell from it, which is the honest trade for not shipping
   a 404 on every image.
 - The `ProductImage.storageKey` field stays typed and unread. If a delivery route arrives, the field
-  becomes the only thing the client needs � no contract change.
+  becomes the only thing the client needs — no contract change.
 
 ---
 
@@ -1691,9 +1691,9 @@ failed" rather than "this build has no image endpoint".
 ### Context
 
 Task 4.1's one-default-per-customer rule is a service-level invariant
-(MySQL has no partial unique index � the D-21 finding), so it is only as
-good as the transaction that enforces it. D-24's discipline � resolve and
-check first, take the lock last � was written for the inventory path,
+(MySQL has no partial unique index — the D-21 finding), so it is only as
+good as the transaction that enforces it. D-24's discipline — resolve and
+check first, take the lock last — was written for the inventory path,
 where the locked row is the inventory row and the ownership check reads a
 *different* row (the product). Applied literally to the address book it
 produced a real defect, caught only by the concurrency integration test:
@@ -1705,8 +1705,8 @@ The mechanism is MySQL REPEATABLE READ snapshot semantics. The original
 then issued `SELECT ... FOR UPDATE`. The first *plain* read of a
 transaction establishes its snapshot; the locking read itself reads the
 latest committed data but creates no snapshot. So the later
-`findAllByUserId` � the read that decides whether a default already
-exists � read a snapshot taken *before* the lock was acquired, and could
+`findAllByUserId` — the read that decides whether a default already
+exists — read a snapshot taken *before* the lock was acquired, and could
 not see rows a concurrent transaction had committed in between. Every
 thread's snapshot was taken while the address table was still empty for
 that user, so every thread saw "no addresses exist" and set the flag.
@@ -1717,7 +1717,7 @@ The locking read is the **first** read of the write transaction:
 `UserRepository.findByEmailForUpdate(email)` resolves and locks the
 caller's row in one statement. A locking read establishes no snapshot, so
 the snapshot is created by the first plain read *under the lock* and sees
-everything committed before it � including the previous lock holder's
+everything committed before it — including the previous lock holder's
 address rows. Create, set-default and delete-with-promotion all read the
 address table only after that point.
 
@@ -1741,9 +1741,9 @@ the role, so the lazy proxy is never touched.
   implementation passes. `AddressConcurrencyIntegrationTest` releases 8
   real threads at once (a `CountDownLatch`, the
   `InventoryConcurrencyIntegrationTest` harness) and asserts only end
-  state � exactly one default among the created rows.
+  state — exactly one default among the created rows.
 - Any future default-mutating address method must keep the lock as the
-  first read. A plain read before it � even a "harmless" resolve �
+  first read. A plain read before it — even a "harmless" resolve —
   re-poisons the snapshot.
 - The same trap applies to any future REPEATABLE READ read-modify-write
   that reads *other rows* after locking one row: check whether the first
@@ -1763,7 +1763,7 @@ The address request and response need a "which address is the default"
 flag. The intuitive property name is `isDefault`. For a *primitive*
 `boolean` field with that name, Lombok generates a getter named
 `isDefault()` (it does not double the "is" prefix), and Jackson derives
-the wire name by stripping the "is" prefix from the getter � so the API
+the wire name by stripping the "is" prefix from the getter — so the API
 would silently expose the field as `default`, not `isDefault`. Nothing
 fails at compile time or in a mocked unit test; only a test that asserts
 the wire name at the HTTP boundary catches it. The entity already hit
@@ -1775,7 +1775,7 @@ the JPQL property path and the derived query methods are unambiguous.
 Boolean properties are named after the state (`defaultAddress`), never
 `is` + noun, on any class that carries a primitive boolean. The request
 DTO uses the same name as the entity and the response, so request,
-response and entity share one vocabulary � `defaultAddress` � on the wire
+response and entity share one vocabulary — `defaultAddress` — on the wire
 and in Java.
 
 ### Consequences
@@ -1785,8 +1785,8 @@ and in Java.
   `$.defaultAddress` at the HTTP boundary, so a rename that reintroduces
   it fails as a contract drift rather than surviving silently.
 - Future primitive-boolean DTO fields follow the same rule. (A
-  `Boolean` wrapper named `isDefault` would serialize correctly � the
-  wrapper gets a `getIsDefault()` getter � but two names for one concept
+  `Boolean` wrapper named `isDefault` would serialize correctly — the
+  wrapper gets a `getIsDefault()` getter — but two names for one concept
   across three classes is the trap D-33 exists to close.)
 - The `Address` entity's class javadoc already records the property-
   resolution reasoning; the DTOs cite it.
@@ -1800,11 +1800,11 @@ and in Java.
 
 ### Context
 
-Plan task 4.3 introduces `GET /api/v1/discover`: a public endpoint that returns approved vendors accepting orders within their delivery radius of a given service location. The endpoint requires a `locationId` parameter (referencing a `service_locations` row), and returns paginated vendor cards with computed `distanceKm` and `estimatedDeliveryFee` (base + per-km � distance).
+Plan task 4.3 introduces `GET /api/v1/discover`: a public endpoint that returns approved vendors accepting orders within their delivery radius of a given service location. The endpoint requires a `locationId` parameter (referencing a `service_locations` row), and returns paginated vendor cards with computed `distanceKm` and `estimatedDeliveryFee` (base + per-km × distance).
 
 Two patterns for public data access existed:
-- `GET /api/v1/locations` � `permitAll()` (reference data)
-- `GET /api/v1/categories` � `permitAll()` (reference data, active roots only)
+- `GET /api/v1/locations` — `permitAll()` (reference data)
+- `GET /api/v1/categories` — `permitAll()` (reference data, active roots only)
 
 The discovery endpoint is similar to locations/categories in that it serves reference data for the storefront, but it also computes real-time distances and filters by each vendor's `delivery_radius_km`.
 
@@ -1816,7 +1816,7 @@ The discovery endpoint is similar to locations/categories in that it serves refe
 - **Distance calculation**: Bounding-box prefilter using `idx_vendor_profiles_status_geo` (composite on `status, latitude, longitude`), then exact Haversine distance check against each vendor's `delivery_radius_km`. The bounding box radius is derived from the maximum `delivery_radius_km` among approved vendors.
 - **Sorting**: Results sorted by `distanceKm` ascending, tie-broken by vendor `id`.
 - **Pagination**: Standard `page` (0-based) and `size` (1..100, default 20) parameters. Response uses `PageResponse` envelope with `page`, `size`, `totalElements`, `totalPages`, `first`, `last`, `empty`.
-- **Fee estimation**: `estimatedDeliveryFee = baseDeliveryFee + perKmFee � distanceKm` (rounded to 2 decimals). `freeDeliveryAbove` is included as informational only.
+- **Fee estimation**: `estimatedDeliveryFee = baseDeliveryFee + perKmFee × distanceKm` (rounded to 2 decimals). `freeDeliveryAbove` is included as informational only.
 - **Error handling**: Unknown `locationId` ? 400 `VALIDATION_FAILED` ("Unknown service location"); missing `locationId` ? 400 `VALIDATION_FAILED` via the `MissingServletRequestParameterException` override in `GlobalExceptionHandler` (standard `ErrorResponse` envelope).
 
 ### Consequences
@@ -1825,7 +1825,7 @@ The discovery endpoint is similar to locations/categories in that it serves refe
 - Bounding-box prefilter keeps the Haversine computation bounded even as vendor count grows.
 - The composite index `idx_vendor_profiles_status_geo` serves both the status filter and the bounding box.
 - `freeDeliveryAbove` is informational; the storefront UI decides whether to show "free delivery above X" badges.
-- The discovery query does not consider vendor prep time, slot availability, or max orders per slot � those are order-time concerns.
+- The discovery query does not consider vendor prep time, slot availability, or max orders per slot — those are order-time concerns.
 - If no approved vendors exist, or max radius is null, an empty page is returned immediately without a bounding-box query.
 
 ---
@@ -1837,14 +1837,14 @@ The discovery endpoint is similar to locations/categories in that it serves refe
 The original project plan (`docs/FlowerConnect_Implementation_Plan_v2.2.md`, task 5.6) specified a slide-out cart drawer:
 `| 5.6 | Cart UI | Slide-out drawer grouped by shop, quantity stepper, price breakdown |`
 
-However, the Phase 5 Stage 0 design specification (`docs/phase-5-stage-0-design.md`, §6.2 and lines 522–530) explicitly allowed:
+However, the Phase 5 Stage 0 design specification (`docs/phase-5-stage-0-design.md`, Â§6.2 and lines 522â€“530) explicitly allowed:
 `CartPage.tsx # full-page cart (optional; drawer may suffice)`
 
 In commit `deccca3`, the cart frontend was implemented as a standalone full-page view mounted directly at `/cart` (`src/features/cart/pages/CartPage.tsx`), without introducing a slide-out drawer component (`CartDrawer.tsx`).
 
 ### Rationale
 
-In a hyperlocal multi-vendor marketplace, cart items from different florists have distinct delivery fees, distance constraints, minimum order requirements, and price-drift warnings. In a 360px–420px slide-out drawer, this multi-vendor information density causes vertical crowding and makes per-vendor subtotals and item adjustments difficult to review. A dedicated full-page cart view at `/cart` provides the horizontal and vertical space necessary to cleanly separate vendor sections, display price drift and unpurchasability reasons, and summarize multi-vendor totals before checkout.
+In a hyperlocal multi-vendor marketplace, cart items from different florists have distinct delivery fees, distance constraints, minimum order requirements, and price-drift warnings. In a 360pxâ€“420px slide-out drawer, this multi-vendor information density causes vertical crowding and makes per-vendor subtotals and item adjustments difficult to review. A dedicated full-page cart view at `/cart` provides the horizontal and vertical space necessary to cleanly separate vendor sections, display price drift and unpurchasability reasons, and summarize multi-vendor totals before checkout.
 
 ### Decision
 
@@ -1872,7 +1872,7 @@ In a hyperlocal multi-vendor marketplace, cart items from different florists hav
 
 ### Context
 
-Plan task 4.9 describes a "Product detail modal". A modal that is not a route has no URL, and a product page that cannot be linked, refreshed or reached from a shared message is not a page at all � so the product detail is a **route**, and the overlay is a *presentation of that route* rather than a separate screen.
+Plan task 4.9 describes a "Product detail modal". A modal that is not a route has no URL, and a product page that cannot be linked, refreshed or reached from a shared message is not a page at all — so the product detail is a **route**, and the overlay is a *presentation of that route* rather than a separate screen.
 
 The route has to be nested somewhere. Nesting it under the florist's storefront (`/vendors/{vendorId}/products/{productId}`) is what lets the shop stay on screen behind the product, which is the point of an overlay: the customer sees the product in the context of the shop it belongs to.
 
@@ -1880,14 +1880,14 @@ The route has to be nested somewhere. Nesting it under the florist's storefront 
 
 - The product route is nested under the storefront route.
 - A product reached **from within the app** renders as a panel **over** the storefront, with the shop still behind it and a close control; the storefront's own content is unchanged and remains visible.
-- A product reached **directly** � a typed URL, a pasted link, a shared message � renders on its own, with the storefront not shown.
+- A product reached **directly** — a typed URL, a pasted link, a shared message — renders on its own, with the storefront not shown.
 - The two presentations are mutually exclusive for one URL. There is no state in which the product is both an overlay and alone.
-- Every ineligibility � unknown, inactive, sold out, an unapproved or non-accepting florist, or a florist outside the delivery radius � is the **same** non-disclosing 404, so the overlay never reveals whether a product exists.
+- Every ineligibility — unknown, inactive, sold out, an unapproved or non-accepting florist, or a florist outside the delivery radius — is the **same** non-disclosing 404, so the overlay never reveals whether a product exists.
 
 ### Consequences
 
-- The surface behind the overlay is a **live page**, not a static backdrop: it stays in the DOM and stays keyboard-reachable. The overlay declares `aria-modal="true"`, which on its own implements **neither** focus management nor a focus trap. This is a recorded limitation, deferred rather than fixed � see the 4.9 entry in `docs/progress.md`.
-- D-36 fixes **what** the two presentations are. **How** the frontend chooses between them is a separate question, and the rule that shipped with Gate E is being replaced � see D-37.
+- The surface behind the overlay is a **live page**, not a static backdrop: it stays in the DOM and stays keyboard-reachable. The overlay declares `aria-modal="true"`, which on its own implements **neither** focus management nor a focus trap. This is a recorded limitation, deferred rather than fixed — see the 4.9 entry in `docs/progress.md`.
+- D-36 fixes **what** the two presentations are. **How** the frontend chooses between them is a separate question, and the rule that shipped with Gate E is being replaced — see D-37.
 - The product is reachable from the search results as well as from a storefront. What that means for the search context is part of D-37.
 
 ---
@@ -1895,7 +1895,7 @@ The route has to be nested somewhere. Nesting it under the florist's storefront 
 ## D-37: The overlay is distinguished by explicit navigation state and a per-page-load token
 
 **Status:** Accepted
-**Date:** Phase 4 (task 4.9) � implemented and verified in the Gate E remediation
+**Date:** Phase 4 (task 4.9) — implemented and verified in the Gate E remediation
 
 > **Implemented and verified.** The mechanism below is what shipped; the
 > coverage named under "Verification" is what the automated suite actually
@@ -1906,9 +1906,9 @@ The route has to be nested somewhere. Nesting it under the florist's storefront 
 
 D-36 fixes the two presentations but not the rule that chooses between them. The Gate E implementation inferred the choice from `useNavigationType()` alone: a PUSH renders the overlay, a POP renders the standalone page. Inferring a presentation from a navigation type is fragile in three specific ways.
 
-First, **dismissal and history**. The close control and the Escape key both navigate to the storefront, which **pushes** a history entry. The browser Back button then returns to the product URL with a POP navigation, so the product renders standalone � with no shop behind it and, under that implementation, no close control either.
+First, **dismissal and history**. The close control and the Escape key both navigate to the storefront, which **pushes** a history entry. The browser Back button then returns to the product URL with a POP navigation, so the product renders standalone — with no shop behind it and, under that implementation, no close control either.
 
-Second, **the search context**. The product route was nested under the storefront alone, so a product opened from the search results left the search page entirely: the customer landed on a shop they did not open, and the search filters and page number � which were local to the search page � were lost. The app shell keys its route-transition wrapper by the full pathname, so every pathname change remounts the routed subtree. The results survive only because the query cache is held above the router; the filters that select them do not.
+Second, **the search context**. The product route was nested under the storefront alone, so a product opened from the search results left the search page entirely: the customer landed on a shop they did not open, and the search filters and page number — which were local to the search page — were lost. The app shell keys its route-transition wrapper by the full pathname, so every pathname change remounts the routed subtree. The results survive only because the query cache is held above the router; the filters that select them do not.
 
 Third, **a refresh**. React Router keeps navigation state in the history entry, and the browser preserves that state across a same-document reload, so a marker written in one page load can still be present in the next one. A rule that reads a marker alone therefore cannot distinguish "the customer opened this from the shop" from "the customer reloaded this page".
 
@@ -1916,10 +1916,10 @@ Third, **a refresh**. React Router keeps navigation state in the history entry, 
 
 - **The overlay is marked, not inferred.** A product link carries explicit React Router navigation state identifying it as an overlay, together with a **token** identifying the current JavaScript page load. The token is generated once per page load, held in memory only, never persisted and never sent to the server. A marker is honoured only when its token matches the current page load, which is what makes a reload render the standalone page rather than reconstruct an overlay.
 - **Ordinary links carry no marker.** React Router writes navigation state only when a link supplies it, so no other route in the app can be mistaken for an overlay.
-- **The product route is nested under the search surface as well as the storefront**, giving two public product URLs � `/vendors/{vendorId}/products/{productId}` and `/search/products/{productId}` � that render the same product component. A product opened from the search results therefore keeps the results behind it.
-- **Each surface recognises its own product child by an explicit route id** (`storefront-product`, `search-product`), read through `useMatches()`. The ids must be **distinct**: React Router requires route ids to be globally unique within a data router and throws on a collision when the router is created. The same ids let a surface tell a matched product child from any other child, which `useOutlet()` cannot do � it returns `null` both when no child matched and when the matched index child has no element.
+- **The product route is nested under the search surface as well as the storefront**, giving two public product URLs — `/vendors/{vendorId}/products/{productId}` and `/search/products/{productId}` — that render the same product component. A product opened from the search results therefore keeps the results behind it.
+- **Each surface recognises its own product child by an explicit route id** (`storefront-product`, `search-product`), read through `useMatches()`. The ids must be **distinct**: React Router requires route ids to be globally unique within a data router and throws on a collision when the router is created. The same ids let a surface tell a matched product child from any other child, which `useOutlet()` cannot do — it returns `null` both when no child matched and when the matched index child has no element.
 - **The search filters and page live in an in-memory store**, not in component state, so they survive the remount that opening a product causes. The store is not persisted: a full reload starts from the defaults, which is the correct reading of "this application session".
-- **Dismissal pops the in-app predecessor.** The close control and the Escape key return to the surface the product was opened from, without pushing a duplicate background entry. The predecessor's existence is guaranteed by the marker � the marker is written only by a link that pushes an entry � so no history-index guess is needed. A `window.history.state.idx` guard was considered and rejected: it reads the *browser's* history, whereas the tests run a memory router with an in-memory history, so it would take the wrong branch under test.
+- **Dismissal pops the in-app predecessor.** The close control and the Escape key return to the surface the product was opened from, without pushing a duplicate background entry. The predecessor's existence is guaranteed by the marker — the marker is written only by a link that pushes an entry — so no history-index guess is needed. A `window.history.state.idx` guard was considered and rejected: it reads the *browser's* history, whereas the tests run a memory router with an in-memory history, so it would take the wrong branch under test.
 - **A standalone product page offers a return path** back to the surface it belongs to, and never calls `navigate(-1)`.
 
 ### Consequences
@@ -1933,7 +1933,7 @@ Third, **a refresh**. React Router keeps navigation state in the history entry, 
 
 ### Verification
 
-Automated � asserted by the frontend suite (128 customer tests across 12 files; 730 frontend tests across 65 files; typecheck, lint and build all clean):
+Automated — asserted by the frontend suite (128 customer tests across 12 files; 730 frontend tests across 65 files; typecheck, lint and build all clean):
 
 - Overlay open, close, Escape, Back and Forward from the storefront, and the same from the search surface.
 - Closing pops the in-app predecessor rather than pushing a duplicate background entry.
@@ -1943,20 +1943,20 @@ Automated � asserted by the frontend suite (128 customer tests across 12 files; 
 - A malformed florist id and a malformed product id each issue no request and render the non-disclosing unavailable state.
 - The two product route ids are distinct, and the router is created without an id collision.
 
-**Browser-level behaviour: checked in a real browser, not by an automated test.** The four frontend navigation checks � refreshing a product URL that was opened as an overlay, refreshing a directly opened standalone product URL, Back and Forward through an overlay opened from the search results and from a storefront, and keyboard traversal through the overlay � were exercised in a real Chromium browser after the automated suite passed. The catalogue API responses were **stubbed in the browser**, because the backend instance available at the time could not serve the uncommitted public-catalogue endpoints. The checks therefore establish the **frontend** navigation, reload and history behaviour; they do **not** establish end-to-end catalogue integration against the real backend or MySQL, which remains unverified. The keyboard traversal confirmed the recorded limitation: focus can leave the overlay, and no focus trap is implemented. The stale-token test still covers only the marker comparison, so the automated suite does not on its own prove these browser results.
+**Browser-level behaviour: checked in a real browser, not by an automated test.** The four frontend navigation checks — refreshing a product URL that was opened as an overlay, refreshing a directly opened standalone product URL, Back and Forward through an overlay opened from the search results and from a storefront, and keyboard traversal through the overlay — were exercised in a real Chromium browser after the automated suite passed. The catalogue API responses were **stubbed in the browser**, because the backend instance available at the time could not serve the uncommitted public-catalogue endpoints. The checks therefore establish the **frontend** navigation, reload and history behaviour; they do **not** establish end-to-end catalogue integration against the real backend or MySQL, which remains unverified. The keyboard traversal confirmed the recorded limitation: focus can leave the overlay, and no focus trap is implemented. The stale-token test still covers only the marker comparison, so the automated suite does not on its own prove these browser results.
 
 ---
 
 ## D-38: Location-gated catalogue surfaces versus the storefront's non-blocking area advisory
 
 **Status:** Accepted
-**Date:** Phase 4 (tasks 4.6�4.9)
+**Date:** Phase 4 (tasks 4.6–4.9)
 
 ### Context
 
 The catalogue endpoints do not all take a delivery area. `GET /api/v1/discover` and `GET /api/v1/search` require `locationId` (D-34, and the search contract from the same phase), and `GET /api/v1/products/{id}` takes one to decide whether the product is deliverable. `GET /api/v1/vendors/{id}/storefront` takes none: the customer has already chosen that florist, and the endpoint applies no delivery-radius filter.
 
-A single rule � "the customer area gates everything" � would therefore contradict the storefront endpoint's own contract and would hide a shop the backend is happy to serve.
+A single rule — "the customer area gates everything" — would therefore contradict the storefront endpoint's own contract and would hide a shop the backend is happy to serve.
 
 ### Decision
 
@@ -1979,11 +1979,11 @@ A single rule � "the customer area gates everything" � would therefore contradic
 
 ### Context
 
-Plan task 4.7 lists "price slider" among the search controls. A two-handle range slider has no native accessible semantics, cannot be typed into, and is awkward to operate with a screen reader or with a keyboard alone. The backend's contract, by contrast, is two independent decimal bounds � `priceMin` and `priceMax` � with `priceMin > priceMax` refused as a validation error.
+Plan task 4.7 lists "price slider" among the search controls. A two-handle range slider has no native accessible semantics, cannot be typed into, and is awkward to operate with a screen reader or with a keyboard alone. The backend's contract, by contrast, is two independent decimal bounds — `priceMin` and `priceMax` — with `priceMin > priceMax` refused as a validation error.
 
 ### Decision
 
-- The price bounds are **two labelled number inputs** � "Minimum price" and "Maximum price" � that mirror the backend's `priceMin` and `priceMax` exactly.
+- The price bounds are **two labelled number inputs** — "Minimum price" and "Maximum price" — that mirror the backend's `priceMin` and `priceMax` exactly.
 - A minimum greater than the maximum is refused **before** the request is issued, with the error shown against both fields.
 - The slider is a documented deviation from the plan's wording, not an omission.
 
@@ -2008,7 +2008,7 @@ The tempting implementation is to remember the intended add and replay it after 
 
 ### Decision
 
-- An anonymous visitor's add-to-cart **navigates to the login page**, carrying the current path in the router's `from` state � the convention the route guard and the login page already use � so the customer returns to where they were.
+- An anonymous visitor's add-to-cart **navigates to the login page**, carrying the current path in the router's `from` state — the convention the route guard and the login page already use — so the customer returns to where they were.
 - **No pending add is persisted.** The add is not queued, not stored and not replayed. The customer returns to the product and presses the button again.
 - A signed-in customer who is not a `CUSTOMER` sees the control **disabled**, with the reason stated.
 - The backend remains the authority on authorization, pricing, stock and cart validation. The frontend sends only the product id, the quantity and the optional gift note, and the price snapshot is taken server-side (decision C-1).
@@ -2140,7 +2140,7 @@ deliberately out of scope for Stage 1.
 ## D-43: Vendor order endpoints use the FLORIST namespace without approval gating
 
 **Status:** Accepted
-**Date:** Phase 6 (Stage 2, task 6.2�6.4)
+**Date:** Phase 6 (Stage 2, task 6.2–6.4)
 
 ### Context
 
@@ -2148,7 +2148,7 @@ Stage 2 exposes the vendor order action endpoints (accept/reject/prepare/out-for
 
 Two questions had to be settled before writing the endpoints.
 
-First, the URL namespace. The plan prose names `/api/v1/vendor/products` (singular) in one place, but the codebase and `SecurityConfig` use `/api/v1/vendors/**` (plural). Introducing a second near-identical prefix risks attaching a rule to the wrong one. Stage 2 therefore uses `/api/v1/vendor/orders` (singular) for the order endpoints � a distinct, deliberate namespace � and adds a matching `SecurityConfig` rule `.requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")`.
+First, the URL namespace. The plan prose names `/api/v1/vendor/products` (singular) in one place, but the codebase and `SecurityConfig` use `/api/v1/vendors/**` (plural). Introducing a second near-identical prefix risks attaching a rule to the wrong one. Stage 2 therefore uses `/api/v1/vendor/orders` (singular) for the order endpoints — a distinct, deliberate namespace — and adds a matching `SecurityConfig` rule `.requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")`.
 
 Second, whether `@RequiresApprovedVendor` applies. D-6 draws a clear line: a suspended vendor is hidden from discovery and blocked from new catalog/inventory/order work, but must still process their own existing in-flight orders to completion. Applying `@RequiresApprovedVendor` to the order-action endpoints would break that guarantee (a suspended vendor could not accept or deliver an in-flight order). So the order endpoints carry the FLORIST namespace rule plus per-handler ownership (missing order 404, foreign order 403) but deliberately **not** `@RequiresApprovedVendor`.
 
@@ -2164,7 +2164,7 @@ Stock side effects are delegated to `OrderStateMachine` ? `InventoryService` und
 ### Consequences
 
 - A suspended vendor can still accept/reject/prepare/deliver their existing orders (D-6 honored), but cannot create new orders or touch catalog/inventory (those routes carry `@RequiresApprovedVendor`).
-- Forgetting `@RequiresApprovedVendor` on a future catalog/inventory/order-creation route fails open � the main review checklist item for vendor features.
+- Forgetting `@RequiresApprovedVendor` on a future catalog/inventory/order-creation route fails open — the main review checklist item for vendor features.
 - `V17` is additive; `V16` is not edited (ADR-002/D-9). The Phase 5 checkout history row keeps a null `actor_type`, compatible with the ENUM column.
 
 ## D-45: Customer order response exposes only safe, customer-visible fields
@@ -2216,7 +2216,7 @@ only actor information that is safe for a customer to see.
 
 Task 6.5 requires the auto-reject threshold (minutes after which an unaccepted
 `PLACED` order is auto-cancelled) to be configurable. The plan places this
-setting in `platform_config` (plan section 9, phases 6�10), but Phase 6
+setting in `platform_config` (plan section 9, phases 6–10), but Phase 6
 precedes Phase 10, so no `platform_config` table existed and `CheckoutProperties`
 explicitly defers runtime settings to Phase 10.
 
@@ -2228,7 +2228,7 @@ explicitly defers runtime settings to Phase 10.
   commission, platform-fee and timeout rows without another migration.
 - `AutoRejectService` reads the threshold from `platform_config` at job run time.
   If the row is missing, the documented default (60 minutes) is used and a
-  warning is logged � auto-reject is never silently disabled. A non-integer
+  warning is logged — auto-reject is never silently disabled. A non-integer
   value fails fast at service startup (`IllegalStateException`).
 - The scheduler cadence (`app.auto-reject-cron`, default hourly) and batch bound
   (`app.auto-reject-batch-size`, default 100) come from `AppProperties`, following
@@ -2281,22 +2281,22 @@ Phase 7 introduces payments for checkout. Stage 1 supports cash-on-delivery (COD
 
 ### Context
 
-Stage 1 of Phase 7 supports COD only. Stage 2 part 1 introduces online checkout without a real payment gateway � the intent is simulated so the frontend can exercise the resume/pay flow end to end in tests. Decisions to settle: where the intent lives, how a shared intent groups multiple orders, how resume transitions work, and RBAC for payment endpoints.
+Stage 1 of Phase 7 supports COD only. Stage 2 part 1 introduces online checkout without a real payment gateway — the intent is simulated so the frontend can exercise the resume/pay flow end to end in tests. Decisions to settle: where the intent lives, how a shared intent groups multiple orders, how resume transitions work, and RBAC for payment endpoints.
 
 ### Decision
 
 - **`PaymentIntent` is a separate entity** (`com.flowerconnect.payment.domain.PaymentIntent`, `IntentStatus` CREATED/PAID/EXPIRED/FAILED) with a `payment_intents` table created by additive migration `V20`. One intent per payment group, keyed by `payment_group_id` (VARCHAR(36), unique).
 - **Online checkout creates one shared intent + one `PENDING` payment per order.** All orders in a multi-vendor checkout share the same `payment_group_id` and the same intent reference (`intent_sim_<uuid>`). Orders start `PENDING_PAYMENT`; stock is reserved via `RESERVE` movement but quantity is untouched. Intent expires after `app.intentTtlMinutes` (default 30).
-- **`resumePayment` transitions `PENDING_PAYMENT -> PLACED` exclusively through `OrderStateMachine`** (ActorType.SYSTEM, SideEffect.NONE since stock already reserved), then syncs `payments.status` to PAID, `orders.payment_status` to PAID, and intent status to PAID � all in one transaction. Expired intent (past `expiresAt`) is rejected with 409.
+- **`resumePayment` transitions `PENDING_PAYMENT -> PLACED` exclusively through `OrderStateMachine`** (ActorType.SYSTEM, SideEffect.NONE since stock already reserved), then syncs `payments.status` to PAID, `orders.payment_status` to PAID, and intent status to PAID — all in one transaction. Expired intent (past `expiresAt`) is rejected with 409.
 - **`fetchPaymentState` and `fetchGroupState` are read-only views** scoped to the owning customer. RBAC: `/api/v1/payments/**` ? `hasRole("CUSTOMER")`. Florist and admin are 403; unauthenticated is 401.
 - **`OrderStateMachine` dependency on `PaymentService` is broken via `ObjectProvider`** (circular dependency: `PaymentService ? OrderStateMachine ? PaymentService`). `OrderStateMachineProvider.getObject()` resolves lazily at call time.
-- **`PENDING_PAYMENT` is excluded from vendor order list and summary** (`VendorOrderService`) since it's not yet an actionable order � the customer hasn't paid yet.
+- **`PENDING_PAYMENT` is excluded from vendor order list and summary** (`VendorOrderService`) since it's not yet an actionable order — the customer hasn't paid yet.
 - **`created_at`/`updated_at` on `PaymentIntent` use `@CreationTimestamp`/`@UpdateTimestamp`** (Hibernate) so manually created intents in tests persist correctly.
 
 ### Consequences
 
 - COD path is unchanged from Stage 1; `paymentMethod` defaults to COD in `CheckoutRequest`/`CheckoutQuoteRequest`.
-- No external gateway, no card data, no secrets stored � the simulated intent is test-only scaffolding for Stage 2 part 1. A real online provider (intent creation, webhooks, capture) is deferred to a later Phase 7 step.
+- No external gateway, no card data, no secrets stored — the simulated intent is test-only scaffolding for Stage 2 part 1. A real online provider (intent creation, webhooks, capture) is deferred to a later Phase 7 step.
 - `V20` is additive; no applied migration is edited (ADR-002/D-9).
 - 7 integration tests + 17 unit tests + 9 slice RBAC tests all green; full backend unit suite 1133 tests pass.
 
@@ -2316,7 +2316,7 @@ Stage 3 introduces the webhook endpoint that provider callbacks hit, plus a simu
 - **Signature verified with constant-time comparison** (`MessageDigest.isEqual`) against `app.webhook-secret` (`APP_WEBHOOK_SECRET` env). A tolerance window (`app.webhookToleranceSeconds`) rejects stale timestamps.
 - **`SecurityConfig` matcher ordering fixed:** the webhook `permitAll` rule is placed **before** the `/api/v1/payments/**` ? `hasRole("CUSTOMER")` rule so the webhook is reachable without authentication while all other payment endpoints remain CUSTOMER-only.
 - **Prod startup validation:** `WebhookSecretValidator` (`@Profile("prod")`) fails application startup if the webhook secret is absent or shorter than 32 bytes, preventing a silently-inert webhook in production.
-- **Simulator behind `!prod` profile:** `SimulatedPaymentProvider` + `SimulatorController` expose `POST /api/v1/payments/simulator/{orderId}/pay|fail` (customer auth + ownership required). The simulator generates a correctly signed event and delivers it through the same webhook verification path � no card-like fields, no external calls, no secrets stored.
+- **Simulator behind `!prod` profile:** `SimulatedPaymentProvider` + `SimulatorController` expose `POST /api/v1/payments/simulator/{orderId}/pay|fail` (customer auth + ownership required). The simulator generates a correctly signed event and delivers it through the same webhook verification path — no card-like fields, no external calls, no secrets stored.
 - **Rate limiting:** webhook is IP-keyed via `RateLimitFilter` (no email available on webhook requests).
 - **`PaymentService.processProviderEvent`** applies group transitions atomically via `OrderStateMachine.transitionGroup` (locks order rows ascending id). Success ? PAID/PLACED (ActorType.SYSTEM); failure ? FAILED/CANCELLED with reservation release. Late success after cancel/timeout ? REFUND_PENDING (no resurrection); failure after success ? no regression; duplicate event IDs ? idempotent. Each accepted event persists one `PaymentEvent` row transactionally.
 - **`resumePayment` fixed** to not transition payment/order; returns pending state and marks intent EXPIRED on timeout only. Regression test added.
@@ -2343,9 +2343,9 @@ The backend Stage 3 (webhook + simulator) is complete. The frontend needs to int
 
 - **Payment-method selector at checkout.** `CheckoutPage` gains a payment-method radio group (COD default; ONLINE offered because backend 7.4 is built). The selected method is sent as `paymentMethod` in the `CheckoutRequest`. On COD checkout the confirmation step navigates to `/orders`; on ONLINE checkout it navigates to `/payment/:paymentGroupId`.
 
-- **Payment status page.** `PaymentStatusPage` at `/payment/:paymentGroupId` polls `GET /api/v1/payments/group/{paymentGroupId}` via TanStack Query with `refetchInterval` of 8 s (within plan �9.4's 5–10 s). Polling pauses while the tab is hidden (`usePolling`) and stops for terminal states (`PAID`, `FAILED`, `REFUNDED`). The page shows pending �" paid/failed/expired/refund-pending states using existing design tokens and responsive layouts.
+- **Payment status page.** `PaymentStatusPage` at `/payment/:paymentGroupId` polls `GET /api/v1/payments/group/{paymentGroupId}` via TanStack Query with `refetchInterval` of 8 s (within plan §9.4's 5â€“10 s). Polling pauses while the tab is hidden (`usePolling`) and stops for terminal states (`PAID`, `FAILED`, `REFUNDED`). The page shows pending â†" paid/failed/expired/refund-pending states using existing design tokens and responsive layouts.
 
-- **Resume is a refresh, not a completion.** The resume action calls `POST /api/v1/payments/{orderId}/resume`. After Stage 3 backend changes, `resumePayment` does *not* transition payment/order to paid — it returns the current pending state and marks the intent expired on timeout. Only the verified webhook flow transitions a payment to `PAID`/`PLACED`. The frontend resume button is shown only for pending orders in non-terminal groups.
+- **Resume is a refresh, not a completion.** The resume action calls `POST /api/v1/payments/{orderId}/resume`. After Stage 3 backend changes, `resumePayment` does *not* transition payment/order to paid â€” it returns the current pending state and marks the intent expired on timeout. Only the verified webhook flow transitions a payment to `PAID`/`PLACED`. The frontend resume button is shown only for pending orders in non-terminal groups.
 
 - **No card-like data anywhere.** The frontend never collects, renders, stores, logs, or submits card numbers, CVV, or other card-like data. Online payment in v1 is a simulated test-mode provider (D-48/D-49).
 
@@ -2353,13 +2353,13 @@ The backend Stage 3 (webhook + simulator) is complete. The frontend needs to int
 
 - **Role protection.** `/payment/:paymentGroupId` is guarded by `ProtectedRoute roles={[CUSTOMER_ROLE]}`. Existing API/error-handling conventions (Axios interceptors, `ApiErrorInfo`, TanStack Query) are preserved.
 
-- **COD checkout preserved.** The COD checkout flow is unchanged — COD remains the default payment method and navigates to `/orders` on success.
+- **COD checkout preserved.** The COD checkout flow is unchanged â€” COD remains the default payment method and navigates to `/orders` on success.
 
 ### Consequences
 
 - The payment-method selector is a new checkout control; existing COD tests are updated to include `paymentMethod: "COD"` in the expected `placeCheckout` payload.
 - The payment status page is a new route; no existing routes are modified.
-- 7 new Vitest/RTL tests cover pending�"terminal transitions, polling stop behavior, resume API call, terminal-state UI, and API error handling.
+- 7 new Vitest/RTL tests cover pendingâ†"terminal transitions, polling stop behavior, resume API call, terminal-state UI, and API error handling.
 - Full frontend suite: lint, typecheck, tests, build all clean. Backend unit suite: 1157 tests, 0 failures.
 
 
@@ -2402,21 +2402,21 @@ Plan task 8.2 specifies a single cancellation endpoint `POST /api/v1/orders/{id}
 
 ### Decision
 
-- **Single endpoint `POST /api/v1/orders/{id}/cancel` for all three roles.** A specific matcher in `SecurityConfig` permits CUSTOMER, FLORIST, and ADMIN on `POST /api/v1/orders/{orderId}/cancel`, placed before the broad `/api/v1/orders/**` → CUSTOMER rule. The `CancellationService` derives the actor type from the authentication authorities and enforces ownership: CUSTOMER on their own order, VENDOR on their own order (including suspended vendors per D-6), ADMIN on any order.
+- **Single endpoint `POST /api/v1/orders/{id}/cancel` for all three roles.** A specific matcher in `SecurityConfig` permits CUSTOMER, FLORIST, and ADMIN on `POST /api/v1/orders/{orderId}/cancel`, placed before the broad `/api/v1/orders/**` â†’ CUSTOMER rule. The `CancellationService` derives the actor type from the authentication authorities and enforces ownership: CUSTOMER on their own order, VENDOR on their own order (including suspended vendors per D-6), ADMIN on any order.
 
 - **`CancellationService` as orchestrator.** Validates actor, ownership, current state, and reason requirements, then delegates the status change to `OrderStateMachine`. It does not write order status, payment status, or stock directly. Payment status updates go through `PaymentService.markRefundPending`.
 
 - **Target status resolution follows section 6.1 exactly:**
-  - VENDOR on PLACED → REJECTED (reason required)
-  - CUSTOMER/ADMIN on PLACED → CANCELLED (reason optional for CUSTOMER, required for ADMIN)
-  - CUSTOMER/VENDOR/ADMIN on CONFIRMED → CANCELLED (reason required for VENDOR/ADMIN)
-  - VENDOR/ADMIN on PREPARING → CANCELLED (reason required)
-  - ADMIN on OUT_FOR_DELIVERY → CANCELLED (reason required)
+  - VENDOR on PLACED â†’ REJECTED (reason required)
+  - CUSTOMER/ADMIN on PLACED â†’ CANCELLED (reason optional for CUSTOMER, required for ADMIN)
+  - CUSTOMER/VENDOR/ADMIN on CONFIRMED â†’ CANCELLED (reason required for VENDOR/ADMIN)
+  - VENDOR/ADMIN on PREPARING â†’ CANCELLED (reason required)
+  - ADMIN on OUT_FOR_DELIVERY â†’ CANCELLED (reason required)
   - Terminal states (DELIVERED, CANCELLED, REJECTED) admit no transition (409).
 
 - **Payment effects:** Paid online orders (paymentMethod=ONLINE, paymentStatus=PAID) become REFUND_PENDING via `PaymentService.markRefundPending`; COD before delivery leaves payment PENDING (Option B, per D-47). No money moves for COD cancellations before delivery.
 
-- **Stock effects** delegated to `OrderStateMachine` → `InventoryService` per section 6.2: RELEASE before acceptance, RESTOCK after acceptance but before PREPARING, NONE from PREPARING onward.
+- **Stock effects** delegated to `OrderStateMachine` â†’ `InventoryService` per section 6.2: RELEASE before acceptance, RESTOCK after acceptance but before PREPARING, NONE from PREPARING onward.
 
 - **`OrderCancelled` event** published after commit with actor, reason, previous status. Slot capacity freed automatically via existing `countBookedOrdersForSlot` query (CANCELLED/REJECTED excluded from PLACED/CONFIRMED/PENDING_PAYMENT count).
 
@@ -2425,8 +2425,8 @@ Plan task 8.2 specifies a single cancellation endpoint `POST /api/v1/orders/{id}
 ### Consequences
 
 - No separate vendor/admin cancellation URLs; single endpoint with role-based ownership enforcement.
-- `CancellationService` in `com.flowerconnect.order.service` (alongside `OrderStateMachine`), not a separate `dispute` package — cancellations are order transitions, not disputes.
-- Integration test covers full status × actor matrix, reason validation, exact stock quantities/movements, cancel-vs-accept race, duplicate cancellation, paid-online REFUND_PENDING, COD Option B, slot capacity, suspended vendor, RBAC (401, 403 foreign, 404, 200).
+- `CancellationService` in `com.flowerconnect.order.service` (alongside `OrderStateMachine`), not a separate `dispute` package â€” cancellations are order transitions, not disputes.
+- Integration test covers full status Ã— actor matrix, reason validation, exact stock quantities/movements, cancel-vs-accept race, duplicate cancellation, paid-online REFUND_PENDING, COD Option B, slot capacity, suspended vendor, RBAC (401, 403 foreign, 404, 200).
 
 
 ## D-53: CancellationService in order.service package (not dispute package)
@@ -2455,7 +2455,7 @@ Place `CancellationService` in `com.flowerconnect.order.service` alongside `Orde
 
 ### Context
 
-Plan 8.3: "Paid online orders: REFUND_PENDING → REFUNDED (admin marks in v1...). COD orders cancelled before delivery: no money has moved." Section 6.1 says "refund if already paid" for PLACED → REJECTED/CANCELLED. The state machine does not modify payment status; `PaymentService` is the sole writer of payment status (D-47).
+Plan 8.3: "Paid online orders: REFUND_PENDING â†’ REFUNDED (admin marks in v1...). COD orders cancelled before delivery: no money has moved." Section 6.1 says "refund if already paid" for PLACED â†’ REJECTED/CANCELLED. The state machine does not modify payment status; `PaymentService` is the sole writer of payment status (D-47).
 
 ### Decision
 
@@ -2517,11 +2517,11 @@ Stage 1 and Stage 2 of Phase 8 implemented the backend cancellation endpoint (`P
 
 Three things needed settling:
 
-**Why a customer's reason is optional but a vendor's and admin's are required.** The backend state machine enforces this: CUSTOMER cancellation of PLACED/CONFIRMED does not require a reason, while VENDOR cancellation of CONFIRMED/PREPARING and ADMIN cancellation of any non-terminal state does. The frontend mirrors the backend rather than duplicating the rule � each dialog's `requiresReason` flag drives both the rendered reason box and the zod resolver, so they cannot disagree (following D-30's precedent).
+**Why a customer's reason is optional but a vendor's and admin's are required.** The backend state machine enforces this: CUSTOMER cancellation of PLACED/CONFIRMED does not require a reason, while VENDOR cancellation of CONFIRMED/PREPARING and ADMIN cancellation of any non-terminal state does. The frontend mirrors the backend rather than duplicating the rule — each dialog's `requiresReason` flag drives both the rendered reason box and the zod resolver, so they cannot disagree (following D-30's precedent).
 
 **Conditional dialog rendering to avoid framer-motion role conflicts.** Both `RejectReasonDialog` and `CancelReasonDialog` use `motion.div` with `animate={open ? "visible" : "hidden"}`. When always rendered (even with `open={false}`), testing-library's `findByRole("dialog")` cannot reliably resolve which dialog matches, causing flaky timeouts. Dialogs are therefore conditionally rendered (`{cancelTarget && <CancelReasonDialog ... />}`) so only the open dialog exists in the DOM.
 
-**Dialog state reset on unmount.** When a dialog unmounts (cancel target set to null), its internal reason state resets to empty. This is intentional � each dialog instance starts fresh, so a vendor who opens cancel, types a reason, cancels, then reopens sees an empty reason field rather than stale text.
+**Dialog state reset on unmount.** When a dialog unmounts (cancel target set to null), its internal reason state resets to empty. This is intentional — each dialog instance starts fresh, so a vendor who opens cancel, types a reason, cancels, then reopens sees an empty reason field rather than stale text.
 
 ### Decision
 
@@ -2530,7 +2530,7 @@ Three things needed settling:
 - **Admin cancel (AdminOrderLookupPage):** Admin can cancel any non-terminal order. Reason is required.
 - **Admin refund queue (AdminRefundsPage):** Paginated listing of `REFUND_PENDING` payments with optional vendor/date filters. Mark-refunded dialog requires a non-blank reference note (<= 500 chars). Idempotent: already-REFUNDED returns current state.
 - **Dialogs render conditionally** based on their open state to avoid framer-motion role resolution conflicts with testing-library.
-- **No disputes UI yet** � deferred to Phase 8 Stage 4+ per plan.
+- **No disputes UI yet** — deferred to Phase 8 Stage 4+ per plan.
 
 ### Consequences
 
@@ -2615,7 +2615,7 @@ Phase 8 Stage 5 implements dispute resolution (plan task 8.5): admins resolve OP
 - 11 new integration tests cover all resolution outcomes, partial amount bounds/rounding, final-state behavior, concurrent resolution, audit contents, event payload, online vs COD payment effects, unchanged order status, and ADMIN-only RBAC.
 
 
-## D-59: In-app notification read API � recipient derived from the authenticated principal, namespace open to every authenticated role
+## D-59: In-app notification read API — recipient derived from the authenticated principal, namespace open to every authenticated role
 
 **Status:** Accepted
 **Date:** Phase 9 Stage 2
@@ -2630,10 +2630,10 @@ Second, how the recipient is identified. Accepting a user id from the request wo
 
 ### Decision
 
-- **`GET /api/v1/notifications`** � one page of the caller's own notifications, newest first, with read state, returned as the shared `PageResponse<NotificationResponse>` envelope.
-- **`GET /api/v1/notifications/unread-count`** � the caller's unread count.
-- **`PATCH /api/v1/notifications/{id}/read`** � marks one of the caller's notifications read; a missing or foreign id is 404.
-- **`POST /api/v1/notifications/read-all`** � marks all of the caller's notifications read, returns the number marked.
+- **`GET /api/v1/notifications`** — one page of the caller's own notifications, newest first, with read state, returned as the shared `PageResponse<NotificationResponse>` envelope.
+- **`GET /api/v1/notifications/unread-count`** — the caller's unread count.
+- **`PATCH /api/v1/notifications/{id}/read`** — marks one of the caller's notifications read; a missing or foreign id is 404.
+- **`POST /api/v1/notifications/read-all`** — marks all of the caller's notifications read, returns the number marked.
 - The namespace `/api/v1/notifications/**` is mapped to `hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")` in `SecurityConfig`, placed before the `.anyRequest().authenticated()` catch-all.
 - The recipient is derived from `Authentication.getName()` (the JWT subject); no route accepts a user id. `NotificationService` resolves the user from the email and scopes every read/mark query by `userId`.
 - `NotificationResponse` exposes only safe recipient-facing fields (category, title, message, optional deep-link target, read/create timestamps); internal event and entity details are omitted.
@@ -2642,7 +2642,7 @@ Second, how the recipient is identified. Accepting a user id from the request wo
 ### Consequences
 
 - A customer, florist, or administrator each sees only their own notifications; cross-user access is not expressible in the request.
-- Forgetting `@RequiresApprovedVendor` on future catalog/inventory/order-creation routes still fails open � that review item from D-13 is unchanged; notifications are personal reads, not vendor transactions.
+- Forgetting `@RequiresApprovedVendor` on future catalog/inventory/order-creation routes still fails open — that review item from D-13 is unchanged; notifications are personal reads, not vendor transactions.
 - Because the recipient is read from the JWT per request, an admin approval or suspension takes effect on the next inbox read with no token re-issue, consistent with D-13.
 
 
@@ -2658,7 +2658,7 @@ Phase 9 Stage 3 (plan task 9.3) requires email notifications for order events, v
 ### Decision
 
 - **Templates**: Plain-text only, rendered by `EmailTemplateService`. No HTML/template engine dependency. Templates cover: order placed (customer & vendor), order status changes (customer), refunds (customer), disputes (customer & vendor), vendor lifecycle (approved/rejected/suspended/reinstated). INR formatting, plain text.
-- **Listener**: `EmailNotificationListener` with `@Async("notificationExecutor")` + `@TransactionalEventListener(phase = AFTER_COMMIT)` for each event type. Recipients resolved from JWT subject via `UserRepository`. Email failures logged and swallowed � never break the originating transaction.
+- **Listener**: `EmailNotificationListener` with `@Async("notificationExecutor")` + `@TransactionalEventListener(phase = AFTER_COMMIT)` for each event type. Recipients resolved from JWT subject via `UserRepository`. Email failures logged and swallowed — never break the originating transaction.
 - **Sender**: `EmailSender` interface with `SmtpEmailSender` (MailHog in dev, real SMTP in prod via `application-prod.yml`) and `NoOpEmailSender` (fallback when no SMTP configured). `EmailSender.send(to, subject, body)` is fire-and-forget.
 - **MailHog**: Already in `docker-compose.yml` (port 1025) and `application-dev.yml` (`mailhog:1025`).
 
@@ -2667,7 +2667,7 @@ Phase 9 Stage 3 (plan task 9.3) requires email notifications for order events, v
 - Email failures never roll back orders, payments, vendor actions, or disputes.
 - Plain-text templates avoid HTML/encoding issues and keep dependency footprint minimal.
 - MailHog in dev means emails are visible at `http://localhost:8025` without real SMTP credentials.
-- Real SMTP credentials stay in environment variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`) � never committed.
+- Real SMTP credentials stay in environment variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`) — never committed.
 
 ---
 
@@ -2693,7 +2693,7 @@ Plan task 9.4 requires polling-based live updates: vendor new-order alerts (toas
 - Sound is best-effort: fails silently if Web Audio API unavailable or autoplay blocked.
 - Deduplication prevents alert fatigue; `Set` of seen order IDs resets on page reload (acceptable trade-off).
 - Toast components follow existing UI patterns (`PRESSABLE`, `FOCUS_RING`, `animate-slide-up`).
-- Polling stops on terminal states (`DELIVERED`, `CANCELLED`, `REJECTED`) and when tab hidden � no wasted requests.
+- Polling stops on terminal states (`DELIVERED`, `CANCELLED`, `REJECTED`) and when tab hidden — no wasted requests.
 - 18 backend unit tests and 8 backend integration tests cover list pagination/newest-first, unread count, mark-one-read ownership (own success, foreign 404, missing 404), mark-all-read, RBAC (anonymous 401, every authenticated role 200), and the error envelope; the frontend NotificationBell and SiteHeader wiring are covered by 25 frontend tests.
 
 ---
@@ -2728,12 +2728,12 @@ so the transport choice and the delivery guarantees had to be settled before imp
   300s so the container never terminates a live stream before the emitter timeout.
 - **Post-commit delivery only**: `NotificationService.create` pushes to SSE subscribers via
   `TransactionSynchronization.afterCommit`. A rolled-back business transaction never produces a
-  stream event, and an SSE delivery failure is logged and swallowed � it can never roll back
+  stream event, and an SSE delivery failure is logged and swallowed — it can never roll back
   notification persistence, email delivery, or the originating business transaction.
 - **Best-effort, no replay**: delivery is best-effort; there is no replay and no exactly-once
   promise. Reconnects recover through the existing `GET /api/v1/notifications` list and the
   unread-count API. SSE is optional: polling (`useNewOrderAlert`/`useOrderStatusToast`) is retained
-  as the fallback, and SSE supplements it � it must never become necessary for persisting or
+  as the fallback, and SSE supplements it — it must never become necessary for persisting or
   reading notifications.
 - **Frontend integration**: `useNotificationStream` invalidates the notification list and unread-count
   query keys on each event; the bell subscribes while signed in and closes on unmount, disable,
@@ -2763,9 +2763,9 @@ Task 11.2 requires a quick-sale endpoint with an idempotency key against double 
 
 - **Required header `Idempotency-Key`.** A missing or non-canonical-UUID key returns 400 `VALIDATION_FAILED`. Key format/length are validated before any stock or database work.
 - **Replay returns the original response.** A completed sale with the same key and the same request fingerprint returns the stored transaction (re-queried items) and deducts nothing.
-- **Same key, different body → 409.** The request fingerprint is the SHA-256 hex of the canonical body (sorted `productId:quantity` + `paymentMethod`). A mismatch rejects with `CONFLICT`.
-- **Same key, in-progress → 409.** A row exists but `completed_at` is null, meaning a concurrent sale with the same key is mid-flight.
-- **Concurrent identical requests → exactly one sale.** All writers serialize on the unique `(vendor_id, idempotency_key)` constraint. The loser rolls back its own deduction (releasing locks) and replays the winner's stored response, or receives a clean 409 if the payload differs.
+- **Same key, different body â†’ 409.** The request fingerprint is the SHA-256 hex of the canonical body (sorted `productId:quantity` + `paymentMethod`). A mismatch rejects with `CONFLICT`.
+- **Same key, in-progress â†’ 409.** A row exists but `completed_at` is null, meaning a concurrent sale with the same key is mid-flight.
+- **Concurrent identical requests â†’ exactly one sale.** All writers serialize on the unique `(vendor_id, idempotency_key)` constraint. The loser rolls back its own deduction (releasing locks) and replays the winner's stored response, or receives a clean 409 if the payload differs.
 - **Transaction boundary.** The idempotency check, the stock lock, the deduction, the `pos_transactions` insert and the `pos_items` insert are all one `@Transactional` unit. Stock is never negative and never double-deducted.
 
 ### Consequences
@@ -2786,9 +2786,9 @@ Task 11.3 requires POS to draw from the same stock pool as marketplace orders, u
 ### Decision
 
 - **Sellability gate.** A product must exist (else 404), belong to the calling vendor (else 403), be `ACTIVE` and not expired (`expiryDate != null && expiryDate < today`, where `today` is `LocalDate.now(clock)` in the vendor's business zone, else 409), and have an inventory row (else 409).
-- **Available stock only.** `available = quantity − reservedQuantity`. A sale may consume only available stock; it must never take units reserved for marketplace orders. If any line is short, return 409 `INSUFFICIENT_STOCK` naming the short product and persist nothing (all-or-nothing).
+- **Available stock only.** `available = quantity âˆ’ reservedQuantity`. A sale may consume only available stock; it must never take units reserved for marketplace orders. If any line is short, return 409 `INSUFFICIENT_STOCK` naming the short product and persist nothing (all-or-nothing).
 - **Locking discipline.** Inventory rows are locked with `SELECT ... FOR UPDATE` via `InventoryRepository.findByProductIdForUpdate`, ordered by ascending product ID, exactly as checkout/accept/cancellation do (D-24). Ownership and sellability are checked *before* locking, so a foreign vendor cannot stall another vendor's row.
-- **One movement per line.** Each deducted line writes one `stock_movements` row of type `SALE_POS`, delta `-quantity`, `reference_id` = POS transaction id, `reference_type` = `pos-transaction`, actor = authenticated vendor. All through `InventoryService`/`StockService` — POS never writes inventory fields directly and never creates a second locking path.
+- **One movement per line.** Each deducted line writes one `stock_movements` row of type `SALE_POS`, delta `-quantity`, `reference_id` = POS transaction id, `reference_type` = `pos-transaction`, actor = authenticated vendor. All through `InventoryService`/`StockService` â€” POS never writes inventory fields directly and never creates a second locking path.
 - **Duplicate product IDs** in one request are merged (quantities summed) and validated once.
 
 ### Consequences
@@ -2850,42 +2850,42 @@ D-13 established that `@RequiresApprovedVendor` is per-handler and inert in `@We
 
 - **`EndpointAccessMatrix.java`** (test-only, `com.flowerconnect.security`) is the single source of truth: `AccessRule` enum (ANY_AUTH, CUSTOMER, FLORIST, ADMIN, PUBLIC), `Entry` record (method, pathPattern, rule, per-role statuses, note, testPath), and a complete `ENTRIES` list covering every handler across all controllers (auth, users, locations, vendors, admin, cart, checkout, orders, analytics, billing, reviews, dispute, pos, images).
 - **`EndpointAccessSweepIT.java`** (test-only, `com.flowerconnect.security`) is a fail-closed coverage test: every registered handler (reflected from `RequestMappingInfo`) is covered by exactly one matrix row; no duplicate entries; every entry has a rule; a catch-all rule exists. 5 tests pass.
-- **`EndpointAccessMatrixRbacTest.java`** (test-only, `com.flowerconnect.security`) exercises the real filter chain via `MockMvc` seeded through `login()` for CUSTOMER/FLORIST/ADMIN plus anonymous, iterating all entries × 4 roles, asserting exact 401/403 deny cases and non-401 allow cases. Infra paths (`/actuator`, `/swagger-ui`, `/v3/api-docs`) are handled leniently (springdoc oddity). All role×entry assertions pass.
+- **`EndpointAccessMatrixRbacTest.java`** (test-only, `com.flowerconnect.security`) exercises the real filter chain via `MockMvc` seeded through `login()` for CUSTOMER/FLORIST/ADMIN plus anonymous, iterating all entries Ã— 4 roles, asserting exact 401/403 deny cases and non-401 allow cases. Infra paths (`/actuator`, `/swagger-ui`, `/v3/api-docs`) are handled leniently (springdoc oddity). All roleÃ—entry assertions pass.
 
 ### Consequences
 
 - No production code changed; no migration.
 - The matrix is the maintenance reference: when a new handler is added, add a matching `Entry` to `ENTRIES` or the sweep test fails (fail-closed).
 - Because `@RequiresApprovedVendor` is inert in slices, the RBAC test uses `@SpringBootTest`+the real `SecurityFilterChain`, matching the D-13 rationale that method security must be verified at integration level.
-- `/api/v1/users/me` (GET/PATCH) and `/api/v1/users/me/password` (POST) resolve to ANY_AUTH (subject-resolved self-service, no `/api/v1/users/**` matcher) rather than CUSTOMER-only — the matrix reflects this and the RBAC test asserts it.
+- `/api/v1/users/me` (GET/PATCH) and `/api/v1/users/me/password` (POST) resolve to ANY_AUTH (subject-resolved self-service, no `/api/v1/users/**` matcher) rather than CUSTOMER-only â€” the matrix reflects this and the RBAC test asserts it.
 
 ### Verification
 
 - Backend unit suite: 1386/1386 pass, BUILD SUCCESS.
 - Sweep test: 5/5 pass.
-- RBAC test: all role×entry assertions pass.
+- RBAC test: all roleÃ—entry assertions pass.
 - Full integration suite: not re-run end-to-end (each Spring context ~15s; >1200 tests exceeds a single session window); key acceptance tests pass individually.
 
 
-## D-68: Rate limiting � per-profile activation, per-user/IP keys, config-driven limits, Caffeine per-instance
+## D-68: Rate limiting — per-profile activation, per-user/IP keys, config-driven limits, Caffeine per-instance
 
 **Status:** Accepted
 **Date:** Phase 13 Stage 4 (task 13.1)
 
 ### Context
 
-Phase 13 Stage 1 required a rate-limit review and extension (plan �13). The Phase 1 `RateLimitFilter` existed but was inactive by default (`app.rate-limit.enabled` never set; `matchIfMissing=false`), only covered login/register/forgot-reset/webhook, trusted `X-Forwarded-For`/`X-Real-IP` unconditionally (IP spoofing), logged full request bodies (including passwords), bypassed entirely when the body had no email, and ran before `JwtAuthenticationFilter` so it could not key by authenticated user. Sensitive mutating endpoints (checkout, dispute creation, review submission, address creation, cart mutations, image uploads, POS sale) had no rate limit at all.
+Phase 13 Stage 1 required a rate-limit review and extension (plan §13). The Phase 1 `RateLimitFilter` existed but was inactive by default (`app.rate-limit.enabled` never set; `matchIfMissing=false`), only covered login/register/forgot-reset/webhook, trusted `X-Forwarded-For`/`X-Real-IP` unconditionally (IP spoofing), logged full request bodies (including passwords), bypassed entirely when the body had no email, and ran before `JwtAuthenticationFilter` so it could not key by authenticated user. Sensitive mutating endpoints (checkout, dispute creation, review submission, address creation, cart mutations, image uploads, POS sale) had no rate limit at all.
 
 ### Decision
 
 - **Per-profile activation:** `app.rate-limit.enabled` gates the filter via `@ConditionalOnProperty`. Set to `true` in base `application.yml` (dev) and `application-prod.yml` (prod); `application-test.yml` keeps it `false` so existing integration tests are unaffected; the dedicated `application-rate-limit-test.yml` enables it with low limits for fast tests.
-- **Key strategy:** sensitive endpoints are keyed by the authenticated principal (JWT subject/email) so each user has an independent bucket, with a client-IP fallback for unauthenticated calls. Anonymous endpoints (login/register/forgot/reset) are keyed by email-from-body plus IP; a missing email no longer bypasses � it falls back to IP. Webhook is keyed by IP. Keys are SHA-256 hashes of the identifier (never raw email/token in logs or tests).
+- **Key strategy:** sensitive endpoints are keyed by the authenticated principal (JWT subject/email) so each user has an independent bucket, with a client-IP fallback for unauthenticated calls. Anonymous endpoints (login/register/forgot/reset) are keyed by email-from-body plus IP; a missing email no longer bypasses — it falls back to IP. Webhook is keyed by IP. Keys are SHA-256 hashes of the identifier (never raw email/token in logs or tests).
 - **Trusted proxies only:** `app.rate-limit.trusted-proxies` (default empty) lists proxy IPs/CIDRs whose `X-Forwarded-For`/`X-Real-IP` are honored. Empty by default ? `remoteAddr` is used ? safe-by-default, no IP spoofing via forged headers.
 - **No body logging:** the filter never logs request bodies or emails; only path and hashed key at debug.
 - **No multipart buffering:** upload bodies are never read or buffered by the filter; they pass through untouched.
 - **Filter ordering:** rate-limit filter registered before `UsernamePasswordAuthenticationFilter` (which has a registered order), after `SecurityHeadersFilter` and `JwtAuthenticationFilter`, so order is `SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF` and the principal is available at rate-limit time.
 - **Limits in configuration only:** every threshold and window is a `RateLimitProperties` field (`app.rate-limit.auth.*`, `app.rate-limit.webhookRequestsPerHour`, `app.rate-limit.sensitive.*`). None are hard-coded in the filter or services. Sensitive endpoints: checkout 30/h, checkout/quote 60/h, dispute create 10/h, review submit 20/h, address create 20/h, cart mutation 60/h, image upload 30/h, POS sale 300/h. These are starting values chosen to avoid blocking normal workflows; they are documented as tunable and may be revisited with real usage.
-- **No shared store / Redis:** per-instance Caffeine buckets (expire-after-access 2h, max 10k). Limits are not globally consistent across multiple backend instances � acceptable for v1 single-instance, revisit if the service scales. No CAPTCHA (out of scope).
+- **No shared store / Redis:** per-instance Caffeine buckets (expire-after-access 2h, max 10k). Limits are not globally consistent across multiple backend instances — acceptable for v1 single-instance, revisit if the service scales. No CAPTCHA (out of scope).
 
 ### Consequences
 
@@ -2895,19 +2895,19 @@ Phase 13 Stage 1 required a rate-limit review and extension (plan �13). The Phas
 
 ### Verification
 
-- `RateLimitFilterUnitTest` (8 tests): disabled pass-through, under/over limit, 429 body + `Retry-After`, authenticated-user key isolation, IP key isolation, trusted proxy honoring `X-Forwarded-For`, untrusted proxy ignoring it, multipart passthrough � all pass.
-- `RateLimitIntegrationTest` (8 tests) against real MySQL + production filter chain: sensitive endpoint rate limiting by authenticated user, user key isolation, anonymous IP isolation, 429 status + `Retry-After` + `RATE_LIMITED` code, regression of existing auth rate limits � all pass.
+- `RateLimitFilterUnitTest` (8 tests): disabled pass-through, under/over limit, 429 body + `Retry-After`, authenticated-user key isolation, IP key isolation, trusted proxy honoring `X-Forwarded-For`, untrusted proxy ignoring it, multipart passthrough — all pass.
+- `RateLimitIntegrationTest` (8 tests) against real MySQL + production filter chain: sensitive endpoint rate limiting by authenticated user, user key isolation, anonymous IP isolation, 429 status + `Retry-After` + `RATE_LIMITED` code, regression of existing auth rate limits — all pass.
 - Backend unit suite: 1402/1402 pass, BUILD SUCCESS.
 
 
-## D-69: Audit-log coverage � typed actor model (USER / SYSTEM) for settlement run, refund pending, COD collection
+## D-69: Audit-log coverage — typed actor model (USER / SYSTEM) for settlement run, refund pending, COD collection
 
 **Status:** Accepted
 **Date:** Phase 13 Stage 6 (task 13.5)
 
 ### Context
 
-Phase 13 Stage 6 requires an audit-log coverage sweep. The existing `audit_log` table (V6 migration) is written by admin operations: vendor approval/rejection/suspension/reinstatement, user status changes, category mutations, platform and vendor commission rate changes, payment refunds, review hide/unhide, dispute resolution, and settlement finalization. Three security-sensitive mutations lacked audit rows: settlement cycle creation (`runSettlement`), payment refund-pending marking (`markRefundPending`), and COD payment collection (`collectPayment`). In addition, the weekly scheduled settlement run (via `SettlementScheduler`) had no audit row at all, which the plan's rule that "admin and settlement actions appear in the audit log" (plan �13, �14) requires to be closed.
+Phase 13 Stage 6 requires an audit-log coverage sweep. The existing `audit_log` table (V6 migration) is written by admin operations: vendor approval/rejection/suspension/reinstatement, user status changes, category mutations, platform and vendor commission rate changes, payment refunds, review hide/unhide, dispute resolution, and settlement finalization. Three security-sensitive mutations lacked audit rows: settlement cycle creation (`runSettlement`), payment refund-pending marking (`markRefundPending`), and COD payment collection (`collectPayment`). In addition, the weekly scheduled settlement run (via `SettlementScheduler`) had no audit row at all, which the plan's rule that "admin and settlement actions appear in the audit log" (plan §13, §14) requires to be closed.
 
 ### Decision
 
@@ -2927,7 +2927,7 @@ Phase 13 Stage 6 requires an audit-log coverage sweep. The existing `audit_log` 
 - Three new audit action types: `SETTLEMENT_CREATED`, `PAYMENT_REFUND_PENDING`, `PAYMENT_COLLECTED` (entity types `SETTLEMENT`, `PAYMENT`, `PAYMENT`).
 - Additive Flyway migration `V32`; no schema change to existing data; no existing audit behavior modified (all existing rows remain USER).
 - Actor email is nullable to accommodate system-initiated runs (settlement scheduler) where no real user exists.
-- Audit failures behave consistently with existing code � they join the same transaction and roll back with it.
+- Audit failures behave consistently with existing code — they join the same transaction and roll back with it.
 - All existing `AuditLog.builder()` call sites (DisputeService, PlatformConfigService, CategoryService, VendorAdminService, ReviewService, UserStatusService, AdminCommissionRateController) now explicitly set `actorType=AuditActorType.USER`.
 
 ### Verification
@@ -2939,3 +2939,46 @@ Phase 13 Stage 6 requires an audit-log coverage sweep. The existing `audit_log` 
 - Backend unit suite: 2822/2822 pass, BUILD SUCCESS.
 - Backend compile: clean.
 
+
+## D-70: Dev demo seed data runner design and activation (Phase 14 Stage 1, task 14.5)
+
+### Context
+
+Phase 14 Stage 1 introduces rich, deterministic seed data for developer demonstrations, local UI inspection, and automated end-to-end testing. The dataset must cover realistic marketplace state (approved, pending, and suspended vendors; multi-level categories; catalog products with stock, near-expiry, low-stock, and images; customers with addresses; full order lifecycles including cancellations, refunds, and disputes; reviews; POS sales; and billing settlements).
+
+Hard architectural constraints:
+1. Seed code must never run in `prod` or `test` profiles.
+2. The runner must be strictly idempotent — repeated startup must not duplicate rows or corrupt totals.
+3. No raw SQL or repository bypasses: business records must be created strictly through service-layer methods and state machines to validate domain rules.
+4. No network dependencies or external hotlinking: images must be generated locally and documented with clear licensing.
+5. No passwords or secrets committed or printed.
+
+### Decision
+
+1. **Activation:**
+   - Dedicated Spring component `DemoSeedRunner` annotated with `@Profile("dev")`, `@ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true", matchIfMissing = true)`, and `@Order(100)`.
+   - `application.yml`, `application-prod.yml`, and `application-test.yml` explicitly configure `app.seed.enabled: false`. `application-dev.yml` enables it via `${APP_SEED_ENABLED:true}`.
+   - Activation tests (`DemoSeedActivationTest`) assert bean exclusion in `prod` and `test` profiles, and inclusion only under `dev` with `app.seed.enabled=true`.
+2. **Idempotency & Service-Layer Orchestration:**
+   - `DemoSeedService` orchestrates creation through existing domain services (`VendorService`, `CategoryService`, `ProductService`, `InventoryService`, `ProductImageService`, `AuthService`, `AddressService`, `CartService`, `CheckoutService`, `PaymentService`, `OrderStateMachine`, `CancellationService`, `DisputeService`, `ReviewService`, `PosService`, `SettlementService`).
+   - Idempotency checks rely on unique identifiers (e.g. `userRepository.existsByEmail`, `categoryRepository.findBySlug`, `inventoryRepository.findByProductId`, `orderRepository.findByUserIdOrderByCreatedAtDesc`, `settlementRepository.findByVendorIdAndPeriodStartAndPeriodEnd`).
+   - Re-running `seedAll()` executes safely and asserts zero row delta across all 13 underlying tables.
+3. **Procedural Local Images:**
+   - In-memory flower image generator `DemoImageGenerator` creates valid 400x400 JPEG images using Java 2D Graphics with smooth antialiased petals, stems, and banners.
+   - Images are uploaded through `ProductImageService` using `InMemoryMultipartFile`, satisfying `ImageValidationService` constraints without external dependencies.
+   - Provenance and Apache 2.0 licensing are recorded in `docs/credits.md`.
+4. **Secrets Management:**
+   - Dev credentials use environment variables `DEMO_PASSWORD` / `DEMO_USER_PASSWORD` and `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+   - If `DEMO_PASSWORD` is unset, the runner logs a clear warning and skips execution without failing the boot. No secrets are committed, printed in logs, or exposed via public endpoints.
+
+### Consequences
+
+- Local development boot with `dev` profile and `DEMO_PASSWORD` automatically populates a rich, representative marketplace.
+- Production and test environments are strictly isolated and never execute seed code.
+- Resetting the database is handled via clean container reset (`docker compose down -v && docker compose up -d`).
+
+### Verification
+
+- `DemoSeedActivationTest`: 4/4 pass (verifies exclusion in prod/test and activation in dev).
+- `DemoSeedRunnerUnitTest`: 3/3 pass (verifies image generation and skip on missing password).
+- `DemoSeedIntegrationTest`: 1/1 pass against real MySQL (verifies full dataset coverage, stock reconciliation, billing & settlement reconciliation, and zero row drift on re-run).

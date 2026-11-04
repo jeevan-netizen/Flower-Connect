@@ -74,6 +74,8 @@ app:
     jpeg-quality: 0.85
   checkout:
     quote-signing-secret: ${APP_CHECKOUT_QUOTE_SIGNING_SECRET}
+  seed:
+    enabled: false
 
 management:
   endpoints:
