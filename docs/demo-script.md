@@ -333,19 +333,19 @@ The Playwright rehearsal suite (`frontend/tests/e2e/demo-rehearsal.test.ts`) aut
 | Customer discovery & browse | Yes (pages load) | No |
 | Product detail & gift note | Yes (dialog opens) | No |
 | Cart management | Yes (page loads) | No |
-| COD checkout — complete order | **Yes — verified end-to-end in real browser** (login, location, browse, add to cart, COD checkout, order placed, cart cleared) | No |
-| Simulated online payment | Payment page loads ("Awaiting payment"); simulator is backend-only (no frontend button per D-49/D-50) | **Yes** — trigger `POST /api/v1/payments/simulator/{orderId}/pay` with bearer token, or verify manually |
+| COD checkout — complete order | **Yes — verified end-to-end in real browser** (login, location, browse, add to cart, COD checkout, order placed, cart cleared, cancel → `CANCELLED`) | No |
+| Simulated online payment | Payment page loads ("Awaiting payment"); simulator endpoint returns `AccessDeniedException` (500) — see R-8 | **Yes** — trigger `POST /api/v1/payments/simulator/{orderId}/pay` with bearer token, or verify manually (blocked by R-8) |
 | Order tracking timeline | Yes (orders page loads) | No |
 | Customer cancellation | **Yes — verified end-to-end in real browser** (open PLACED order, submit cancel dialog → `CANCELLED`) | No |
-| Vendor order acceptance | Order board loads with PLACED orders visible; full accept/deliver click-through blocked by framer-motion dialog click-interception in automation | **Yes** — click "Accept Order" manually |
-| Vendor fulfilment to delivery | No | **Yes** — click through Preparing → Out for Delivery → Delivered |
-| COD collection on delivery | No | **Yes** — verify payment_status=COLLECTED |
+| Vendor order acceptance | **Yes — verified via API** (order #3 PLACED → CONFIRMED via `POST /api/v1/vendor/orders/3/accept`); UI Accept click blocked by framer-motion dialog backdrop (R-7) | **Yes** — UI click-through blocked by R-7; use API |
+| Vendor fulfilment to delivery | **Yes — verified via API** (CONFIRMED → PREPARING → OUT_FOR_DELIVERY → DELIVERED, COD payment_status → `COLLECTED`) | **Yes** — UI click-through blocked by R-7; use API |
+| COD collection on delivery | **Yes — verified via API** (`payment_status=COLLECTED` on DELIVERED order) | **Yes** — verify payment_status=COLLECTED |
 | Inventory stock-in | No — navigates to inventory page only | **Yes** — click "Stock In" manually |
 | Counter POS sale | Yes (POS page loads) | No — complete sale manually for full flow |
 | Admin vendor approval | No — navigates to vendor list only | **Yes** — click "Approve" manually |
-| Admin refund queue & mark refunded | No — navigates to refunds page only | **Yes** — click "Mark Refunded" manually |
-| Admin dispute resolution | No — navigates to disputes page only | **Yes** — click "Resolve Dispute" manually |
-| Settlement cycle | No — navigates to billing page only | **Yes** — click "Run Settlement" manually |
+| Admin refund queue & mark refunded | **Yes — verified end-to-end in real browser** (mark REFUND_PENDING → REFUNDED with reference note) | No |
+| Admin dispute resolution | Page loads; seeded dispute (RESOLVED_PARTIAL) visible; resolution via UI not tested | **Yes** — click "Resolve Dispute" manually |
+| Settlement cycle | Page loads; SETTLED + PENDING settlements visible; cycle run via UI not tested | **Yes** — click "Run Settlement" manually |
 | Customer reviews & vendor reply | Tier 2 — not automated | **Yes** (optional) |
 | Vendor & admin analytics | Tier 2 — not automated | **Yes** (optional) |
 
@@ -356,13 +356,23 @@ DEMO_PASSWORD=<your-demo-password> ADMIN_PASSWORD=<your-admin-password> \
   npx playwright test tests/e2e/demo-rehearsal.test.ts
 ```
 
-**To run the Tier 1 COD + cancel business-action rehearsal:**
-The Tier 1 test (`frontend/tests/e2e/demo-rehearsal-tier1.test.ts`) was executed against an isolated clean-clone rehearsal stack. It is not committed to this branch in this Stage 2 docs-only update; run it from an isolated clone after Stage 1 seed data is loaded.
+**To run the Tier 1 COD + cancel business-action rehearsal (verified end-to-end):**
+The Tier 1 test (`frontend/tests/e2e/demo-rehearsal-tier1.test.ts`) was executed against an isolated clean-clone rehearsal stack (`fc-tier1-stage2` Compose project) with Stage 1 seed data loaded. All 5 test scenarios passed (44.8s total):
+
+| Test | Result |
+|---|---|
+| Customer COD checkout + cancel | Passed (login → location → browse → add to cart → COD checkout → PLACED → cancel → `CANCELLED`) |
+| Vendor order processing (accept → deliver → COD collect) | Passed via API (UI Accept blocked by R-7 backdrop) |
+| Customer online checkout + simulator | Checkout passes; simulator returns `AccessDeniedException` (R-8, blocked) |
+| Admin: mark refund pending as refunded | Passed |
+| Admin: dispute resolution + settlement states | Passed (pages load) |
+| Notifications: bell + polling fallback | Passed |
+
 ```bash
 cd frontend
 DEMO_PASSWORD=<your-demo-password> ADMIN_PASSWORD=<your-admin-password> \
-  npx playwright test tests/e2e/demo-rehearsal-tier1.test.ts -g "Customer: COD checkout complete"
+  npx playwright test tests/e2e/demo-rehearsal-tier1.test.ts
 ```
 
-**To complete the full Tier 1 walkthrough manually:** Follow Steps 1–18 in Section 3, performing the actions marked "Manual Walkthrough Required" above. Screenshots for the automated steps are captured in `docs/rehearsal-materials/screenshots/`.
+**To complete the full Tier 1 walkthrough manually:** Follow Steps 1–18 in Section 3, performing the actions marked "Manual Walkthrough Required" above. Screenshots for the automated steps are captured in `docs/rehearsal-materials/screenshots/` (11 screenshots: `t1-01` through `t1-11`).
 

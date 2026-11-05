@@ -1,11 +1,13 @@
 package com.flowerconnect.payment.controller;
 
+import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.repository.OrderRepository;
 import com.flowerconnect.payment.dto.WebhookResponse;
 import com.flowerconnect.payment.provider.SimulatedPaymentProvider;
 import com.flowerconnect.payment.repository.PaymentRepository;
+import com.flowerconnect.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -35,18 +37,19 @@ import jakarta.validation.constraints.Positive;
 public class SimulatorController {
 
     private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
     private final SimulatedPaymentProvider provider;
 
     @PostMapping("/simulator/{orderId}/pay")
-    @Transactional(readOnly = true)
+    @Transactional
     public ResponseEntity<WebhookResponse> pay(Authentication authentication,
                                                @PathVariable @Positive(message = "Order id must be positive") Long orderId) {
         return simulate(authentication, orderId, "pay");
     }
 
     @PostMapping("/simulator/{orderId}/fail")
-    @Transactional(readOnly = true)
+    @Transactional
     public ResponseEntity<WebhookResponse> fail(Authentication authentication,
                                                 @PathVariable @Positive(message = "Order id must be positive") Long orderId) {
         return simulate(authentication, orderId, "fail");
@@ -55,7 +58,14 @@ public class SimulatorController {
     private ResponseEntity<WebhookResponse> simulate(Authentication authentication, Long orderId, String action) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
-        if (!order.getUser().getEmail().equals(authentication.getName())) {
+
+        // Resolve the authenticated customer by email (JWT subject) and compare
+        // user IDs via scalar queries, avoiding lazy-loading Order.user.
+        User actor = userRepository.findByEmailWithRole(authentication.getName())
+                .orElseThrow(() -> BusinessException.notFound("Authenticated user not found"));
+        Long orderCustomerId = orderRepository.findCustomerIdByOrderId(orderId)
+                .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
+        if (!orderCustomerId.equals(actor.getId())) {
             throw BusinessException.forbidden("Order " + orderId + " belongs to another customer");
         }
 

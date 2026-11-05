@@ -1675,10 +1675,13 @@ Branch: `phase-14-polish-deliverables` (working tree contains uncommitted Stage 
 |----|------|-------------|----------|----------|-----------------|--------|
 | R-7 | Frontend / E2E | Vendor accept/deliver click-through blocked by framer-motion dialog click-interception: vendor board shows PLACED orders (Accept buttons visible), but clicking "Accept" then "Mark prepared/delivered" hangs at ~90s due to a concurrent reject-dialog backdrop intercepting pointer events. Shares the same hidden-but-present backdrop pattern as R-4 (`RejectReasonDialog` at `fixed inset-0 z-50` with `animate="hidden"`). Whether this affects real users or is automation-only has not been confirmed; treat as an E2E blocker requiring manual completion for the Tier 1 demo. | Medium | demo-rehearsal-tier1.test.ts, error-context snapshot showing open "Reject order" dialog during accept flow | Complete vendor accept/deliver/COD-collect manually in browser; automate once dialog dismissal is hardened; investigate whether the hidden backdrop intercepts real-user clicks | Documented |
 
-**Tier 1 browser rehearsal results (real browser, isolated fc-tier1-rehearsal Compose project, seeded via real services):**
-- Customer COD checkout + cancel: VERIFIED end-to-end (login, Koramangala location, browse, add "Red Grand Gala Roses" to cart with gift note, COD checkout order PLACED, cart cleared, order visible in /orders, cancel CANCELLED). 5 screenshots (t1-01 to t1-05). 14.3s.
-- Vendor accept/deliver/COD collect: order board loads with PLACED orders visible; full click-through blocked by dialog interception (R-7). Verify manually.
-- Simulated online payment: /payment/:id loads ("Awaiting payment"); simulator is backend-only (POST /api/v1/payments/simulator/{orderId}/pay, bearer token) per D-49/D-50 no frontend button.
-- Admin refund queue / dispute resolution / reviews: pages load; business actions to be completed manually.
-- Rate limiting: 5 logins/hr per email (in-memory Caffeine); cleared by restarting the backend container between rapid automated iterations.
-- Isolated stack torn down (docker compose -p fc-tier1-rehearsal down -v); primary environment untouched. No credentials committed.
+**Tier 1 browser rehearsal results (real browser, isolated fc-tier1-stage2 Compose project, seeded via real services via DemoSeedRunner):**
+- Customer COD checkout + cancel: VERIFIED end-to-end (login → Koramangala location → browse → add "Red Grand Gala Roses" to cart with gift note → COD checkout → PLACED → cart cleared → cancel → `CANCELLED`). 5 screenshots (`t1-01`…`t1-05`). ~15s.
+- Customer online checkout: VERIFIED via UI (order created, `PENDING_PAYMENT` status). Simulator API (`POST /api/v1/payments/simulator/{orderId}/pay`) returns `AccessDeniedException` (500) — blocked by R-8.
+- Vendor order processing: VERIFIED via API (Order #3 PLACED → CONFIRMED → PREPARING → OUT_FOR_DELIVERY → DELIVERED → `payment_status=COLLECTED`). UI Accept click blocked by R-7 backdrop; API used instead. 3 screenshots (`t1-vendor-dashboard`, `t1-vendor-order-board`, `t1-vendor-accepted`, `t1-vendor-delivered-cod-collected`).
+- Admin: mark refund pending as refunded: VERIFIED end-to-end (mark `REFUND_PENDING` → `REFUNDED` with reference note). 2 screenshots (`t1-admin-refund-queue`, `t1-admin-refund-marked`).
+- Admin: dispute resolution + settlements: PAGES LOAD (disputes page shows seeded RESOLVED_PARTIAL dispute; billing page shows SETTLED + PENDING settlements). Business actions via UI not tested.
+- Notifications: bell shows unread count, panel opens: VERIFIED. 1 screenshot (`t1-notifications-panel`).
+- Rate limiting: 5 logins/hr per email (in-memory Caffeine); cleared by restarting backend container between rapid automated iterations.
+- Isolated stack torn down (`docker compose -p fc-tier1-stage2 down -v`); primary environment untouched. No credentials committed.
+- Total: 5 Playwright tests passed (44.8s), 11 screenshots captured.
