@@ -1728,3 +1728,66 @@ Branch: `phase-14-polish-deliverables` (working tree contains uncommitted Stage 
 - Production build & lint: Frontend build clean (`tsc -b && vite build` built in 8.9s), frontend lint clean.
 - Prod-like compose stack: End-to-end verified with health checks, HTTPS login & session refresh in Chromium, reverse proxying, and PowerShell backup/restore rehearsal.
 - Branch: `phase-14-polish-deliverables`. Ready for Stage 3 commit.
+
+### Phase 14 Stage 4 — Task 14.1 (Journey and Concurrency Integration Tests) - COMPLETE (2026-11-05)
+
+**Implementation Summary:**
+Added two `@SpringBootTest` + Testcontainers (MySQL) integration test classes under
+`backend/src/test/java/com/flowerconnect/journey/`, driving the real APIs and the
+order state machine against a real database. Fixtures (vendor, product, inventory,
+address) are built through repositories per existing integration-test convention;
+the journey steps are driven through MockMvc (register, login, discover, cart,
+checkout) and `OrderStateMachine` (vendor accept/deliver). No business behavior
+changed; no applied migration edited; no sleeps used (races coordinated with
+`CountDownLatch` where applicable). Nothing committed or pushed.
+
+**1. `CodJourneyIntegrationTest` (full customer COD journey):**
+1. Registers a customer via `POST /api/v1/auth/register`.
+2. Discovers the eligible vendor via `GET /api/v1/discover?locationId=` (vendor asserted present).
+3. Sets the customer's delivery address at the same service location (distance 0, in radius).
+4. Adds the product to the cart (`POST /api/v1/cart/items`) and gets a quote (`POST /api/v1/checkout/quote`).
+5. Checks out with COD (`POST /api/v1/checkout`) → `PLACED`, `PENDING` payment, stock reserved.
+6. Vendor accepts via `OrderStateMachine.transition` (`PLACED` → `CONFIRMED`) → stock committed.
+7. Progresses to delivery (`CONFIRMED` → `PREPARING` → `OUT_FOR_DELIVERY` → `DELIVERED`) → COD collected.
+8. Verifies final order (`DELIVERED`), payment (`COLLECTED`), commission row, and `COD_DUES` ledger entry.
+9. Runs settlement generation/netting via `SettlementService.runSettlement` and `finalizeSettlement`, verifying totals and that the outstanding balance is discharged to zero.
+
+**Key COD assertions (`BigDecimal`, no floating point):**
+- Subtotal `299.00`, delivery fee `30.00`, platform fee `0.00`, total `329.00`.
+- Stock: quantity `10`, reserved `1` after checkout; quantity `9`, reserved `0` after accept.
+- Commission: rate `10.00`, subtotal `299.00`, commission amount `29.90` (`299 × 0.10`, HALF_UP).
+- Ledger: `COD_DUES` amount `-29.90` (negated `commission + platformFee`); outstanding balance `-29.90`.
+- Settlement: totalCredits `0.00`, totalDues `29.90`, netAmount `-29.90`, direction `VENDOR_PAYS_PLATFORM`; after finalize, outstanding balance `0.00`.
+
+**2. `OnlineJourneyIntegrationTest` (full simulated-online journey):**
+1. Registers a customer and checks out ONLINE → `PENDING_PAYMENT`, `PENDING` payment, shared payment group/intent, stock reserved (quantity untouched, reserved +1).
+2. Pays via the non-prod simulator (`POST /api/v1/payments/simulator/{orderId}/pay`, which delivers through the signed webhook path) → `PLACED`, `PAID`, intent `PAID`; stock still reserved (committed only on accept).
+3. Duplicate simulator/webhook delivery → outcome `ignored`, order stays `PLACED`/`PAID` (idempotent, no second side effect).
+4. Unauthorized simulator use denied: no token → `401`; foreign customer → `403`.
+5. Vendor accepts (`PLACED` → `CONFIRMED`) → stock committed; delivers → `DELIVERED`.
+6. Verifies commission row and `ONLINE_ORDER_CREDIT` ledger entry (`299.00 - 29.90 + 30.00 = 299.10`); outstanding balance `+299.10`.
+7. Runs settlement → totalCredits `299.10`, totalDues `0.00`, netAmount `+299.10`, direction `PLATFORM_PAYS_VENDOR`; after finalize, outstanding balance `0.00`.
+8. Confirms simulator disabled in production (cites `SimulatorProdAbsenceIntegrationTest`).
+
+**3. Concurrency scenarios (reviewed; all already covered — cited, not duplicated):**
+| Plan case | Existing test + evidence |
+|-----------|--------------------------|
+| N parallel checkouts for the last unit → exactly one succeeds | `CheckoutApiIntegrationTest.checkoutConcurrentDistinctCustomersLastUnitStockRace` (5 customers, 1 unit: exactly 1 HTTP 200, 4× `INSUFFICIENT_STOCK`, exactly 1 RESERVE movement); also `checkoutConcurrentDistinctCustomersSlotCapacityRace` and `concurrentIdenticalRequestsProduceOnlyOneCheckout` |
+| Checkout racing vendor acceptance/cancellation → one consistent result, no double reservation/stock movement | `CancellationIntegrationTest.cancelAndAcceptRaceSerialisesOnTheOrderRow` (CountDownLatch cancel vs accept; coherent inventory and movement types) |
+| POS and online checkout competing for the last unit | `PosCheckoutRaceIntegrationTest.posAndCheckoutRaceForLastUnitExactlyOneSucceeds` (CountDownLatch `recordSale` vs `checkout`; exactly one succeeds, `available = 0`, exactly one movement) |
+| Duplicate webhook events delivered repeatedly | `WebhookControllerIntegrationTest.duplicateEventIdIsAcknowledgedWithoutSideEffects` (same event id → `duplicate`, no second side effect); `OnlineJourneyIntegrationTest` duplicate simulator pay → `ignored`; `OrderStateMachine.transitionGroup` locks order rows ascending id (serializes concurrent duplicates) |
+| Two disputes created concurrently for the same order | `DisputeIntegrationTest.concurrentDisputeCreationResultsInExactlyOne` (8 threads, CountDownLatch: exactly 1× `200`, 7× `409`, DB `disputes` count = 1) |
+
+No new concurrency tests were added because each required case already has equivalent latch/barrier-coordinated coverage asserting persisted outcomes.
+
+**Verification:**
+- `./mvnw verify -Pintegration "-Dit.test=CodJourneyIntegrationTest,OnlineJourneyIntegrationTest"` → **2 tests, 0 failures, 0 errors, BUILD SUCCESS** (~4 min incl. Testcontainers startup).
+- Concurrency citation batch `./mvnw verify -Pintegration "-Dit.test=CheckoutApiIntegrationTest,CancellationIntegrationTest,PosCheckoutRaceIntegrationTest,DisputeIntegrationTest"` → **67 tests, 0 failures, 0 errors, BUILD SUCCESS** (~4 min).
+- `./mvnw verify -Pintegration "-Dit.test=WebhookControllerIntegrationTest"` → **13 tests, 0 failures, 0 errors, BUILD SUCCESS**.
+- Backend unit suite unaffected (no production code changed); not re-run in full here.
+- Full integration suite could not be completed in this session window (baseline previously timed out at ~15 min); focused failsafe runs used instead. Reported as a runtime limitation below.
+
+**Limitations:**
+- Full backend integration suite not executed end-to-end in this session (time window); only focused failsafe classes run. Each Spring context boots a shared Testcontainers MySQL (~15s per context), so running >1200 integration tests in one go exceeds a single session.
+- The simulator is `!prod`-profile gated; production absence verified by `SimulatorProdAbsenceIntegrationTest` (prior session), not re-run here.
+- Branch: `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 4 changes; no commit or push per instructions.
