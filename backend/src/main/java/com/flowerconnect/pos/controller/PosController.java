@@ -65,7 +65,7 @@ public class PosController {
      * {@code Idempotency-Key} header (canonical UUID) to prevent double-submit.
      */
     @Operation(summary = "Record a POS walk-in sale",
-            description = "Deducts available stock for each line, writes one SALE_POS stock "
+            description = "FLORIST. Deducts available stock for each line, writes one SALE_POS stock "
                     + "movement per line, and returns a receipt. POS is commission-free and "
                     + "creates no order, payment, commission or ledger row.")
     @ApiResponses({
@@ -90,7 +90,7 @@ public class PosController {
      * Retrieves a past POS sale receipt. Foreign sales are 403, missing sales 404.
      */
     @Operation(summary = "Retrieve a POS sale receipt",
-            description = "Returns the receipt for a past POS sale owned by the calling vendor.")
+            description = "FLORIST. Returns the receipt for a past POS sale owned by the calling vendor.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Receipt found"),
             @ApiResponse(responseCode = "403", description = "Sale belongs to another vendor"),
@@ -110,7 +110,7 @@ public class PosController {
      * day boundaries are converted at query time.
      */
     @Operation(summary = "Today's POS summary",
-            description = "Returns today's transaction count, total revenue and a "
+            description = "FLORIST. Returns today's transaction count, total revenue and a "
                     + "breakdown by payment-method label. POS revenue is commission-free.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Today's summary")
@@ -140,7 +140,7 @@ public class PosController {
      * only and creates no order, payment, commission or ledger row.
      */
     @Operation(summary = "POS sales report",
-            description = "Returns a daily or weekly sales summary for the calling vendor: "
+            description = "FLORIST. Returns a daily or weekly sales summary for the calling vendor: "
                     + "transaction count, total revenue, payment-method breakdown (CASH/CARD/UPI), "
                     + "and top-selling products by quantity sold. POS revenue is commission-free "
                     + "and separate from marketplace revenue.")

@@ -42,7 +42,7 @@ public class AdminAnalyticsController {
      * are omitted. Maximum range is 365 days.
      */
     @Operation(summary = "Analytics overview",
-            description = "Returns summary analytics for a date range.")
+            description = "ADMIN. Returns summary analytics for a date range.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Overview metrics"),
             @ApiResponse(responseCode = "400", description = "Invalid date range"),
@@ -74,7 +74,7 @@ public class AdminAnalyticsController {
      * are omitted. Maximum range is 365 days.
      */
     @Operation(summary = "Daily trends",
-            description = "Returns a daily time series of delivered orders and revenue.")
+            description = "ADMIN. Returns a daily time series of delivered orders and revenue.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Daily trend series"),
             @ApiResponse(responseCode = "400", description = "Invalid date range"),

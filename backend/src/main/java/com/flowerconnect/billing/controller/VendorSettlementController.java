@@ -28,6 +28,11 @@ import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -49,6 +54,7 @@ import java.util.List;
  */
 @Slf4j
 @Validated
+@Tag(name = "Vendor settlements", description = "FLORIST-only: view your own weekly settlements and attached entries")
 @RestController
 @RequestMapping("/api/v1/vendor/billing/settlements")
 @RequiredArgsConstructor
@@ -59,6 +65,13 @@ public class VendorSettlementController {
     private final UserRepository userRepository;
 
     @GetMapping
+    @Operation(summary = "List the vendor's settlements",
+            description = "Returns one page of the calling vendor's settlements, newest first. FLORIST-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Settlement page"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account")
+    })
     public ResponseEntity<SettlementPageResponse> getVendorSettlements(
             Authentication authentication,
             @PageableDefault(size = 20, sort = "periodEnd", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -74,6 +87,14 @@ public class VendorSettlementController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get one of the vendor's settlements",
+            description = "Returns one settlement owned by the calling vendor with its attached entries. FLORIST-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Settlement detail"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account"),
+            @ApiResponse(responseCode = "404", description = "Settlement not found")
+    })
     public ResponseEntity<SettlementDetailResponse> getVendorSettlement(
             @PathVariable Long id,
             Authentication authentication) {

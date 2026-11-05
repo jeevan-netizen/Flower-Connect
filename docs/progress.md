@@ -1791,3 +1791,25 @@ No new concurrency tests were added because each required case already has equiv
 - Full backend integration suite not executed end-to-end in this session (time window); only focused failsafe classes run. Each Spring context boots a shared Testcontainers MySQL (~15s per context), so running >1200 integration tests in one go exceeds a single session.
 - The simulator is `!prod`-profile gated; production absence verified by `SimulatorProdAbsenceIntegrationTest` (prior session), not re-run here.
 - Branch: `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 4 changes; no commit or push per instructions.
+
+### Phase 14 Stage 5 — Tasks 14.3 & 14.8 (API & Project Documentation) - COMPLETE (2026-11-05)
+
+**14.3 OpenAPI / Swagger documentation:**
+- Added `@Operation` + `@ApiResponses` + `@Parameter` annotations + class-level `@Tag` to every controller handler that lacked them, covering all 44 controllers. Each `@Operation.description` states the endpoint purpose and access category.
+- Added `backend/src/test/java/com/flowerconnect/security/OpenApiRoleCoverageTest.java`: a `@SpringBootTest` guard that iterates all `RequestMappingHandlerMapping` handler methods on FlowerConnect `@RestController` classes and fails if any handler lacks an `@Operation` with a non-empty description. Scoped to the project's own controllers so Spring's built-in error/resource handlers are not flagged. Detects newly added handlers so API documentation cannot silently drift.
+- Swagger/OpenAPI (`springdoc 2.3.0`) remains available in `dev` (`SpringDocConfig` is `@Profile("dev")`) and disabled in `prod`/`staging` (`springdoc.api-docs.enabled: false`), consistent with the Phase 13 security decision.
+- Verified: `./mvnw test -Dtest=OpenApiRoleCoverageTest` → **1 test, 0 failures, 0 errors, BUILD SUCCESS**. Backend compiles clean.
+
+**14.8 Project documentation:**
+- `README.md`: Replaced provisional quick-start with full project documentation — description, tech stack, architecture diagram, feature list by role (Customer / Vendor / Admin), prerequisites (Docker Desktop, WSL2, port conflicts, DB_PORT, line endings), clean-clone quick start, dev demo account email patterns (passwords not published), backend/frontend/Playwright test commands, project structure, troubleshooting, and destructive reset instructions scoping `docker compose down -v`.
+- `docs/architecture.md`: Updated current phase to Phase 14; replaced the outdated high-level diagram (removed Redis/gateway, listed all phases/modules) and added the final backend module package diagram.
+- `docs/er-diagram.md` (new): Entity-relationship diagram derived table-by-table from Flyway migrations V1–V32, with columns, constraints, and inferred foreign-key relationships.
+- `docs/api-summary.md` (new): Method, path, access rule, and purpose for every endpoint grouped by module, cross-checked against `EndpointAccessMatrix`/`docs/rbac-matrix.md`.
+- `docs/test-report.md` (new): Test suites, exact commands, current known results, concurrency/security coverage, and an explicit distinction between focused integration runs and a full-suite pass (full suite previously exceeded the ~15-minute window).
+
+**Verification:**
+- Backend test-compile: clean.
+- `OpenApiRoleCoverageTest`: 1/1 pass.
+- No production behavior changed; no applied Flyway migration edited; no secrets committed.
+
+**Branch:** `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 5 changes; no commit or push per instructions. Stage 6 not started.

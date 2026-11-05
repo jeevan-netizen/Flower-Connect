@@ -61,7 +61,7 @@ public class VendorProductImageController {
     private final ProductImageService productImageService;
 
     @Operation(summary = "Upload a product image",
-            description = "Accepts JPEG, PNG and WebP, decided by the file's content and not by its name or "
+            description = "FLORIST. Accepts JPEG, PNG and WebP, decided by the file's content and not by its name or "
                     + "declared type. The image is decoded, scaled to fit and re-encoded by the server; the "
                     + "stored object is named by the server and its extension comes from the detected format. "
                     + "The first image of a product becomes its cover automatically. Requires an APPROVED vendor.")
@@ -87,7 +87,7 @@ public class VendorProductImageController {
     }
 
     @Operation(summary = "List a product's images",
-            description = "Returns the product's images in display order, each flagged primary or not.")
+            description = "FLORIST. Returns the product's images in display order, each flagged primary or not.")
     @GetMapping
     public ResponseEntity<List<ProductImageResponse>> listImages(
             Authentication authentication,
@@ -96,7 +96,7 @@ public class VendorProductImageController {
     }
 
     @Operation(summary = "Set an image as the product cover",
-            description = "Clears the previous cover in the same transaction, so exactly one image is primary "
+            description = "FLORIST. Clears the previous cover in the same transaction, so exactly one image is primary "
                     + "afterwards. Returns the full ordered list because two rows changed.")
     @PutMapping("/{imageId}/primary")
     public ResponseEntity<List<ProductImageResponse>> setPrimaryImage(
@@ -107,7 +107,7 @@ public class VendorProductImageController {
     }
 
     @Operation(summary = "Reorder a product's images",
-            description = "The request must list every image of the product exactly once; a partial or "
+            description = "FLORIST. The request must list every image of the product exactly once; a partial or "
                     + "repeated list is rejected rather than interpreted.")
     @PutMapping("/order")
     public ResponseEntity<List<ProductImageResponse>> reorderImages(
@@ -119,7 +119,7 @@ public class VendorProductImageController {
     }
 
     @Operation(summary = "Delete a product image",
-            description = "Removes the row and the stored object. Deleting the cover promotes the next image, so "
+            description = "FLORIST. Removes the row and the stored object. Deleting the cover promotes the next image, so "
                     + "the product is never left with images and no cover.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Image deleted"),

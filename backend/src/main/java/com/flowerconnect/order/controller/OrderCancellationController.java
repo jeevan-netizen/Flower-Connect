@@ -38,7 +38,7 @@ public class OrderCancellationController {
      * targets {@code CANCELLED}.
      */
     @Operation(summary = "Cancel an order",
-            description = "Transitions an order to {@code CANCELLED} (or {@code REJECTED} when a "
+            description = "ANY_AUTH. Transitions an order to {@code CANCELLED} (or {@code REJECTED} when a "
                     + "vendor acts on a {@code PLACED} order), releasing or restocking reserved "
                     + "stock per section 6.2. A paid online order is moved to {@code REFUND_PENDING}.")
     @ApiResponses({

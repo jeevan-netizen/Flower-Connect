@@ -8,6 +8,11 @@ import com.flowerconnect.payment.dto.WebhookResponse;
 import com.flowerconnect.payment.provider.SimulatedPaymentProvider;
 import com.flowerconnect.payment.repository.PaymentRepository;
 import com.flowerconnect.repository.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -30,6 +35,7 @@ import jakarta.validation.constraints.Positive;
  * {@code POST /api/v1/payments/webhook}.
  */
 @Slf4j
+@Tag(name = "Payment simulator", description = "Test-mode pay/fail (simulated provider), !prod profile only, customer auth + ownership")
 @RequiredArgsConstructor
 @Profile("!prod")
 @RestController
@@ -43,6 +49,16 @@ public class SimulatorController {
 
     @PostMapping("/simulator/{orderId}/pay")
     @Transactional
+    @Operation(summary = "Simulate a successful payment",
+            description = "Test-mode: delivers a successful provider event through the signed webhook path "
+                    + "for the authenticated customer's own order. Requires customer authentication and "
+                    + "order ownership. !prod profile only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Payment simulated"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Order belongs to another customer"),
+            @ApiResponse(responseCode = "404", description = "Order or payment not found")
+    })
     public ResponseEntity<WebhookResponse> pay(Authentication authentication,
                                                @PathVariable @Positive(message = "Order id must be positive") Long orderId) {
         return simulate(authentication, orderId, "pay");
@@ -50,6 +66,16 @@ public class SimulatorController {
 
     @PostMapping("/simulator/{orderId}/fail")
     @Transactional
+    @Operation(summary = "Simulate a failed payment",
+            description = "Test-mode: delivers a failed provider event through the signed webhook path "
+                    + "for the authenticated customer's own order. Requires customer authentication and "
+                    + "order ownership. !prod profile only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Payment failure simulated"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Order belongs to another customer"),
+            @ApiResponse(responseCode = "404", description = "Order or payment not found")
+    })
     public ResponseEntity<WebhookResponse> fail(Authentication authentication,
                                                 @PathVariable @Positive(message = "Order id must be positive") Long orderId) {
         return simulate(authentication, orderId, "fail");

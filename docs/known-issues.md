@@ -532,6 +532,13 @@ AdminDisputeControllerTest 5, GlobalExceptionHandlerTest 2, SmtpEmailSenderTest 
 | P-9 | Auth / Origin Validation | `AuthController.validateCookieAuthentication` validates `Origin` against `APP_CORS_ORIGINS`. Running prod-like stack under HTTPS on port 8443 required `APP_CORS_ORIGINS` to contain `https://localhost:8443`. | Low | `AuthController.java:153-160` | Configured default `APP_CORS_ORIGINS` to include `https://localhost:8443,http://localhost:8088` in `docker-compose.prod.yml` | Fixed |
 | P-10 | Test / Runtime | Full backend integration suite cannot complete in a single session window (~15 min baseline timeout). Each Spring context boots a shared Testcontainers MySQL (~15s per context), so running >1200 integration tests in one go exceeds the session window. | Medium | Focused failsafe runs used for Stage 4 (journey + concurrency classes) instead of `./mvnw verify -Pintegration` end-to-end. | Run focused `-Dit.test=...` batches per session; schedule a full-suite run separately when time permits. No production code or behavior change required. | Open |
 
+## Phase 14 Stage 5 Findings (task 14.3 & 14.8: API & project documentation)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| D-1 | Documentation | OpenAPI annotations added to all 44 controllers; `OpenApiRoleCoverageTest` enforces per-handler `@Operation` documentation so newly added handlers cannot slip through undocumented. | Info | `backend/src/test/java/com/flowerconnect/security/OpenApiRoleCoverageTest.java` (1/1 pass) | Maintain the coverage test when adding controllers; Swagger available in dev, disabled in prod/staging | Fixed |
+| D-2 | Documentation | `docs/er-diagram.md`, `docs/api-summary.md`, `docs/test-report.md` created; `README.md` and `docs/architecture.md` completed/updated for Phase 14. | Info | New docs files under `docs/` | Keep docs in sync with future endpoint/schema changes | Fixed |
+
 ## Deprecation Notices
 
 _None._

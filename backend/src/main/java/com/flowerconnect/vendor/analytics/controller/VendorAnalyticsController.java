@@ -4,6 +4,11 @@ import com.flowerconnect.security.jwt.JwtService;
 import com.flowerconnect.vendor.analytics.dto.VendorAnalyticsDailyTrend;
 import com.flowerconnect.vendor.analytics.dto.VendorAnalyticsOverviewResponse;
 import com.flowerconnect.vendor.analytics.service.VendorAnalyticsService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -27,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
  * historical analytics -- this controller deliberately does not gate on
  * approval status (D-6).
  */
+@Tag(name = "Vendor analytics", description = "FLORIST-only marketplace and POS analytics for the calling vendor")
 @RestController
 @RequestMapping("/api/v1/vendor/analytics")
 public class VendorAnalyticsController {
@@ -56,6 +62,16 @@ public class VendorAnalyticsController {
      * marketplace counts or revenue.
      */
     @GetMapping("/overview")
+    @Operation(summary = "Vendor analytics overview",
+            description = "Returns marketplace analytics (delivered orders, revenue, commission) plus a "
+                    + "commission-free POS section for a date range. Defaults to trailing 30 days ending "
+                    + "on vendor-local today; maximum range 365 days. FLORIST-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Overview metrics"),
+            @ApiResponse(responseCode = "400", description = "Invalid date range"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account")
+    })
     public ResponseEntity<VendorAnalyticsOverviewResponse> overview(
             Authentication authentication,
             @RequestParam(required = false)
@@ -74,6 +90,16 @@ public class VendorAnalyticsController {
      * zero-filled. Same range rules as {@link #overview}.
      */
     @GetMapping("/daily-trends")
+    @Operation(summary = "Vendor daily trends",
+            description = "Returns a daily time series of marketplace and POS metrics for a date range, "
+                    + "zero-filled for days with no activity. Buckets are in the vendor's service-location "
+                    + "timezone. FLORIST-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Daily trend series"),
+            @ApiResponse(responseCode = "400", description = "Invalid date range"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account")
+    })
     public ResponseEntity<List<VendorAnalyticsDailyTrend>> dailyTrends(
             Authentication authentication,
             @RequestParam(required = false)

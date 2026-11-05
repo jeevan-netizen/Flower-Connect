@@ -69,7 +69,7 @@ public class VendorOrderController {
     private final VendorOrderService vendorOrderService;
 
     @Operation(summary = "Accept an order",
-            description = "Transitions {@code PLACED &#8594; CONFIRMED} and commits the "
+            description = "FLORIST. Transitions {@code PLACED &#8594; CONFIRMED} and commits the "
                     + "reserved stock. Refused with 409 if any item is short of stock.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Order accepted"),
@@ -86,7 +86,7 @@ public class VendorOrderController {
     }
 
     @Operation(summary = "Reject an order",
-            description = "Transitions {@code PLACED &#8594; REJECTED} and releases the "
+            description = "FLORIST. Transitions {@code PLACED &#8594; REJECTED} and releases the "
                     + "reserved stock. A reason is mandatory.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Order rejected"),
@@ -105,7 +105,7 @@ public class VendorOrderController {
     }
 
     @Operation(summary = "Mark an order preparing",
-            description = "Transitions {@code CONFIRMED &#8594; PREPARING}.")
+            description = "FLORIST. Transitions {@code CONFIRMED &#8594; PREPARING}.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Order marked preparing"),
             @ApiResponse(responseCode = "403", description = "Order belongs to another vendor"),
@@ -120,7 +120,7 @@ public class VendorOrderController {
     }
 
     @Operation(summary = "Mark an order out for delivery",
-            description = "Transitions {@code PREPARING &#8594; OUT_FOR_DELIVERY}.")
+            description = "FLORIST. Transitions {@code PREPARING &#8594; OUT_FOR_DELIVERY}.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Order marked out for delivery"),
             @ApiResponse(responseCode = "403", description = "Order belongs to another vendor"),
@@ -135,7 +135,7 @@ public class VendorOrderController {
     }
 
     @Operation(summary = "Mark an order delivered",
-            description = "Transitions {@code OUT_FOR_DELIVERY &#8594; DELIVERED} and records "
+            description = "FLORIST. Transitions {@code OUT_FOR_DELIVERY &#8594; DELIVERED} and records "
                     + "COD collection ({@code payment_status = COLLECTED}) for COD orders.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Order marked delivered"),
@@ -151,7 +151,7 @@ public class VendorOrderController {
     }
 
     @Operation(summary = "List the vendor's orders",
-            description = "One page of the authenticated vendor's own orders, newest first. "
+            description = "FLORIST. One page of the authenticated vendor's own orders, newest first. "
                     + "Optional {@code status} and {@code fromDate}/{@code toDate} filters.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Order page"),
@@ -182,7 +182,7 @@ public class VendorOrderController {
     }
 
     @Operation(summary = "Today's order summary",
-            description = "Counts by status, today's order count, today's total value excluding "
+            description = "FLORIST. Counts by status, today's order count, today's total value excluding "
                     + "cancelled/rejected orders, and expected COD cash for delivered orders. "
                     + "Today is the local date in the vendor's service-location timezone.")
     @ApiResponses({

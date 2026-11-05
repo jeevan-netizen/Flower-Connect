@@ -22,6 +22,11 @@ import com.flowerconnect.billing.dto.OutstandingBalanceResponse;
 import com.flowerconnect.billing.dto.SettlementEntryPageResponse;
 import com.flowerconnect.billing.service.BillingLedgerService;
 import com.flowerconnect.billing.service.StatementService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -40,8 +45,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Admin controller for viewing all ledger entries, outstanding balances and statements.
+ */
 @Slf4j
 @Validated
+@Tag(name = "Admin billing ledger", description = "ADMIN-only: all-vendor ledger, outstanding balances, overdue vendors, statements")
 @RestController
 @RequestMapping("/api/v1/admin/billing")
 @RequiredArgsConstructor
@@ -52,6 +61,14 @@ public class AdminBillingLedgerController {
     private final com.flowerconnect.billing.service.OverdueDuesService overdueDuesService;
 
     @GetMapping("/ledger")
+    @Operation(summary = "List all ledger entries (admin)",
+            description = "Returns one page of all-vendor settlement entries with optional vendorId, "
+                    + "date-range and type filters. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ledger page"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account")
+    })
     public ResponseEntity<SettlementEntryPageResponse> getAllLedger(
             @RequestParam(required = false) Long vendorId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
@@ -64,6 +81,14 @@ public class AdminBillingLedgerController {
     }
 
     @GetMapping("/outstanding/{vendorId}")
+    @Operation(summary = "Get a vendor's outstanding balance (admin)",
+            description = "Returns a vendor's signed outstanding balance. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Outstanding balance"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Vendor not found")
+    })
     public ResponseEntity<OutstandingBalanceResponse> getOutstandingBalance(@PathVariable Long vendorId) {
         BigDecimal balance = billingLedgerService.getOutstandingBalance(vendorId);
         return ResponseEntity.ok(OutstandingBalanceResponse.builder()
@@ -73,11 +98,29 @@ public class AdminBillingLedgerController {
     }
 
     @GetMapping("/overdue")
+    @Operation(summary = "List overdue vendors (admin)",
+            description = "Returns vendors with an overdue negative outstanding balance (days overdue "
+                    + "exceeds the configured threshold). Advisory only; no automatic suspension. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Overdue vendor list"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account")
+    })
     public ResponseEntity<java.util.List<com.flowerconnect.billing.dto.OverdueVendorResponse>> getOverdueVendors() {
         return ResponseEntity.ok(overdueDuesService.getOverdueVendors());
     }
 
     @GetMapping("/statement")
+    @Operation(summary = "Download a vendor statement CSV (admin)",
+            description = "Generates and downloads a CSV account statement for a vendor over a date "
+                    + "range. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "CSV statement"),
+            @ApiResponse(responseCode = "400", description = "Invalid date range"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Vendor not found")
+    })
     public ResponseEntity<byte[]> getStatement(
             @RequestParam Long vendorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate periodStart,

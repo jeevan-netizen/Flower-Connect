@@ -2,6 +2,11 @@ package com.flowerconnect.storefront.controller;
 
 import com.flowerconnect.storefront.dto.StorefrontResponse;
 import com.flowerconnect.storefront.service.StorefrontService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code hasRole("FLORIST")}.
  */
 @RequiredArgsConstructor
+@Tag(name = "Vendor storefront", description = "Public vendor storefront (no authentication)")
 @RestController
 @RequestMapping("/api/v1/vendors")
 public class StorefrontController {
@@ -27,6 +33,13 @@ public class StorefrontController {
     private final StorefrontService storefrontService;
 
     @GetMapping("/{id}/storefront")
+    @Operation(summary = "Get a vendor's storefront",
+            description = "Public. Returns the vendor's public profile, weekly hours and a "
+                    + "paginated product list. No delivery-radius filter is applied.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Storefront"),
+            @ApiResponse(responseCode = "404", description = "Vendor not found, not approved, or not accepting orders")
+    })
     public ResponseEntity<StorefrontResponse> storefront(
             @PathVariable Long id,
             @RequestParam(required = false) @Min(0) Integer page,

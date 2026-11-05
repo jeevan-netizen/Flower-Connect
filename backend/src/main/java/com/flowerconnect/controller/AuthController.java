@@ -11,6 +11,11 @@ import com.flowerconnect.security.dto.RegisterRequest;
 import com.flowerconnect.security.dto.ResetPasswordRequest;
 import com.flowerconnect.security.jwt.PasswordResetService;
 import com.flowerconnect.security.jwt.RefreshTokenCookieService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -26,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Arrays;
 
 @Slf4j
+@Tag(name = "Authentication", description = "Register, login, token refresh and logout (public, some require cookie-based CSRF headers)")
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -51,18 +57,44 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @Operation(summary = "Register a new customer account",
+            description = "Creates a CUSTOMER account. Public endpoint. Returns the access token and "
+                    + "sets the refresh token as an HttpOnly cookie. Duplicate email or phone yields 409.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Account created"),
+            @ApiResponse(responseCode = "400", description = "Validation failed"),
+            @ApiResponse(responseCode = "409", description = "Email or phone already in use")
+    })
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         AuthService.AuthTokens tokens = authService.register(request);
         return responseWithRefreshCookie(tokens.response(), tokens.refreshToken());
     }
 
     @PostMapping("/login")
+    @Operation(summary = "Authenticate and issue tokens",
+            description = "Validates credentials and returns an access token plus an HttpOnly refresh "
+                    + "cookie. Public endpoint; rate-limited. Returns 401 for invalid credentials.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Authenticated"),
+            @ApiResponse(responseCode = "400", description = "Validation failed"),
+            @ApiResponse(responseCode = "401", description = "Invalid email or password"),
+            @ApiResponse(responseCode = "429", description = "Rate limited")
+    })
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthService.AuthTokens tokens = authService.login(request);
         return responseWithRefreshCookie(tokens.response(), tokens.refreshToken());
     }
 
     @PostMapping("/refresh")
+    @Operation(summary = "Refresh the access token",
+            description = "Authenticated. Issues a new access token using the refresh token (HttpOnly cookie "
+                    + "or body). Rotates the refresh token. Requires the X-FlowerConnect-Client header and "
+                    + "an exact allowed Origin when the token arrives via cookie.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "New access token issued"),
+            @ApiResponse(responseCode = "400", description = "Refresh token is required"),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid client header / origin")
+    })
     public ResponseEntity<AuthResponse> refresh(
             HttpServletRequest request,
             @RequestBody(required = false) RefreshRequest body) {
@@ -83,6 +115,14 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
+    @Operation(summary = "Log out and revoke the refresh token",
+            description = "Authenticated. Revokes the refresh token and clears its HttpOnly cookie. "
+                    + "Requires the X-FlowerConnect-Client header and an exact allowed Origin.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Logged out"),
+            @ApiResponse(responseCode = "400", description = "Refresh token is required"),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid client header / origin")
+    })
     public ResponseEntity<Void> logout(
             HttpServletRequest request,
             @RequestBody(required = false) RefreshRequest body) {
@@ -109,6 +149,13 @@ public class AuthController {
      * email; SUSPENDED/DISABLED/nonexistent accounts are silently ignored.
      */
     @PostMapping("/forgot-password")
+    @Operation(summary = "Request a password reset",
+            description = "Public. Generates a password-reset token and delivers it via email (MailHog "
+                    + "in dev). Always returns 200 with an identical body regardless of whether the "
+                    + "email is registered, to avoid user enumeration.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Reset requested (generic response)")
+    })
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         passwordResetService.requestPasswordReset(request.getEmail());
         return ResponseEntity.ok().build();
@@ -121,6 +168,14 @@ public class AuthController {
      * tokens are revoked.
      */
     @PostMapping("/reset-password")
+    @Operation(summary = "Reset the password with a valid token",
+            description = "Public. Validates the single-use reset token, re-hashes the new password and "
+                    + "revokes all of the user's refresh tokens. Returns one generic 400 for not-found, "
+                    + "expired or already-used tokens so the token state is not observable.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Password reset"),
+            @ApiResponse(responseCode = "400", description = "Invalid, expired or already-used token")
+    })
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordResetService.completePasswordReset(request.getToken(), request.getNewPassword());
         return ResponseEntity.ok().build();

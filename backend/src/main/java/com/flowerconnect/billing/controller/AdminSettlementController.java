@@ -29,6 +29,11 @@ import com.flowerconnect.billing.service.SettlementService;
 import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.repository.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +60,7 @@ import java.util.List;
  */
 @Slf4j
 @Validated
+@Tag(name = "Admin settlements", description = "ADMIN-only: generate, list, finalize weekly settlements")
 @RestController
 @RequestMapping("/api/v1/admin/billing/settlements")
 @RequiredArgsConstructor
@@ -64,6 +70,17 @@ public class AdminSettlementController {
     private final UserRepository userRepository;
 
     @PostMapping("/run")
+    @Operation(summary = "Run a settlement cycle",
+            description = "Generates a settlement cycle for a vendor (or all vendors when vendorId is "
+                    + "omitted) over a date range. Idempotent: re-running returns the existing PENDING "
+                    + "settlement. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Settlement generated"),
+            @ApiResponse(responseCode = "400", description = "Invalid date range"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "409", description = "Settlement already SETTLED")
+    })
     public ResponseEntity<List<SettlementResponse>> runSettlement(
             @Valid @RequestBody RunSettlementRequest request,
             Authentication authentication) {
@@ -85,6 +102,13 @@ public class AdminSettlementController {
     }
 
     @GetMapping
+    @Operation(summary = "List settlements (admin)",
+            description = "Returns one page of settlements with optional vendorId and status filters. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Settlement page"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account")
+    })
     public ResponseEntity<SettlementPageResponse> listSettlements(
             @RequestParam(required = false) Long vendorId,
             @RequestParam(required = false) SettlementStatus status,
@@ -95,6 +119,14 @@ public class AdminSettlementController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get one settlement (admin)",
+            description = "Returns one settlement by id with its attached entries. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Settlement detail"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Settlement not found")
+    })
     public ResponseEntity<SettlementDetailResponse> getSettlement(@PathVariable Long id) {
         Settlement settlement = settlementService.getSettlementById(id);
         List<SettlementEntry> entries = settlementService.getSettlementEntries(id);
@@ -106,6 +138,17 @@ public class AdminSettlementController {
     }
 
     @PatchMapping("/{id}/finalize")
+    @Operation(summary = "Finalize a settlement",
+            description = "Transitions a PENDING settlement to SETTLED, capturing the admin reference "
+                    + "note and timestamp. Requires a non-blank reference note. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Settlement finalized"),
+            @ApiResponse(responseCode = "400", description = "Reference note is blank"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Settlement not found"),
+            @ApiResponse(responseCode = "409", description = "Settlement already SETTLED")
+    })
     public ResponseEntity<SettlementResponse> finalizeSettlement(
             @PathVariable Long id,
             @Valid @RequestBody FinalizeSettlementRequest request,

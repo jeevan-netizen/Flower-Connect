@@ -28,6 +28,11 @@ import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.repository.AuditLogRepository;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +66,7 @@ import java.math.BigDecimal;
  */
 @Slf4j
 @Validated
+@Tag(name = "Admin commission rates", description = "ADMIN-only: platform default and per-vendor commission rates")
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
@@ -78,6 +84,13 @@ public class AdminCommissionRateController {
 
     /** Read the platform global commission-rate default (admin-only). */
     @GetMapping("/platform-settings/commission-rate")
+    @Operation(summary = "Get the platform default commission rate",
+            description = "Returns the platform default commission rate (percentage 0-100). ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Default rate"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account")
+    })
     public ResponseEntity<AdminCommissionRateResponse> getPlatformRate() {
         BigDecimal rate = platformConfigService.getCommissionRateDefault();
         return ResponseEntity.ok(AdminCommissionRateResponse.builder().rate(rate).build());
@@ -85,6 +98,15 @@ public class AdminCommissionRateController {
 
     /** Update the platform global commission-rate default (admin-only). */
     @PatchMapping("/platform-settings/commission-rate")
+    @Operation(summary = "Update the platform default commission rate",
+            description = "Updates the platform default commission rate (percentage 0-100). Writes an "
+                    + "audit-log row. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Default rate updated"),
+            @ApiResponse(responseCode = "400", description = "Validation failed (rate out of range)"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account")
+    })
     public ResponseEntity<AdminCommissionRateResponse> updatePlatformRate(
             Authentication authentication,
             @Valid @RequestBody AdminCommissionRateRequest request) {
@@ -102,6 +124,15 @@ public class AdminCommissionRateController {
 
     /** Read a vendor's commission-rate override (admin-only). */
     @GetMapping("/vendors/{id}/commission-rate")
+    @Operation(summary = "Get a vendor's commission-rate override",
+            description = "Returns a vendor's commission-rate override (percentage 0-100), or null if "
+                    + "none is set. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vendor rate"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Vendor profile not found")
+    })
     public ResponseEntity<AdminCommissionRateResponse> getVendorRate(
             @PathVariable @Positive(message = "Vendor profile id must be positive") Long id) {
 
@@ -115,6 +146,16 @@ public class AdminCommissionRateController {
 
     /** Set a per-vendor commission-rate override (admin-only). */
     @PatchMapping("/vendors/{id}/commission-rate")
+    @Operation(summary = "Set a per-vendor commission-rate override",
+            description = "Sets a per-vendor commission-rate override (percentage 0-100). Writes an "
+                    + "audit-log row. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vendor rate set"),
+            @ApiResponse(responseCode = "400", description = "Validation failed (rate out of range)"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Vendor profile not found")
+    })
     public ResponseEntity<AdminCommissionRateResponse> setVendorRate(
             Authentication authentication,
             @PathVariable @Positive(message = "Vendor profile id must be positive") Long id,
@@ -155,6 +196,15 @@ public class AdminCommissionRateController {
 
     /** Clear a per-vendor commission-rate override (admin-only). */
     @DeleteMapping("/vendors/{id}/commission-rate")
+    @Operation(summary = "Clear a per-vendor commission-rate override",
+            description = "Clears a per-vendor commission-rate override so the platform default "
+                    + "applies. Writes an audit-log row. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Vendor rate cleared"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Vendor profile not found")
+    })
     public ResponseEntity<Void> clearVendorRate(
             Authentication authentication,
             @PathVariable @Positive(message = "Vendor profile id must be positive") Long id) {

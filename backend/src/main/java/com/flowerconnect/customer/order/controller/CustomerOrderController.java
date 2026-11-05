@@ -53,7 +53,7 @@ public class CustomerOrderController {
     private final CustomerOrderService customerOrderService;
 
     @Operation(summary = "List the caller's orders",
-            description = "Returns one page of the authenticated customer's own orders, newest "
+            description = "CUSTOMER. Returns one page of the authenticated customer's own orders, newest "
                     + "first, with an optional status filter. Page size is clamped to 1..100.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "The caller's order page"),
@@ -78,7 +78,7 @@ public class CustomerOrderController {
     }
 
     @Operation(summary = "Read one of the caller's orders",
-            description = "Returns the full detail of one order owned by the authenticated "
+            description = "CUSTOMER. Returns the full detail of one order owned by the authenticated "
                     + "customer, including items, fees and the status timeline.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Order found"),

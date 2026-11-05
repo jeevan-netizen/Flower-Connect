@@ -23,6 +23,10 @@ import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +45,7 @@ import java.math.BigDecimal;
  */
 @Slf4j
 @Validated
+@Tag(name = "Vendor billing rate", description = "FLORIST-only: read the vendor's effective commission rate")
 @RestController
 @RequestMapping("/api/v1/vendor/billing")
 @RequiredArgsConstructor
@@ -52,6 +57,15 @@ public class VendorBillingRateController {
 
     /** Returns the caller's own effective rate (override wins, else platform default). */
     @GetMapping("/rate")
+    @Operation(summary = "Get the vendor's effective commission rate",
+            description = "Returns the caller's own effective commission rate (percentage 0-100). The "
+                    + "per-vendor override wins if set, otherwise the platform default applies. FLORIST-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Effective rate"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account"),
+            @ApiResponse(responseCode = "404", description = "Vendor profile not found")
+    })
     public ResponseEntity<VendorBillingRateResponse> getRate(Authentication authentication) {
         User caller = userRepository.findByEmailWithRole(authentication.getName())
                 .orElseThrow(() -> BusinessException.unauthorized("Authenticated user not found"));

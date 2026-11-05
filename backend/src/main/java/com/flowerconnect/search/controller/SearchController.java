@@ -3,6 +3,11 @@ package com.flowerconnect.search.controller;
 import com.flowerconnect.geo.dto.PageResponse;
 import com.flowerconnect.search.dto.PublicProductResponse;
 import com.flowerconnect.search.service.SearchService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -24,6 +29,7 @@ import java.math.BigDecimal;
  * products from approved, accepting vendors within their delivery radius.
  */
 @Validated
+@Tag(name = "Product search", description = "Public product search for a delivery location (no authentication)")
 @RestController
 @RequestMapping("/api/v1/search")
 @RequiredArgsConstructor
@@ -32,6 +38,14 @@ public class SearchController {
     private final SearchService searchService;
 
     @GetMapping
+    @Operation(summary = "Search products",
+            description = "Public. Returns active, in-stock products from approved, "
+                    + "accepting vendors within their delivery radius of the given location. "
+                    + "locationId is required.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Search results page"),
+            @ApiResponse(responseCode = "400", description = "locationId is required or unknown")
+    })
     public ResponseEntity<PageResponse<PublicProductResponse>> search(
             @RequestParam @NotNull(message = "locationId is required") Long locationId,
             @RequestParam(required = false) String q,

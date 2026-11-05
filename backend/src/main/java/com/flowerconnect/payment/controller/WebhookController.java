@@ -7,6 +7,10 @@ import com.flowerconnect.payment.dto.WebhookResponse;
 import com.flowerconnect.payment.service.PaymentService;
 import com.flowerconnect.payment.service.WebhookSignatureService;
 import com.flowerconnect.config.AppProperties;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -38,6 +42,7 @@ import java.nio.charset.StandardCharsets;
  * </ul>
  */
 @Slf4j
+@Tag(name = "Payment webhook", description = "Signature-authenticated public webhook (HMAC-SHA256), no JWT")
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/payments")
@@ -49,6 +54,16 @@ public class WebhookController {
     private final ObjectMapper objectMapper;
 
     @PostMapping("/webhook")
+    @Operation(summary = "Receive a payment provider webhook",
+            description = "Signature-authenticated (HMAC-SHA256 over timestamp + raw body). Requires no "
+                    + "JWT. Invalid/missing signature, stale timestamp or oversized body are rejected "
+                    + "4xx with no state change. Duplicate event IDs are acknowledged without side effects.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Event accepted or duplicate acknowledged"),
+            @ApiResponse(responseCode = "400", description = "Malformed payload or oversized body"),
+            @ApiResponse(responseCode = "401", description = "Invalid or missing signature"),
+            @ApiResponse(responseCode = "404", description = "Unknown payment intent")
+    })
     public ResponseEntity<WebhookResponse> handleWebhook(HttpServletRequest request) throws IOException {
         byte[] body = readBody(request);
 

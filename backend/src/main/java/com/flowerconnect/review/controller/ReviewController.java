@@ -51,7 +51,7 @@ public class ReviewController {
      * submit, and only once per order.
      */
     @Operation(summary = "Submit a review",
-            description = "Creates a review for a DELIVERED order. Rating 1-5, "
+            description = "CUSTOMER. Creates a review for a DELIVERED order. Rating 1-5, "
                     + "optional comment up to 1000 characters. One review per order.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Review created"),
@@ -77,7 +77,7 @@ public class ReviewController {
      * Returns the authenticated customer's own review, even if it is hidden.
      */
     @Operation(summary = "Get the customer's own review",
-            description = "Returns the caller's review for the given review ID. "
+            description = "CUSTOMER. Returns the caller's review for the given review ID. "
                     + "The caller must be the review's customer; hidden reviews "
                     + "are still returned to their owner.")
     @ApiResponses({
@@ -101,7 +101,7 @@ public class ReviewController {
      * second attempt returns 409.
      */
     @Operation(summary = "Reply to a review",
-            description = "Adds a vendor reply to a review on the vendor's own "
+            description = "FLORIST. Adds a vendor reply to a review on the vendor's own "
                     + "order. One reply per review; a second attempt returns 409. "
                     + "Reply is trimmed and capped at 1000 characters.")
     @ApiResponses({
@@ -129,7 +129,7 @@ public class ReviewController {
      * newest first. Paginated.
      */
     @Operation(summary = "List the vendor's own reviews",
-            description = "Returns one page of the vendor's reviews, newest first. "
+            description = "FLORIST. Returns one page of the vendor's reviews, newest first. "
                     + "Hidden reviews are included because the caller owns them.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Vendor review page"),
@@ -150,7 +150,7 @@ public class ReviewController {
      * distribution over visible reviews).
      */
     @Operation(summary = "Get vendor review summary",
-            description = "Returns the average rating, review count, and "
+            description = "FLORIST. Returns the average rating, review count, and "
                     + "rating distribution over the vendor's visible reviews.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Review summary"),
@@ -171,7 +171,7 @@ public class ReviewController {
      * unknown or not approved (consistent with the storefront rule).
      */
     @Operation(summary = "List public reviews for a vendor",
-            description = "Returns one page of visible reviews for an approved "
+            description = "PUBLIC. Returns one page of visible reviews for an approved "
                     + "vendor, newest first. No authentication required.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Public review page"),
@@ -192,7 +192,7 @@ public class ReviewController {
      * transaction.
      */
     @Operation(summary = "Hide a review",
-            description = "Hides a review from public storefronts and aggregates. "
+            description = "ADMIN. Hides a review from public storefronts and aggregates. "
                     + "Remains visible to admins, the owning vendor, and the "
                     + "review's customer.")
     @ApiResponses({
@@ -221,7 +221,7 @@ public class ReviewController {
      * recomputes the vendor aggregate in the same transaction.
      */
     @Operation(summary = "Unhide a review",
-            description = "Restores a hidden review to public storefronts and "
+            description = "ADMIN. Restores a hidden review to public storefronts and "
                     + "aggregates.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Review unhidden"),
@@ -246,7 +246,7 @@ public class ReviewController {
      * newest first.
      */
     @Operation(summary = "List reviews for moderation",
-            description = "Returns one page of reviews, newest first. Optional "
+            description = "ADMIN. Returns one page of reviews, newest first. Optional "
                     + "hidden filter shows only hidden or only visible reviews.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Admin review page"),

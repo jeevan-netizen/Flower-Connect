@@ -79,7 +79,7 @@ public class VendorInventoryController {
     // ------------------------------------------------------------------
 
     @Operation(summary = "Read a product's stock level",
-            description = "Returns quantity, reserved quantity, availability (quantity − reserved), "
+            description = "FLORIST. Returns quantity, reserved quantity, availability (quantity − reserved), "
                     + "the low-stock threshold and flag, and the expiry date.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Inventory found"),
@@ -94,7 +94,7 @@ public class VendorInventoryController {
     }
 
     @Operation(summary = "Record stock received",
-            description = "Adds units to the quantity and appends one STOCK_IN movement with a positive "
+            description = "FLORIST. Adds units to the quantity and appends one STOCK_IN movement with a positive "
                     + "delta. The movement's actor is the authenticated vendor.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Stock added"),
@@ -112,7 +112,7 @@ public class VendorInventoryController {
     }
 
     @Operation(summary = "Record stock removed",
-            description = "Removes units from the quantity and appends one STOCK_OUT movement with a negative "
+            description = "FLORIST. Removes units from the quantity and appends one STOCK_OUT movement with a negative "
                     + "delta. Refused with 409 when the removal would consume units reserved for pending orders.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Stock removed"),
@@ -130,7 +130,7 @@ public class VendorInventoryController {
     }
 
     @Operation(summary = "Adjust the recorded quantity",
-            description = "Applies a signed correction and appends one ADJUSTMENT movement with that delta. "
+            description = "FLORIST. Applies a signed correction and appends one ADJUSTMENT movement with that delta. "
                     + "A reason is mandatory and is stored on the movement. A zero correction is refused.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Quantity adjusted"),
@@ -148,7 +148,7 @@ public class VendorInventoryController {
     }
 
     @Operation(summary = "Write off lost stock",
-            description = "Records a physical loss as one WASTE movement with a negative delta, the same "
+            description = "FLORIST. Records a physical loss as one WASTE movement with a negative delta, the same "
                     + "vocabulary the expiry scheduler uses. A reason is mandatory and is stored on the movement.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Stock written off"),
@@ -166,7 +166,7 @@ public class VendorInventoryController {
     }
 
     @Operation(summary = "Replace the low-stock alert threshold",
-            description = "Sets the number at or below which the product appears in the low-stock list. "
+            description = "FLORIST. Sets the number at or below which the product appears in the low-stock list. "
                     + "Not a stock change: no movement is written.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Threshold updated"),
@@ -184,7 +184,7 @@ public class VendorInventoryController {
     }
 
     @Operation(summary = "Replace or clear the expiry date",
-            description = "Sets the optional expiry date; a null body value clears it. Not a stock change: the "
+            description = "FLORIST. Sets the optional expiry date; a null body value clears it. Not a stock change: the "
                     + "expiry scheduler is what turns a reached date into a WASTE movement.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Expiry date updated"),
@@ -200,7 +200,7 @@ public class VendorInventoryController {
     }
 
     @Operation(summary = "Read a product's movement history",
-            description = "One page of the append-only stock movement log for the product, newest first. "
+            description = "FLORIST. One page of the append-only stock movement log for the product, newest first. "
                     + "Each row carries the signed delta, the reason and the actor who caused it.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "History page"),
@@ -224,7 +224,7 @@ public class VendorInventoryController {
     // ------------------------------------------------------------------
 
     @Operation(summary = "List the vendor's low-stock products",
-            description = "One page of the vendor's products whose availability (quantity − reserved) has "
+            description = "FLORIST. One page of the vendor's products whose availability (quantity − reserved) has "
                     + "reached or fallen below their own low-stock threshold. Never contains another "
                     + "vendor's products.")
     @ApiResponses({

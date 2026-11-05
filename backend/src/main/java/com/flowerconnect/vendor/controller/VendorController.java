@@ -4,6 +4,11 @@ import com.flowerconnect.vendor.dto.VendorProfileResponse;
 import com.flowerconnect.vendor.dto.VendorProfileUpdateRequest;
 import com.flowerconnect.vendor.dto.VendorRegisterRequest;
 import com.flowerconnect.vendor.service.VendorService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Slf4j
 @Validated
+@Tag(name = "Vendor self-service", description = "Vendor registration and own-profile management")
 @RestController
 @RequestMapping("/api/v1/vendors")
 @RequiredArgsConstructor
@@ -36,6 +42,15 @@ public class VendorController {
      * {@code POST /api/v1/auth/login}.
      */
     @PostMapping("/register")
+    @Operation(summary = "Register a vendor account",
+            description = "Public. Creates the FLORIST account and a PENDING_APPROVAL profile "
+                    + "in one transaction. Returns the created profile; the client then signs in "
+                    + "through POST /api/v1/auth/login.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Vendor registered"),
+            @ApiResponse(responseCode = "400", description = "Validation failed"),
+            @ApiResponse(responseCode = "409", description = "Email or phone already in use")
+    })
     public ResponseEntity<VendorProfileResponse> register(
             @Valid @RequestBody VendorRegisterRequest request) {
         VendorProfileResponse created = vendorService.register(request);
@@ -43,11 +58,30 @@ public class VendorController {
     }
 
     @GetMapping("/profile")
+    @Operation(summary = "Get the calling vendor's own profile",
+            description = "FLORIST-only. Returns the authenticated vendor's own profile, "
+                    + "resolved from the JWT subject.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vendor profile"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account"),
+            @ApiResponse(responseCode = "404", description = "No vendor profile")
+    })
     public ResponseEntity<VendorProfileResponse> getOwnProfile(Authentication authentication) {
         return ResponseEntity.ok(vendorService.getOwnProfile(authentication.getName()));
     }
 
     @PutMapping("/profile")
+    @Operation(summary = "Update the calling vendor's own profile",
+            description = "FLORIST-only. Full replacement of the editable profile fields. "
+                    + "Resolved from the JWT subject.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile updated"),
+            @ApiResponse(responseCode = "400", description = "Validation failed"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account"),
+            @ApiResponse(responseCode = "404", description = "No vendor profile")
+    })
     public ResponseEntity<VendorProfileResponse> updateOwnProfile(
             Authentication authentication,
             @Valid @RequestBody VendorProfileUpdateRequest request) {

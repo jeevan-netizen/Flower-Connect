@@ -4,13 +4,17 @@
 
 FlowerConnect is a **hyperlocal flower marketplace**. It connects local florists with customers for same-day or scheduled flower delivery within a tight geographic radius. The platform handles browsing, ordering, payments, and delivery coordination.
 
-Current development phase: **Phase 3f (Image handling)** — authentication (Phase 1), service
-locations (Phase 2a), and vendor registration/approval with the `audit_log` trail (Phase 2b/2c) are
-implemented, as are the admin user listing and status-management APIs (Phase 2d), the vendor and
-admin frontends (Phase 2d), categories (Phase 3a), the product/inventory/stock-movement data model
-(Phase 3b), the vendor catalog and inventory APIs (Phase 3c/3d), the expiry sweep (Phase 3e) and
-product image handling (Phase 3f). The bytes of an uploaded image live behind a `StorageService`
-abstraction — local disk today, a declared S3 stub behind the `s3` profile.
+Current development phase: **Phase 14 (Production Readiness & Polish)** — authentication (Phase 1),
+service locations (Phase 2a), vendor registration/approval with the `audit_log` trail (Phase 2b/2c),
+admin user listing and status management (Phase 2d), vendor and admin frontends (Phase 2d),
+categories (Phase 3a), product/inventory/stock-movement data model (Phase 3b), vendor catalog and
+inventory APIs (Phase 3c/3d), expiry sweep (Phase 3e), product image handling (Phase 3f), customer
+address book (Phase 4), geo discovery and product search (Phase 4), cart and checkout (Phase 5),
+order state machine and vendor/customer order APIs (Phase 6), COD and simulated online payments
+(Phase 7), cancellations, refunds and disputes (Phase 8), in-app notifications with polling and SSE
+(Phase 9), billing commissions, ledger and settlements (Phase 10), POS integration (Phase 11),
+ratings and reviews with vendor analytics (Phase 12), security hardening (Phase 13), and production
+readiness polish (Phase 14).
 
 ## 2. High-Level Architecture
 
@@ -20,9 +24,6 @@ abstraction — local disk today, a declared S3 stub behind the `s3` profile.
 │  React 18 + Vite + TypeScript + Tailwind CSS           │
 │  http://localhost:5173                                │
 ├──────────────────────────────────────────────────────┤
-│                       API Gateway                      │
-│  (future)                                              │
-├──────────────────────────────────────────────────────┤
 │              Backend (Spring Boot 3.2)                │
 │  Java 17 · Maven · JPA · Flyway · Lombok · MapStruct │
 │  http://localhost:8080                                │
@@ -31,11 +32,48 @@ abstraction — local disk today, a declared S3 stub behind the `s3` profile.
 │  Roles + Users (Phase 0/1)                            │
 │  Service Locations (Phase 2a)                         │
 │  Vendor Profiles + Vendor Hours (Phase 2b)            │
-│  Future: Catalog, Orders, Payments, Delivery          │
+│  Catalog / Products / Images (Phase 3)                │
+│  Inventory + Stock Movements (Phase 3)                │
+│  Customer Addresses (Phase 4)                         │
+│  Cart / Checkout / Orders (Phase 5-6)                 │
+│  Payments (COD + simulated online, Phase 7)           │
+│  Cancellations / Refunds / Disputes (Phase 8)         │
+│  Notifications + SSE (Phase 9)                        │
+│  Commission / Ledger / Settlements (Phase 10)         │
+│  POS (Phase 11)                                       │
+│  Reviews + Analytics (Phase 12)                       │
+│  Security hardening (Phase 13)                        │
 ├──────────────────────────────────────────────────────┤
-│                    Redis 7 (docker)                    │
-│  Session cache, future: rate limiting, cart state     │
+│           (Redis removed in v1 — rate limiting uses   │
+│            Caffeine per-instance buckets)             │
 └──────────────────────────────────────────────────────┘
+```
+
+### Module diagram (backend packages)
+
+```
+com.flowerconnect
+├── FlowerConnectApplication          (@EnableAsync, @EnableScheduling)
+├── config                            (Security, Clock, AppProperties, CheckoutProperties, Cors, RateLimit, SecurityHeaders, SpringDoc dev-only)
+├── domain                            (User, Role, VendorProfile, ServiceLocation, AuditActorType, AuditLog)
+├── security                          (JwtService, JwtAuthenticationFilter, AuthService, RefreshTokenService, PasswordResetService, RoleBoundaryTester)
+├── controller                        (AuthController, UserController, AdminUserController)
+├── geo                               (LocationController, LocationService, DiscoveryController)
+├── catalog                           (CategoryController, AdminCategoryController, ProductService)
+├── cart                              (CartController, CartService)
+├── checkout                          (CheckoutController, CheckoutService, CheckoutProperties)
+├── order                             (OrderStateMachine, OrderRepository, CancellationService, AutoRejectService)
+├── payment                           (PaymentController, PaymentService, WebhookController, SimulatorController (!prod))
+├── pos                               (PosController, PosService)
+├── inventory                         (InventoryService, InventoryRepository, StockMovementRepository, InventoryExpiryService)
+├── customer                          (AddressController, AddressService, CustomerOrderController, CustomerOrderService)
+├── dispute                           (CustomerDisputeController, VendorDisputeController, AdminDisputeController, DisputeService)
+├── notification                      (NotificationService, NotificationController, EmailTemplateService, EmailNotificationListener, NotificationSseController, NotificationSseService)
+├── settlement                        (BillingLedgerService, SettlementService, StatementService, CommissionRateService, PlatformConfigService, OverdueDuesService)
+│   └── controller                    (AdminSettlementController, VendorSettlementController, VendorBillingLedgerController, VendorBillingRateController, AdminCommissionRateController, AdminBillingLedgerController, AdminRefundController)
+├── review                            (ReviewController, ReviewService)
+├── vendor                            (VendorController, VendorAdminController, VendorProductController, VendorInventoryController, VendorProductImageController, VendorOrderController, SlotController, VendorAnalyticsController)
+└── test                              (AbstractIntegrationTest, integration test classes)
 ```
 
 ### Service Boundaries (Planned)

@@ -2,6 +2,10 @@ package com.flowerconnect.catalog.controller;
 
 import com.flowerconnect.catalog.dto.CategoryPageResponse;
 import com.flowerconnect.catalog.service.CategoryService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code /api/v1/locations} public read pattern.
  */
 @Slf4j
+@Tag(name = "Public categories", description = "Public read of active top-level categories (no authentication)")
 @RestController
 @RequestMapping("/api/v1/categories")
 @RequiredArgsConstructor
@@ -27,6 +32,12 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
+    @Operation(summary = "List active top-level categories",
+            description = "Returns the active top-level categories ordered by display_order then id. "
+                    + "Public endpoint; no authentication required.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Category list")
+    })
     public ResponseEntity<CategoryPageResponse> getCategories() {
         return ResponseEntity.ok(categoryService.listActive());
     }
