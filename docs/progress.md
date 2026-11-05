@@ -1685,3 +1685,46 @@ Branch: `phase-14-polish-deliverables` (working tree contains uncommitted Stage 
 - Rate limiting: 5 logins/hr per email (in-memory Caffeine); cleared by restarting backend container between rapid automated iterations.
 - Isolated stack torn down (`docker compose -p fc-tier1-stage2 down -v`); primary environment untouched. No credentials committed.
 - Total: 5 Playwright tests passed (44.8s), 11 screenshots captured.
+
+### Phase 14 Stage 3 — Task 14.6 (Production Readiness) completed
+
+**Implementation Summary:**
+1. **Profile Configuration Audit & Staging Parity:**
+   - Audited `dev`, `staging`, and `prod` configurations.
+   - Created `backend/src/main/resources/application-staging.yml` mirroring production externalization, strict security policies, fail-fast configuration on missing secrets, health indicators, dev seed disabled (`app.seed.enabled: false`), and Swagger disabled (`springdoc.api-docs.enabled: false`, `swagger-ui.enabled: false`).
+   - Hardened `WebhookSecretValidator` to `@Profile({"prod", "staging"})` enforcing 32-byte secret validation on staging.
+   - Updated `CheckoutProperties.validate(env)` to check both `prod` and `staging` profiles when rejecting `INSECURE_DEFAULT_SECRET`.
+   - Disabled `management.health.mail.enabled: false` in `prod` and `staging` so external SMTP placeholder reachability does not fail container health checks (`/actuator/health`).
+2. **Readiness Unit Tests (Weak-Secret Parameterized Coverage & Leaking Prevention):**
+   - Expanded `backend/src/test/java/com/flowerconnect/config/ProductionProfileReadinessTest.java` (23 unit tests): verifies fail-fast startup on null, empty, whitespace, short, and 31-character/byte boundary values for `JWT_SECRET`, `APP_WEBHOOK_SECRET`, and `APP_CHECKOUT_QUOTE_SIGNING_SECRET`, confirms rejected values are never leaked in exception messages, verifies database externalization fail-fast, and verifies absence of dev seed runner, payment simulator, and OpenAPI.
+   - Expanded `backend/src/test/java/com/flowerconnect/config/StagingProfileReadinessTest.java` (22 unit tests): verifies weak-secret parameterization, boundary tests, non-leaking verification, database credential externalization, and component exclusion in staging.
+   - Verified `CheckoutPropertiesTest` (15 tests), `WebhookSecretValidatorTest` (4 tests), and `JwtServiceTest` (11 tests). Total: **75/75 security & readiness tests pass**.
+3. **Local HTTPS & Single-Origin Compose Deployment (`docker-compose.prod.yml`):**
+   - Configured single-origin architecture via reverse proxy in `frontend/server.mjs`: Node production server supports native HTTPS (port `8443`) and HTTP fallback, proxying `/api` requests to backend container while serving static frontend bundle, enabling strict cookie security across browser clients without port mismatches.
+   - Configured `SameSite=Strict`, `HttpOnly`, and `Secure` cookie attributes.
+   - Self-signed dev certificates generated via `scripts/generate-dev-certs.ps1` stored in `certs/` (gitignored, outside version control).
+   - Dedicated production network and named volumes (`prod-mysql-data`, `prod-uploads`).
+   - Isolated MySQL 8 container with `TZ=UTC` and no host-published database port.
+   - Documented local HTTPS / RFC 6265bis localhost secure-context behavior.
+4. **Prod-Like Stack Verification & Real Browser E2E (`fc-prod-test`):**
+   - Started isolated stack on port `8443` (`docker compose -p fc-prod-test -f docker-compose.prod.yml up --build -d`).
+   - Verified container health: `fc-prod-test-mysql` (healthy), `fc-prod-test-backend` (healthy), `fc-prod-test-frontend` (healthy).
+   - Verified actuator: `/actuator/health` returns `{"status":"UP","groups":["liveness","readiness"]}` without leaking internal configuration; liveness and readiness return UP.
+   - Verified frontend reverse proxy: `GET https://localhost:8443/` (200 OK) and `GET https://localhost:8443/api/v1/categories` (200 OK).
+   - Executed Playwright E2E browser test (`frontend/tests/e2e/prod-https-session.test.ts`):
+     - Login sets `Set-Cookie: refresh_token=...; Path=/api/v1/auth; HttpOnly; SameSite=Strict; Secure`.
+     - Browser network stack stores and preserves the `Secure` cookie under HTTPS.
+     - Subsequent `fetch("/api/v1/auth/refresh")` transmits the `Secure` cookie and returns HTTP 200 with new `accessToken`.
+   - Verified security boundaries: Swagger `/swagger-ui.html` returns 404; `/v3/api-docs` returns 404; simulator `POST /api/v1/payments/simulator/{orderId}/pay` returns 404; dev seed logs show 0 executions of `DemoSeedRunner`.
+   - Rehearsed and verified backup/restore runbook in PowerShell on Windows: MySQL dump/restore via `mysqldump --no-tablespaces` and `uploads` volume backup/restore via `alpine tar`.
+   - Stack cleaned up cleanly (`docker compose -p fc-prod-test -f docker-compose.prod.yml down -v`).
+5. **Documentation Deliverables (`docs/deployment.md`):**
+   - Comprehensive deployment guide covering profiles, externalized secrets, local HTTPS setup, single-origin proxying, verified PowerShell & Bash backup/restore runbooks.
+   - Findings table and resolutions recorded in `docs/known-issues.md` (P-1 through P-9).
+
+**Verification:**
+- Profile readiness tests: **45/45 passed** (`ProductionProfileReadinessTest` 23, `StagingProfileReadinessTest` 22). Total focused security tests: **75/75 passed** (`CheckoutPropertiesTest` 15, `WebhookSecretValidatorTest` 4, `JwtServiceTest` 11).
+- Browser E2E HTTPS session test: **1/1 passed (2.6s)** (`prod-https-session.test.ts`).
+- Production build & lint: Frontend build clean (`tsc -b && vite build` built in 8.9s), frontend lint clean.
+- Prod-like compose stack: End-to-end verified with health checks, HTTPS login & session refresh in Chromium, reverse proxying, and PowerShell backup/restore rehearsal.
+- Branch: `phase-14-polish-deliverables`. Ready for Stage 3 commit.

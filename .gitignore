@@ -25,6 +25,12 @@ frontend/test-results/
 .DS_Store
 Thumbs.db
 
+# Certificates (dev/local TLS)
+certs/
+*.pem
+*.key
+*.crt
+
 # DBHub
 dbhub.toml
 

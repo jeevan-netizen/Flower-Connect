@@ -117,7 +117,7 @@ public class CheckoutProperties {
         if (quoteSigningSecret == null || quoteSigningSecret.trim().length() < 32) {
             throw new IllegalStateException("Quote signing secret must be at least 32 characters");
         }
-        if (env != null && env.acceptsProfiles(Profiles.of("prod"))
+        if (env != null && (env.acceptsProfiles(Profiles.of("prod")) || env.acceptsProfiles(Profiles.of("staging")))
                 && INSECURE_DEFAULT_SECRET.equals(quoteSigningSecret)) {
             throw new IllegalStateException("Default quote signing secret cannot be used in production profile");
         }

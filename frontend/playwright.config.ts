@@ -21,6 +21,7 @@ export default defineConfig({
     command: "npm run dev -- --host 127.0.0.1 --port 5174",
     url: process.env.E2E_BASE_URL ?? "http://localhost:5174",
     reuseExistingServer: !process.env.CI,
+    ignoreHTTPSErrors: true,
     timeout: 120000,
   },
 });

@@ -34,7 +34,7 @@ public class JwtService {
     @PostConstruct
     public void init() {
         String secret = jwtProperties.getSecret();
-        if (secret == null || secret.length() < 32) {
+        if (secret == null || secret.trim().length() < 32) {
             throw new IllegalStateException("JWT_SECRET must be at least 32 characters");
         }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));

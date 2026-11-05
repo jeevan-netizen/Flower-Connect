@@ -10,16 +10,16 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Startup validation of the webhook secret in the {@code prod} profile.
+ * Startup validation of the webhook secret in {@code prod} and {@code staging} profiles.
  *
  * <p>The shared secret used to sign and verify payment webhooks must be
  * configured from environment configuration only and must be at least 32
- * bytes. Absence or a short secret fails startup so a production deployment
+ * bytes. Absence or a short secret fails startup so a deployment
  * can never accept unsigned webhook events with a weak or missing secret.
  * {@code .env.example} may contain a placeholder only.
  */
 @Component
-@Profile("prod")
+@Profile({"prod", "staging"})
 public class WebhookSecretValidator {
 
     private final AppProperties appProperties;
@@ -33,9 +33,9 @@ public class WebhookSecretValidator {
     public void validate() {
         String secret = appProperties.getWebhookSecret();
         if (secret == null
-                || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+                || secret.trim().getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException(
-                    "app.webhook-secret must be set and at least 32 bytes in the prod profile");
+                    "app.webhook-secret must be set and at least 32 bytes in prod and staging profiles");
         }
     }
 }
