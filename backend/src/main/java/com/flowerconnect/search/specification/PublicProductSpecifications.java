@@ -2,6 +2,7 @@ package com.flowerconnect.search.specification;
 
 import com.flowerconnect.catalog.domain.Product;
 import com.flowerconnect.catalog.domain.Product.ProductStatus;
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 import java.math.BigDecimal;
 import java.util.List;
@@ -65,5 +66,18 @@ public final class PublicProductSpecifications {
     /** Restricts results to a single vendor (still subject to eligibility filters). */
     public static Specification<Product> vendorId(Long vendorId) {
         return (root, query, builder) -> builder.equal(root.get("vendor").get("id"), vendorId);
+    }
+
+    /**
+     * Eagerly fetches the vendor and category associations so that
+     * {@code product.getVendor()} and {@code product.getCategory()} do not
+     * trigger per-row lazy-load queries when the response DTO is built.
+     */
+    public static Specification<Product> fetchVendorAndCategory() {
+        return (root, query, builder) -> {
+            root.fetch("vendor", JoinType.LEFT);
+            root.fetch("category", JoinType.LEFT);
+            return builder.conjunction();
+        };
     }
 }

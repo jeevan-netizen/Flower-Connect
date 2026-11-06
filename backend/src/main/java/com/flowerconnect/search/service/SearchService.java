@@ -4,6 +4,7 @@ import com.flowerconnect.domain.ServiceLocation;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.catalog.domain.Product;
 import com.flowerconnect.catalog.domain.Product.ProductStatus;
+import com.flowerconnect.catalog.domain.ProductImage;
 import com.flowerconnect.catalog.repository.ProductImageRepository;
 import com.flowerconnect.catalog.repository.ProductRepository;
 import com.flowerconnect.exception.BusinessException;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -124,7 +126,8 @@ public class SearchService {
         // Product eligibility: vendor-qualified + ACTIVE + optional filters.
         Specification<Product> spec = PublicProductSpecifications.forVendorIds(
                 new java.util.ArrayList<>(qualifyingVendorIds))
-                .and(PublicProductSpecifications.activeProduct());
+                .and(PublicProductSpecifications.activeProduct())
+                .and(PublicProductSpecifications.fetchVendorAndCategory());
         if (category != null) {
             spec = spec.and(PublicProductSpecifications.inCategory(category));
         }
@@ -171,8 +174,22 @@ public class SearchService {
         int end = Math.min(start + safeSize, available.size());
         List<Product> pageContent = available.subList(start, end);
 
+        // Batch-fetch images for all page products at once to avoid a per-product
+        // N+1 query in toResponse().
+        List<Long> pageProductIds = pageContent.stream().map(Product::getId).toList();
+        Map<Long, List<ProductImage>> imagesByProduct = new HashMap<>();
+        if (!pageProductIds.isEmpty()) {
+            productImageRepository
+                    .findByProductIdInOrderByProductIdSortOrderAscIdAsc(pageProductIds)
+                    .forEach(img -> imagesByProduct
+                            .computeIfAbsent(img.getProduct().getId(), k -> new ArrayList<>())
+                            .add(img));
+        }
+
         List<PublicProductResponse> content = pageContent.stream()
-                .map(p -> toResponse(p, inventoryMap.get(p.getId()), vendorDistance.get(p.getVendor().getId())))
+                .map(p -> toResponse(p, inventoryMap.get(p.getId()),
+                        vendorDistance.get(p.getVendor().getId()),
+                        imagesByProduct.getOrDefault(p.getId(), List.of())))
                 .toList();
 
         int totalPages = (int) Math.ceil((double) available.size() / safeSize);
@@ -189,9 +206,9 @@ public class SearchService {
                 .build();
     }
 
-    private PublicProductResponse toResponse(Product product, Inventory inventory, BigDecimal distanceKm) {
-        List<PublicProductImageResponse> images = productImageRepository
-                .findByProductIdOrderBySortOrderAscIdAsc(product.getId()).stream()
+    private PublicProductResponse toResponse(Product product, Inventory inventory, BigDecimal distanceKm,
+                                             List<ProductImage> images) {
+        List<PublicProductImageResponse> imageResponses = images.stream()
                 .map(image -> PublicProductImageResponse.builder()
                         .id(image.getId())
                         .originalFilename(image.getOriginalFilename())
@@ -213,7 +230,7 @@ public class SearchService {
                 .description(product.getDescription())
                 .basePrice(product.getBasePrice())
                 .available(inventory == null ? null : inventory.getAvailable())
-                .images(images)
+                .images(imageResponses)
                 .build();
     }
 

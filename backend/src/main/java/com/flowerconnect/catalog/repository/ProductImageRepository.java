@@ -4,6 +4,7 @@ import com.flowerconnect.catalog.domain.ProductImage;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import jakarta.persistence.LockModeType;
@@ -48,6 +49,13 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Long
     long countByProductId(Long productId);
 
     Optional<ProductImage> findByIdAndProductId(Long id, Long productId);
-
     List<ProductImage> findByProductId(Long productId);
+
+    /**
+     * All images for the given products, ordered for display. Used to batch-fetch
+     * images for a page of products and avoid a per-product N+1 query in search.
+     */
+    @Query("SELECT i FROM ProductImage i WHERE i.product.id IN :productIds ORDER BY i.product.id ASC, i.sortOrder ASC, i.id ASC")
+    List<ProductImage> findByProductIdInOrderByProductIdSortOrderAscIdAsc(@Param("productIds") List<Long> productIds);
+
 }

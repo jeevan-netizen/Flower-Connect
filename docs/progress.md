@@ -1812,4 +1812,28 @@ No new concurrency tests were added because each required case already has equiv
 - `OpenApiRoleCoverageTest`: 1/1 pass.
 - No production behavior changed; no applied Flyway migration edited; no secrets committed.
 
-**Branch:** `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 5 changes; no commit or push per instructions. Stage 6 not started.
+### Phase 14 Stage 6 — Task 14.7 (Performance Sanity) - COMPLETE (2026-11-06)
+
+**Implementation Summary:**
+- `PerformanceSanityIT` integration test seeded a Testcontainers MySQL 8.0.36 database (3 vendors, 27 products, 120 orders for test customer, 150 notifications, 30 settlement entries) and ran `EXPLAIN` on discovery, search, customer order list, vendor order list, notification list/unread-count, vendor billing ledger, and admin analytics queries.
+- Measured N+1 query counts via Hibernate `SessionFactoryStatistics.getQueryExecutionCount()` (instrumentation verified working with `spring.jpa.properties.hibernate.generate_statistics=true`, test-only via `@TestPropertySource`):
+  - **Search N+1 — Fixed:** before fix page size=20 → 24 queries, page size=50 → 54 queries (+30 per product). After fix: page=20→5, page=50→5, page=100→5 (bounded, 0 growth). Fixed with `JOIN FETCH vendor+category` via `PublicProductSpecifications.fetchVendorAndCategory()` and batch image fetch via `ProductImageRepository.findByProductIdInOrderByProductIdSortOrderAscIdAsc(List<Long>)`.
+  - **Customer order list N+1 — Fixed:** before fix page size=20→2, page size=50→2 (growth hidden by persistence context sharing; confirmed by code inspection of `CustomerOrderService.toListItem()` accessing `order.getVendor().getBusinessName()` where `Order.vendor` is `FetchType.LAZY`). After fix: page=20→2, page=50→2 (bounded, verified with clean persistence context via `entityManager.clear()`). Fixed with `@EntityGraph(attributePaths={"vendor"})` on `OrderRepository.findByUserIdOrderByCreatedAtDesc` and `findByUserIdAndStatusOrderByCreatedAtDesc`.
+  - Notifications: list=2 queries (count + data), unread-count=1 query (bounded, no N+1)
+  - Vendor billing ledger: 1 query (bounded, no N+1)
+- Verified pagination coverage for all 32 list endpoints from `EndpointAccessMatrix`; all have documented max page sizes (default 100) or justified unpaged access (small reference data, single values, time series, CSV, max-8 images).
+- Added Flyway migration `V33__performance_indexes.sql` with 5 justified indexes:
+  - `idx_vendor_profiles_status_accepting_radius(status, accepting_orders, delivery_radius_km)` — verified covering index for `findMaxDeliveryRadiusForApproved` (full scan → `Using where; Using index`)
+  - `idx_orders_vendor_status_created_at_desc(vendor_profile_id, status, created_at DESC)` — verified filesort eliminated for `findByVendorIdAndStatusOrderByCreatedAtDesc`
+  - `idx_orders_vendor_created_at_desc(vendor_profile_id, created_at DESC)` — verified filesort eliminated for `findByVendorIdAndStatusNotOrderByCreatedAtDesc` and `findByVendorIdAndCreatedAtBetweenOrderByCreatedAtDesc`
+  - `idx_orders_user_created_at_desc(user_id, created_at DESC)` — correct shape for `findByUserIdOrderByCreatedAtDesc`; not chosen by optimizer at demo scale
+  - `idx_orders_user_status_created_at_desc(user_id, status, created_at DESC)` — correct shape for `findByUserIdAndStatusOrderByCreatedAtDesc`; not chosen by optimizer at demo scale
+
+**Verification:**
+- `./mvnw failsafe:integration-test failsafe:verify -Pintegration "-Dit.test=PerformanceSanityIT"` → **13 tests, 0 failures, 0 errors, BUILD SUCCESS** (~3 min including Testcontainers startup + 33 Flyway migrations)
+- `./mvnw clean compile` → BUILD SUCCESS
+- `./mvnw test-compile` → BUILD SUCCESS
+- `docs/performance.md` (new): complete findings table, before/after EXPLAIN comparison, measured N+1 query counts at three page sizes, pagination coverage, index changes, test commands, remaining limitations.
+- `docs/er-diagram.md`: note that ER diagram covers migrations V1–V32; V33 adds only indexes (no table/column changes) so diagram unchanged.
+
+**Branch:** `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 6 changes; no commit or push per instructions. Stage 7 not started.

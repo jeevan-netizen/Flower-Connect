@@ -8,6 +8,7 @@ import com.flowerconnect.vendor.analytics.dto.OrderDeliveryDto;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -28,11 +29,13 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
+    @EntityGraph(attributePaths = {"vendor"})
     Page<Order> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     /**
      * One page of the customer's orders in a single status, newest first.
      */
+    @EntityGraph(attributePaths = {"vendor"})
     Page<Order> findByUserIdAndStatusOrderByCreatedAtDesc(Long userId, Order.OrderStatus status,
                                                           Pageable pageable);
 
