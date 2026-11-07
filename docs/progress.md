@@ -1871,3 +1871,38 @@ No new concurrency tests were added because each required case already has equiv
 - `npm run build` (`tsc -b && vite build`): clean, built in 30.94s
 
 **Branch:** `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 7 changes; no commit or push per instructions. Stage 8 not started.
+
+### Phase 14 Stage 8 â€” Task 14.2 (React Tests for Key Components and Flows) - COMPLETE (2026-11-07)
+
+**Implementation Summary:**
+- Added React/Vitest tests for two components that existed but had no test coverage at all:
+  - `frontend/src/features/vendor/pages/VendorPosPage.test.tsx` (POS component): 7 tests covering POS header/sections, empty ticket state, charge button disabled when empty, payment method radio selection, logout/cache-clear, no receipt on empty ticket, all three payment options rendered.
+  - `frontend/src/features/review/components/StarRating.test.tsx` (review star rating): 11 tests covering read-only ratings (integer, fractional, half stars), "New" empty state, custom empty label, className passthrough, interactive mode with rate buttons, onSelect callback, aria-pressed state.
+- Added 1 new test to existing `frontend/src/features/checkout/pages/CheckoutPage.test.tsx` for online payment method selection (places checkout with `paymentMethod: "ONLINE"`).
+
+**Coverage inventory â€” key flows:**
+| Feature/Flow | Current Coverage | Missing Behavior | Proposed Test | Status |
+|---|---|---|---|---|
+| Auth guards & session restoration | useAuth.test.tsx, auth-store.test.tsx | None | N/A | Covered |
+| Location picker & persistence | location-store.test.ts | None | N/A | Covered |
+| Vendor cards + "New" state | VendorCard.test.tsx | None | N/A | Covered |
+| Cart drawer / multi-vendor cart | CartPage.test.tsx | None | N/A | Covered |
+| Checkout quote errors, double-submit, COD | CheckoutPage.test.tsx | Online payment selection | Added `places checkout with ONLINE payment method` | Added |
+| Order stepper transitions | OrderStatusStepper.test.tsx | None | N/A | Covered |
+| Polling stopping at terminal states | usePolling.test.tsx | None | N/A | Covered |
+| Vendor order-board actions | VendorOrderBoardPage.test.tsx | None | N/A | Covered |
+| Notification bell / unread count | NotificationBell.test.tsx | None | N/A | Covered |
+| Dispute creation / response forms | DisputePages.test.tsx | None | N/A | Covered |
+| Billing / settlement tables | VendorBillingPage.test.tsx | None | N/A | Covered |
+| POS component | None (no test file) | All POS behavior | Added VendorPosPage.test.tsx (7 tests) | Added |
+| Reviews / StarRating | None (no test file) | All rating behavior | Added StarRating.test.tsx (11 tests) | Added |
+| Analytics component | VendorAnalyticsPage.test.tsx | None | N/A | Covered |
+
+**Verification:**
+- Playwright responsive-accessibility (Stage 7): **240/240 passed** (previously verified)
+- ESLint: clean, exit code 0
+- TypeScript typecheck (`tsc -b`): clean, exit code 0
+- Vitest: **884 tests passed** across 84 test files, 1 pre-existing flaky failure (`AdminVendorsPage.test.tsx` â€” "rejects a reason longer than the backend allows", 30s timeout, documented as pre-existing)
+- Vite production build: clean, built in 27.85s
+
+**Branch:** `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 8 changes; no commit or push per instructions. Stage 9 not started.

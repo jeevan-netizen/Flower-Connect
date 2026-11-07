@@ -573,3 +573,22 @@ _None._
 - Playwright responsive-accessibility: **240/240 passed** across all viewports and screens
 - Frontend lint: clean; typecheck: clean; unit tests: **866 passed**; production build: clean (30.94s)
 - No production behavior changed; no endpoints or response shapes altered
+
+## Phase 14 Stage 8 Findings (task 14.2: React tests for key components and flows)
+
+**Test coverage gaps filled:**
+- `frontend/src/features/vendor/pages/VendorPosPage.test.tsx` (new): 7 tests for the POS component, which previously had no test file. Covers header/sections, empty ticket state, charge button disabled when empty, payment method radio selection, logout/cache-clear, no receipt on empty ticket, all three payment options.
+- `frontend/src/features/review/components/StarRating.test.tsx` (new): 11 tests for the StarRating review component, which previously had no test file. Covers read-only ratings (integer, fractional, half stars), "New" empty state, custom empty label, className passthrough, interactive mode with rate buttons, onSelect callback, aria-pressed state.
+- `frontend/src/features/checkout/pages/CheckoutPage.test.tsx` (extended): +1 test for online payment method selection (places checkout with `paymentMethod: "ONLINE"`).
+
+**Pre-existing flaky test (not caused by this stage):**
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| T-1 | Frontend / Test | `AdminVendorsPage.test.tsx` "rejects a reason longer than the backend allows, before sending it" times out at 30s. Confirmed pre-existing on clean `main`. | Low | `src/features/admin/pages/AdminVendorsPage.test.tsx` test timeout | Documented as pre-existing; unrelated to Stage 8 changes | Open |
+
+**Verification:**
+- ESLint: clean, exit code 0
+- TypeScript typecheck (`tsc -b`): clean, exit code 0
+- Vitest: **884 tests passed** across 84 test files, 1 pre-existing flaky failure (`AdminVendorsPage.test.tsx`)
+- Vite production build: clean, built in 27.85s
+- No production behavior changed; no endpoints or response shapes altered
