@@ -26,7 +26,7 @@ import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
 const HEADING_CLASS = "px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500";
 const CELL_CLASS = "px-4 py-3 text-sm text-slate-700 align-middle";
-const ACTION_BUTTON_CLASS = `rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
+const ACTION_BUTTON_CLASS = `rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
 
 /**
  * `LowStockProductResponse` carries the same six stock figures as

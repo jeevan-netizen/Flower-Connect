@@ -245,16 +245,16 @@ export function SiteHeader() {
 
   return (
     <header className="relative bg-bolder-bg text-bolder-text">
-      <nav
-        aria-label="Main"
-        className="mx-auto flex w-full max-w-landing items-center justify-between gap-6 px-5 py-4 sm:px-8 lg:px-14"
-      >
+        <nav
+          aria-label="Main"
+          className="mx-auto flex w-full max-w-landing items-center justify-between gap-4 sm:gap-6 px-5 py-4 sm:px-8 lg:px-14"
+        >
         <Link
           to="/"
           className={`flex items-center gap-3 rounded-sm ${FOCUS_RING_DARK}`}
         >
           <LogoMark />
-          <span className="font-display text-[24px] font-medium leading-none">
+          <span className="font-display text-[20px] sm:text-[24px] font-medium leading-none">
             FlowerConnect
           </span>
         </Link>

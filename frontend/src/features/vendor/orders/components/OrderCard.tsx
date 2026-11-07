@@ -44,7 +44,7 @@ const STATUS_TONES: Record<VendorOrderResponse["status"], string> = {
 
 function actionButtonClass(disabled: boolean): string {
   return [
-    "rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700",
+    "rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700",
     "hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed",
     disabled ? "" : `${PRESSABLE} ${FOCUS_RING}`,
   ].join(" ");

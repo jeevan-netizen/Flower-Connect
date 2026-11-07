@@ -245,7 +245,8 @@ export function OrderDetailPage() {
 
       {/* Items */}
       <Card title="Items">
-        <table className="w-full text-left text-sm divide-y divide-slate-100">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm divide-y divide-slate-100">
           <thead className="text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th scope="col" className="py-3 pr-4 font-medium">
@@ -282,6 +283,7 @@ export function OrderDetailPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </Card>
 
       {/* Review: shown once the order is DELIVERED */}

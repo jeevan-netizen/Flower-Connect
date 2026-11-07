@@ -354,7 +354,7 @@ export function VendorPosPage() {
                   <button
                     onClick={() => addItem(product.productId, product.name, product.basePrice)}
                     disabled={disabled || isSubmitting}
-                    className={`mt-1 w-full rounded border border-slate-400 px-2 py-1 text-sm text-slate-100 hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
+                    className={`mt-1 w-full rounded border border-slate-400 px-2 py-2 text-sm text-slate-100 hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
                   >
                     Quick Add
                   </button>

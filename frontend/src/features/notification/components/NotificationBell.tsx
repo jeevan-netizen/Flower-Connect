@@ -149,7 +149,7 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
               <>
                 <ul role="menu" className="space-y-1">
                   {notifications.map((notification) => (
-                    <li key={notification.id} className={ROW_CLASS}>
+                    <li key={notification.id} role="menuitem" className={ROW_CLASS}>
                       {notification.readAt === null && (
                         <span className={UNREAD_DOT} aria-hidden="true" />
                       )}

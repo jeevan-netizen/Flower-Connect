@@ -554,3 +554,22 @@ AdminDisputeControllerTest 5, GlobalExceptionHandlerTest 2, SmtpEmailSenderTest 
 ## Deprecation Notices
 
 _None._
+
+## Phase 14 Stage 7 Findings (task 14.4: responsive layout and accessibility pass)
+
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| S-1 | Frontend / Layout | Horizontal overflow of 30px on `/browse` at 360px viewport. SiteHeader nav gap (`gap-6`, 24px) and logo text (`text-[24px]`) exceeded the available width at mobile-small viewports. | Medium | Playwright diagnostic: `scrollWidth - clientWidth = 30px` at 360px; overflowing div `flex items-center gap-2` at `left:260, right:390` in `SiteHeader.tsx:270` | Changed nav gap to `gap-4 sm:gap-6` and logo text to `text-[20px] sm:text-[24px]` on mobile | Fixed |
+| S-2 | Frontend / Accessibility | Panel `<li>` elements in NotificationBell lacked `role="menuitem"`. | Low | `NotificationBell.tsx:151` | Added `role="menuitem"` to panel list items | Fixed |
+| S-3 | Frontend / Accessibility | Pagination Previous/Next buttons lacked `aria-disabled` state when disabled. | Low | `Pagination.tsx` | Added `aria-disabled` to Prev/Next buttons | Fixed |
+| S-4 | Frontend / Touch targets | VendorPosPage quick add button (`py-1`), VendorInventoryPage action buttons (`py-1`), OrderCard action buttons (`py-1`) too small for comfortable touch at 44px minimum. | Low | Component inspections | Increased padding to `py-2` / `py-1.5` | Fixed |
+| S-5 | Frontend / Layout | OrderDetailPage items table could overflow horizontally on narrow screens. | Medium | `OrderDetailPage.tsx:248-286` | Wrapped items table in `overflow-x-auto` div | Fixed |
+
+**Test additions:**
+- `frontend/tests/e2e/responsive-accessibility.test.ts`: 240 Playwright tests (5 viewports × 12 screens × 4 checks) — all pass
+- `frontend/tests/e2e/responsive-screenshots.test.ts`: screenshot capture at 5 viewports × 9 screens
+
+**Verification:**
+- Playwright responsive-accessibility: **240/240 passed** across all viewports and screens
+- Frontend lint: clean; typecheck: clean; unit tests: **866 passed**; production build: clean (30.94s)
+- No production behavior changed; no endpoints or response shapes altered

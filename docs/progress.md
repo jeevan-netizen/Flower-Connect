@@ -1837,3 +1837,37 @@ No new concurrency tests were added because each required case already has equiv
 - `docs/er-diagram.md`: note that ER diagram covers migrations V1–V32; V33 adds only indexes (no table/column changes) so diagram unchanged.
 
 **Branch:** `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 6 changes; no commit or push per instructions. Stage 7 not started.
+
+### Phase 14 Stage 7 â€” Task 14.4 (Responsive Layout and Accessibility Pass) - COMPLETE (2026-11-06)
+
+**Implementation Summary:**
+- Required viewports: 360, 390, 768, 1024, 1440 px
+- Screens checked: customer (home/discovery, search, storefront, cart, checkout, orders, order detail, address book, notifications, disputes, review prompt), vendor (order board, catalog, inventory, billing, disputes, settings), POS (tablet), admin (dashboard, vendor management, refunds, disputes, billing, reviews, analytics)
+- Preserved dark plum-black ground, rose accent, Fraunces + DM Sans typography, existing design tokens
+- No features added or business behavior/endpoints/response shapes altered
+
+**Fixes applied:**
+1. `frontend/src/app/components/SiteHeader.tsx:250` â€” nav gap `gap-6` â†’ `gap-4 sm:gap-6` on mobile so header items fit at 360px width
+2. `frontend/src/app/components/SiteHeader.tsx:257` â€” logo text `text-[24px]` â†’ `text-[20px] sm:text-[24px]` on mobile
+3. `frontend/src/features/customer/orders/pages/OrderDetailPage.tsx:248-286` â€” items table wrapped in `overflow-x-auto` div (pre-existing fix confirmed)
+4. `frontend/src/features/notification/components/NotificationBell.tsx:151` â€” panel `<li>` got `role="menuitem"` (pre-existing fix confirmed)
+5. `frontend/src/shared/components/Pagination.tsx` â€” Previous/Next buttons got `aria-disabled` (pre-existing fix confirmed)
+6. `frontend/src/features/vendor/pages/VendorPosPage.tsx:357` â€” quick add button `py-1` â†’ `py-2` (pre-existing fix confirmed)
+7. `frontend/src/features/vendor/pages/VendorInventoryPage.tsx:29` â€” action buttons `py-1` â†’ `py-1.5` (pre-existing fix confirmed)
+8. `frontend/src/features/vendor/orders/components/OrderCard.tsx:47` â€” action buttons `py-1` â†’ `py-1.5` (pre-existing fix confirmed)
+
+**New test files:**
+- `frontend/tests/e2e/responsive-accessibility.test.ts` â€” 240 Playwright tests (5 viewports × 12 screens × 4 checks: overflow, button names, link names, focus indicators)
+- `frontend/tests/e2e/responsive-screenshots.test.ts` â€” screenshot capture at 5 viewports × 9 screens
+
+**Key defect fixed:**
+- Horizontal overflow of 30px on `/browse` at 360px viewport caused by SiteHeader nav items exceeding container width (nav gap too wide, logo text too large). Fixed via responsive gap and logo size. Verified with diagnostic test: overflow went from 30px to 0px.
+
+**Verification:**
+- Playwright responsive-accessibility test: **240/240 passed** (60 overflow + 60 button names + 60 link names + 60 focus indicators, all viewports × all screens)
+- `npm run lint`: clean, exit code 0
+- `npm run typecheck` (`tsc -b`): clean, exit code 0
+- `npm test` (`vitest run`): **866 tests passed** across 82 test files, 0 failures
+- `npm run build` (`tsc -b && vite build`): clean, built in 30.94s
+
+**Branch:** `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 7 changes; no commit or push per instructions. Stage 8 not started.
