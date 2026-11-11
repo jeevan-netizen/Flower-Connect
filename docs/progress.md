@@ -1906,3 +1906,27 @@ No new concurrency tests were added because each required case already has equiv
 - Vite production build: clean, built in 27.85s
 
 **Branch:** `phase-14-polish-deliverables`. Working tree contains uncommitted Stage 8 changes; no commit or push per instructions. Stage 9 not started.
+
+### Phase 14 Stage 9 â€” Tasks 14.10 & 14.12 (Synopsis Reconciliation and Report Material) - COMPLETE (2026-11-07)
+
+**Scope:** Reconcile the synopsis (plan §10) against the implemented stack and build report material (`docs/report-material/`). No production code changed; no migration; no commit or push.
+
+**14.10 â€” Synopsis reconciliation:**
+- Created `docs/synopsis-reconciliation.md` with 12 evidence-based rows covering every plan §10 synopsis claim.
+- Evidenced rows (no change needed): Stripeâ†’COD + simulated test-mode gateway only (`CodPaymentProvider`, `SimulatedPaymentProvider`, `SimulatorController` behind `!prod`; D-47/48/49); Twilio/SendGridâ†’SMTP email (`SmtpEmailSender`, MailHog 1025) + in-app notifications, no SMS (D-60); Mapboxâ†’Haversine over seeded `service_locations` centroids, no GPS/map service (D-4/D-34); Redisâ†’not provisioned, Caffeine per-instance rate limiting (D-68, Stage 6); Flyway/Docker Compose/Zustand/TanStack Query/Zod all match (ADR-002/004).
+- The user approved the 12 plan-derived working module names; all map to Phases 1–12 in `docs/synopsis-reconciliation.md` and appear in the authored synopsis at `docs/synopsis.md`. The original submitted synopsis is not in the repository and was not modified; `docs/synopsis.md` is the implementation-accurate replacement. Stripe, Twilio/SendGrid, Mapbox, and Redis wording was amended in the authored synopsis to match the implemented behavior (COD + simulated gateway only; SMTP email + in-app notifications, no SMS; Haversine over seeded centroids, no GPS/map service; Redis not provisioned).
+
+**14.12 â€” Report material:**
+- Created `docs/report-material/report-material.md` containing: identifying fields (project name: FlowerConnect; institution: SJC Institute of Technology); screenshot inventory mapped 1:1 to `docs/demo-script.md` steps 1â€“18 (customer, vendor, admin) plus Tier 2 (reviews/analytics, no screenshots); results summary with verified test counts; limitations (L-1â€¦L-12); future scope (F-1â€¦F-13).
+- Existing rehearsal screenshots reused as-is (captured during verified Tier 1 clean-clone rehearsal); no fresh capture (no live stack running, no image-inspection tooling to confirm they match current committed UI). Not claimed to demonstrate flows not executed.
+
+**Verification (Stage 9):**
+- Frontend unit (verified `npm run test`): **885 tests passed**, 84 files, 0 failures; typecheck clean; lint clean; build clean.
+- Backend unit (verified `./mvnw -o test`): **1484 tests run, 0 failures, 0 errors, BUILD SUCCESS** â€” the 4 pre-existing `UnnecessaryStubbingException` errors in `SearchServiceTest` were stale stubs left by Stage 6's batch image-fetch change and have been removed. V33 performance indexes confirmed applied (Flyway migrated schema to v33 during run).
+- Backend integration (focused batches, NOT full suite): Checkout/cancellation/POS-race/dispute 67/67; COD+online journeys 2/2; Webhook 13/13; PerformanceSanityIT 13/13; OpenApiRoleCoverageTest 1/1.
+- Concurrency (verified, CountDownLatch, no sleeps): last-unit checkout race 1â200/4â409/1 RESERVE; checkout vs accept/cancel serialises; POS vs online last unit exactly one succeeds / available=0 / 1 movement; duplicate webhook ignored no side effect; two concurrent disputes 1â200/7â409 / DB count=1.
+- Stage 6 performance (docs/performance.md): Search N+1 fixed 24â54 before â†’ 5â5â5 after (bounded); customer order list N+1 fixed via `@EntityGraph`; V33 indexes added; 32 list endpoints pagination-documented.
+
+**Remaining source limitation:** The originally submitted synopsis is not in the repository. `docs/synopsis.md` is the authored, implementation-accurate replacement using the user-approved 12-module list; it does not claim to reproduce or amend the missing original.
+
+**Branch:** `phase-14-polish-deliverables`. Stage 9 complete: synopsis reconciliation, report materials, authored synopsis, and SearchServiceTest cleanup are in the working tree, ready to commit. Stage 10 not started.

@@ -592,3 +592,29 @@ _None._
 - Vitest: **884 tests passed** across 84 test files, 1 pre-existing flaky failure (`AdminVendorsPage.test.tsx`)
 - Vite production build: clean, built in 27.85s
 - No production behavior changed; no endpoints or response shapes altered
+
+## Phase 14 Stage 9 Findings (tasks 14.10 & 14.12: synopsis reconciliation and report material)
+
+**Synopsis reconciliation (14.10):**
+- Created `docs/synopsis-reconciliation.md` with 12 evidence-based rows mapping every plan §10 synopsis claim to the implemented reality.
+- Evidenced (no change needed): Stripeâ†’COD + simulated test-mode gateway only (`CodPaymentProvider`, `SimulatedPaymentProvider`, `SimulatorController` behind `!prod`; D-47/48/49); Twilio/SendGridâ†’SMTP email (`SmtpEmailSender`, MailHog 1025) + in-app notifications, no SMS (D-60); Mapboxâ†’Haversine over seeded `service_locations` centroids, no GPS/map service (D-4/D-34); Redisâ†’not provisioned, Caffeine per-instance rate limiting (D-68); Flyway/Docker Compose/Zustand/TanStack Query/Zod all match (ADR-002/004).
+- The authored synopsis at `docs/synopsis.md` supplies the synopsis text and the 12 user-approved module names (Authentication; Vendor profiles and approval; Catalog and inventory; Addresses, discovery, and search; Cart and checkout; Order management; Payments and COD; Cancellations, refunds, and disputes; Notifications and real-time updates; Billing and settlements; POS; Reviews and analytics). Wording was amended for Stripe (COD + simulated gateway only), Twilio/SendGrid (SMTP email + in-app, no SMS), Mapbox (Haversine over centroids, no GPS/map), and Redis (not provisioned). The original submitted synopsis is not in the repository and was not modified.
+
+**Report material (14.12):**
+- Created `docs/report-material/report-material.md`: identifying fields (project name: FlowerConnect; institution: SJC Institute of Technology); screenshot inventory mapped to `docs/demo-script.md` steps 1â€“18; results summary; limitations (L-1â€¦L-12); future scope (F-1â€¦F-13).
+- Existing rehearsal screenshots reused as-is; no fresh capture (no live stack running, no image-inspection tooling to confirm they match current committed UI). Not claimed to demonstrate flows not executed.
+- Project name (FlowerConnect) and institution (SJC Institute of Technology) are recorded in `docs/report-material/report-material.md`; no open input remains.
+
+**Verification (Stage 9):**
+- Frontend unit (verified `npm run test`): **885 tests passed**, 84 files, 0 failures; typecheck clean; lint clean; build clean.
+- Backend unit (verified `./mvnw -o test`): **1484 tests run, 0 failures, 0 errors, BUILD SUCCESS** â€” the 4 pre-existing `UnnecessaryStubbingException` errors in `SearchServiceTest` were stale stubs left by Stage 6's batch image-fetch change and have been removed.
+- Backend integration (focused batches, NOT full suite): Checkout/cancellation/POS-race/dispute 67/67; COD+online journeys 2/2; Webhook 13/13; PerformanceSanityIT 13/13; OpenApiRoleCoverageTest 1/1.
+- Concurrency (verified, CountDownLatch, no sleeps): last-unit checkout race 1â200/4â409/1 RESERVE; checkout vs accept/cancel serialises; POS vs online last unit exactly one succeeds / available=0 / 1 movement; duplicate webhook ignored no side effect; two concurrent disputes 1â200/7â409 / DB count=1.
+- Stage 6 performance (docs/performance.md): Search N+1 fixed 24â54 before â†’ 5â5â5 after (bounded); customer order list N+1 fixed via `@EntityGraph`; V33 indexes added; 32 list endpoints pagination-documented.
+
+**New tracking item:**
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| S-9 | Docs / Report material | Institution supplied as SJC Institute of Technology; no open issue | Low | User-provided value recorded in `docs/report-material/report-material.md` | Closed | Fixed |
+| S-10 | Docs / Synopsis | Original submitted synopsis is not in repository; an implementation-accurate replacement was authored at user request | Low | `docs/synopsis.md`, `docs/synopsis-reconciliation.md` | Keep original-source limitation clear; no original document was altered | Resolved for deliverable |
+
