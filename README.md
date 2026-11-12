@@ -56,6 +56,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the final module diagram 
 ## Prerequisites
 
 - **Docker Desktop** with Compose v2+ (Windows: Docker Desktop with WSL2 backend recommended)
+- **Node 22 LTS** (required for local frontend development; the frontend Dockerfile uses `node:22-alpine` and `.nvmrc` pins `22`)
 - **Git** (line endings: the repo enforces LF on wrapper scripts via `.gitattributes`; on Windows, check out with `core.autocrlf=input` to avoid CRLF breaking `./mvnw` inside Linux containers)
 - A terminal (PowerShell, Git Bash, or WSL)
 
@@ -136,8 +137,8 @@ cd backend
 
 ```bash
 cd frontend
-npm install        # package-lock.json is intentionally gitignored
-npm run test       # Vitest
+npm ci          # requires Node 22 (see .nvmrc / engines in package.json)
+npm run test    # Vitest
 npm run typecheck  # tsc -b
 npm run lint       # ESLint
 npm run build      # tsc -b && vite build
