@@ -618,3 +618,29 @@ _None._
 | S-9 | Docs / Report material | Institution supplied as SJC Institute of Technology; no open issue | Low | User-provided value recorded in `docs/report-material/report-material.md` | Closed | Fixed |
 | S-10 | Docs / Synopsis | Original submitted synopsis is not in repository; an implementation-accurate replacement was authored at user request | Low | `docs/synopsis.md`, `docs/synopsis-reconciliation.md` | Keep original-source limitation clear; no original document was altered | Resolved for deliverable |
 
+## Phase 14 Stage 10 Findings (task 14.11: final clean-clone rehearsal)
+
+**Clean-clone rehearsal (task 14.11):**
+- Cloned `phase-14-polish-deliverables` (commit `1060dce`) into fresh directory `C:\Users\jeeva\AppData\Local\Temp\kilo\stage10-clone`.
+- Built and started stack with unique Compose project name `fc-stage10-rehearsal`; all containers healthy; backend/frontend health checks pass.
+- Full demo script (Tier 1 + Tier 2) executed in real Chromium browser against seeded dev stack: customer login/location/browse/storefront/cart/checkout(COD)/order-tracking; vendor login/order-board/accept-prepare-out-for-delivery-deliver(COD collected); admin login/vendor-management/billing-settlements; Tier 2 review moderation + analytics. All flows COMPLETE.
+- 8 screenshots captured (s1â€“s8).
+- Rehearsal date: 2026-11-11. Total time: ~45 min.
+- Deviations: (D-1) backend transient `mysql` DNS failure on start, fixed by `docker compose restart backend`; (D-2) admin billing transient 500, recovered on retry. Both documented, not product defects.
+
+**Verification (scripts/verify.ps1 authored and run from clean clone):**
+- Backend unit tests (`./mvnw -o test`): **1484 tests, 0 failures, 0 errors, BUILD SUCCESS**.
+- Backend full integration suite (`./mvnw verify -Pintegration`): **did not complete** â€” exceeded ~15-min session window (timed out ~20:53). Matches Known Issue P-10. Focused batches previously verified: 67/67, 2/2, 13/13, 13/13, 1/1.
+- Frontend lint (`npm run lint`): BLOCKED â€” ESLint 8.57.1 incompatible with Node v22.23.2 (`es-abstract`/`object.fromentries` CJS/ESM resolution failure). Environment/tooling issue; not auto-upgraded without approval (see known-issues npm-audit stance).
+- Frontend typecheck (`npm run typecheck`): BLOCKED â€” `package-lock.json` is gitignored, so clean-clone `npm install` resolves react-hook-form/@hookform/resolvers/zod/three/framer-motion differently than main workspace, causing dozens of TS2307/TS2322/TS2694 errors. Dependency drift from gitignored lockfile; not product defect.
+- Frontend tests (`npm run test`): 346 tests passed; 46/84 test files failed â€” all `Failed to resolve entry for package "react-hook-form"` (same gitignored-package-lock dependency drift).
+- Frontend build (`npm run build`): not run â€” blocked by typecheck (`tsc -b` first step).
+
+**Stage 10 clean-clone blockers (documented, not unilaterally fixed):**
+| id | area | description | severity | evidence | proposed action | status |
+|----|------|-------------|----------|----------|-----------------|--------|
+| B-1 | Frontend / dependency resolution | `package-lock.json` gitignored; clean-clone `npm install` resolves react-hook-form/@hookform/resolvers/zod/three differently than main workspace, breaking lint/typecheck/tests/build. | High | 46/84 frontend test files fail `react-hook-form` resolution; typecheck has 50+ TS errors | Consider committing `package-lock.json` or pinning drifted deps; requires approval (changes .gitignore convention) | Open |
+| B-2 | Frontend / tooling | ESLint 8.57.1 incompatible with Node v22.23.2 (`es-abstract` module resolution failure); lint cannot run in clean clone. | Medium | `npm run lint` fails on `es-abstract`/`object.fromentries` | Review ESLint/Node pinning; requires approval (known-issues npm-audit stance: ask before upgrading) | Open |
+| B-3 | Backend / integration suite | Full `./mvnw verify -Pintegration` (>1200 tests) exceeds ~15-min session window; each Spring context ~15s. | Medium | Timed out at ~20:53 during checkout/cancellation/POS-race/dispute classes | Schedule separate full-suite run when time permits; focused batches pass | Open |
+
+

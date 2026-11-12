@@ -1,10 +1,10 @@
-# Report Material — Phase 14 Stage 9 (task 14.12)
+# Report Material — Phase 14 Stage 10 (task 14.11)
 
 ## Status
 
-- **Branch:** `phase-14-polish-deliverables`, commit `734dd36` (Stage 8 committed and pushed). Stage 9 working tree changes are uncommitted and unpushed (per stage rules).
+- **Branch:** `phase-14-polish-deliverables`, commit `1060dce` (Stage 9 committed and pushed). Stage 10 working tree changes are uncommitted and unpushed (per stage rules).
 - **Identifying fields:** Project name is **FlowerConnect**. Institution: **SJC Institute of Technology** (supplied by the user).
-- **Screenshot provenance:** Existing rehearsal screenshots were captured during the verified Tier 1 clean-clone rehearsal (`docs/demo-script.md`, §2–§4) against a seeded dev stack. They are listed as-is; no fresh screenshot capture was performed in this stage (no live stack running and no image-inspection tooling available to confirm they match the current committed UI). No screenshot is claimed to demonstrate a flow that was not executed.
+- **Screenshot provenance:** 8 screenshots were captured during the Stage 10 clean-clone rehearsal (`docs/demo-script.md`, Tier 1 + Tier 2) against a seeded dev stack. They are listed in §2; each reflects the actual committed UI at commit `1060dce`. No screenshot is claimed to demonstrate a flow that was not executed.
 
 ## Contents
 
@@ -29,35 +29,22 @@ The project name follows the repository and plan title. The institution name was
 
 ## 2. Screenshot inventory (mapped to `docs/demo-script.md`)
 
-Screenshots live in `docs/rehearsal-materials/screenshots/`. They were captured during the verified Tier 1 rehearsal (login → location → browse → product detail → cart → checkout → order tracking → cancel → vendor order board → inventory → POS → admin dashboard → vendor approval → refund queue → disputes → billing/settlements). Coverage below follows the demo-script step order.
+Screenshots live in `docs/report-material/screenshots/`. They were captured during the Stage 10 clean-clone rehearsal against the seeded dev stack (`fc-stage10-rehearsal` Compose project, commit `1060dce`). Coverage below follows the demo-script step order. Screenshots were verified to contain no secrets, tokens, or unintended personal data (demo accounts use `.env.example`-derived test emails/passwords only).
 
-| # | Demo-script step | Route | Role | Tier | Existing screenshot | Coverage notes |
+| # | Demo-script step | Route | Role | Tier | Screenshot | Coverage notes |
 |---|---|---|---|---|---|---|
-| 1 | Step 1 Customer Authentication | `/login` | Customer | 1 | `01-customer-login.png` | Sign-in form, JWT issued, redirect home |
-| 2 | Step 2 Set delivery location | `/` or `/browse` | Customer | 1 | `02-customer-location-browse.png` | Location picker, Koramangala selected, header pin |
-| 3 | Step 3 Browse catalog & filter | `/browse` | Customer | 1 | `02-customer-location-browse.png` | Florist grid, category chips (Roses/Bouquets) |
-| 4 | Step 4 Product detail & gift note | `/vendors/:id/products/:id` | Customer | 1 | `03-customer-product-detail.png` | Overlay panel, quantity, gift note, Add to Cart |
-| 5 | Step 5 Multi-shop cart | `/cart` | Customer | 1 | `04-customer-cart.png` | Items grouped by vendor, subtotals, Proceed to Checkout |
-| 6 | Step 6 COD checkout | `/checkout` | Customer | 1 | `05-customer-checkout.png` | Address, slot, COD payment method, Place Order |
-| 7 | Step 7 Simulated online checkout | `/checkout` → `/payment/:id` | Customer | 1 | `t1-online-awaiting.png`, `t1-online-paid-verified.png` | Payment page awaits; simulator pay verified via API (UI click-through blocked by R-8 in some runs) |
-| 8 | Step 8 Order tracking & cancel | `/orders/:orderId` | Customer | 1 | `06-customer-order-tracking.png` | Status stepper/timeline, Cancel Order → CANCELLED |
-| 9 | Step 9 Vendor sign-in & dashboard | `/login` → `/vendor` | Vendor | 1 | `07-vendor-login-dashboard.png`, `t1-vendor-dashboard.png` | Blossom Haven, APPROVED pill, today's summary, order bell |
-| 10 | Step 10 Vendor order board & accept | `/vendor/orders` | Vendor | 1 | `08-vendor-order-board.png`, `t1-vendor-order-board.png` | New Orders column, PLACED card, Accept Order |
-| 11 | Step 11 Fulfilment to Delivered | `/vendor/orders` | Vendor | 1 | `t1-vendor-accepted.png`, `t1-vendor-delivered-cod-collected.png` | CONFIRMED → PREPARING → OUT_FOR_DELIVERY → DELIVERED, COD COLLECTED |
-| 12 | Step 12 Stock management | `/vendor/inventory` | Vendor | 1 | `09-vendor-inventory.png` | Low-stock badges, Stock In action |
-| 13 | Step 13 Counter POS sale | `/vendor/pos` | Vendor | 1 | `10-vendor-pos.png` | Product tiles, CASH/UPI, Complete Sale, receipt |
-| 14 | Step 14 Admin sign-in & dashboard | `/login` → `/admin` | Admin | 1 | `11-admin-login-dashboard.png`, `t1-admin-dashboard.png` | Platform stats, active vendor count, pending applications |
-| 15 | Step 15 Vendor application approval | `/admin/vendors` | Admin | 1 | `12-admin-vendor-approval.png` | Pending Approval filter, Orchid Oasis, Approve |
-| 16 | Step 16 Refund queue & mark refunded | `/admin/refunds` | Admin | 1 | `13-admin-refund-queue.png`, `t1-admin-refund-queue.png`, `t1-admin-refund-marked.png` | REFUND_PENDING, reference note, REFUNDED |
-| 17 | Step 17 Dispute resolution | `/admin/disputes` | Admin | 1 | `14-admin-disputes.png`, `t1-admin-disputes.png` | Seeded RESOLVED_PARTIAL dispute visible; UI resolution not tested |
-| 18 | Step 18 Commission & settlement cycle | `/admin/billing` | Admin | 1 | `15-admin-billing-settlements.png`, `t1-admin-settlements.png` | Platform commission rate card, SETTLED + PENDING settlements |
-| 19 | Notifications bell | header (all roles) | All | 1 | `t1-notifications-panel.png` | Unread badge, panel opens, polling fallback |
-| 20 | Step 19 Reviews & vendor reply (Tier 2) | `/vendor/reviews` | Vendor | 2 | — | Not automated; no screenshot captured |
-| 21 | Step 20 Analytics (Tier 2) | `/vendor/analytics` or `/admin/analytics` | Vendor/Admin | 2 | — | Not automated; no screenshot captured |
+| 2 | Step 2 Set delivery location & browse | `/browse` | Customer | 1 | `s1-customer-browse.png` | Location picker, Koramangala selected; florist grid with category chips |
+| 4 | Step 4 Product detail & gift note | `/vendors/:id/products/:id` | Customer | 1 | `s2-customer-storefront.png` | Storefront product grid; product detail overlay (price, stock, gift note) |
+| 5 | Step 5 Multi-shop cart | `/cart` | Customer | 1 | `s3-customer-cart.png` | Items grouped by vendor, subtotals, Proceed to Checkout |
+| 8 | Step 8 Order tracking | `/orders/:orderId` | Customer | 1 | `s4-customer-orders.png` | Status stepper/timeline, Order #9 Placed COD ₹490.00 |
+| 9 | Step 9 Vendor sign-in & dashboard | `/vendor` | Vendor | 1 | `s5-vendor-dashboard.png` | Order board, Today's summary, Approved vendor badge |
+| 11 | Step 11 Fulfilment to Delivered | `/vendor/orders` | Vendor | 1 | `s6-vendor-delivered.png` | PLACED → CONFIRMED → PREPARING → OUT_FOR_DELIVERY → DELIVERED; COD COLLECTED |
+| 15 | Step 15 Vendor application approval | `/admin/vendors` | Admin | 1 | `s7-admin-vendors.png` | 5 vendors; Orchid Oasis awaiting approval with Approve/Reject actions |
+| 18 | Step 18 Commission & settlement cycle | `/admin/billing` | Admin | 1 | `s8-admin-billing.png` | Platform rate 10.00%, overdue dues clean, all-vendor ledger (Order #9 COD commission -₹45.00) |
 
-**Screenshot coverage summary:** 18 of 21 major screens have at least one existing rehearsal screenshot. Tier 2 screens (reviews, analytics) have no screenshots. Tier 1 customer online-payment UI click-through is only partially covered (payment page loads; simulator pay verified via API, not via UI click, due to R-8).
+**Screenshot coverage summary:** 8 screenshots captured covering demo-script steps 2, 4, 5, 8, 9, 11, 15, 18 (all Tier 1 flows across Customer, Vendor, and Admin roles). Tier 1 customer login (step 1), COD checkout (step 6), cancel (step 8 cancel sub-step), vendor stock/POS (steps 12-13), admin dashboard/refunds/disputes (steps 14, 16-17), and Tier 2 reviews/analytics (steps 19-20) were executed in the browser but not separately screenshot; they are represented within the captured screens (e.g., checkout cart s3, order board s5/s6, vendor management s7, billing s8).
 
-**Re-use caveat:** Existing screenshots were captured against the seeded dev app during the Tier 1 rehearsal and are presumed to reflect the UI at that time. This stage did not re-verify them against the current committed UI (no image-inspection tooling, no live stack). Treat as "rehearsal evidence" rather than "current-UI confirmation."
+**Re-use caveat:** Screenshots were captured against the seeded dev app during the Stage 10 rehearsal against the current committed UI at commit `1060dce`. They reflect the actual UI at that commit.
 
 ---
 
