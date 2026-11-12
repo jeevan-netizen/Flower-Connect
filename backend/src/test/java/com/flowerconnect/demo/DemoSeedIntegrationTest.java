@@ -67,6 +67,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -295,13 +296,23 @@ class DemoSeedIntegrationTest extends AbstractIntegrationTest {
 
         // --- 3. RECONCILIATION CHECKS ---
 
+        // Only reconcile orders that this seed created: legacy DELIVERED orders
+        // left behind by other integration test classes (e.g. CommissionIntegrationTest
+        // backfillDeliveredOrdersIdempotently) do not carry commission/ledger entries
+        // and must not cause this test to fail. Shared Testcontainers database has
+        // no per-class rollback, so state accumulates across the suite.
+        Set<Long> demoCustomerIds = Set.of(c1.getId(), c2.getId(), c3.getId());
+        List<Order> demoOrders = allOrders.stream()
+                .filter(o -> o.getUser() != null && demoCustomerIds.contains(o.getUser().getId()))
+                .toList();
+
         // Stock reconciliation: for every inventory row, available + reserved = quantity
         for (Inventory inv : inventoryRepository.findAll()) {
             assertThat(inv.getAvailable() + inv.getReservedQuantity()).isEqualTo(inv.getQuantity());
         }
 
-        // Billing reconciliation: delivered orders have commission and ledger entries
-        for (Order o : allOrders) {
+        // Billing reconciliation: delivered demo orders have commission and ledger entries
+        for (Order o : demoOrders) {
             if (o.getStatus() == OrderStatus.DELIVERED) {
                 Commission comm = commissionRepository.findByOrderId(o.getId()).orElseThrow();
                 assertThat(comm.getCommissionAmount()).isGreaterThan(BigDecimal.ZERO);

@@ -15,12 +15,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.not;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -40,6 +42,9 @@ class SearchApiIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper json;
 
     @Autowired
     private com.flowerconnect.repository.UserRepository userRepository;
@@ -123,12 +128,37 @@ class SearchApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/search")
                         .param("locationId", origin.getId().toString())
                         .param("size", "100"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[*].id", hasItem(product.getId().intValue())))
-                .andExpect(jsonPath("$.content[?(@.id==" + product.getId() + ")].name",
-                        hasItem(org.hamcrest.Matchers.containsString("Searchable Roses"))))
-                .andExpect(jsonPath("$.content[?(@.id==" + product.getId() + ")].available",
-                        hasItem(10)));
+                .andExpect(status().isOk());
+        // Search is paginated; other integration test classes accumulate vendors
+        // on the shared Testcontainers database, so this test's product may land
+        // on a later page. Iterate every page until it is found.
+        boolean found = false;
+        int page = 0;
+        int totalPages = 1;
+        while (page < totalPages) {
+            MvcResult result = mockMvc.perform(get("/api/v1/search")
+                            .param("locationId", origin.getId().toString())
+                            .param("size", "100")
+                            .param("page", String.valueOf(page)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode body = json.readTree(result.getResponse().getContentAsString());
+            JsonNode content = body.get("content");
+            for (JsonNode node : content) {
+                if (node.get("id").asLong() == product.getId()) {
+                    found = true;
+                    assertThat(node.get("name").asText()).contains("Searchable Roses");
+                    assertThat(node.get("available").asInt()).isEqualTo(10);
+                    break;
+                }
+            }
+            if (found) {
+                break;
+            }
+            totalPages = body.get("totalPages").asInt();
+            page++;
+        }
+        assertThat(found).as("search should return the active in-stock product").isTrue();
     }
 
     @Test

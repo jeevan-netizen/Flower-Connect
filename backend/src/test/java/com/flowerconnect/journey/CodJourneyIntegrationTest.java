@@ -143,20 +143,33 @@ class CodJourneyIntegrationTest extends AbstractIntegrationTest {
         VendorSetup vendor = createApprovedVendorWithProduct("Journey Cod Vendor", PRODUCT_PRICE);
 
         // ------------------------------------------------------------------
-        // 3. Discover the eligible vendor from the customer's location
+        // 3. Discover the eligible vendor from the customer's location.
+        //    Discovery is paginated; other integration test classes accumulate
+        //    vendors on the shared Testcontainers database, so the test vendor
+        //    may land on a later page. Iterate every page until it is found.
         // ------------------------------------------------------------------
-        MvcResult discover = mvc.perform(get("/api/v1/discover")
-                .param("locationId", locationId.toString()))
-            .andExpect(status().isOk())
-            .andReturn();
-        JsonNode discovery = json.readTree(discover.getResponse().getContentAsString());
-        JsonNode content = discovery.get("content");
         boolean found = false;
-        for (JsonNode node : content) {
-            if (node.get("id").asLong() == vendor.profileId) {
-                found = true;
+        int page = 0;
+        int totalPages = 1;
+        while (page < totalPages) {
+            MvcResult discover = mvc.perform(get("/api/v1/discover")
+                    .param("locationId", locationId.toString())
+                    .param("page", String.valueOf(page)))
+                .andExpect(status().isOk())
+                .andReturn();
+            JsonNode discovery = json.readTree(discover.getResponse().getContentAsString());
+            JsonNode content = discovery.get("content");
+            for (JsonNode node : content) {
+                if (node.get("id").asLong() == vendor.profileId) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
                 break;
             }
+            totalPages = discovery.get("totalPages").asInt();
+            page++;
         }
         assertThat(found).as("approved vendor should appear in discovery").isTrue();
 
