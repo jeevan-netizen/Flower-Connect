@@ -24,6 +24,10 @@ import com.flowerconnect.dispute.domain.Dispute;
 import com.flowerconnect.dispute.domain.DisputeStatus;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.Order.OrderStatus;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -220,6 +224,11 @@ public class BillingLedgerService {
     public Page<SettlementEntry> getAllLedger(Long vendorId, LocalDateTime from, LocalDateTime to,
                                               SettlementEntryType type, Pageable pageable) {
         Specification<SettlementEntry> spec = (root, query, cb) -> {
+            root.fetch("vendor", JoinType.LEFT);
+            root.fetch("order", JoinType.LEFT);
+            root.fetch("dispute", JoinType.LEFT);
+            root.fetch("settlement", JoinType.LEFT);
+            query.distinct(true);
             var predicate = cb.conjunction();
             if (vendorId != null) {
                 predicate = cb.and(predicate, cb.equal(root.get("vendor").get("id"), vendorId));

@@ -20,8 +20,10 @@ import com.flowerconnect.billing.domain.Settlement;
 import com.flowerconnect.billing.domain.SettlementStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -34,10 +36,20 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long>, J
 
     Optional<Settlement> findByVendorIdAndPeriodStartAndPeriodEnd(Long vendorId, LocalDate periodStart, LocalDate periodEnd);
 
+    @EntityGraph(attributePaths = {"vendor", "settledBy"})
     Page<Settlement> findByVendorIdOrderByPeriodEndDesc(Long vendorId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"vendor", "settledBy"})
     Page<Settlement> findByStatusOrderByPeriodEndDesc(SettlementStatus status, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"vendor", "settledBy"})
     Page<Settlement> findByVendorIdAndStatusOrderByPeriodEndDesc(
             Long vendorId, SettlementStatus status, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"vendor", "settledBy"})
+    @Query("SELECT s FROM Settlement s")
+    Page<Settlement> findAll(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"vendor", "settledBy"})
+    Optional<Settlement> findById(Long id);
 }
