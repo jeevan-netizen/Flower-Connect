@@ -77,22 +77,27 @@ public class AnalyticsService {
         String toSql = toDate.plusDays(1).toString(); // exclusive upper bound
 
         // Delivered orders in range, using the delivered timestamp from history.
-        String deliveredBase =
+        // FROM/JOIN portion is kept separate from the WHERE predicates so that
+        // per-metric extra JOINs (users, vendor_profiles) can be composed before
+        // WHERE. Appending a JOIN after WHERE would produce invalid SQL.
+        String deliveredFromJoin =
                 "FROM orders o " +
                         "JOIN order_status_history osh ON osh.order_id = o.id " +
-                        "AND osh.to_status = 'DELIVERED' " +
-                        "WHERE o.status = 'DELIVERED' " +
+                        "AND osh.to_status = 'DELIVERED'";
+
+        String deliveredWhere =
+                "WHERE o.status = 'DELIVERED' " +
                         "AND osh.created_at >= ? " +
                         "AND osh.created_at < ?";
 
         Long totalDeliveredOrders =
                 jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) " + deliveredBase,
+                        "SELECT COUNT(*) " + deliveredFromJoin + deliveredWhere,
                         Long.class, fromSql, toSql);
 
         BigDecimal marketplaceSales =
                 jdbcTemplate.queryForObject(
-                        "SELECT COALESCE(SUM(o.total), 0) " + deliveredBase,
+                        "SELECT COALESCE(SUM(o.total), 0) " + deliveredFromJoin + deliveredWhere,
                         BigDecimal.class, fromSql, toSql);
 
         // Platform revenue: commission + platform fees for delivered orders.
@@ -119,18 +124,20 @@ public class AnalyticsService {
         // Active customers: ACTIVE users with at least one delivered order in range.
         Long activeCustomers =
                 jdbcTemplate.queryForObject(
-                        "SELECT COUNT(DISTINCT o.user_id) " + deliveredBase +
-                                " JOIN users u ON u.id = o.user_id AND u.status = 'ACTIVE'",
+                        "SELECT COUNT(DISTINCT o.user_id) " + deliveredFromJoin +
+                                " JOIN users u ON u.id = o.user_id AND u.status = 'ACTIVE' " +
+                                deliveredWhere,
                         Long.class, fromSql, toSql);
 
         // Top vendors by delivered marketplace sales.
         List<AnalyticsTopVendor> topVendors =
                 jdbcTemplate.query(
-                        "SELECT o.vendor_id, vp.business_name, " +
+                        "SELECT o.vendor_profile_id AS vendor_id, vp.business_name, " +
                                 "COALESCE(SUM(o.total), 0) AS sales, COUNT(*) AS order_count " +
-                                deliveredBase +
-                                " JOIN vendor_profiles vp ON vp.id = o.vendor_id " +
-                                "GROUP BY o.vendor_id, vp.business_name " +
+                                deliveredFromJoin +
+                                " JOIN vendor_profiles vp ON vp.id = o.vendor_profile_id " +
+                                deliveredWhere +
+                                " GROUP BY o.vendor_profile_id, vp.business_name " +
                                 "ORDER BY sales DESC " +
                                 "LIMIT ?",
                         (rs, rowNum) -> AnalyticsTopVendor.builder()
