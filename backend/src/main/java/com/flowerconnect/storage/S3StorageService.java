@@ -1,5 +1,7 @@
 package com.flowerconnect.storage;
 
+import java.util.Optional;
+
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
@@ -53,6 +55,11 @@ public class S3StorageService implements StorageService {
 
     @Override
     public void delete(String key) {
+        throw new StorageException(NOT_IMPLEMENTED);
+    }
+
+    @Override
+    public Optional<byte[]> read(String key) {
         throw new StorageException(NOT_IMPLEMENTED);
     }
 

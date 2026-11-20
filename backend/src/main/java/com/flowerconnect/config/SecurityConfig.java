@@ -154,6 +154,7 @@ public class SecurityConfig {
                 // These exceptions must precede the /api/v1/vendors/** FLORIST rule.
                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{id}/storefront").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/products/{id}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/products/{id}/images/{imageId}").permitAll()
                 // Phase 12 public vendor reviews (task 12.2): readable without
                 // authentication for approved vendors; hidden reviews excluded.
                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/reviews").permitAll()

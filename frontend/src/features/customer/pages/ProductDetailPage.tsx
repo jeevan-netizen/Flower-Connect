@@ -4,7 +4,7 @@ import { useSelectedLocation } from "@/features/location/hooks/useSelectedLocati
 import { usePublicProduct } from "@/features/customer/queries";
 import type { ProductSurfaceContext } from "@/features/customer/navigation";
 import { LocationPrompt } from "@/features/customer/components/LocationPrompt";
-import { ProductImagePlaceholder } from "@/features/customer/components/ProductImagePlaceholder";
+import { ProductImage } from "@/features/customer/components/ProductImage";
 import { AddToCartButton } from "@/features/customer/components/AddToCartButton";
 import { CustomerErrorState } from "@/features/customer/components/CustomerErrorState";
 import { formatAvailability, formatMoney } from "@/features/customer/format";
@@ -158,7 +158,12 @@ export function ProductDetailPage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ProductImagePlaceholder image={image} productName={item.name} />
+        <ProductImage
+          productId={item.id}
+          image={image}
+          productName={item.name}
+          locationId={locationId}
+        />
 
         <div>
           <p className="text-sm text-slate-500">{item.vendorName}</p>

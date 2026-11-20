@@ -208,7 +208,11 @@ export function SearchPage() {
           </p>
         </FadeIn>
       ) : (
-        <ProductGrid products={products} detailPathBase="/search/products" />
+        <ProductGrid
+          products={products}
+          detailPathBase="/search/products"
+          locationId={locationId}
+        />
       )}
 
       {results.data && !results.isPending && !results.error && (

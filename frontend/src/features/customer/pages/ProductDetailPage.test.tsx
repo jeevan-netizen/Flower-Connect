@@ -174,14 +174,25 @@ describe("ProductDetailPage", () => {
     expect(screen.getByText("A dozen deep red roses.")).toBeInTheDocument();
   });
 
-  it("renders a placeholder rather than an image", async () => {
+  it("renders an  for the product image when a location is selected", async () => {
     useLocationStore.setState({ selected: KORAMANGALA });
 
     const { container } = renderProduct();
 
     await screen.findByRole("heading", { name: "Red Rose Bouquet", level: 1 });
+    const img = container.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img!).toHaveAttribute("src", expect.stringContaining("/api/v1/products/1001/images/501?locationId=4"));
+    expect(img!.getAttribute("alt")).toMatch(/Photo of Red Rose Bouquet/);
+  });
+
+  it("renders no image when no delivery location is selected", async () => {
+    useLocationStore.setState({ selected: null });
+
+    const { container } = renderProduct();
+
+    await screen.findByRole("heading", { name: "Choose your delivery area" });
     expect(container.querySelector("img")).toBeNull();
-    expect(screen.getByRole("img", { name: /Photo of Red Rose Bouquet/ })).toBeInTheDocument();
   });
 
   it("sends the gift note with the add", async () => {

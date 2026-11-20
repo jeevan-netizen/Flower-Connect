@@ -1,5 +1,7 @@
 package com.flowerconnect.storage;
 
+import java.util.Optional;
+
 /**
  * Byte storage for uploaded assets (plan task 3.8: "Local disk (dev) / S3 (prod)
  * behind {@code StorageService} — pluggable by profile").
@@ -48,6 +50,16 @@ public interface StorageService {
      * call unconditionally.
      */
     void delete(String key);
+
+    /**
+     * Reads the bytes stored at {@code key}, or returns empty when nothing is
+     * stored there. A missing object is not an infrastructure failure: it is the
+     * normal "image not found" case and callers should treat an empty result as
+     * a 404 rather than as an error.
+     *
+     * @throws StorageException if the object exists but cannot be read
+     */
+    Optional<byte[]> read(String key);
 
     /** Whether an object exists at {@code key}. */
     boolean exists(String key);

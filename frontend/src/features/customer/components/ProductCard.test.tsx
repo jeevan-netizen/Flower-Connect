@@ -22,11 +22,12 @@ describe("ProductCard", () => {
     expect(screen.getByText("Only 2 left")).toBeInTheDocument();
   });
 
-  it("renders a placeholder rather than an image, because no route serves the bytes", () => {
-    const { container } = renderWithProviders(<ProductCard product={makePublicProduct()} />);
+  it("renders a placeholder when no delivery location is selected", () => {
+    const { container } = renderWithProviders(
+      <ProductCard product={makePublicProduct()} locationId={null} />,
+    );
 
-    // D-31 / known issue 020: a broken image reads as a failed upload, so the
-    // customer area never renders an <img> at all.
+    // No location means the image endpoint cannot be called, so no  is rendered.
     expect(container.querySelector("img")).toBeNull();
     expect(
       screen.getByRole("img", { name: /Photo of Red Rose Bouquet/ }),
@@ -34,11 +35,28 @@ describe("ProductCard", () => {
   });
 
   it("says so when the product has no photo", () => {
-    renderWithProviders(<ProductCard product={makePublicProduct({ images: [] })} />);
+    renderWithProviders(<ProductCard product={makePublicProduct({ images: [] })} locationId={1} />);
 
     expect(
       screen.getByRole("img", { name: /No photo available for Red Rose Bouquet/ }),
     ).toBeInTheDocument();
+  });
+
+  it("renders an  for the primary image when a location is selected", () => {
+    renderWithProviders(
+      <ProductCard
+        product={makePublicProduct({
+          images: [
+            makePublicProductImage({ id: 1, originalFilename: "first.jpg", primary: false }),
+            makePublicProductImage({ id: 2, originalFilename: "cover.jpg", primary: true }),
+          ],
+        })}
+        locationId={1}
+      />,
+    );
+
+    const img = screen.getByRole("img", { name: /Photo of Red Rose Bouquet: cover\.jpg/ });
+    expect(img).toHaveAttribute("src", expect.stringContaining("/api/v1/products/1001/images/2?locationId=1"));
   });
 
   it("links to the product inside its florist's storefront", () => {
@@ -98,6 +116,7 @@ describe("ProductCard", () => {
             makePublicProductImage({ id: 2, originalFilename: "cover.jpg", primary: true }),
           ],
         })}
+        locationId={1}
       />,
     );
 
@@ -115,6 +134,7 @@ describe("ProductCard", () => {
             makePublicProductImage({ id: 2, originalFilename: "second.jpg", primary: false }),
           ],
         })}
+        locationId={1}
       />,
     );
 
