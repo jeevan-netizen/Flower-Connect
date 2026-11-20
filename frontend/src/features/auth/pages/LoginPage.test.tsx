@@ -71,7 +71,7 @@ describe("LoginPage", () => {
     );
 
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
   });
 
@@ -96,7 +96,7 @@ describe("LoginPage", () => {
     );
 
     await userEvent.type(screen.getByLabelText(/email address/i), "not-an-email");
-    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "password123");
 
     fireEvent.submit(document.querySelector("form")!);
 
@@ -153,7 +153,7 @@ describe("LoginPage", () => {
     );
 
     await userEvent.type(screen.getByLabelText(/email address/i), "user@test.com");
-    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "password123");
 
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
@@ -186,6 +186,19 @@ describe("LoginPage", () => {
     );
   });
 
+  it("should link to the forgot-password page near the password field", () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("link", { name: /forgot password\?/i })).toHaveAttribute(
+      "href",
+      "/forgot-password",
+    );
+  });
+
   it("should prefill the email and explain the handoff after vendor registration", () => {
     render(
       <MemoryRouter
@@ -198,7 +211,7 @@ describe("LoginPage", () => {
     expect(screen.getByLabelText(/email address/i)).toHaveValue("petal@example.com");
     expect(screen.getByText(/florist application is in/i)).toBeInTheDocument();
     // The password is never carried across, even though the email is.
-    expect(screen.getByLabelText(/password/i)).toHaveValue("");
+    expect(screen.getByLabelText(/^password$/i)).toHaveValue("");
   });
 
   it("should not prefill anything on an ordinary login visit", () => {

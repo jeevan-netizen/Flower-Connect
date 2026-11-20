@@ -20,6 +20,7 @@ import {
   toServiceLocationOptions,
 } from "@/features/location/types";
 import { LocationPicker } from "@/features/vendor-registration/components/LocationPicker";
+import { PasswordField } from "@/features/auth/components/PasswordField";
 import { TextInput } from "@/features/vendor-registration/components/TextInput";
 import {
   FormErrorSummary,
@@ -188,16 +189,14 @@ export function VendorRegisterPage() {
               error={errors.phone?.message}
               registration={register("phone")}
             />
-            <TextInput
+            <PasswordField
               label="Password"
-              type="password"
               autoComplete="new-password"
               error={errors.password?.message}
               registration={register("password")}
             />
-            <TextInput
+            <PasswordField
               label="Confirm password"
-              type="password"
               autoComplete="new-password"
               error={errors.confirmPassword?.message}
               registration={register("confirmPassword")}

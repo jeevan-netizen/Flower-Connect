@@ -6,6 +6,8 @@ import { SiteHeader } from "@/app/components/SiteHeader";
 import { HomePage } from "@/features/home/pages/HomePage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
+import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
 import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
@@ -31,6 +33,7 @@ import { VendorStorefrontPage } from "@/features/customer/pages/VendorStorefront
 import { ProductDetailPage } from "@/features/customer/pages/ProductDetailPage";
 import { OrderHistoryPage } from "@/features/customer/orders/pages/OrderHistoryPage";
 import { OrderDetailPage } from "@/features/customer/orders/pages/OrderDetailPage";
+import { ChangePasswordPage } from "@/features/auth/pages/ChangePasswordPage";
 import { RaiseDisputePage, DisputeDetailPage } from "@/features/dispute/pages/DisputePages";
 import { PRODUCT_ROUTE_IDS } from "@/features/customer/navigation";
 import { PaymentStatusPage } from "@/features/payment/pages/PaymentStatusPage";
@@ -202,8 +205,28 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      {
+        // Change password is available to every authenticated role — customer,
+        // florist and admin alike — because the endpoint verifies the caller's
+        // own session and revokes their other refresh tokens on success.
+        path: "settings/password",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE, VENDOR_ROLE, ADMIN_ROLE]}>
+            <ChangePasswordPage />
+          </ProtectedRoute>
+        ),
+      },
       { path: "login", element: <RequireUnauth><LoginPage /></RequireUnauth> },
       { path: "register", element: <RequireUnauth><RegisterPage /></RequireUnauth> },
+      {
+        // Password reset is public: no session is needed to request or complete one.
+        path: "forgot-password",
+        element: <RequireUnauth><ForgotPasswordPage /></RequireUnauth>,
+      },
+      {
+        path: "reset-password",
+        element: <RequireUnauth><ResetPasswordPage /></RequireUnauth>,
+      },
       {
         // The vendor entry point (plan task 1.7). Public, because
         // `POST /api/v1/vendors/register` creates the account itself, and

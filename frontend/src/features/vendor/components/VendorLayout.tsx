@@ -86,6 +86,13 @@ export function VendorLayout() {
             <p className="text-xs uppercase tracking-wide text-slate-500">Vendor area</p>
           </div>
 
+          <NavLink
+            to="/settings/password"
+            className={`mt-3 block rounded-md bg-brand-600 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-700 ${FOCUS_RING} ${PRESSABLE}`}
+          >
+            Change password
+          </NavLink>
+
           <nav className="mt-4 rounded-lg border border-slate-200 bg-white p-2 shadow-sm" aria-label="Vendor">
             <ul className="flex flex-col gap-1 md:flex-col">
               {NAV_ITEMS.filter((item) => !item.requiresApproval || profile?.status === "APPROVED").map(

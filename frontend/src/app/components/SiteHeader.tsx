@@ -207,6 +207,12 @@ export function SiteHeader() {
               Admin
             </Link>
           )}
+          <Link
+            className={NAV_LINK}
+            to="/settings/password"
+          >
+            Change password
+          </Link>
           <span className="relative">
             <NotificationBell enabled={isAuthenticated} />
           </span>
