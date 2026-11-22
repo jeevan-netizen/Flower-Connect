@@ -3,20 +3,34 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VendorProfilePage } from "@/features/vendor/pages/VendorProfilePage";
 import { renderWithProviders } from "@/test/render";
-import { makeVendorProfile } from "@/test/factories";
-import { businessError, validationError } from "@/test/api-errors";
+import {
+  makeUserResponse,
+  makeVendorProfile,
+} from "@/test/factories";
+import { validationError, businessError } from "@/test/api-errors";
 import type { VendorProfile, VendorProfileUpdateRequest } from "@/features/vendor/types";
+import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { clearVendorCache } from "@/features/vendor/queries";
 
 const mockFetch = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
+const mockLogout = vi.hoisted(() => vi.fn());
 
 vi.mock("@/features/vendor/api", () => ({
   fetchOwnProfile: mockFetch,
   updateOwnProfile: mockUpdate,
 }));
+vi.mock("@/features/auth/api", () => ({
+  logout: mockLogout,
+}));
 
-function setup(profile: VendorProfile = makeVendorProfile()) {
+function setup(
+  profile: VendorProfile = makeVendorProfile(),
+  user = makeUserResponse({ role: "FLORIST" }),
+) {
   mockFetch.mockResolvedValue(profile);
+  useAuthStore.setState({ user });
+  mockLogout.mockResolvedValue(undefined);
   return renderWithProviders(<VendorProfilePage />);
 }
 
@@ -227,5 +241,41 @@ describe("VendorProfilePage", () => {
     await waitFor(() => {
       expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
     });
+  });
+
+  it("renders the Change password link and the Log out button", async () => {
+    setup();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("link", { name: /change password/i }),
+    ).toHaveAttribute("href", "/settings/password");
+    expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
+  });
+
+  it("clears the vendor cache and logs out on Log out", async () => {
+    const { queryClient } = setup();
+
+    // Prime the vendor cache so we can observe it being cleared.
+    queryClient.setQueryData(["vendor", "profile"], makeVendorProfile());
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole("button", { name: /log out/i }));
+
+    await waitFor(() => {
+      expect(mockLogout).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("clearVendorCache removes the vendor profile from the query cache", () => {
+    const { queryClient } = setup();
+    queryClient.setQueryData(["vendor", "profile"], makeVendorProfile());
+    clearVendorCache(queryClient);
+    expect(queryClient.getQueryData(["vendor", "profile"])).toBeUndefined();
   });
 });

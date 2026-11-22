@@ -27,10 +27,11 @@ if (process.env.VITE_API_BASE_URL) {
 
 const CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' https://checkout.razorpay.com",
   "style-src 'self' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data:",
+  "frame-src https://api.razorpay.com https://checkout.razorpay.com",
   apiOrigin ? `connect-src 'self' ${apiOrigin}` : "connect-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",

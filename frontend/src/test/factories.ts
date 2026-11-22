@@ -28,6 +28,7 @@ import type {
   OrderItemSummary,
   SlotResponse,
 } from "@/features/checkout/types";
+import type { UserResponse } from "@/features/auth/types";
 import type { ServiceLocationGroup } from "@/features/location/types";
 import type { AdminRole, AdminUser, UserStatus } from "@/features/admin/types";
 import type {
@@ -119,6 +120,22 @@ export function makeAdminUser(overrides: Partial<AdminUser> = {}): AdminUser {
     phone: "+919876543210",
     role: "CUSTOMER" as AdminRole,
     status: "ACTIVE" as UserStatus,
+    createdAt: "2026-09-02T09:15:00",
+    ...overrides,
+  };
+}
+
+/**
+ * A customer user fixture shaped exactly like `UserResponse`: id, email,
+ * fullName, phone, role, createdAt — and deliberately no credential material.
+ */
+export function makeUserResponse(overrides: Partial<UserResponse> = {}): UserResponse {
+  return {
+    id: 42,
+    email: "buyer@example.com",
+    fullName: "Bea Buyer",
+    phone: "+919876543210",
+    role: "CUSTOMER",
     createdAt: "2026-09-02T09:15:00",
     ...overrides,
   };

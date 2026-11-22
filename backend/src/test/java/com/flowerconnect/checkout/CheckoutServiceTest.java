@@ -13,6 +13,7 @@ import com.flowerconnect.checkout.dto.CheckoutQuoteResponse;
 import com.flowerconnect.checkout.dto.CheckoutRequest;
 import com.flowerconnect.checkout.dto.CheckoutResponse;
 import com.flowerconnect.checkout.dto.CheckoutShopQuote;
+import com.flowerconnect.config.AppProperties;
 import com.flowerconnect.config.CheckoutProperties;
 import com.flowerconnect.config.PlatformConfigRepository;
 import com.flowerconnect.billing.service.CommissionRateService;
@@ -29,6 +30,8 @@ import com.flowerconnect.customer.repository.AddressRepository;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.domain.OrderItem;
 import com.flowerconnect.order.domain.OrderStatusHistory;
+import com.flowerconnect.payment.client.RazorpayOrder;
+import com.flowerconnect.payment.service.RazorpayService;
 import com.flowerconnect.repository.ServiceLocationRepository;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
@@ -75,9 +78,13 @@ class CheckoutServiceTest {
     @Mock
     private CheckoutProperties checkoutProperties;
     @Mock
+    private AppProperties appProperties;
+    @Mock
     private PlatformConfigRepository platformConfigRepository;
     @Mock
     private CommissionRateService commissionRateService;
+    @Mock
+    private RazorpayService razorpayService;
     @Mock
     private com.flowerconnect.order.repository.OrderRepository orderRepository;
     @Mock
@@ -1015,6 +1022,10 @@ class CheckoutServiceTest {
     }
 
     private void setupCheckoutMocks() {
+        when(appProperties.getIntentTtlMinutes()).thenReturn(30);
+        when(razorpayService.createOrder(any(BigDecimal.class), anyString()))
+                .thenReturn(new RazorpayOrder(
+                        "order_test_123", new BigDecimal("10000"), "INR", "created", "receipt_test"));
         when(inventoryRepository.findByProductIdForUpdate(20L)).thenReturn(Optional.of(inventory));
         when(vendorProfileRepository.findByIdForUpdate(vendor.getId())).thenReturn(Optional.of(vendor));
         when(orderRepository.countBookedOrdersForSlot(eq(vendor.getId()), any(LocalDateTime.class))).thenReturn(0L);

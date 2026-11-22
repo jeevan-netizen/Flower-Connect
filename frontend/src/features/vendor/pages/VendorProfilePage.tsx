@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useUpdateVendorProfile, useVendorProfile } from "@/features/vendor/queries";
+import { Link, useNavigate } from "react-router-dom";
+import { useUpdateVendorProfile, useVendorProfile, clearVendorCache } from "@/features/vendor/queries";
 import { buildProfileUpdateRequest, type VendorProfile } from "@/features/vendor/types";
 import {
   logoUrlField,
@@ -21,6 +22,9 @@ import {
 } from "@/features/vendor/components/FormFields";
 import { VendorErrorState } from "@/features/vendor/components/VendorErrorState";
 import { formatDecimal, formatRating, formatStatus } from "@/features/vendor/format";
+import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { useQueryClient } from "@tanstack/react-query";
+import { PRESSABLE } from "@/motion/pressable";
 
 /**
  * Mirrors `VendorProfileUpdateRequest` for the fields this page owns. The
@@ -63,8 +67,18 @@ function toFormValues(profile: VendorProfile): ProfileFormValues {
 export function VendorProfilePage() {
   const { data: profile, isPending, error, refetch } = useVendorProfile();
   const updateProfile = useUpdateVendorProfile();
+  const queryClient = useQueryClient();
+  const { logout } = useAuthStore();
+  const navigate = useNavigate();
   const [success, setSuccess] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<ApiErrorInfo | null>(null);
+
+  /* ---------------------------------------------------------------- Logout */
+  const handleLogout = () => {
+    clearVendorCache(queryClient);
+    logout();
+    navigate("/", { replace: true });
+  };
 
   const {
     register,
@@ -204,6 +218,23 @@ export function VendorProfilePage() {
           <ReadOnlyRow label="Last updated" value={profile.updatedAt} />
         </dl>
       </Card>
+
+      {/* ----------------------------------- Actions ----------------------------------- */}
+      <div className="flex items-center gap-3">
+        <Link
+          to="/settings/password"
+          className="inline-flex items-center rounded-md border border-transparent bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+        >
+          Change password
+        </Link>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className={`inline-flex items-center rounded-md border border-transparent bg-bolder-rose px-4 py-2.5 text-sm font-medium text-bolder-bg hover:bg-bolder-rose-strong focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 ${PRESSABLE}`}
+        >
+          Log out
+        </button>
+      </div>
     </div>
   );
 }

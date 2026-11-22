@@ -9,6 +9,8 @@ import com.flowerconnect.catalog.repository.CategoryRepository;
 import com.flowerconnect.catalog.repository.ProductRepository;
 import com.flowerconnect.catalog.service.ProductService;
 import com.flowerconnect.cart.dto.AddCartItemRequest;
+import com.flowerconnect.payment.client.RazorpayClient;
+import com.flowerconnect.payment.client.RazorpayOrder;
 import com.flowerconnect.customer.domain.Address;
 import com.flowerconnect.customer.repository.AddressRepository;
 import com.flowerconnect.domain.Role;
@@ -44,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -62,6 +65,10 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -109,6 +116,7 @@ class OnlineCheckoutIntegrationTest extends AbstractIntegrationTest {
     @Autowired private PaymentRepository payments;
     @Autowired private PaymentIntentRepository intents;
     @Autowired private PasswordEncoder encoder;
+    @MockBean private RazorpayClient razorpayClient;
 
     private Long locationId;
     private Long vendorProfileId;
@@ -121,6 +129,13 @@ class OnlineCheckoutIntegrationTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         locationId = locations.findByPincode(PINCODE).orElseThrow().getId();
         categoryId = categories.findBySlug("roses").orElseThrow().getId();
+
+        // Mock Razorpay client: return a test order id for any createOrder call
+        when(razorpayClient.createOrder(any(BigDecimal.class), eq("INR"), anyString()))
+            .thenAnswer(invocation -> new RazorpayOrder(
+                "order_test_" + UUID.randomUUID(),
+                invocation.getArgument(0, BigDecimal.class),
+                "INR", "created", "receipt_test"));
 
         // Create approved vendor
         vendorEmail = "vendor-online-" + UUID.randomUUID() + "@t.com";
@@ -309,7 +324,7 @@ class OnlineCheckoutIntegrationTest extends AbstractIntegrationTest {
         assertThat(result.get("orders").get(0).get("paymentMethod").asText()).isEqualTo("ONLINE");
         assertThat(result.get("paymentMethod").asText()).isEqualTo("ONLINE");
         assertThat(result.get("paymentGroupId").asText()).isNotEmpty();
-        assertThat(result.get("intentReference").asText()).startsWith("intent_sim_");
+        assertThat(result.get("intentReference").asText()).startsWith("order_test_");
         assertThat(result.get("intentExpiresAt").asText()).isNotEmpty();
 
         // Assert DB state

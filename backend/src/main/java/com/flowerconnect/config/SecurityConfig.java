@@ -103,6 +103,9 @@ public class SecurityConfig {
                  // Phase 7 public webhook: signature-authenticated, no JWT. Must be declared
                  // before the broader /api/v1/payments/** CUSTOMER rule below so it matches first.
                  .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()
+                 // Razorpay test-mode webhook: signature-authenticated, no JWT. Must be declared
+                 // before the broader /api/v1/payments/** CUSTOMER rule below so it matches first.
+                 .requestMatchers(HttpMethod.POST, "/api/v1/payments/razorpay/webhook").permitAll()
                  // Customer payments (Phase 7, task 7.4): fetch/resume payment state for the authenticated customer's own orders/groups.
                  .requestMatchers("/api/v1/payments/**").hasRole("CUSTOMER")
                  // Customer order history and detail (plan Phase 6, task 6.3):

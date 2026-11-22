@@ -37,6 +37,21 @@ export async function changePassword(data: ChangePasswordRequest): Promise<void>
   await api.post("/users/me/password", data);
 }
 
+export interface ProfileUpdateRequest {
+  fullName?: string;
+  phone?: string | null;
+}
+
+/**
+ * `PATCH /api/v1/users/me` — updates the authenticated user's full name and/or
+ * phone. Email is not editable through this endpoint. Reuses the existing
+ * backend contract (no new endpoint invented).
+ */
+export async function updateCurrentUser(data: ProfileUpdateRequest): Promise<UserResponse> {
+  const response = await api.patch<UserResponse>("/users/me", data);
+  return response.data;
+}
+
 export async function forgotPassword(data: ForgotPasswordRequest): Promise<void> {
   await api.post("/auth/forgot-password", data);
 }

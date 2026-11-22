@@ -1983,3 +1983,88 @@ No new concurrency tests were added because each required case already has equiv
 - Full backend integration suite (`./mvnw verify -Pintegration`) executed end-to-end in one process (B-3 resolved): **750 integration tests, 0 failures, 0 errors, BUILD SUCCESS** after 17:57 min. Root cause of the prior 2 failures + 1 error was test interference through the shared Testcontainers database (no per-class rollback): `CommissionIntegrationTest.backfillDeliveredOrdersIdempotently()` created legacy DELIVERED orders without commission/ledger entries, breaking `DemoSeedIntegrationTest`'s billing reconciliation (`NoSuchElement` at line 306); discovery/search tests assumed their vendor/product landed on page 0 but accumulated vendors pushed results to later pages. Fixed by (1) scoping `DemoSeedIntegrationTest`'s reconciliation to its own demo customer orders, (2) paginating discovery/search until the target record is found. All three previously failing classes now pass individually, together, and in the full suite. Surefire unit phase passed fully (1484 tests, 0 failures).
 - Phase 14 Definition of Done: **FULLY MET**. Synopsis + report materials complete (Stage 9); clean-clone demo rehearsed with all Tier 1 + Tier 2 flows verified (Stage 10); frontend automated verification passes in clean clone (lint exit 0, typecheck exit 0, 84 files / 885 tests passed, build exit 0); full backend integration suite passes end-to-end (750/750, 0 failures); backend unit suite passes (1484/1484).
 
+## Razorpay Test-Mode Checkout (in progress, uncommitted)
+
+Replaced the simulated online payment provider with Razorpay Standard Checkout in test mode. COD remains unchanged.
+
+### Backend
+- `AppProperties`: added `razorpayKeyId`, `razorpayKeySecret`, `razorpayWebhookSecret` config (maps `app.razorpay.*`). Webhook secret not required at startup; the webhook endpoint rejects all requests when absent.
+- `RazorpayClient` interface + `RazorpayClientImpl` (RestTemplate, HTTP Basic auth) for `POST https://api.razorpay.com/v1/orders`.
+- `RazorpayService`: creates Razorpay Orders server-side using the server-calculated INR total converted to paise; verifies checkout signatures (HMAC-SHA256 over `order_id + "|" + payment_id`); processes Razorpay webhooks (`payment.captured` → PAID/PLACED, `payment.failed` → FAILED/CANCELLED) idempotently via `payment_events.provider_event_id`.
+- `RazorpayController`: `GET /api/v1/payments/razorpay/key` (public Key ID only), `POST /api/v1/payments/razorpay/{orderId}/verify` (CUSTOMER, ownership enforced), `POST /api/v1/payments/razorpay/webhook` (permitAll, signature-verified).
+- `CheckoutService`: ONLINE checkout now creates a Razorpay Order instead of a simulated intent; `providerReference` stores the Razorpay order id.
+- `SecurityConfig`: `POST /api/v1/payments/razorpay/webhook` mapped to `permitAll` before the `/api/v1/payments/**` → `hasRole("CUSTOMER")` rule.
+- `PaymentRepository`: added `findByProviderReference`.
+
+### Frontend
+- `payment/types.ts`: added `RazorpayKeyResponse`, `RazorpayVerifyRequest`, `RazorpayVerifyResponse`, `RAZORPAY_PATH`.
+- `payment/api.ts`: added `fetchRazorpayKey()` and `verifyRazorpayPayment()`.
+- `payment/pages/RazorpayCheckoutPage.tsx`: loads Razorpay SDK and automatically opens Standard Checkout once the order details are ready; verifies signature on success and offers retry only if the customer closes checkout.
+- `checkout/pages/CheckoutPage.tsx`: ONLINE checkout navigates directly to `/payment/razorpay/:orderId`; confirmation/empty-cart state no longer hides the payment route after checkout clears the cart cache.
+- `server.mjs`: Content Security Policy permits Razorpay's hosted checkout script (`https://checkout.razorpay.com`) and payment frame (`https://api.razorpay.com`); without these, the browser blocked the SDK and its checkout frame.
+- `app/router.tsx`: added `payment/razorpay/:orderId` route (CUSTOMER guarded).
+
+### Config
+- `.env.example`: replaced Stripe placeholders with Razorpay `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` placeholders.
+- `application.yml`: added `app.razorpay.*` property mapping.
+- `docker-compose.yml`: forwards `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` to the backend.
+
+### Tests
+- `RazorpayServiceTest`: 11 unit tests (order creation, signature verification, idempotency, webhook captured/failed, foreign order, non-pending order).
+- `RazorpayControllerTest`: 7 slice tests (key endpoint, verify, webhook accept/duplicate/invalid signature).
+- `OnlineCheckoutIntegrationTest`: updated to mock `RazorpayClient` and assert `order_test_` prefix instead of `intent_sim_`.
+- `payment/api.test.ts`: 2 frontend tests (fetch key, verify payment).
+- `RazorpayCheckoutPage.test.tsx`: 4 frontend tests (load details, error state, verify success, verify failure).
+
+### Verification
+- Backend unit suite: passes (Razorpay tests included).
+- Frontend typecheck, lint, tests: pass.
+- Follow-up checkout fix: frontend production build passes and the `fc-stage10-rehearsal` frontend container is healthy; local site returns HTTP 200. Razorpay's SDK and payment frame origins are now allowed by the frontend CSP.
+
+## Customer Profile Page (complete, uncommitted)
+
+Added a shared Profile destination (`/profile`) that dispatches to the
+role-appropriate profile page, guarded to CUSTOMER and VENDOR.
+
+- Customers see their existing customer Profile page (Account details and
+  Addresses management).
+- Vendors see the existing Vendor Profile page.
+- The standalone Vendor Profile navigation link (`/vendor/profile`) was removed
+  from the vendor sidebar (`VendorLayout`); vendors reach their profile through
+  the shared `/profile` link in the header instead. The vendor dashboard's
+  "Edit profile" card now links to `/profile`.
+- ADMIN and other roles are refused by the route guard; unauthenticated visitors
+  are redirected to login. Customer account/address data is never exposed to
+  vendors and vendor profile management is never exposed to customers.
+
+### Backend
+- No backend changes required. The existing `PATCH /api/v1/users/me` endpoint (full name + phone) and the address CRUD endpoints (`GET|POST|PUT|DELETE /api/v1/addresses`) already cover every editable field. No new endpoints invented; no sensitive information stored in the frontend.
+
+### Frontend
+- `frontend/src/features/auth/api.ts`: added `updateCurrentUser()` (`PATCH /api/v1/users/me`, full name + phone) reusing the existing backend contract.
+- `frontend/src/features/customer/address/api.ts`: new `createAddress`, `updateAddress`, `deleteAddress` clients reusing `AddressResponse` from the checkout slice.
+- `frontend/src/features/customer/address/queries.ts`: new `useAddresses`, `useCreateAddress`, `useUpdateAddress`, `useDeleteAddress`, `clearAddressCache` hooks with `["profile", "addresses"]` cache keys.
+- `frontend/src/features/customer/pages/CustomerProfilePage.tsx`: `CustomerProfilePage` with:
+  - **Account section**: editable full name and phone (read-only email, role, customer id, member since; link to change password).
+  - **Addresses section**: list saved addresses with default indicator; add via `POST /addresses`; update via `PUT /addresses/{id}`; delete via `DELETE /addresses/{id}` with confirmation; default-address checkbox (first address defaults automatically; changing default clears the previous).
+  - **Logout action** at the bottom of the page (clears address cache, logs out, navigates home).
+- `frontend/src/features/customer/pages/ProfilePage.tsx`: new shared component that dispatches CUSTOMER → `CustomerProfilePage` and VENDOR → `VendorProfilePage`.
+- `frontend/src/app/router.tsx`: `/profile` route now guarded to `CUSTOMER` and `VENDOR` and renders `ProfilePage`; the standalone `/vendor/profile` route under the vendor namespace was removed.
+- `frontend/src/app/components/SiteHeader.tsx`: added Profile link in customer navigation (next to Orders); Logout removed from customer nav and moved to the Profile page.
+- `frontend/src/features/vendor/components/VendorLayout.tsx`: removed the standalone `Profile` (`/vendor/profile`) nav link and the vendor account actions (`Change password` link, `Log out` button) from the vendor sidebar — those now live only on the shared `/profile` page for vendors.
+- `frontend/src/features/vendor/pages/VendorDashboardPage.tsx`: the "Edit profile" card now links to `/profile`.
+- `frontend/src/features/vendor/pages/VendorProfilePage.tsx`: added the vendor account actions at the bottom of the page:
+  - **Change password** link (`/settings/password`, guarded to all roles including vendor by `SecurityConfig`).
+  - **Log out** button at the bottom (clears the vendor query cache via `clearVendorCache`, logs out via the auth store, navigates home) — mirroring the customer Profile page logout.
+- `frontend/src/test/factories.ts`: added `makeUserResponse()` fixture.
+- `frontend/src/features/customer/pages/CustomerProfilePage.test.tsx`: 13 tests (account render/save/validation/error, addresses render/add/edit/delete/loading/error, logout).
+- `frontend/src/features/vendor/pages/VendorProfilePage.test.tsx`: 17 tests (profile render/readonly fields/submit/validation/error/load states, plus Change password link presence, Log out presence, and cache-clearing logout).
+- `frontend/src/app/router.test.tsx`: updated vendor children assertion (dropped `/vendor/profile`), repointed the florist profile and vendor-routes tests at `/profile`, added a customer-at-`/profile` test and an anonymous-at-`/profile` login-redirect test.
+- `frontend/src/features/vendor/components/VendorLayout.test.tsx`: the vendor sidebar no longer renders a `Profile` link (negative assertion added).
+- `frontend/src/app/components/SiteHeader.test.tsx`: florist test asserts the header does NOT render Change password or Log out links (vendor actions live on the Profile page).
+
+### Tests
+- Frontend: `CustomerProfilePage.test.tsx` (13 tests) and `VendorProfilePage.test.tsx` (17 tests), all pass. Full frontend suite: 935 tests pass, typecheck clean, lint clean, production build clean.
+- Header cleanup: `Change password` and `Log out` links removed from the shared `SiteHeader` and from the vendor sidebar (`VendorLayout`) for every role; `Log out` remains only at the bottom of `CustomerProfilePage` (clears address cache) and `VendorProfilePage` (clears vendor cache), both logging out via the auth store and navigating home. Profile link and all other navigation items preserved.
+
+

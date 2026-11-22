@@ -36,9 +36,11 @@ import com.flowerconnect.order.repository.OrderStatusHistoryRepository;
 import com.flowerconnect.payment.domain.Payment;
 import com.flowerconnect.payment.domain.PaymentIntent;
 import com.flowerconnect.payment.domain.PaymentIntent.IntentStatus;
+import com.flowerconnect.payment.client.RazorpayOrder;
 import com.flowerconnect.payment.repository.PaymentIntentRepository;
 import com.flowerconnect.payment.repository.PaymentRepository;
 import com.flowerconnect.payment.service.PaymentService;
+import com.flowerconnect.payment.service.RazorpayService;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
 import lombok.RequiredArgsConstructor;
@@ -111,6 +113,7 @@ private final CommissionRateService commissionRateService;
     private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
     private final PaymentIntentRepository paymentIntentRepository;
+    private final RazorpayService razorpayService;
     private final AppProperties appProperties;
     private final Clock clock;
     private final SlotValidationService slotValidationService;
@@ -517,18 +520,14 @@ private final CommissionRateService commissionRateService;
         BigDecimal grandTotal = BigDecimal.ZERO;
         LocalDateTime now = LocalDateTime.now(clock);
 
-        // Pre-compute the payment group and intent reference for ONLINE checkout
-        // (single intent for the combined grand total). The IDs are known up
-        // front so each order's Payment row can link to the group inside the
-        // loop; the intent row itself is written once grandTotal is known.
+        // Pre-compute the payment group for ONLINE checkout (single group for
+        // the combined grand total). The Razorpay order id is obtained after
+        // grandTotal is known, once the Razorpay API has been called.
         String paymentGroupId = null;
-        String intentReference = null;
-        LocalDateTime intentExpiresAt = null;
         if (paymentMethod == Order.PaymentMethod.ONLINE) {
             paymentGroupId = UUID.randomUUID().toString();
-            intentReference = "intent_sim_" + UUID.randomUUID();
-            intentExpiresAt = now.plusMinutes(appProperties.getIntentTtlMinutes());
         }
+        List<Payment> onlinePayments = new ArrayList<>();
 
         for (CheckoutRequest.CheckoutItem checkoutItem : request.getItems()) {
             Long vendorId = checkoutItem.getVendorId();
@@ -654,20 +653,22 @@ private final CommissionRateService commissionRateService;
 
             // Create one payment row per order inside the checkout transaction.
             // COD: pending COD payment. ONLINE: pending payment linked to the
-            // shared group/intent. Any failure rolls back orders, payments and
-            // reservations together.
+            // shared group/intent. The Razorpay order id is set after the
+            // Razorpay Order is created below (once grandTotal is known).
+            // Any failure rolls back orders, payments and reservations together.
             Payment payment;
             if (paymentMethod == Order.PaymentMethod.ONLINE) {
                 payment = Payment.builder()
                         .order(order)
                         .method(com.flowerconnect.payment.domain.Payment.PaymentMethod.ONLINE)
-                        .provider("simulated")
-                        .providerReference(intentReference)
+                        .provider("razorpay")
+                        .providerReference(null)
                         .amount(order.getTotal())
                         .status(com.flowerconnect.payment.domain.Payment.PaymentStatus.PENDING)
                         .paymentGroupId(paymentGroupId)
                         .build();
                 payment = paymentRepository.saveAndFlush(payment);
+                onlinePayments.add(payment);
             } else {
                 payment = paymentService.createCodPayment(order, order.getTotal());
             }
@@ -736,16 +737,30 @@ private final CommissionRateService commissionRateService;
                     .build());
         }
 
+        // Create a Razorpay Order for the combined grand total (ONLINE only).
+        // The amount is in INR paise and is server-calculated; the browser is
+        // never trusted with the amount. All in the same transaction so a
+        // Razorpay failure rolls back orders, payments and stock together.
+        String razorpayOrderId = null;
+        if (paymentMethod == Order.PaymentMethod.ONLINE) {
+            RazorpayOrder razorpayOrder = razorpayService.createOrder(grandTotal.setScale(SCALE_2, ROUNDING), paymentGroupId);
+            razorpayOrderId = razorpayOrder.id();
+            for (Payment onlinePayment : onlinePayments) {
+                onlinePayment.setProviderReference(razorpayOrderId);
+                paymentRepository.saveAndFlush(onlinePayment);
+            }
+        }
+
         // Write the single payment intent for the combined grand total (ONLINE only).
-        // Written after grandTotal is known; all in the same transaction so a
-        // later failure rolls it back along with orders, payments and stock.
+        // The provider reference is the Razorpay order id; the frontend uses it
+        // to initialise Razorpay Standard Checkout.
         if (paymentMethod == Order.PaymentMethod.ONLINE) {
             PaymentIntent intent = PaymentIntent.builder()
                     .paymentGroupId(paymentGroupId)
                     .total(grandTotal.setScale(SCALE_2, ROUNDING))
                     .status(IntentStatus.CREATED)
-                    .providerReference(intentReference)
-                    .expiresAt(intentExpiresAt)
+                    .providerReference(razorpayOrderId)
+                    .expiresAt(now.plusMinutes(appProperties.getIntentTtlMinutes()))
                     .build();
             paymentIntentRepository.saveAndFlush(intent);
         }
@@ -767,8 +782,8 @@ private final CommissionRateService commissionRateService;
                 .total(grandTotal.setScale(SCALE_2, ROUNDING))
                 .paymentMethod(paymentMethod.name())
                 .paymentGroupId(paymentGroupId)
-                .intentReference(intentReference)
-                .intentExpiresAt(intentExpiresAt != null ? intentExpiresAt.toString() : null)
+                .intentReference(razorpayOrderId)
+                .intentExpiresAt(now != null ? now.plusMinutes(appProperties.getIntentTtlMinutes()).toString() : null)
                 .build();
     }
 

@@ -97,8 +97,31 @@ export interface PaymentResumeResponse {
   paidAt: string | null;
 }
 
+/** Response of `GET /api/v1/payments/razorpay/key` — public Key ID only. */
+export interface RazorpayKeyResponse {
+  keyId: string;
+}
+
+/** Request body of `POST /api/v1/payments/razorpay/{orderId}/verify`. */
+export interface RazorpayVerifyRequest {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}
+
+/** Response of `POST /api/v1/payments/razorpay/{orderId}/verify`. */
+export interface RazorpayVerifyResponse {
+  orderId: number;
+  orderStatus: string;
+  paymentStatus: PaymentStatus;
+  paymentGroupId: string | null;
+}
+
 /** The payments namespace under `/api/v1`. */
 export const PAYMENTS_PATH = "/payments";
+
+/** The Razorpay payments sub-namespace under `/api/v1/payments`. */
+export const RAZORPAY_PATH = "/razorpay";
 
 /** Polling interval for payment state, in milliseconds (plan §9.4: 5–10 s). */
 export const PAYMENT_POLL_INTERVAL_MS = 8_000;

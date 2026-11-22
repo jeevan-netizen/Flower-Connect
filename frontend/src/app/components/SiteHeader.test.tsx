@@ -24,7 +24,6 @@ import { makeCartResponse } from "@/test/factories";
 const mockState = vi.hoisted(() => ({
   isAuthenticated: false,
   user: null as UserResponse | null,
-  logout: vi.fn(),
 }));
 
 vi.mock("@/features/auth/stores/auth-store", () => ({
@@ -32,7 +31,6 @@ vi.mock("@/features/auth/stores/auth-store", () => ({
     const state = {
       isAuthenticated: mockState.isAuthenticated,
       user: mockState.user,
-      logout: mockState.logout,
     };
     return selector ? selector(state) : state;
   },
@@ -57,15 +55,6 @@ vi.mock("@/features/location/queries", () => ({
   }),
 }));
 
-vi.mock("@/features/vendor/queries", () => ({ clearVendorCache: vi.fn() }));
-vi.mock("@/features/admin/queries", () => ({ clearAdminCache: vi.fn() }));
-
-/**
- * The header reads the customer's cart so it can show the item count. The cart
- * is a CUSTOMER-only resource, and the query is gated on the same condition
- * the cart link is rendered under — so these cases assert which requests the
- * header is allowed to make, not how the query is configured.
- */
 const mockFetchCart = vi.hoisted(() => vi.fn());
 
 vi.mock("@/features/cart/api", () => ({
@@ -154,7 +143,6 @@ describe("SiteHeader navigation", () => {
   beforeEach(() => {
     mockState.isAuthenticated = false;
     mockState.user = null;
-    mockState.logout.mockClear();
     mockFetchCart.mockReset();
     mockFetchCart.mockResolvedValue(makeCartResponse());
     mockFetchUnreadCount.mockReset();
@@ -254,7 +242,6 @@ describe("SiteHeader navigation", () => {
     // The link carries the item count in a badge, so its accessible name is
     // "Cart" for an empty cart and "Cart 2" for a cart with two items.
     expect(screen.getByRole("link", { name: /^Cart/ })).toHaveAttribute("href", "/cart");
-    expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Vendor" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Register" })).not.toBeInTheDocument();
   });
@@ -269,18 +256,9 @@ describe("SiteHeader navigation", () => {
 
     expect(screen.getByRole("link", { name: "Vendor" })).toHaveAttribute("href", "/vendor");
     expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
-  });
-
-  it("logs out from the panel too", async () => {
-    mockState.isAuthenticated = true;
-    mockState.user = florist();
-    narrowViewport();
-    renderAt();
-
-    await userEvent.click(screen.getByRole("button", { name: /open menu/i }));
-    await userEvent.click(screen.getByRole("button", { name: /log out/i }));
-
-    expect(mockState.logout).toHaveBeenCalledTimes(1);
+    // Vendor account actions live on the shared Profile page, not the header.
+    expect(screen.queryByRole("link", { name: /change password/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /log out/i })).not.toBeInTheDocument();
   });
 
   it("does not ask for the customer cart as an anonymous visitor", () => {

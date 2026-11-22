@@ -13,7 +13,6 @@ import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
 import { ApprovedVendorGate } from "@/features/vendor/components/ApprovedVendorGate";
 import { VendorDashboardPage } from "@/features/vendor/pages/VendorDashboardPage";
-import { VendorProfilePage } from "@/features/vendor/pages/VendorProfilePage";
 import { VendorSettingsPage } from "@/features/vendor/pages/VendorSettingsPage";
 import { VendorHoursPage } from "@/features/vendor/pages/VendorHoursPage";
 import { VendorCatalogPage } from "@/features/vendor/pages/VendorCatalogPage";
@@ -33,10 +32,12 @@ import { VendorStorefrontPage } from "@/features/customer/pages/VendorStorefront
 import { ProductDetailPage } from "@/features/customer/pages/ProductDetailPage";
 import { OrderHistoryPage } from "@/features/customer/orders/pages/OrderHistoryPage";
 import { OrderDetailPage } from "@/features/customer/orders/pages/OrderDetailPage";
+import { ProfilePage } from "@/features/customer/pages/ProfilePage";
 import { ChangePasswordPage } from "@/features/auth/pages/ChangePasswordPage";
 import { RaiseDisputePage, DisputeDetailPage } from "@/features/dispute/pages/DisputePages";
 import { PRODUCT_ROUTE_IDS } from "@/features/customer/navigation";
 import { PaymentStatusPage } from "@/features/payment/pages/PaymentStatusPage";
+import RazorpayCheckoutPage from "@/features/payment/pages/RazorpayCheckoutPage";
 import { AdminRefundsPage } from "@/features/admin/pages/AdminRefundsPage";
 import { AdminOrderLookupPage } from "@/features/admin/pages/AdminOrderLookupPage";
 import { AdminDisputesPage } from "@/features/admin/pages/AdminDisputesPage";
@@ -174,10 +175,33 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "payment/razorpay/:orderId",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE]}>
+            <RazorpayCheckoutPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: "orders",
         element: (
           <ProtectedRoute roles={[CUSTOMER_ROLE]}>
             <OrderHistoryPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        // The shared profile destination: customers see their account and
+        // address profile, vendors see their vendor profile. `ProfilePage`
+        // dispatches purely on the authenticated role, so customer account data
+        // is never exposed to vendors and vendor profile management is never
+        // exposed to customers. The route is guarded to CUSTOMER and VENDOR;
+        // ADMIN and other roles are refused by the guard, and unauthenticated
+        // visitors are redirected to login.
+        path: "profile",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE, VENDOR_ROLE]}>
+            <ProfilePage />
           </ProtectedRoute>
         ),
       },
@@ -251,7 +275,6 @@ export const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <VendorDashboardPage /> },
-          { path: "profile", element: <VendorProfilePage /> },
           { path: "settings", element: <VendorSettingsPage /> },
           { path: "hours", element: <VendorHoursPage /> },
           // Phase 3g catalog and inventory (plan tasks 3.5–3.9). `new` is declared

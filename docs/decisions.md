@@ -2982,3 +2982,43 @@ Hard architectural constraints:
 - `DemoSeedActivationTest`: 4/4 pass (verifies exclusion in prod/test and activation in dev).
 - `DemoSeedRunnerUnitTest`: 3/3 pass (verifies image generation and skip on missing password).
 - `DemoSeedIntegrationTest`: 1/1 pass against real MySQL (verifies full dataset coverage, stock reconciliation, billing & settlement reconciliation, and zero row drift on re-run).
+
+
+## D-71: Razorpay Standard Checkout replaces simulated online payments (test mode only)
+
+**Status:** Accepted
+**Date:** Phase 14 (Razorpay checkout implementation)
+
+### Context
+
+Phase 7 introduced a simulated online payment provider (`SimulatedPaymentProvider`, `SimulatorController`) behind the `!prod` profile. The frontend polled payment state and used a `resume` action that was a refresh, not a completion. The plan required replacing this with Razorpay Standard Checkout in test mode while keeping COD working.
+
+Key questions:
+- How to create Razorpay Orders server-side without trusting browser-supplied amounts.
+- How to verify Razorpay checkout signatures without marking orders paid from unverified callbacks.
+- How to handle Razorpay webhooks separately from the existing simulator webhook.
+- How to configure Razorpay credentials without requiring the webhook secret until it's needed.
+
+### Decision
+
+- **Server-side order creation**: `CheckoutService` calls `RazorpayClient.createOrder()` with the server-calculated INR total converted to paise during the checkout transaction. The browser never supplies an amount. All order/payment/stock creation happens in the same transaction, so a Razorpay API failure rolls back everything.
+- **Signature verification**: `POST /api/v1/payments/razorpay/{orderId}/verify` verifies `HMAC-SHA256(razorpay_order_id + "|" + razorpay_payment_id, key_secret)`. An unverified signature never changes payment or order state. Ownership is enforced via the order's customer email.
+- **Webhook separation**: `POST /api/v1/payments/razorpay/webhook` is a separate endpoint from the existing simulator webhook at `/api/v1/payments/webhook`. It verifies `X-Razorpay-Signature` (HMAC-SHA256 over the raw body with the webhook secret), handles `payment.captured` (PAID/PLACED) and `payment.failed` (FAILED/CANCELLED), and uses `payment_events.provider_event_id` for idempotency. Duplicate event IDs are acknowledged without side effects.
+- **Configuration**: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` map to `app.razorpay.*`. The Key Secret is never sent to the frontend. The webhook secret is not required at startup; the webhook endpoint rejects all requests when absent (fail-safe).
+- **Frontend**: `RazorpayCheckoutPage` loads the Razorpay SDK from `https://checkout.razorpay.com/v1/checkout.js`, fetches the public Key ID and the Razorpay order reference, opens Standard Checkout, and on success calls the verify endpoint. Only the Key ID and order details reach the browser.
+- **COD preserved**: The COD checkout flow is unchanged. `POST /api/v1/payments/simulator/{orderId}/pay|fail` remain available behind `!prod` for backward compatibility but are no longer part of the online checkout flow.
+
+### Consequences
+
+- Online checkout now depends on Razorpay test-mode API availability. In environments without Razorpay credentials, ONLINE checkout returns a clear error.
+- The Razorpay Key ID is public and safe to expose to the frontend; the Key Secret is server-only.
+- Webhook secret is optional at startup; production deployments must configure it before enabling webhook-based payment completion.
+- Existing simulator tests were updated to mock `RazorpayClient` and assert `order_test_` prefix instead of `intent_sim_`.
+
+### Verification
+
+- `RazorpayServiceTest`: 11/11 unit tests pass.
+- `RazorpayControllerTest`: 7/7 slice tests pass.
+- `OnlineCheckoutIntegrationTest`: updated to mock `RazorpayClient`.
+- Frontend `payment/api.test.ts` (2 tests) and `RazorpayCheckoutPage.test.tsx` (4 tests) pass.
+- Backend unit suite passes; frontend typecheck, lint, tests, build pass.

@@ -1,27 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { Outlet } from "react-router-dom";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
-import { vendorKeys } from "@/features/vendor/queries";
 import { renderWithProviders, createTestQueryClient } from "@/test/render";
 import { makeVendorProfile } from "@/test/factories";
 import { businessError, vendorNotApprovedError } from "@/test/api-errors";
 
 const mockFetch = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
-const mockLogout = vi.hoisted(() => vi.fn());
 
 vi.mock("@/features/vendor/api", () => ({
   fetchOwnProfile: mockFetch,
   updateOwnProfile: mockUpdate,
-}));
-
-vi.mock("@/features/auth/stores/auth-store", () => ({
-  useAuthStore: (selector?: (s: { logout: () => void }) => unknown) => {
-    const state = { logout: mockLogout };
-    return selector ? selector(state) : state;
-  },
 }));
 
 function renderLayout(queryClient = createTestQueryClient()) {
@@ -48,7 +38,7 @@ describe("VendorLayout", () => {
 
     const dashboard = screen.getByRole("link", { name: "Dashboard" });
     expect(dashboard).toHaveAttribute("href", "/vendor");
-    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/vendor/profile");
+    expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Delivery settings" })).toHaveAttribute("href", "/vendor/settings");
     expect(screen.getByRole("link", { name: "Operating hours" })).toHaveAttribute("href", "/vendor/hours");
   });
@@ -80,7 +70,7 @@ describe("VendorLayout", () => {
       expect(screen.queryByRole("link", { name: new RegExp(label, "i") })).not.toBeInTheDocument();
     });
     // The areas a pending vendor still needs stay reachable.
-    expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
   });
 
   it("does not link to the Phase 5/6 areas that have no API yet", async () => {
@@ -124,20 +114,5 @@ describe("VendorLayout", () => {
     renderLayout();
 
     expect(await screen.findByText(/no vendor profile/i)).toBeInTheDocument();
-  });
-
-  it("drops cached vendor data on logout so the next account starts clean", async () => {
-    const queryClient = createTestQueryClient();
-    renderLayout(queryClient);
-
-    await waitFor(() => {
-      expect(queryClient.getQueryData(vendorKeys.profile)).toBeDefined();
-    });
-
-    const removeSpy = vi.spyOn(queryClient, "removeQueries");
-    await userEvent.click(screen.getByRole("button", { name: /log out/i }));
-
-    expect(mockLogout).toHaveBeenCalledTimes(1);
-    expect(removeSpy).toHaveBeenCalledWith({ queryKey: vendorKeys.all });
   });
 });

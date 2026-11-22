@@ -15,6 +15,7 @@ import {
   makePublicProduct,
   makeServiceLocations,
   makeStorefront,
+  makeUserResponse,
   makeVendorProfile,
 } from "@/test/factories";
 // `vi.mock` is hoisted above these, so the router, guard and pages all bind to
@@ -226,7 +227,6 @@ describe("application router", () => {
     // read as a product id.
     expect(vendorRoute?.children?.map((child) => child.path)).toEqual([
       undefined,
-      "profile",
       "settings",
       "hours",
       "catalog",
@@ -252,7 +252,7 @@ describe("application router", () => {
   });
 
   it("renders the profile editor for a florist", async () => {
-    renderAt("/vendor/profile");
+    renderAt("/profile");
 
     await waitFor(() => {
       expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
@@ -339,12 +339,34 @@ describe("application router", () => {
   it("keeps a customer out of every vendor route", async () => {
     mockState.user = { ...florist(), role: "CUSTOMER" };
 
-    renderAt("/vendor/profile");
+    renderAt("/vendor/settings");
 
     await waitFor(() => {
       expect(screen.getByText(/does not have access to this area/i)).toBeInTheDocument();
     });
     expect(screen.queryByLabelText(/business name/i)).not.toBeInTheDocument();
+  });
+
+  it("renders the customer profile at /profile for a customer", async () => {
+    mockState.user = makeUserResponse();
+
+    renderAt("/profile");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/full name/i)).toHaveValue("Bea Buyer");
+    });
+    expect(screen.queryByLabelText(/business name/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps an anonymous visitor out of /profile and shows the login page", async () => {
+    mockState.isAuthenticated = false;
+    mockState.user = null;
+
+    renderAt("/profile");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /welcome back/i })).toBeInTheDocument();
+    });
   });
 
   it("keeps an anonymous visitor out of the vendor area and shows the login page", async () => {
@@ -704,7 +726,7 @@ describe("admin route protection", () => {
   it("leaves the vendor routes working for a florist after the admin routes were added", async () => {
     mockState.user = florist();
 
-    renderAt("/vendor/profile");
+    renderAt("/profile");
 
     await waitFor(() => {
       expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();

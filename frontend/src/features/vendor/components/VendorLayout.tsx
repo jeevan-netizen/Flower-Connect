@@ -1,12 +1,10 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/features/auth/stores/auth-store";
-import { clearVendorCache, useVendorProfile } from "@/features/vendor/queries";
+import { NavLink, Outlet } from "react-router-dom";
+import { useVendorProfile } from "@/features/vendor/queries";
 import { VendorErrorState } from "@/features/vendor/components/VendorErrorState";
 import { VendorStatusBanner } from "@/features/vendor/components/VendorStatusBanner";
 import { countOpenDays } from "@/features/vendor/format";
 import { FlowerLoader } from "@/motion/FlowerLoader";
-import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
+import { FOCUS_RING } from "@/motion/pressable";
 
 interface VendorNavItem {
   to: string;
@@ -37,7 +35,6 @@ const NAV_ITEMS: VendorNavItem[] = [
   { to: "/vendor/inventory", label: "Inventory", requiresApproval: true },
   { to: "/vendor/billing", label: "Billing & Payouts" },
   { to: "/vendor/analytics", label: "Analytics" },
-  { to: "/vendor/profile", label: "Profile" },
   { to: "/vendor/settings", label: "Delivery settings" },
   { to: "/vendor/hours", label: "Operating hours" },
 ];
@@ -62,20 +59,12 @@ function navClass({ isActive }: { isActive: boolean }): string {
  * visible from every screen, and so it reads from the same cached profile query
  * the pages use — one `GET /api/v1/vendors/profile` serves the whole area.
  *
- * Logging out here clears the vendor query cache so the next account to sign in
- * on this tab cannot read the previous vendor's cached profile.
+ * Vendor account actions (Change password, Log out) live on the shared
+ * `/profile` page rendered by `ProfilePage`, not in the vendor sidebar — so an
+ * action belongs to exactly one place.
  */
 export function VendorLayout() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const logout = useAuthStore((state) => state.logout);
   const { data: profile, isPending, error, refetch } = useVendorProfile();
-
-  const handleLogout = () => {
-    clearVendorCache(queryClient);
-    logout();
-    navigate("/", { replace: true });
-  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -85,13 +74,6 @@ export function VendorLayout() {
             <p className="text-lg font-bold text-brand-700">FlowerConnect</p>
             <p className="text-xs uppercase tracking-wide text-slate-500">Vendor area</p>
           </div>
-
-          <NavLink
-            to="/settings/password"
-            className={`mt-3 block rounded-md bg-brand-600 px-3 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-700 ${FOCUS_RING} ${PRESSABLE}`}
-          >
-            Change password
-          </NavLink>
 
           <nav className="mt-4 rounded-lg border border-slate-200 bg-white p-2 shadow-sm" aria-label="Vendor">
             <ul className="flex flex-col gap-1 md:flex-col">
@@ -106,14 +88,6 @@ export function VendorLayout() {
               )}
             </ul>
           </nav>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`mt-4 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
-          >
-            Log out
-          </button>
         </aside>
 
         <main className="min-w-0 flex-1 space-y-6">
