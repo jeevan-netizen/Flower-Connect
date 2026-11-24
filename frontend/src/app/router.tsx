@@ -192,15 +192,17 @@ export const router = createBrowserRouter([
       },
       {
         // The shared profile destination: customers see their account and
-        // address profile, vendors see their vendor profile. `ProfilePage`
-        // dispatches purely on the authenticated role, so customer account data
-        // is never exposed to vendors and vendor profile management is never
-        // exposed to customers. The route is guarded to CUSTOMER and VENDOR;
-        // ADMIN and other roles are refused by the guard, and unauthenticated
+        // address profile, vendors see their vendor profile, and administrators
+        // see their administrator account. `ProfilePage` dispatches purely on
+        // the authenticated role, so customer account data is never exposed to
+        // vendors or admins, vendor profile management is never exposed to
+        // customers or admins, and admin account data is never exposed to
+        // customers or vendors. The route is guarded to CUSTOMER, VENDOR and
+        // ADMIN; other roles are refused by the guard, and unauthenticated
         // visitors are redirected to login.
         path: "profile",
         element: (
-          <ProtectedRoute roles={[CUSTOMER_ROLE, VENDOR_ROLE]}>
+          <ProtectedRoute roles={[CUSTOMER_ROLE, VENDOR_ROLE, ADMIN_ROLE]}>
             <ProfilePage />
           </ProtectedRoute>
         ),

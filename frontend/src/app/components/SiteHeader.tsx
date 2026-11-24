@@ -154,12 +154,24 @@ export function SiteHeader() {
       <Link className={NAV_LINK} to="/">
         Home
       </Link>
-      <Link className={NAV_LINK} to="/browse">
-        Browse
-      </Link>
-      <Link className={NAV_LINK} to="/orders">
-        Orders
-      </Link>
+      {/* Customer-facing catalogue links. Browsing is public, so an
+          unauthenticated visitor still sees Browse; a signed-in customer sees
+          Browse and Orders. A vendor or admin must not see customer browsing
+          or customer order history in the shared header. */}
+      {!isAuthenticated ? (
+        <Link className={NAV_LINK} to="/browse">
+          Browse
+        </Link>
+      ) : user?.role === CUSTOMER_ROLE ? (
+        <>
+          <Link className={NAV_LINK} to="/browse">
+            Browse
+          </Link>
+          <Link className={NAV_LINK} to="/orders">
+            Orders
+          </Link>
+        </>
+      ) : null}
       <Link className={NAV_LINK} to="/profile">
         Profile
       </Link>

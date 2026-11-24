@@ -414,6 +414,9 @@ class VendorControllerTest {
         request.setBusinessName("Test Blossoms");
         request.setAddressLine1("12 Test Street");
         request.setServiceLocationId(1L);
+        request.setCity("Bengaluru");
+        request.setArea("Koramangala");
+        request.setPincode("560034");
         request.setPrepTimeMinutes(30);
         request.setSlotDurationMinutes(60);
         request.setMaxOrdersPerSlot(10);

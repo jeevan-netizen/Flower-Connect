@@ -79,6 +79,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                // Service-area proposals (Phase 14 vendor registration): submission is
+                // open to any authenticated account; approval/rejection is administrator-only.
+                // Declared before the broad /api/v1/locations/** permitAll rule below so it
+                // matches first.
+                .requestMatchers(HttpMethod.POST, "/api/v1/locations/proposals")
+                    .hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/locations/proposals/**")
+                    .hasRole("ADMIN")
                 .requestMatchers("/api/v1/locations/**").permitAll()
                 .requestMatchers("/api/v1/discover/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/search/**").permitAll()

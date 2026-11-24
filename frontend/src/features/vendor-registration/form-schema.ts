@@ -45,9 +45,20 @@ export const vendorRegisterSchema = z
     addressLine1: requiredTextField("Address line 1", 255),
     addressLine2: optionalTextField("Address line 2", 255),
     logoUrl: logoUrlField,
-    // Kept as the raw `<select>` string and converted by
+    city: requiredTextField("City", 128),
+    area: requiredTextField("Area / locality", 128),
+    pincode: z
+      .string()
+      .trim()
+      .min(1, "Pincode is required")
+      .refine(
+        (value) => /^[0-9]{6}$/.test(value),
+        "Pincode must be a 6-digit number",
+      ),
+    // Kept as the raw combobox string and converted by
     // `buildVendorRegisterRequest`, consistent with the string-typed form state
-    // the vendor area uses (docs/decisions.md, D-15).
+    // the vendor area uses (docs/decisions.md, D-15). The value must resolve to an
+    // existing `service_locations.id` — the backend enforces the foreign key.
     serviceLocationId: z
       .string()
       .trim()
@@ -75,6 +86,9 @@ export const VENDOR_REGISTER_FIELDS = [
   "addressLine1",
   "addressLine2",
   "logoUrl",
+  "city",
+  "area",
+  "pincode",
   "serviceLocationId",
 ] as const satisfies readonly (keyof VendorRegisterFormValues)[];
 

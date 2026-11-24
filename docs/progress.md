@@ -2067,4 +2067,90 @@ role-appropriate profile page, guarded to CUSTOMER and VENDOR.
 - Frontend: `CustomerProfilePage.test.tsx` (13 tests) and `VendorProfilePage.test.tsx` (17 tests), all pass. Full frontend suite: 935 tests pass, typecheck clean, lint clean, production build clean.
 - Header cleanup: `Change password` and `Log out` links removed from the shared `SiteHeader` and from the vendor sidebar (`VendorLayout`) for every role; `Log out` remains only at the bottom of `CustomerProfilePage` (clears address cache) and `VendorProfilePage` (clears vendor cache), both logging out via the auth store and navigating home. Profile link and all other navigation items preserved.
 
+## Customer navigation links hidden from vendor users (uncommitted)
 
+Removed the customer "Browse" and "Orders" links from the shared `SiteHeader` for vendor (and admin) users, so vendors no longer see customer browsing or customer order-history sections in the shared header.
+
+- `frontend/src/app/components/SiteHeader.tsx`: `Browse` is still shown to unauthenticated visitors (public browsing) and to signed-in customers; `Orders` is shown only to signed-in customers. Both are withheld from vendor and admin users. Route authorization and data access are unchanged (`/browse` remains public, `/orders` remains CUSTOMER-only).
+- `frontend/src/app/components/SiteHeader.test.tsx`: updated the anonymous panel test (Orders no longer appears), added florist-exclusion assertions (no Browse/Orders), and added a test that a signed-in customer sees Browse and Orders.
+- `frontend/src/features/vendor/components/VendorLayout.tsx`: unchanged — the vendor sidebar already renders only vendor-specific links (`/vendor/orders` is vendor order management, not the customer order history).
+- Route authorization unchanged: `/orders` stays guarded to `CUSTOMER` in `router.tsx`; no new endpoints or data-access changes.
+
+### Tests
+- Frontend: `SiteHeader.test.tsx` (18 tests), `VendorLayout.test.tsx` (8 tests), `router.test.tsx` (46 tests) all pass.
+
+## Admin Profile page (uncommitted)
+
+Added an Admin Profile destination at the shared `/profile` route and moved the admin "Change password" and "Log out" actions out of the admin sidebar onto that page, mirroring the customer and vendor Profile pattern.
+
+- `frontend/src/features/admin/pages/AdminProfilePage.tsx` (new): read-only account details (full name, email, role, admin id, member-since) from the authenticated user's JWT subject; a "Change password" link to the existing `/settings/password` route (`POST /api/v1/users/me/password`, valid for admins — no new endpoint invented); a "Log out" button that clears the admin query cache (`clearAdminCache`), ends the auth session, and navigates home. No passwords, tokens, or secrets are displayed or stored.
+- `frontend/src/features/customer/pages/ProfilePage.tsx`: role dispatch extended so ADMIN → `AdminProfilePage` alongside CUSTOMER → `CustomerProfilePage` and FLORIST → `VendorProfilePage`.
+- `frontend/src/app/router.tsx`: `/profile` route guard extended from `[CUSTOMER_ROLE, VENDOR_ROLE]` to `[CUSTOMER_ROLE, VENDOR_ROLE, ADMIN_ROLE]` so administrators can reach the shared profile page; route comment updated.
+- `frontend/src/features/admin/components/AdminLayout.tsx`: removed the "Change password" NavLink and "Log out" button from the admin sidebar; account actions now live only on `/profile`. Sidebar renders only admin area links (Dashboard, Vendors, Users, Billing & Settlements, Review moderation, Analytics).
+- `frontend/src/app/components/SiteHeader.tsx`: unchanged for this task — the shared header never rendered Change password or Log out for any role (admin sees only the Admin link); confirmed no duplication remains.
+- `frontend/src/features/admin/pages/AdminProfilePage.test.tsx` (new, 4 tests): admin account details render read-only, Change password link present, no credential material shown, Log out clears cache + ends session + navigates home.
+- `frontend/src/features/customer/pages/ProfilePage.test.tsx` (new, 3 tests): role dispatch renders CustomerProfilePage for CUSTOMER, VendorProfilePage for FLORIST, AdminProfilePage for ADMIN.
+- `frontend/src/features/admin/components/AdminLayout.test.tsx`: logout test removed; asserts Change password and Log out are absent from the admin sidebar.
+- `frontend/src/app/router.test.tsx`: added admin-at-`/profile` test (renders AdminProfilePage, Change password link, Log out button).
+- `frontend/src/app/components/SiteHeader.test.tsx`: added admin exclusion test (no Change password / Log out / Browse / Orders in the header for admins).
+
+### Tests
+- Frontend: `AdminProfilePage.test.tsx` (4), `ProfilePage.test.tsx` (3), updated `AdminLayout.test.tsx`, `SiteHeader.test.tsx`, `router.test.tsx` (47 tests) all pass.
+
+
+## Service-Location Proposal Flow for Vendor Registration (in progress, uncommitted)
+
+Extended vendor registration (`POST /api/v1/vendors/register`) to collect the shop's
+address (`city`, `area`, `pincode`) alongside the existing `service_location_id` FK,
+and to propose a new service area when the shop's city+area is not yet a seeded
+`service_locations` row. Vendor profiles remain bound to an existing service location
+(never to an unreviewed proposal), per D-4.
+
+### Backend
+- `V34__create_service_location_proposals.sql`: additive migration creating the
+  `service_location_proposals` table (`id`, `city`, `area`, `pincode`, `address_line1`,
+  `address_line2`, `status` ENUM PENDING/APPROVED/REJECTED, `proposed_by_user_id` FK,
+  `proposed_by_email`, `reviewed_by_user_id`, `rejection_reason`, `created_at`,
+  `reviewed_at`, plus indexes and a CHECK tying reviewer/user consistency).
+- `ServiceLocationProposal` entity + `ServiceLocationProposalRepository`.
+- DTOs: `ServiceLocationProposalRequest`, `ApproveServiceLocationProposalRequest`,
+  `ServiceLocationProposalResponse`.
+- `ServiceLocationProposalMapper` (static `INSTANCE`, used by both controller and
+  service since the `WebMvcTest` context cannot resolve a Spring mapper bean).
+- `LocationProposalService`: idempotent submit (returns existing PENDING proposal for
+  the same city+area), approve (creates the real `ServiceLocation` with admin-supplied
+  coordinates/timezone, flips proposal to APPROVED), reject (records reason, flips to
+  REJECTED). PENDING proposals are never returned by `GET /api/v1/locations`.
+- `LocationProposalController`: `POST /api/v1/locations/proposals` (any authenticated
+  role), `GET /api/v1/locations/proposals` (ADMIN), `POST .../{id}/approve` (ADMIN),
+  `POST .../{id}/reject` (ADMIN).
+- `SecurityConfig`: proposal endpoints gated (`hasAnyRole` for submit, `hasRole ADMIN`
+  for list/approve/reject), ordered before the catch-all authenticated rule.
+- `VendorRegisterRequest`: added `city`, `area`, `pincode` (`@NotBlank`, pincode
+  `@Pattern 6-digit`). `VendorService.maybeProposeServiceLocation` wired into
+  `register` — proposes when the shop's city+area has no matching service location.
+- Vendor profile still copies coordinates from the chosen (existing) service location;
+  no coordinates are invented from the form.
+
+### Frontend
+- `ServiceAreaPicker.tsx`: typeable combobox over `GET /api/v1/locations` — free text
+  with filtered matches; selecting a known area binds its id, typing an unseeded area
+  leaves the id unset (proposal path).
+- `VendorRegisterPage.tsx`: "Shop address" section with city/area/pincode fields plus
+  the service-area picker.
+- `form-schema.ts`, `types.ts`: city/area/pincode fields added to the register schema
+  and types.
+- `api.test.ts`, `VendorRegisterPage.test.tsx`: updated for combobox/new fields.
+
+### Tests
+- Backend: `LocationProposalServiceTest` (6), `LocationProposalControllerTest` (8),
+  `VendorServiceTest` (22 — added `proposalService` mock), `VendorControllerTest`
+  (26 — register requests now include city/area/pincode), and new
+  `VendorApiIntegrationTest.registeringAShopInAnUnseededAreaCreatesAPendingProposal`
+  (1, vs real MySQL). Full backend unit suite: 1516/1516 pass.
+- Frontend: vendor-registration tests 34 pass, router test 47 pass; lint exit 0,
+  typecheck exit 0, build exit 0.
+
+### Verification
+- `./mvnw test`: 1516 tests, 0 failures, BUILD SUCCESS.
+- `failsafe:integration-test -Dit.test=VendorApiIntegrationTest#registeringAShopInAnUnseededAreaCreatesAPendingProposal`: 1/1 pass.

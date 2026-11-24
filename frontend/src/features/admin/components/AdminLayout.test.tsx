@@ -1,20 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { screen } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
-import { adminKeys } from "@/features/admin/queries";
 import { renderWithProviders } from "@/test/render";
-import { makePage } from "@/test/factories";
-import type { AdminUser } from "@/features/admin/types";
 import type { UserResponse } from "@/features/auth/types";
 
-const mockLogout = vi.hoisted(() => vi.fn());
 const mockCurrentUser = vi.hoisted(() => ({ user: null as UserResponse | null }));
 
 vi.mock("@/features/auth/stores/auth-store", () => ({
-  useAuthStore: (selector: (state: { user: UserResponse | null; logout: () => void }) => unknown) =>
-    selector({ user: mockCurrentUser.user, logout: mockLogout }),
+  useAuthStore: (selector: (state: { user: UserResponse | null }) => unknown) =>
+    selector({ user: mockCurrentUser.user }),
 }));
 
 function adminUser(): UserResponse {
@@ -44,7 +39,7 @@ describe("AdminLayout", () => {
     mockCurrentUser.user = adminUser();
   });
 
-  it("links to both implemented admin areas and nothing else", () => {
+  it("links to the implemented admin areas and nothing else", () => {
     renderShell();
 
     const nav = screen.getByRole("navigation", { name: "Admin" });
@@ -56,6 +51,11 @@ describe("AdminLayout", () => {
     // Catalog, orders and delivery have no admin API in Phase 2, so they are
     // absent rather than rendered as dead links.
     expect(screen.queryByRole("link", { name: /catalog|orders|delivery/i })).not.toBeInTheDocument();
+
+    // Account actions (Change password, Log out) live on the shared /profile
+    // page, not in the admin sidebar.
+    expect(screen.queryByRole("link", { name: /change password/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /log out/i })).not.toBeInTheDocument();
   });
 
   it("renders the child route through the outlet", () => {
@@ -68,17 +68,5 @@ describe("AdminLayout", () => {
     renderShell();
 
     expect(screen.getByText(/admin@example.com \(ADMIN\)/)).toBeInTheDocument();
-  });
-
-  it("clears the admin query cache on logout so the next account sees nothing of this one", async () => {
-    const { queryClient } = renderShell();
-    queryClient.setQueryData(adminKeys.users.list({ role: null, status: null, page: 0 }), makePage<AdminUser>([]));
-
-    await userEvent.click(screen.getByRole("button", { name: /log out/i }));
-
-    expect(mockLogout).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      expect(queryClient.getQueryState(adminKeys.users.all)).toBeUndefined();
-    });
   });
 });

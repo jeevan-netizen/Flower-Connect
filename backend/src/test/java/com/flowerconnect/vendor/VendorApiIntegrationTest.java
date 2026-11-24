@@ -9,6 +9,7 @@ import com.flowerconnect.domain.VendorHours;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.repository.AuditLogRepository;
 import com.flowerconnect.repository.RoleRepository;
+import com.flowerconnect.geo.repository.ServiceLocationProposalRepository;
 import com.flowerconnect.repository.ServiceLocationRepository;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorHoursRepository;
@@ -35,6 +36,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.support.TransactionTemplate;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -74,6 +77,8 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
     private RoleRepository roleRepository;
     @Autowired
     private ServiceLocationRepository serviceLocationRepository;
+    @Autowired
+    private ServiceLocationProposalRepository proposalRepository;
     @Autowired
     private VendorProfileRepository vendorProfileRepository;
     @Autowired
@@ -127,6 +132,36 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
 
         VendorProfile profile = vendorProfileRepository.findByUserId(saved.getId()).orElseThrow();
         assertEquals(VendorProfile.Status.PENDING_APPROVAL, profile.getStatus());
+    }
+
+    @Test
+    void registeringAShopInAnUnseededAreaCreatesAPendingProposal() throws Exception {
+        String email = uniqueEmail();
+        VendorRegisterRequest request = registerRequest(email);
+        // Mysuru is not a seeded service location: the shop's area must be proposed.
+        request.setCity("Mysuru");
+        request.setArea("Mysuru");
+        request.setPincode("570001");
+
+        mockMvc.perform(post("/api/v1/vendors/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.serviceLocationId").value(koramangalaId.intValue()));
+
+        User user = userRepository.findByEmail(email).orElseThrow();
+        java.util.Optional<com.flowerconnect.geo.domain.ServiceLocationProposal> proposal =
+                proposalRepository.findByCityAndAreaAndStatus("Mysuru", "Mysuru",
+                        com.flowerconnect.geo.domain.ServiceLocationProposal.Status.PENDING);
+        assertThat(proposal).isPresent();
+        assertThat(proposal.get().getProposedByUser().getId()).isEqualTo(user.getId());
+        assertThat(proposal.get().getPincode()).isEqualTo("570001");
+        assertThat(proposal.get().getAddressLine1()).isEqualTo("12 Test Street");
+
+        // The proposed area is not a real service location yet, so it must not be
+        // discoverable through the public location list.
+        assertThat(serviceLocationRepository.findByCityAndAreaIgnoreCase("Mysuru", "Mysuru"))
+                .isEmpty();
     }
 
     @Test
@@ -1199,6 +1234,9 @@ class VendorApiIntegrationTest extends AbstractIntegrationTest {
         request.setBusinessName("Test Blossoms");
         request.setDescription("Fresh flowers delivered daily");
         request.setAddressLine1("12 Test Street");
+        request.setCity("Bengaluru");
+        request.setArea("Koramangala");
+        request.setPincode("560034");
         request.setServiceLocationId(koramangalaId);
         request.setDeliveryRadiusKm(new BigDecimal("6.50"));
         request.setMinOrderAmount(new BigDecimal("199.99"));

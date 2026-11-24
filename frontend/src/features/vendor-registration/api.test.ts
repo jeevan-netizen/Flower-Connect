@@ -26,6 +26,9 @@ function formValues(overrides: Partial<VendorRegisterFormValues> = {}): VendorRe
     addressLine1: "12 MG Road",
     addressLine2: "Unit 3",
     logoUrl: "https://cdn.example.com/logo.png",
+    city: "Bengaluru",
+    area: "Indiranagar",
+    pincode: "560038",
     serviceLocationId: "3",
     ...overrides,
   };
@@ -46,6 +49,9 @@ describe("vendor registration api client", () => {
       expect.objectContaining({
         email: "petal@example.com",
         businessName: "Petal & Stem",
+        city: "Bengaluru",
+        area: "Indiranagar",
+        pincode: "560038",
         serviceLocationId: 3,
       }),
     );

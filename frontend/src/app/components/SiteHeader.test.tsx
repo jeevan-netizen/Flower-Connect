@@ -196,9 +196,12 @@ describe("SiteHeader navigation", () => {
     expect(
       screen.getByRole("button", { name: /close menu/i }),
     ).toHaveAttribute("aria-expanded", "true");
-    for (const name of ["Home", "Browse", "Orders", "Register", "For florists", "Login"]) {
+    for (const name of ["Home", "Browse", "Register", "For florists", "Login"]) {
       expect(screen.getAllByRole("link", { name })).toHaveLength(1);
     }
+    // Browsing is public, but Orders is customer-only, so an anonymous visitor
+    // must not see the customer order-history link.
+    expect(screen.queryByRole("link", { name: "Orders" })).not.toBeInTheDocument();
   });
 
   it("closes the panel on Escape and returns focus to the toggle", async () => {
@@ -259,6 +262,39 @@ describe("SiteHeader navigation", () => {
     // Vendor account actions live on the shared Profile page, not the header.
     expect(screen.queryByRole("link", { name: /change password/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /log out/i })).not.toBeInTheDocument();
+    // A florist must not see customer browsing or customer order history.
+    expect(screen.queryByRole("link", { name: "Browse" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Orders" })).not.toBeInTheDocument();
+  });
+
+  it("withholds customer actions from an admin in the header", async () => {
+    mockState.isAuthenticated = true;
+    mockState.user = admin();
+    narrowViewport();
+    renderAt();
+
+    await userEvent.click(screen.getByRole("button", { name: /open menu/i }));
+
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/admin");
+    // Account actions live on the shared Profile page, not the header.
+    expect(screen.queryByRole("link", { name: /change password/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /log out/i })).not.toBeInTheDocument();
+    // An admin must not see customer browsing or customer order history.
+    expect(screen.queryByRole("link", { name: "Browse" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Orders" })).not.toBeInTheDocument();
+  });
+
+  it("shows Browse and Orders to a signed-in customer", async () => {
+    mockState.isAuthenticated = true;
+    mockState.user = customer();
+    narrowViewport();
+    renderAt();
+
+    await userEvent.click(screen.getByRole("button", { name: /open menu/i }));
+
+    expect(screen.getByRole("link", { name: "Browse" })).toHaveAttribute("href", "/browse");
+    expect(screen.getByRole("link", { name: "Orders" })).toHaveAttribute("href", "/orders");
+    expect(screen.queryByRole("link", { name: "Vendor" })).not.toBeInTheDocument();
   });
 
   it("does not ask for the customer cart as an anonymous visitor", () => {

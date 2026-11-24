@@ -6,6 +6,7 @@ import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.exception.ErrorCode;
+import com.flowerconnect.geo.service.LocationProposalService;
 import com.flowerconnect.repository.RoleRepository;
 import com.flowerconnect.repository.ServiceLocationRepository;
 import com.flowerconnect.repository.UserRepository;
@@ -58,6 +59,8 @@ class VendorServiceTest {
     private RoleRepository roleRepository;
     @Mock
     private ServiceLocationRepository serviceLocationRepository;
+    @Mock
+    private LocationProposalService proposalService;
     @Mock
     private VendorMapper mapper;
     @Mock
@@ -391,6 +394,8 @@ class VendorServiceTest {
         when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         when(serviceLocationRepository.findById(7L)).thenReturn(java.util.Optional.of(location));
+        lenient().when(serviceLocationRepository.findByCityAndAreaIgnoreCase(anyString(), anyString()))
+                .thenReturn(java.util.Optional.of(location));
         when(vendorProfileRepository.save(any(VendorProfile.class)))
                 .thenAnswer(inv -> {
                     VendorProfile profile = inv.getArgument(0);

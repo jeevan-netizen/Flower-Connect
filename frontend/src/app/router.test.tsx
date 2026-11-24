@@ -358,6 +358,20 @@ describe("application router", () => {
     expect(screen.queryByLabelText(/business name/i)).not.toBeInTheDocument();
   });
 
+  it("renders the administrator profile at /profile for an admin", async () => {
+    mockState.user = { ...florist(), role: "ADMIN", email: "ada@example.com", fullName: "Ada Admin" };
+
+    renderAt("/profile");
+
+    await waitFor(() => {
+      expect(screen.getByText(/ada admin/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/ada@example.com/i)).toBeInTheDocument();
+    expect(screen.getByText("ADMIN")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /change password/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
+  });
+
   it("keeps an anonymous visitor out of /profile and shows the login page", async () => {
     mockState.isAuthenticated = false;
     mockState.user = null;
