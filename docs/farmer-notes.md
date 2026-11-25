@@ -95,13 +95,13 @@ Example: gross 32 kg at 100/kg → deduction 3 kg, net 29 kg, amount 2900.
 |--------|------|-------|
 | id | BIGINT PK AUTO_INCREMENT | |
 | link_id | BIGINT NOT NULL | FK → farmer_vendor_links(id) |
-| flower_type | VARCHAR(160) NOT NULL | |
-| gross_kg | DECIMAL(10,2) NOT NULL | |
+| flower_type | VARCHAR(100) NOT NULL | |
+| gross_kg | DECIMAL(10,2) NOT NULL | must be > 0 |
 | deduction_kg | DECIMAL(10,2) NOT NULL | from weight-deduction policy |
 | net_kg | DECIMAL(10,2) NOT NULL | gross − deduction |
-| price_per_kg | DECIMAL(10,2) NOT NULL | |
+| price_per_kg | DECIMAL(10,2) NOT NULL | must be > 0 |
 | amount | DECIMAL(12,2) NOT NULL | net × price per kg |
-| deposited_at | DATETIME(6) NOT NULL | defaults to clock now when not supplied |
+| deposited_at | DATETIME(6) NOT NULL | defaults to clock now when not supplied; future rejected |
 | created_at | DATETIME(6) NOT NULL | `@CreationTimestamp` |
 | INDEX(link_id, deposited_at) | | |
 
@@ -109,6 +109,9 @@ Example: gross 32 kg at 100/kg → deduction 3 kg, net 29 kg, amount 2900.
   (404 if missing, 403 if foreign).
 - The link must be `ACTIVE` (409 `CONFLICT` otherwise).
 - `depositedAt` is optional; when omitted it defaults to the injected `Clock`.
+- Future `depositedAt` is rejected (400 `VALIDATION_FAILED`).
+- Request validation: `flowerType` required (max 100 chars), `grossKg > 0`,
+  `pricePerKg > 0` (400 `VALIDATION_FAILED`).
 - No separate passbook table (out of scope).
 
 ## Endpoint summary (Stage 2)
@@ -119,9 +122,9 @@ Example: gross 32 kg at 100/kg → deduction 3 kg, net 29 kg, amount 2900.
 
 ## Verification
 
-- Backend unit: `./mvnw test` **1,398 passed, 0 failed, 0 errors**, BUILD
-  SUCCESS (includes 25 new farmer deposit tests: `WeightDeductionPolicyTest`
-  9, `FarmerDepositServiceTest` 10, `FarmerDepositControllerTest` 6).
+- Backend unit: `./mvnw test` **1,399 passed, 0 failed, 0 errors**, BUILD
+  SUCCESS (includes 26 new farmer deposit tests: `WeightDeductionPolicyTest`
+  4, `FarmerDepositServiceTest` 12, `FarmerDepositControllerTest` 10).
 - Frontend (no changes): `npm test` **853 passed across 81 files**,
   `npm run typecheck` clean, `npm run lint` clean.
 - Money/decimal conventions (`BigDecimal`, `HALF_UP`, scale 2) unchanged.

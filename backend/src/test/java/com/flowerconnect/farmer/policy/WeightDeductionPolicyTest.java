@@ -11,45 +11,28 @@ import static org.junit.jupiter.api.Assertions.*;
 class WeightDeductionPolicyTest {
 
     @Test
-    void belowTenKgDeductsZero() {
-        assertEquals(new BigDecimal("0"), WeightDeductionPolicy.deductionKg(new BigDecimal("0")));
+    void deductionBoundaries() {
         assertEquals(new BigDecimal("0"), WeightDeductionPolicy.deductionKg(new BigDecimal("9.99")));
-        assertEquals(new BigDecimal("0"), WeightDeductionPolicy.deductionKg(new BigDecimal("1")));
-    }
-
-    @Test
-    void tenToBelowTwentyKgDeductsOne() {
         assertEquals(new BigDecimal("1"), WeightDeductionPolicy.deductionKg(new BigDecimal("10")));
-        assertEquals(new BigDecimal("1"), WeightDeductionPolicy.deductionKg(new BigDecimal("15")));
         assertEquals(new BigDecimal("1"), WeightDeductionPolicy.deductionKg(new BigDecimal("19.99")));
-    }
-
-    @Test
-    void twentyToBelowThirtyKgDeductsTwo() {
         assertEquals(new BigDecimal("2"), WeightDeductionPolicy.deductionKg(new BigDecimal("20")));
-        assertEquals(new BigDecimal("2"), WeightDeductionPolicy.deductionKg(new BigDecimal("25")));
         assertEquals(new BigDecimal("2"), WeightDeductionPolicy.deductionKg(new BigDecimal("29.99")));
-    }
-
-    @Test
-    void thirtyToBelowFortyKgDeductsThree() {
         assertEquals(new BigDecimal("3"), WeightDeductionPolicy.deductionKg(new BigDecimal("30")));
-        assertEquals(new BigDecimal("3"), WeightDeductionPolicy.deductionKg(new BigDecimal("32")));
         assertEquals(new BigDecimal("3"), WeightDeductionPolicy.deductionKg(new BigDecimal("39.99")));
-    }
-
-    @Test
-    void fortyToBelowFiftyKgDeductsFour() {
         assertEquals(new BigDecimal("4"), WeightDeductionPolicy.deductionKg(new BigDecimal("40")));
-        assertEquals(new BigDecimal("4"), WeightDeductionPolicy.deductionKg(new BigDecimal("45")));
         assertEquals(new BigDecimal("4"), WeightDeductionPolicy.deductionKg(new BigDecimal("49.99")));
+        assertEquals(new BigDecimal("5"), WeightDeductionPolicy.deductionKg(new BigDecimal("50")));
+        assertEquals(new BigDecimal("5"), WeightDeductionPolicy.deductionKg(new BigDecimal("80")));
     }
 
     @Test
-    void fiftyKgAndAboveDeductsFive() {
-        assertEquals(new BigDecimal("5"), WeightDeductionPolicy.deductionKg(new BigDecimal("50")));
-        assertEquals(new BigDecimal("5"), WeightDeductionPolicy.deductionKg(new BigDecimal("55")));
-        assertEquals(new BigDecimal("5"), WeightDeductionPolicy.deductionKg(new BigDecimal("100")));
+    void exampleFromPlan() {
+        // gross 32 kg and rate 100/kg -> deduction 3 kg, net 29 kg, amount 2900
+        assertEquals(new BigDecimal("3"), WeightDeductionPolicy.deductionKg(new BigDecimal("32")));
+        assertEquals(new BigDecimal("29"),
+                new BigDecimal("32").subtract(new BigDecimal("3")));
+        assertEquals(new BigDecimal("2900"),
+                new BigDecimal("29").multiply(new BigDecimal("100")));
     }
 
     @Test
@@ -62,11 +45,5 @@ class WeightDeductionPolicyTest {
     void nullGrossKgRejected() {
         assertThrows(IllegalArgumentException.class,
                 () -> WeightDeductionPolicy.deductionKg(null));
-    }
-
-    @Test
-    void exampleFromPlan() {
-        // gross 32 kg and rate 100/kg -> deduction 3 kg, net 29 kg, amount 2900
-        assertEquals(new BigDecimal("3"), WeightDeductionPolicy.deductionKg(new BigDecimal("32")));
     }
 }

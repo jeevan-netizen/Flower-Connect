@@ -70,9 +70,14 @@ public class FarmerDepositService {
         BigDecimal netKg = grossKg.subtract(deductionKg).setScale(2, BigDecimal.ROUND_HALF_UP);
         BigDecimal amount = netKg.multiply(pricePerKg).setScale(2, BigDecimal.ROUND_HALF_UP);
 
+        LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime depositedAt = request.getDepositedAt() != null
                 ? request.getDepositedAt()
-                : LocalDateTime.now(clock);
+                : now;
+
+        if (depositedAt.isAfter(now)) {
+            throw BusinessException.badRequest("Deposited at must not be in the future");
+        }
 
         FarmerDeposit deposit = FarmerDeposit.builder()
                 .linkId(linkId)

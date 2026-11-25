@@ -95,11 +95,29 @@ class FarmerDepositServiceTest {
 
     @Test
     void recordDepositHonorsSuppliedDepositedAt() {
-        LocalDateTime depositedAt = LocalDateTime.parse("2026-02-20T09:30:00");
+        // Supplied deposited-at must not be after the injected clock (2026-01-15T10:00:00Z).
+        LocalDateTime depositedAt = LocalDateTime.parse("2026-01-15T09:30:00");
         FarmerDepositResponse response = service.recordDeposit(10L, 100L,
                 request(new BigDecimal("10"), new BigDecimal("10"), depositedAt));
 
         assertEquals(depositedAt, response.getDepositedAt());
+    }
+
+    @Test
+    void recordDepositOmitsDepositedAtUsesInjectedClock() {
+        FarmerDepositResponse response = service.recordDeposit(10L, 100L,
+                request(new BigDecimal("10"), new BigDecimal("10"), null));
+
+        assertEquals(LocalDateTime.parse("2026-01-15T10:00:00"), response.getDepositedAt());
+    }
+
+    @Test
+    void recordDepositRejectsFutureDepositedAt() {
+        LocalDateTime future = LocalDateTime.parse("2026-01-16T10:00:00");
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.recordDeposit(10L, 100L,
+                        request(new BigDecimal("10"), new BigDecimal("10"), future)));
+        assertEquals(ErrorCode.VALIDATION_FAILED, ex.getErrorCode());
     }
 
     @Test

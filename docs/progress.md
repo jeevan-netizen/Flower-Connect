@@ -1146,20 +1146,20 @@ No frontend pages, deposits, collections, passbooks, customer checkout/cart/orde
 
 Implemented on branch `farmer-module`, commit `9f25002` (Stage 1) as the base.
 
-**Migration:** Additive `V36__create_farmer_deposits.sql` — creates `farmer_deposits` (`id`, `link_id` FK→`farmer_vendor_links`, `flower_type` VARCHAR(160), `gross_kg`, `deduction_kg`, `net_kg`, `price_per_kg`, `amount` all `DECIMAL(10,2)`/`DECIMAL(12,2)`, `deposited_at` DATETIME(6), `created_at` DATETIME(6)), index on `(link_id, deposited_at)`. No existing migration edited (ADR-002/D-9).
+**Migration:** Additive `V36__create_farmer_deposits.sql` — creates `farmer_deposits` (`id`, `link_id` FK→`farmer_vendor_links`, `flower_type` VARCHAR(100), `gross_kg`, `deduction_kg`, `net_kg`, `price_per_kg`, `amount` all `DECIMAL(10,2)`/`DECIMAL(12,2)`, `deposited_at` DATETIME(6), `created_at` DATETIME(6)), index on `(link_id, deposited_at)`. No existing migration edited (ADR-002/D-9).
 
 **Backend (`com.flowerconnect.farmer`):**
 - `FarmerDeposit` entity (`@Enumerated` not used; all money/weight fields `BigDecimal` with precision/scale, `@CreationTimestamp` for `created_at`).
 - `FarmerDepositRepository` (`JpaRepository`) with `findByLinkId`.
 - `WeightDeductionPolicy` (package `com.flowerconnect.farmer.policy`): pure, no database access, lower-bound-inclusive brackets — below 10 kg → 0, 10–<20 → 1, 20–<30 → 2, 30–<40 → 3, 40–<50 → 4, 50+ → 5.
-- `FarmerDepositService.recordDeposit(vendorId, linkId, request)`: resolves the florist's vendor from the JWT subject, enforces link ownership (404 missing, 403 foreign, 409 unless link is `ACTIVE`), computes `deduction = WeightDeductionPolicy.deductionKg(grossKg)`, `net = gross − deduction`, `amount = net × pricePerKg`, all rounded `HALF_UP` scale 2; `depositedAt` defaults to the injected `Clock` when not supplied. Persists gross/deduction/net/rate/amount so historical rows are unaffected by policy changes.
+- `FarmerDepositService.recordDeposit(vendorId, linkId, request)`: resolves the florist's vendor from the JWT subject, enforces link ownership (404 missing, 403 foreign, 409 unless link is `ACTIVE`), rejects future `depositedAt` (400 `VALIDATION_FAILED`), computes `deduction = WeightDeductionPolicy.deductionKg(grossKg)`, `net = gross − deduction`, `amount = net × pricePerKg`, all rounded `HALF_UP` scale 2; `depositedAt` defaults to the injected `Clock` when not supplied. Persists gross/deduction/net/rate/amount so historical rows are unaffected by policy changes.
 - `FarmerDepositController`: `POST /api/v1/vendor/farmer-links/{linkId}/deposits` (`FLORIST`, 201 on success). Route is covered by the existing `/api/v1/vendor/farmer-links/**` → `hasRole("FLORIST")` rule in `SecurityConfig`; no SecurityConfig change required.
-- DTOs: `FarmerDepositRequest` (`flowerType`, `grossKg`, `pricePerKg`, optional `depositedAt`), `FarmerDepositResponse`.
+- DTOs: `FarmerDepositRequest` (`flowerType` required max 100 chars, `grossKg` > 0, `pricePerKg` > 0, optional `depositedAt` not future), `FarmerDepositResponse`.
 
-**Tests:** `WeightDeductionPolicyTest` (9), `FarmerDepositServiceTest` (10), `FarmerDepositControllerTest` (6) — 25 tests, all green. Coverage: every deduction bracket and boundary, happy-path calculation (32 kg @ 100 → deduction 3, net 29, amount 2900), foreign link (403), missing link/vendor (404), non-active link (409), invalid body (400), RBAC (401/403/200).
+**Tests:** `WeightDeductionPolicyTest` (4), `FarmerDepositServiceTest` (12), `FarmerDepositControllerTest` (10) — 26 tests, all green. Coverage: every deduction boundary (9.99→0 … 80→5), happy-path calculation (32 kg @ 100 → deduction 3, net 29, amount 2900), foreign link (403), missing link/vendor (404), non-active link (PENDING/REJECTED/SUSPENDED → 409), invalid body / non-positive gross or rate / missing or too-long flower type / future depositedAt (400 `VALIDATION_FAILED`), RBAC (401/403/200), omitted `depositedAt` uses injected Clock.
 
 **Verification:**
-- Backend unit: `./mvnw test` **1,398 passed, 0 failed, 0 errors**, BUILD SUCCESS (includes 25 new farmer deposit tests).
+- Backend unit: `./mvnw test` **1,399 passed, 0 failed, 0 errors**, BUILD SUCCESS (includes 26 new farmer deposit tests).
 - Frontend (no changes): `npm test` **853 passed across 81 files**, `npm run typecheck` clean, `npm run lint` clean.
 - Money/decimal conventions (`BigDecimal`, `HALF_UP`, scale 2) unchanged. Errors use `ErrorCode`, `BusinessException`, and the shared `ErrorResponse` envelope.
 

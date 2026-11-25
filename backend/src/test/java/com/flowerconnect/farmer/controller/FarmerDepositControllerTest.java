@@ -156,6 +156,60 @@ class FarmerDepositControllerTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 
+    @Test
+    @WithMockUser(username = "florist@test.com", roles = {"FLORIST"})
+    void recordDepositRejectsNonPositiveGrossKg() throws Exception {
+        FarmerDepositRequest request = validRequest();
+        request.setGrossKg(BigDecimal.ZERO);
+
+        mockMvc.perform(post("/api/v1/vendor/farmer-links/100/deposits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @WithMockUser(username = "florist@test.com", roles = {"FLORIST"})
+    void recordDepositRejectsMissingFlowerType() throws Exception {
+        FarmerDepositRequest request = validRequest();
+        request.setFlowerType("");
+
+        mockMvc.perform(post("/api/v1/vendor/farmer-links/100/deposits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @WithMockUser(username = "florist@test.com", roles = {"FLORIST"})
+    void recordDepositRejectsTooLongFlowerType() throws Exception {
+        FarmerDepositRequest request = validRequest();
+        request.setFlowerType("a".repeat(101));
+
+        mockMvc.perform(post("/api/v1/vendor/farmer-links/100/deposits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @WithMockUser(username = "florist@test.com", roles = {"FLORIST"})
+    void recordDepositRejectsFutureDepositedAt() throws Exception {
+        // Far-future date is in the future relative to both the system clock (used by
+        // @PastOrPresent validation) and the injected test clock.
+        FarmerDepositRequest request = validRequest();
+        request.setDepositedAt(LocalDateTime.parse("2099-01-01T00:00:00"));
+
+        mockMvc.perform(post("/api/v1/vendor/farmer-links/100/deposits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
     // ------------------------------------------------------------ helpers
 
     private static FarmerDepositRequest validRequest() {
