@@ -14,6 +14,11 @@ passbooks, farmer/vendor pages, and B2B work are explicitly out of scope.
   introduced in Phase 10.
 - Migration version: V35 (next free after V34). Additive only; no existing
   migration edited (ADR-002 / D-9).
+  Stage 2 adds additive `V36__create_farmer_deposits.sql` (`farmer_deposits`
+  table: `id`, `link_id` FK→`farmer_vendor_links`, `flower_type` VARCHAR(160),
+  `gross_kg`/`deduction_kg`/`net_kg`/`price_per_kg` DECIMAL(10,2), `amount`
+  DECIMAL(12,2), `deposited_at` DATETIME(6), `created_at` DATETIME(6), index
+  on `(link_id, deposited_at)`).
 
 ## Role model
 
@@ -51,6 +56,7 @@ passbooks, farmer/vendor pages, and B2B work are explicitly out of scope.
 | POST | `/api/v1/vendor/farmer-links/{id}/reject` | PENDING → REJECTED |
 | POST | `/api/v1/vendor/farmer-links/{id}/suspend` | ACTIVE → SUSPENDED |
 | POST | `/api/v1/vendor/farmer-links/{id}/reactivate` | SUSPENDED → ACTIVE |
+| POST | `/api/v1/vendor/farmer-links/{id}/deposits` | Record a flower deposit on an `ACTIVE` link (`{ "flowerType", "grossKg", "pricePerKg", "depositedAt?" }`) |
 
 ## Link rules
 
@@ -62,49 +68,66 @@ passbooks, farmer/vendor pages, and B2B work are explicitly out of scope.
 - One link per farmer/vendor pair (`UNIQUE(farmer_id, vendor_id)`).
 - Only approved vendors may be linked (existing approved-vendor visibility rules).
 
-## Schema (`farmer_vendor_links`)
+## Deposit rules
+
+**Weight deduction policy** (`com.flowerconnect.farmer.policy.WeightDeductionPolicy`):
+pure, no database access, lower-bound-inclusive brackets:
+
+| Gross kg | Deduction kg |
+|----------|--------------|
+| below 10 | 0 |
+| 10 to below 20 | 1 |
+| 20 to below 30 | 2 |
+| 30 to below 40 | 3 |
+| 40 to below 50 | 4 |
+| 50 and above | 5 |
+
+Calculation: `net = gross − deduction`, `amount = net × pricePerKg`, both rounded
+to 2 decimals with `HALF_UP`. Gross weight, deduction, net weight, rate and
+amount are persisted on each row so historical deposits are unaffected by later
+policy changes.
+
+Example: gross 32 kg at 100/kg → deduction 3 kg, net 29 kg, amount 2900.
+
+**Schema (`farmer_deposits`)**
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | BIGINT PK AUTO_INCREMENT | |
-| farmer_id | BIGINT NOT NULL | FK → users(id) |
-| vendor_id | BIGINT NOT NULL | FK → vendor_profiles(id) |
-| status | ENUM(PENDING,ACTIVE,REJECTED,SUSPENDED) NOT NULL DEFAULT PENDING | native MySQL ENUM (D-20) |
+| link_id | BIGINT NOT NULL | FK → farmer_vendor_links(id) |
+| flower_type | VARCHAR(160) NOT NULL | |
+| gross_kg | DECIMAL(10,2) NOT NULL | |
+| deduction_kg | DECIMAL(10,2) NOT NULL | from weight-deduction policy |
+| net_kg | DECIMAL(10,2) NOT NULL | gross − deduction |
+| price_per_kg | DECIMAL(10,2) NOT NULL | |
+| amount | DECIMAL(12,2) NOT NULL | net × price per kg |
+| deposited_at | DATETIME(6) NOT NULL | defaults to clock now when not supplied |
 | created_at | DATETIME(6) NOT NULL | `@CreationTimestamp` |
-| updated_at | DATETIME(6) NOT NULL | `@UpdateTimestamp` |
-| UNIQUE(farmer_id, vendor_id) | | one link per pair |
-| INDEX(vendor_id, status) | | vendor listing by status |
-| INDEX(farmer_id, status) | | farmer listing |
+| INDEX(link_id, deposited_at) | | |
 
-No separate passbook table (out of scope). No new money fields; `BigDecimal` /
-`HALF_UP` / scale 2 conventions unchanged.
+- A florist may only record deposits on links belonging to their own vendor
+  (404 if missing, 403 if foreign).
+- The link must be `ACTIVE` (409 `CONFLICT` otherwise).
+- `depositedAt` is optional; when omitted it defaults to the injected `Clock`.
+- No separate passbook table (out of scope).
 
-## Errors & Clock
+## Endpoint summary (Stage 2)
 
-- Errors use `ErrorCode`, `BusinessException`, and the shared `ErrorResponse`
-  envelope (`timestamp` from injected `Clock`, `code`, `status`, `message`).
-- `Clock` pattern unchanged: link timestamps use Hibernate
-  `@CreationTimestamp`/`@UpdateTimestamp` (consistent with `VendorProfile`);
-  no injected `Clock` in the farmer service.
-
-## Tests
-
-- `FarmerLinkServiceTest` (21), `FarmerLinkControllerTest` (15),
-  `VendorFarmerLinkControllerTest` (15) — 51 tests, all green.
-- Coverage: every valid and invalid transition, duplicate-request conflict,
-  re-request after REJECTED, florist vs another florist's link (403), farmer
-  vs another farmer's links, RBAC (401/403/200) for all new endpoints.
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/vendor/farmer-links/{linkId}/deposits` | FLORIST | Record a flower deposit (201 on success) |
 
 ## Verification
 
-- Backend unit: `./mvnw test` **1,373 passed, 0 failed, 0 errors**, BUILD
-  SUCCESS (includes 51 new farmer tests).
+- Backend unit: `./mvnw test` **1,398 passed, 0 failed, 0 errors**, BUILD
+  SUCCESS (includes 25 new farmer deposit tests: `WeightDeductionPolicyTest`
+  9, `FarmerDepositServiceTest` 10, `FarmerDepositControllerTest` 6).
 - Frontend (no changes): `npm test` **853 passed across 81 files**,
   `npm run typecheck` clean, `npm run lint` clean.
+- Money/decimal conventions (`BigDecimal`, `HALF_UP`, scale 2) unchanged.
 - Commit hash: reported at commit time.
 
-## Remaining (Stage 2+)
+## Remaining (Stage 3+)
 
-Deposits, collections, passbooks, farmer/vendor pages, customer
-checkout/cart/orders, invoice logic, and vendor-to-vendor B2B work are
-deferred to Stage 2+.
+Collections, passbooks, farmer/vendor pages, customer checkout/cart/orders,
+invoice logic, and vendor-to-vendor B2B work are deferred to Stage 3+.
