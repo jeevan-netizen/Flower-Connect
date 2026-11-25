@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import type { PassbookEntry } from "@/features/farmer/types";
 
 const API_BASE = process.env.E2E_API_BASE_URL ?? "http://localhost:8080/api/v1";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@flowerconnect.test";
@@ -155,7 +156,7 @@ test("farmer module: register, join, deposits, collections, suspension", async (
 
     // Verify each deposit entry
     for (const d of deposits) {
-      const entry = passbookData.entries.find((e: any) => e.id !== undefined && e.type === "DEPOSIT" && e.amount === d.amount);
+      const entry = passbookData.entries.find((e: PassbookEntry) => e.id !== undefined && e.type === "DEPOSIT" && e.amount === d.amount);
       expect(entry).toBeTruthy();
       expect(entry.grossKg).toBe(d.grossKg);
       expect(entry.deductionKg).toBe(d.deduction);

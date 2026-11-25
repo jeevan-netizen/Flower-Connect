@@ -186,10 +186,39 @@ Example: gross 32 kg at 100/kg → deduction 3 kg, net 29 kg, amount 2900.
   4, `FarmerDepositServiceTest` 12, `FarmerDepositControllerTest` 10,
   `FarmerCollectionServiceTest` 21, `FarmerCollectionControllerTest` 7,
   `VendorCollectionControllerTest` 7).
-- Frontend: `npm test` **853 passed**, `npm run typecheck` clean,
+- Frontend: **856 passed across 82 files** (includes 3 new
+  `useEligibleVendors` tests in `queries.test.tsx`), `npm run typecheck` clean,
   `npm run lint` clean, `npm run build` clean.
 - Money/decimal conventions (`BigDecimal`, `HALF_UP`, scale 2) unchanged.
+- **Bug fix:** `useEligibleVendors` had `enabled: query !== undefined`, which
+  disabled the query when `query` was `undefined` (i.e., on initial load with
+  empty search). Changed to `enabled: true` so the vendor list loads on initial
+  page load. Added `queries.test.tsx` (3 tests) covering empty-query fetch,
+  filtered-query fetch, and loading state.
 - Commit hash: reported at commit time.
+
+## Browser verification (Stage 3)
+
+Playwright E2E test (`tests/e2e/farmer-module-flow.test.ts`) passed through
+real Chromium browser. Browser-verified steps:
+
+1. Farmer login (via API token injection into localStorage)
+2. Farmer navigates to vendor discovery (`/farmer/vendors`) — vendors load
+3. Farmer requests to join vendor — "Requested" badge appears
+4. Vendor accepts link (API) — farmer sees "ACTIVE" link status
+5. Vendor adds three deposits via API (32 kg → deduction 3 kg, net 29 kg,
+   amount 2900; 60 kg → deduction 5 kg; 20 kg → deduction 2 kg)
+6. Farmer views passbook — correct balance (7450.00), all three entries with
+   running balance
+7. Farmer requests collection (1000.00) — "Pending" badge appears
+8. Vendor confirms collection (API) — balance drops to 6450.00
+9. Vendor suspends link (API) — "SUSPENDED" status shown
+10. Farmer attempts new deposit/collection on suspended link — blocked with
+    "Deposits require an active link" error
+11. Passbook remains readable on both farmer and vendor sides after suspension
+
+Vendor-side actions (accept, deposits, confirm, suspend) were exercised via API
+calls rather than browser UI, as the vendor UI pages are not yet implemented.
 
 ## Remaining (Stage 4+)
 

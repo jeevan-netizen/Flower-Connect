@@ -53,9 +53,9 @@ export function useFarmerLinks() {
  */
 export function useEligibleVendors(query?: string) {
   return useQuery<FarmerVendor[]>({
-    queryKey: [...farmerKeys.eligibleVendors, query],
+    queryKey: [...farmerKeys.eligibleVendors, query ?? undefined],
     queryFn: () => fetchEligibleVendors(query),
-    enabled: query !== undefined,
+    enabled: true,
   });
 }
 

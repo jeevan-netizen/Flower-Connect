@@ -1186,8 +1186,9 @@ Implemented on branch `farmer-module`, commit `7be8921` (Stage 2 refinements) as
 
 **Verification:**
 - Backend unit: `./mvnw test` **1,434 passed, 0 failed, 0 errors**, BUILD SUCCESS (includes 35 new farmer collection tests).
-- Frontend: `npm test` **853 passed**, `npm run typecheck` clean, `npm run lint` clean, `npm run build` clean.
+- Frontend: **856 passed across 82 files** (includes 3 new `useEligibleVendors` tests), `npm run typecheck` clean, `npm run lint` clean, `npm run build` clean.
 - Money/decimal conventions (`BigDecimal`, `HALF_UP`, scale 2) unchanged. Errors use `ErrorCode`, `BusinessException`, and the shared `ErrorResponse` envelope; injected `Clock` used for `decided_at`/`requested_at`.
+- **Bug fix:** `useEligibleVendors` had `enabled: query !== undefined`, which disabled the query when `query` was `undefined` (i.e., on initial load with empty search). Changed to `enabled: true` so the vendor list loads on initial page load. Added `queries.test.tsx` (3 tests) covering empty-query fetch, filtered-query fetch, and loading state.
 
 **Frontend (`@/features/farmer` and `@/features/vendor`):**
 - `types.ts`, `api.ts`, `queries.ts` for farmer links, eligible vendors, collections, passbook, deposits, and vendor link decisions.
@@ -1195,6 +1196,8 @@ Implemented on branch `farmer-module`, commit `7be8921` (Stage 2 refinements) as
 - Vendor pages: `VendorFarmersListPage` (farmers, link status, balance owed, accept/reject/suspend/reactivate), `VendorFarmerPassbookPage` (deposit form with live deduction/net/amount preview, pending collections with confirm/reject).
 - Components: `FarmerErrorState`, `CollectionForm`, `DepositForm`, `WeightDeductionPreview`.
 - Routes: `/farmer`, `/farmer/vendors`, `/farmer/links/:linkId/passbook` (FARMER); `/vendor/farmers`, `/vendor/farmer-links/:linkId/passbook` (FLORIST). Added to `SiteHeader` and `VendorLayout` navigation.
+
+**Browser verification:** Playwright E2E test (`tests/e2e/farmer-module-flow.test.ts`) passed through real Chromium browser. Verified: farmer login, vendor browse, join request, vendor accept (API), deposits (API), farmer passbook with correct balance/entries, collection request, vendor confirm (API), balance drop, vendor suspend (API), new deposit/collection blocked on suspended link, passbook remains readable.
 
 No collection requests, passbooks, farmer/vendor pages, or B2B work in this stage. Customer checkout/cart/orders and invoice logic untouched.
 
