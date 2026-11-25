@@ -56,3 +56,49 @@ a vendor identifier for the caller.
 - **The settlement ledger is not integrated.** Payment stays `UNPAID`; e-bills, commission recording, and settlement cycles are Stage 2 and deliberately use dedicated B2B tables, not the Phase 10 settlement ledger.
 - **Vendor role is `FLORIST`** (D-11). `FARMER` (Phase 11) is a distinct role and cannot act as a B2B buyer or seller.
 - **Approval is `VendorProfile.status == APPROVED`**, enforced per-handler via `@RequiresApprovedVendor` where transactions require approval (D-13).
+
+---
+
+# Stage 3: B2B Statements and Payment Recording
+
+Status: Complete (branch `b2b-module`, commit on top of Stage 2 `b8cc4f2`)
+
+## Migration
+
+Additive `V40__create_b2b_statements.sql`. Creates `b2b_statements` and `b2b_statement_orders`, and adds `PAID` to the `b2b_orders.payment_status` ENUM (`ENUM('UNPAID', 'PAID')`) so delivered orders can be marked `PAID` when their statement is settled. No existing column/constraint/index is altered except the `payment_status` ENUM value list (additive, ADR-002).
+
+`b2b_statements`: `id` PK, `statement_no` (unique, VARCHAR(64)), `seller_id`/`buyer_id` (FKs → `vendor_profiles`), `period_start`/`period_end` (DATETIME(6)), `total_amount` (DECIMAL(12,2)), `status` ENUM(`OPEN`, `PAID`), nullable `paid_at`, nullable `payment_mode` ENUM(`CASH`, `UPI`, `BANK_TRANSFER`), nullable `payment_note` (VARCHAR(500)), `created_at`/`updated_at`. Constraints: `period_end >= period_start`, `buyer_id <> seller_id`, `total_amount >= 0`. Indexes on `(seller_id, status)` and `(buyer_id, status)`.
+
+`b2b_statement_orders`: `id` PK, `statement_id` FK (ON DELETE CASCADE), `order_id` FK → `b2b_orders`, with a database UNIQUE constraint on `order_id` so an order belongs to at most one statement. Index on `statement_id`.
+
+## Endpoint list
+
+All endpoints live under `/api/v1/vendors/b2b/...`, covered by the `hasRole("FLORIST")` namespace rule and then `@RequiresApprovedVendor` (D-13). The vendor caller is resolved from the JWT subject on every call.
+
+| Method | Path | Description | Role |
+|---|---|---|---|
+| GET | `/api/v1/vendors/b2b/statements/preview?buyerId=&from=&to=` | Eligible delivered/unpaid orders for the buyer in the inclusive range, plus their combined total. `to` defaults to today; `from` defaults to `to - 15 days` (injected `Clock`). | FLORIST |
+| POST | `/api/v1/vendors/b2b/statements` | Create an `OPEN` statement from currently eligible orders; server-computed total; rejects empty statements. | FLORIST |
+| GET | `/api/v1/vendors/b2b/statements?role=&page=&size=` | List the caller's statements as `SELLER` or `BUYER` (role validated; cannot bypass ownership). | FLORIST |
+| GET | `/api/v1/vendors/b2b/statements/{statementId}` | Read one statement. Only seller or buyer may read. | FLORIST |
+| POST | `/api/v1/vendors/b2b/statements/{statementId}/payment` | Seller only. Marks an `OPEN` statement `PAID` and all linked orders' `payment_status` `PAID` in one transaction. Full payment only; paying twice rejected. | FLORIST |
+
+## Implementation decisions
+
+- **Eligible orders**: `DELIVERED`, `payment_status UNPAID`, delivered within the inclusive range, belongs to the caller (seller) and the selected buyer, and not already linked to a statement.
+- **Date range**: `from`/`to` are inclusive calendar dates; the query uses `deliveredAt >= from` and `deliveredAt < to + 1 day`. `period_end` is stored as the end of the `to` day. Invalid ranges (from after to) are rejected with `VALIDATION_FAILED` (400).
+- **Concurrency**: statement creation pessimistically locks the eligible orders (`SELECT ... FOR UPDATE`, ordered by id) so concurrent creations serialise on the same orders. The unique constraint on `b2b_statement_orders(order_id)` is the final safeguard; a uniqueness conflict rolls the whole transaction back and is reported as `CONFLICT` (409), leaving no partial statement row.
+- **Atomicity**: selection, statement creation, and order linking run in one `@Transactional` boundary; payment recording (statement + all linked orders) runs in a second `@Transactional` boundary.
+- **Self-statement**: a vendor cannot create a statement for itself (`buyerId` == caller → `VALIDATION_FAILED` 400).
+- **Ownership**: only the seller may create or pay a statement; only the seller or buyer may read one. A third vendor is refused with `FORBIDDEN` (403) on detail and sees no rows in list.
+- **Payment**: full payment only; `paid_at` defaults to the injected `Clock`. No partial payments, no settlement-ledger integration, no customer-invoice integration (Stage 4 concerns).
+- **Clocks**: all timestamps use the injected `Clock` (never `Instant.now()`); the `MutableClock` test bean pins wall time during integration tests so JWT tokens (expiry validated by jjwt against the system clock) stay valid.
+- **DTOS**: `CreateB2BStatementRequest`, `RecordB2BStatementPaymentRequest`, `B2BStatementResponse`, `B2BStatementPageResponse`, `B2BStatementPreviewResponse`, `B2BStatementOrderSummary`. BigDecimal wire format drops trailing zeros (tests account for this).
+- **Tests**: `B2BStatementServiceTest` (13 unit tests, Mockito), `B2BStatementIntegrationTest` (21 integration tests vs real MySQL + production filter chain), `B2BStatementControllerTest` (7 slice tests with role boundary).
+
+## Shortcuts / known gaps
+
+- Statements use dedicated B2B tables only; no integration with the Phase 10 settlement ledger, customer order payments, or customer invoices (deferred to Stage 4).
+- No partial-payment support; `payment_mode`/`payment_note` are recorded but no ledger entry is created.
+- Listing paginates in memory over the caller's statements (acceptable for Stage 3 volume).
+

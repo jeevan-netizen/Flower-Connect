@@ -102,9 +102,9 @@ public class B2BOrder {
         PLACED, ACCEPTED, REJECTED, CANCELLED, SHIPPED, DELIVERED
     }
 
-    /** Payment lifecycle state. Stage 1 supports only UNPAID. */
+    /** Payment lifecycle state. Stage 1 supports only UNPAID; Stage 3 adds PAID when a statement is settled. */
     public enum PaymentStatus {
-        UNPAID
+        UNPAID, PAID
     }
 
     /** Convenience: add an item and back-reference this order. */
