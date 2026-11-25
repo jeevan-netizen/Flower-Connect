@@ -15,10 +15,17 @@ passbooks, farmer/vendor pages, and B2B work are explicitly out of scope.
 - Migration version: V35 (next free after V34). Additive only; no existing
   migration edited (ADR-002 / D-9).
   Stage 2 adds additive `V36__create_farmer_deposits.sql` (`farmer_deposits`
-  table: `id`, `link_id` FK→`farmer_vendor_links`, `flower_type` VARCHAR(160),
+  table: `id`, `link_id` FK→`farmer_vendor_links`, `flower_type` VARCHAR(100),
   `gross_kg`/`deduction_kg`/`net_kg`/`price_per_kg` DECIMAL(10,2), `amount`
   DECIMAL(12,2), `deposited_at` DATETIME(6), `created_at` DATETIME(6), index
   on `(link_id, deposited_at)`).
+  Stage 3 adds additive `V37__create_farmer_payments.sql` (`farmer_payments`
+  table: `id`, `link_id` FK→`farmer_vendor_links`, `amount` DECIMAL(12,2),
+  `mode` ENUM `CASH`/`UPI`, `note` VARCHAR(500) NULL, `status` ENUM
+  `PENDING`/`CONFIRMED`/`REJECTED`, `requested_at` DATETIME(6),
+  `decided_at` DATETIME(6) NULL), generated column `is_pending` (1 for PENDING,
+  NULL otherwise) with `UNIQUE(link_id, is_pending)`, index on
+  `(link_id, status)`).
 
 ## Role model
 
@@ -114,23 +121,78 @@ Example: gross 32 kg at 100/kg → deduction 3 kg, net 29 kg, amount 2900.
   `pricePerKg > 0` (400 `VALIDATION_FAILED`).
 - No separate passbook table (out of scope).
 
+## Collections schema (`farmer_payments`)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | BIGINT PK AUTO_INCREMENT | |
+| link_id | BIGINT NOT NULL | FK → farmer_vendor_links(id) |
+| amount | DECIMAL(12,2) NOT NULL | |
+| mode | ENUM(CASH,UPI) NOT NULL | |
+| note | VARCHAR(500) NULL | |
+| status | ENUM(PENDING,CONFIRMED,REJECTED) NOT NULL DEFAULT PENDING | native MySQL ENUM |
+| requested_at | DATETIME(6) NOT NULL | |
+| decided_at | DATETIME(6) NULL | set from injected Clock on confirm/reject |
+| is_pending | TINYINT(1) GENERATED | 1 for PENDING, NULL otherwise |
+| UNIQUE(link_id, is_pending) | | at most one PENDING per link |
+| INDEX(link_id, status) | | |
+
+- Outstanding balance is computed as `sum(deposit amounts) - sum(CONFIRMED
+  collection amounts)`; no balance column is stored.
+- PENDING and REJECTED collections remain visible in the passbook but do not
+  reduce the balance.
+
 ## Endpoint summary (Stage 2)
 
 | Method | Path | Role | Description |
 |--------|------|------|-------------|
 | POST | `/api/v1/vendor/farmer-links/{linkId}/deposits` | FLORIST | Record a flower deposit (201 on success) |
 
+## Endpoint summary (Stage 3)
+
+| Method | Path | Role | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/farmer/links/{linkId}/passbook` | FARMER | Link passbook: summary, balance, entries with running balance |
+| POST | `/api/v1/farmer/links/{linkId}/collections` | FARMER | Request a PENDING collection (amount <= balance) |
+| GET | `/api/v1/vendor/farmer-links/{linkId}/passbook` | FLORIST | Vendor view of a link passbook |
+| GET | `/api/v1/vendor/farmer-collections?status=` | FLORIST | Vendor's pending/confirmed/rejected collections |
+| POST | `/api/v1/vendor/farmer-collections/{paymentId}/confirm` | FLORIST | Confirm a PENDING collection (balance rechecked under lock) |
+| POST | `/api/v1/vendor/farmer-collections/{paymentId}/reject` | FLORIST | Reject a PENDING collection (no balance change) |
+
+## Collection rules
+
+- A florist may only record deposits on links belonging to their own vendor
+  (404 if missing, 403 if foreign).
+- The link must be `ACTIVE` (409 `CONFLICT` otherwise).
+- `depositedAt` is optional; when omitted it defaults to the injected `Clock`.
+- Future `depositedAt` is rejected (400 `VALIDATION_FAILED`).
+- Request validation: `flowerType` required (max 100 chars), `grossKg > 0`,
+  `pricePerKg > 0` (400 `VALIDATION_FAILED`).
+- A farmer may request a collection only on their own `ACTIVE` link, for an
+  amount no greater than the outstanding balance; at most one PENDING
+  collection per link.
+- Confirmation recomputes the balance under a pessimistic lock on the link row;
+  if the balance is now too low, the request stays PENDING and a 409 is
+  returned.
+- Rejection sets status to REJECTED and `decided_at`; no balance change.
+- A PENDING request may still be confirmed or rejected when its link is
+  suspended.
+- Ownership: 404 for missing link/payment, 403 for foreign link/payment.
+
 ## Verification
 
-- Backend unit: `./mvnw test` **1,399 passed, 0 failed, 0 errors**, BUILD
-  SUCCESS (includes 26 new farmer deposit tests: `WeightDeductionPolicyTest`
-  4, `FarmerDepositServiceTest` 12, `FarmerDepositControllerTest` 10).
-- Frontend (no changes): `npm test` **853 passed across 81 files**,
-  `npm run typecheck` clean, `npm run lint` clean.
+- Backend unit: `./mvnw test` **1,434 passed, 0 failed, 0 errors**, BUILD
+  SUCCESS (includes 35 new farmer collection tests: `WeightDeductionPolicyTest`
+  4, `FarmerDepositServiceTest` 12, `FarmerDepositControllerTest` 10,
+  `FarmerCollectionServiceTest` 21, `FarmerCollectionControllerTest` 7,
+  `VendorCollectionControllerTest` 7).
+- Frontend: `npm test` **853 passed**, `npm run typecheck` clean,
+  `npm run lint` clean, `npm run build` clean.
 - Money/decimal conventions (`BigDecimal`, `HALF_UP`, scale 2) unchanged.
 - Commit hash: reported at commit time.
 
-## Remaining (Stage 3+)
+## Remaining (Stage 4+)
 
-Collections, passbooks, farmer/vendor pages, customer checkout/cart/orders,
-invoice logic, and vendor-to-vendor B2B work are deferred to Stage 3+.
+Vendor-to-vendor B2B work, customer checkout/cart/orders, invoice logic are
+deferred to Stage 4+.
+

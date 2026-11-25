@@ -9,6 +9,8 @@ import com.flowerconnect.farmer.dto.FarmerLinkRequest;
 import com.flowerconnect.farmer.dto.FarmerLinkResponse;
 import com.flowerconnect.farmer.dto.FarmerRegisterResponse;
 import com.flowerconnect.farmer.dto.FarmerVendorResponse;
+import com.flowerconnect.farmer.repository.FarmerDepositRepository;
+import com.flowerconnect.farmer.repository.FarmerPaymentRepository;
 import com.flowerconnect.farmer.repository.FarmerVendorLinkRepository;
 import com.flowerconnect.repository.RoleRepository;
 import com.flowerconnect.repository.UserRepository;
@@ -20,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,6 +42,8 @@ public class FarmerLinkService {
     public static final String FARMER_ROLE = "FARMER";
 
     private final FarmerVendorLinkRepository linkRepository;
+    private final FarmerDepositRepository depositRepository;
+    private final FarmerPaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final VendorProfileRepository vendorProfileRepository;
@@ -144,7 +149,9 @@ public class FarmerLinkService {
                         request.getVendorId());
                 existing.setStatus(FarmerVendorLink.Status.PENDING);
                 linkRepository.save(existing);
-                return toResponse(existing, vendor.getBusinessName());
+                return toResponse(existing, vendor.getBusinessName(),
+                        userRepository.findById(existing.getFarmerId())
+                                .map(User::getFullName).orElse("unknown"));
             }
             throw BusinessException.conflict("A link already exists between this farmer and vendor");
         }
@@ -155,7 +162,7 @@ public class FarmerLinkService {
                 .status(FarmerVendorLink.Status.PENDING)
                 .build();
         linkRepository.save(link);
-        return toResponse(link, vendor.getBusinessName());
+        return toResponse(link, vendor.getBusinessName(), requestFullName(farmerId));
     }
 
     /**
@@ -190,7 +197,9 @@ public class FarmerLinkService {
         requireTransition(link, FarmerVendorLink.Status.PENDING, FarmerVendorLink.Status.ACTIVE, "accept");
         link.setStatus(FarmerVendorLink.Status.ACTIVE);
         linkRepository.save(link);
-        return toResponse(link, vendorName(link.getVendorId()));
+        return toResponse(link, vendorName(link.getVendorId()),
+                userRepository.findById(link.getFarmerId())
+                        .map(User::getFullName).orElse("unknown"));
     }
 
     /**
@@ -202,7 +211,9 @@ public class FarmerLinkService {
         requireTransition(link, FarmerVendorLink.Status.PENDING, FarmerVendorLink.Status.REJECTED, "reject");
         link.setStatus(FarmerVendorLink.Status.REJECTED);
         linkRepository.save(link);
-        return toResponse(link, vendorName(link.getVendorId()));
+        return toResponse(link, vendorName(link.getVendorId()),
+                userRepository.findById(link.getFarmerId())
+                        .map(User::getFullName).orElse("unknown"));
     }
 
     /**
@@ -214,7 +225,9 @@ public class FarmerLinkService {
         requireTransition(link, FarmerVendorLink.Status.ACTIVE, FarmerVendorLink.Status.SUSPENDED, "suspend");
         link.setStatus(FarmerVendorLink.Status.SUSPENDED);
         linkRepository.save(link);
-        return toResponse(link, vendorName(link.getVendorId()));
+        return toResponse(link, vendorName(link.getVendorId()),
+                userRepository.findById(link.getFarmerId())
+                        .map(User::getFullName).orElse("unknown"));
     }
 
     /**
@@ -226,7 +239,9 @@ public class FarmerLinkService {
         requireTransition(link, FarmerVendorLink.Status.SUSPENDED, FarmerVendorLink.Status.ACTIVE, "reactivate");
         link.setStatus(FarmerVendorLink.Status.ACTIVE);
         linkRepository.save(link);
-        return toResponse(link, vendorName(link.getVendorId()));
+        return toResponse(link, vendorName(link.getVendorId()),
+                userRepository.findById(link.getFarmerId())
+                        .map(User::getFullName).orElse("unknown"));
     }
 
     /* ------------------------------------------------------------- private */
@@ -278,22 +293,36 @@ public class FarmerLinkService {
                 .map(FarmerVendorLink::getVendorId)
                 .distinct()
                 .collect(Collectors.toList());
+        List<Long> farmerIds = links.stream()
+                .map(FarmerVendorLink::getFarmerId)
+                .distinct()
+                .collect(Collectors.toList());
         Map<Long, String> vendorNames = vendorProfileRepository.findAllById(vendorIds).stream()
                 .collect(Collectors.toMap(
                         VendorProfile::getId,
                         VendorProfile::getBusinessName,
                         (existing, replacement) -> existing));
+        Map<Long, String> farmerNames = userRepository.findAllById(farmerIds).stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        User::getFullName,
+                        (existing, replacement) -> existing));
         return links.stream()
-                .map(link -> toResponse(link, vendorNames.get(link.getVendorId())))
+                .map(link -> toResponse(link, vendorNames.get(link.getVendorId()),
+                        farmerNames.get(link.getFarmerId())))
                 .collect(Collectors.toList());
     }
 
-    private FarmerLinkResponse toResponse(FarmerVendorLink link, String vendorName) {
+    private FarmerLinkResponse toResponse(FarmerVendorLink link, String vendorName,
+                                          String farmerName) {
         return FarmerLinkResponse.builder()
                 .id(link.getId())
                 .vendorId(link.getVendorId())
+                .farmerId(link.getFarmerId())
                 .vendorName(vendorName)
+                .farmerName(farmerName)
                 .status(link.getStatus().name())
+                .outstandingBalance(outstandingBalance(link.getId()))
                 .createdAt(link.getCreatedAt())
                 .updatedAt(link.getUpdatedAt())
                 .build();
@@ -303,6 +332,20 @@ public class FarmerLinkService {
         return vendorProfileRepository.findById(vendorId)
                 .map(VendorProfile::getBusinessName)
                 .orElse("unknown");
+    }
+
+    private String requestFullName(Long farmerId) {
+        return userRepository.findById(farmerId)
+                .map(User::getFullName)
+                .orElse("unknown");
+    }
+
+    private BigDecimal outstandingBalance(Long linkId) {
+        BigDecimal deposits = depositRepository.sumAmountByLinkId(linkId);
+        BigDecimal confirmedCollections = paymentRepository.sumAmountByLinkIdAndStatus(linkId,
+                com.flowerconnect.farmer.domain.FarmerPayment.Status.CONFIRMED);
+        return (deposits == null ? BigDecimal.ZERO : deposits)
+                .subtract(confirmedCollections == null ? BigDecimal.ZERO : confirmedCollections);
     }
 
     private static String normalizePhone(String phone) {

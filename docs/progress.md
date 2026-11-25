@@ -1165,3 +1165,37 @@ Implemented on branch `farmer-module`, commit `9f25002` (Stage 1) as the base.
 
 No collection requests, passbooks, farmer/vendor pages, or B2B work in this stage. Customer checkout/cart/orders and invoice logic untouched.
 
+### Stage 3 (Collection requests, passbooks, farmer/vendor screens) - COMPLETE (2026-11-25)
+
+Implemented on branch `farmer-module`, commit `7be8921` (Stage 2 refinements) as the base.
+
+**Migration:** Additive `V37__create_farmer_payments.sql` â€” creates `farmer_payments` (`id`, `link_id` FKâ†’`farmer_vendor_links`, `amount` DECIMAL(12,2), `mode` ENUM `CASH`/`UPI`, `note` VARCHAR(500) NULL, `status` ENUM `PENDING`/`CONFIRMED`/`REJECTED`, `requested_at` DATETIME(6), `decided_at` DATETIME(6) NULL), plus a generated column `is_pending` (1 for PENDING, NULL otherwise) with `UNIQUE(link_id, is_pending)` to enforce at most one PENDING collection per link, and index on `(link_id, status)`. No existing migration edited (ADR-002/D-9).
+
+**Backend (`com.flowerconnect.farmer`):**
+- `FarmerPayment` entity (inner `Mode`/`Status` enums, `@Enumerated(EnumType.STRING)`).
+- `FarmerPaymentRepository` (`JpaRepository`) with `findByLinkId`, `findByLinkIdInAndStatus`, `existsByLinkIdAndStatus`, `findByIdForUpdate` (pessimistic write lock), and `sumAmountByLinkIdAndStatus`.
+- `FarmerDepositRepository` gained `sumAmountByLinkId`; `FarmerVendorLinkRepository` gained `findByIdAndVendorIdForUpdate`/`findByIdAndFarmerIdForUpdate` (pessimistic write locks).
+- `FarmerLinkService` now injects `FarmerDepositRepository`/`FarmerPaymentRepository` and computes `outstandingBalance` = sum(deposits) âˆ’ sum(CONFIRMED collections); `FarmerLinkResponse` carries `farmerId`, `farmerName`, `outstandingBalance`.
+- `FarmerCollectionService`: `requestCollection` (farmer, ACTIVE link, amount <= balance, at most one PENDING), `confirmCollection` (vendor, lock link + payment, recompute balance under lock, reject if insufficient), `rejectCollection` (vendor, no balance change), `getPassbook` (farmer or vendor, combined entries ordered by date then id with running balance), `listCollectionsByStatus` (vendor). PENDING/REJECTED collections do not reduce balance. Suspended links block new deposits and collection requests but pre-existing PENDING requests can still be confirmed/rejected.
+- `FarmerCollectionController`: `GET /api/v1/farmer/links/{linkId}/passbook`, `POST /api/v1/farmer/links/{linkId}/collections` (FARMER).
+- `VendorCollectionController`: `GET /api/v1/vendor/farmer-links/{linkId}/passbook`, `GET /api/v1/vendor/farmer-collections?status=`, `POST /api/v1/vendor/farmer-collections/{paymentId}/confirm`, `POST /api/v1/vendor/farmer-collections/{paymentId}/reject` (FLORIST).
+- `SecurityConfig`: `/api/v1/vendor/farmer-collections/**` â†’ `hasRole("FLORIST")`; `/api/v1/farmer/links/**` already FARMER-only.
+- DTOs: `FarmerCollectionRequest`, `FarmerCollectionResponse`, `PassbookResponse`, `PassbookEntryResponse`.
+
+**Tests:** `FarmerCollectionServiceTest` (21), `FarmerCollectionControllerTest` (7), `VendorCollectionControllerTest` (7) â€” 35 tests, all green. Coverage: balance and running balance with multiple deposits/collections, PENDING/REJECTED do not reduce balance, amount above balance rejected, second PENDING rejected, confirmation rechecks balance after concurrent reduction, suspension blocks new deposits/collections but passbook readable and pre-existing PENDING decidable, cross-farmer/cross-florist ownership (404/403), RBAC for all new routes, invalid/repeated transitions rejected.
+
+**Verification:**
+- Backend unit: `./mvnw test` **1,434 passed, 0 failed, 0 errors**, BUILD SUCCESS (includes 35 new farmer collection tests).
+- Frontend: `npm test` **853 passed**, `npm run typecheck` clean, `npm run lint` clean, `npm run build` clean.
+- Money/decimal conventions (`BigDecimal`, `HALF_UP`, scale 2) unchanged. Errors use `ErrorCode`, `BusinessException`, and the shared `ErrorResponse` envelope; injected `Clock` used for `decided_at`/`requested_at`.
+
+**Frontend (`@/features/farmer` and `@/features/vendor`):**
+- `types.ts`, `api.ts`, `queries.ts` for farmer links, eligible vendors, collections, passbook, deposits, and vendor link decisions.
+- Farmer pages: `FarmerDashboardPage` (linked vendors, status, outstanding balance), `FarmerVendorBrowsePage` (search approved vendors, request to join), `FarmerPassbookPage` (entries with running balance).
+- Vendor pages: `VendorFarmersListPage` (farmers, link status, balance owed, accept/reject/suspend/reactivate), `VendorFarmerPassbookPage` (deposit form with live deduction/net/amount preview, pending collections with confirm/reject).
+- Components: `FarmerErrorState`, `CollectionForm`, `DepositForm`, `WeightDeductionPreview`.
+- Routes: `/farmer`, `/farmer/vendors`, `/farmer/links/:linkId/passbook` (FARMER); `/vendor/farmers`, `/vendor/farmer-links/:linkId/passbook` (FLORIST). Added to `SiteHeader` and `VendorLayout` navigation.
+
+No collection requests, passbooks, farmer/vendor pages, or B2B work in this stage. Customer checkout/cart/orders and invoice logic untouched.
+
+

@@ -236,6 +236,8 @@ describe("application router", () => {
       "orders",
       "disputes",
       "billing",
+      "farmers",
+      "farmer-links/:linkId/passbook",
     ]);
   });
 

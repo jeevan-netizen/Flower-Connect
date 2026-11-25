@@ -39,12 +39,20 @@ import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
 import { AdminUsersPage } from "@/features/admin/pages/AdminUsersPage";
 import { AdminBillingPage } from "@/features/admin/pages/AdminBillingPage";
+import { FarmerDashboardPage } from "@/features/farmer/pages/FarmerDashboardPage";
+import { FarmerVendorBrowsePage } from "@/features/farmer/pages/FarmerVendorBrowsePage";
+import { FarmerPassbookPage } from "@/features/farmer/pages/FarmerPassbookPage";
+import { VendorFarmersListPage } from "@/features/vendor/pages/VendorFarmersListPage";
+import { VendorFarmerPassbookPage } from "@/features/vendor/pages/VendorFarmerPassbookPage";
 
 /** Seeded role name for customers (V3__seed_roles.sql). */
 const CUSTOMER_ROLE = "CUSTOMER";
 
 /** Seeded role name for vendors. The plan calls this role "VENDOR"; the seeded role is FLORIST and is not renamed (docs/decisions.md, D-11). */
 const VENDOR_ROLE = "FLORIST";
+
+/** Seeded role name for farmers (V35 migration). */
+const FARMER_ROLE = "FARMER";
 
 /** Seeded role name for administrators (`roles` row 3, V3__seed_roles.sql). */
 const ADMIN_ROLE = "ADMIN";
@@ -212,6 +220,21 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // Phase 11 farmer dashboard shell. Guarded by FARMER role; the backend
+        // re-checks the role on every request.
+        path: "farmer",
+        element: (
+          <ProtectedRoute roles={[FARMER_ROLE]}>
+            <VendorLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <FarmerDashboardPage /> },
+          { path: "vendors", element: <FarmerVendorBrowsePage /> },
+          { path: "links/:linkId/passbook", element: <FarmerPassbookPage /> },
+        ],
+      },
+      {
         // Phase 2 vendor dashboard shell. The guard is UX gating only — the
         // backend re-checks ROLE_FLORIST (and, for approved-only vendor
         // features, the approval state) on every request.
@@ -240,6 +263,9 @@ export const router = createBrowserRouter([
           { path: "orders", element: <VendorOrderBoardPage /> },
           { path: "disputes", element: <VendorDisputesPage /> },
           { path: "billing", element: <VendorBillingPage /> },
+          // Phase 11 vendor farmer management (Stage 3 of the farmer module).
+          { path: "farmers", element: <VendorFarmersListPage /> },
+          { path: "farmer-links/:linkId/passbook", element: <VendorFarmerPassbookPage /> },
         ],
       },
       {

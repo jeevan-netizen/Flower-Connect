@@ -10,6 +10,8 @@ import com.flowerconnect.farmer.dto.FarmerLinkRequest;
 import com.flowerconnect.farmer.dto.FarmerLinkResponse;
 import com.flowerconnect.farmer.dto.FarmerRegisterRequest;
 import com.flowerconnect.farmer.dto.FarmerRegisterResponse;
+import com.flowerconnect.farmer.repository.FarmerDepositRepository;
+import com.flowerconnect.farmer.repository.FarmerPaymentRepository;
 import com.flowerconnect.farmer.repository.FarmerVendorLinkRepository;
 import com.flowerconnect.repository.RoleRepository;
 import com.flowerconnect.repository.UserRepository;
@@ -21,13 +23,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -36,6 +42,7 @@ import static org.mockito.Mockito.*;
  * listings and vendor transitions.
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class FarmerLinkServiceTest {
 
     @Mock
@@ -50,6 +57,10 @@ class FarmerLinkServiceTest {
     private com.flowerconnect.security.util.EmailNormalizer emailNormalizer;
     @Mock
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    @Mock
+    private FarmerDepositRepository depositRepository;
+    @Mock
+    private FarmerPaymentRepository paymentRepository;
 
     @InjectMocks
     private FarmerLinkService farmerLinkService;
@@ -80,6 +91,10 @@ class FarmerLinkServiceTest {
                 .businessName("Not Yet Approved")
                 .status(VendorProfile.Status.PENDING_APPROVAL)
                 .build();
+
+        when(depositRepository.sumAmountByLinkId(anyLong())).thenReturn(BigDecimal.ZERO);
+        when(paymentRepository.sumAmountByLinkIdAndStatus(anyLong(), any()))
+                .thenReturn(BigDecimal.ZERO);
 
         pendingLink = FarmerVendorLink.builder()
                 .id(100L)

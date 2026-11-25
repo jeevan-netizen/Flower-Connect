@@ -1,12 +1,10 @@
 package com.flowerconnect.farmer.repository;
 
 import com.flowerconnect.farmer.domain.FarmerVendorLink;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -29,4 +27,14 @@ public interface FarmerVendorLinkRepository
     Optional<FarmerVendorLink> findByIdAndFarmerId(Long id, Long farmerId);
 
     boolean existsByFarmerIdAndVendorId(Long farmerId, Long vendorId);
+
+    /* ------------------------------------------------------------------ locking */
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM FarmerVendorLink l WHERE l.id = ?1 AND l.vendorId = ?2")
+    Optional<FarmerVendorLink> findByIdAndVendorIdForUpdate(Long id, Long vendorId);
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM FarmerVendorLink l WHERE l.id = ?1 AND l.farmerId = ?2")
+    Optional<FarmerVendorLink> findByIdAndFarmerIdForUpdate(Long id, Long farmerId);
 }

@@ -138,9 +138,12 @@ public class SecurityConfig {
                    // the farmer module). Declared before the broad /api/v1/vendor/** rule so it
                    // matches first; both require FLORIST, ownership is enforced in the service.
                    .requestMatchers("/api/v1/vendor/farmer-links/**").hasRole("FLORIST")
-                   // Phase 8 vendor disputes (task 8.4): vendor views/responds to disputes on their orders.
-                   .requestMatchers("/api/v1/vendor/disputes/**").hasRole("FLORIST")
-                   // Phase 9 in-app notifications (task 9.2): every authenticated
+                    // Phase 8 vendor disputes (task 8.4): vendor views/responds to disputes on their orders.
+                    .requestMatchers("/api/v1/vendor/disputes/**").hasRole("FLORIST")
+                    // Farmer/vendor collection decisions (Stage 3 of the farmer module): confirm and
+                    // reject pending collections on the caller's vendor's links.
+                    .requestMatchers("/api/v1/vendor/farmer-collections/**").hasRole("FLORIST")
+                    // Phase 9 in-app notifications (task 9.2): every authenticated
                    // role receives its own notifications, resolved from the JWT
                    // subject. Ownership is enforced in the service layer, so no
                    // route accepts a user id and cross-user access is impossible.
