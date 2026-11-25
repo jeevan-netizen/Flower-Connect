@@ -423,12 +423,17 @@ public class B2BOrderService {
     }
 
     /**
-     * Seller delivers a SHIPPED order.
+     * Seller delivers a SHIPPED order. Assigns the e-bill bill number exactly
+     * once, derived from the order id and the delivery year, using the injected
+     * Clock. The order row is pessimistically locked so concurrent delivery
+     * attempts serialise and the bill number assignment is atomic with the
+     * status transition.
      */
     @Transactional
     public B2BOrderResponse deliver(String sellerEmail, Long orderId) {
         VendorProfile seller = requireApprovedVendor(sellerEmail);
-        B2BOrder order = requireOrder(orderId);
+        B2BOrder order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> BusinessException.notFound("B2B order not found"));
         if (!order.getSeller().getId().equals(seller.getId())) {
             throw BusinessException.forbidden("Only the seller can deliver this order");
         }
@@ -437,9 +442,13 @@ public class B2BOrderService {
                     "Order " + orderId + " is " + order.getStatus() + ", not SHIPPED; cannot deliver");
         }
 
+        LocalDateTime deliveredAt = LocalDateTime.now(clock);
         order.setStatus(Status.DELIVERED);
-        order.setDeliveredAt(LocalDateTime.now(clock));
-        order.setUpdatedAt(LocalDateTime.now(clock));
+        order.setDeliveredAt(deliveredAt);
+        order.setUpdatedAt(deliveredAt);
+        if (order.getBillNumber() == null) {
+            order.setBillNumber(generateBillNumber(order.getId(), deliveredAt));
+        }
         orderRepository.saveAndFlush(order);
 
         log.info("Seller {} delivered B2B order {}", seller.getId(), order.getOrderNo());
@@ -555,6 +564,18 @@ public class B2BOrderService {
     private String generateOrderNo() {
         String stamp = String.valueOf(LocalDateTime.now(clock).toEpochSecond(java.time.ZoneOffset.UTC));
         return "B2B-" + stamp + "-" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    /**
+     * Generates the e-bill bill number exactly once when an order is delivered.
+     * Format: {@code EB-<deliveryYear>-<zeroPaddedOrderId>}, e.g.
+     * {@code EB-2026-000042}. Derived from the order id (unique per order) and
+     * the delivery year read from the injected Clock, so the value is stable
+     * across repeated requests and safe against concurrent delivery attempts.
+     */
+    private String generateBillNumber(Long orderId, LocalDateTime deliveredAt) {
+        int year = deliveredAt.getYear();
+        return String.format("EB-%d-%06d", year, orderId);
     }
 
     private boolean matchesQuery(VendorProfile seller, String query) {

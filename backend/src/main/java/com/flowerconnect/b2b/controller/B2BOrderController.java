@@ -7,6 +7,7 @@ import com.flowerconnect.b2b.dto.B2BOrderResponse;
 import com.flowerconnect.b2b.dto.B2BProductSummary;
 import com.flowerconnect.b2b.dto.PlaceB2BOrderRequest;
 import com.flowerconnect.b2b.dto.SellerSummary;
+import com.flowerconnect.b2b.service.B2BEbillService;
 import com.flowerconnect.b2b.service.B2BOrderService;
 import com.flowerconnect.b2b.domain.B2BOrder.Status;
 import com.flowerconnect.vendor.security.RequiresApprovedVendor;
@@ -18,7 +19,10 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
@@ -50,6 +54,7 @@ import java.util.List;
 public class B2BOrderController {
 
     private final B2BOrderService b2bOrderService;
+    private final B2BEbillService b2bEbillService;
 
     @Operation(summary = "Search other approved vendors",
             description = "Returns approved vendors (excluding the caller) whose business name "
@@ -176,5 +181,28 @@ public class B2BOrderController {
             @Parameter(description = "B2B order id")
             @PathVariable @Positive(message = "Order id must be positive") Long orderId) {
         return ResponseEntity.ok(b2bOrderService.deliver(authentication.getName(), orderId));
+    }
+
+    @Operation(summary = "Download the e-bill PDF",
+            description = "Returns the e-bill PDF for a delivered B2B order. Only the buyer or the "
+                    + "seller on the order may download it; only DELIVERED orders have an e-bill. "
+                    + "The response is application/pdf with a download filename based on the bill "
+                    + "number.")
+    @GetMapping("/orders/{orderId}/e-bill")
+    public ResponseEntity<byte[]> eBill(
+            Authentication authentication,
+            @Parameter(description = "B2B order id")
+            @PathVariable @Positive(message = "Order id must be positive") Long orderId) {
+        byte[] pdf = b2bEbillService.generateEbillPdf(authentication.getName(), orderId);
+        B2BOrderResponse order = b2bOrderService.getOrder(authentication.getName(), orderId);
+        String billNumber = order.getBillNumber();
+        String filename = (billNumber != null ? billNumber : "order-" + orderId) + ".pdf";
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(filename)
+                .build();
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .body(pdf);
     }
 }

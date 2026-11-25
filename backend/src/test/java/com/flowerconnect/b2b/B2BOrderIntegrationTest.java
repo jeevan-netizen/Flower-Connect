@@ -43,14 +43,19 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -582,6 +587,108 @@ class B2BOrderIntegrationTest extends AbstractIntegrationTest {
     }
 
     // ------------------------------------------------------------------
+    // E-bill
+    // ------------------------------------------------------------------
+
+    @Test
+    void eBillDownloadAfterDelivery() throws Exception {
+        Long orderId = placeOrderAndReturnId();
+        acceptOrder(orderId);
+        shipOrder(orderId);
+
+        MvcResult delivered = mockMvc.perform(post("/api/v1/vendors/b2b/orders/{orderId}/deliver", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(sellerToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+        String billNo = objectMapper.readTree(delivered.getResponse().getContentAsString())
+                .get("billNumber").asText();
+        assertThatBillNo(billNo);
+
+        // Buyer can download.
+        MvcResult buyerResult = mockMvc.perform(get("/api/v1/vendors/b2b/orders/{orderId}/e-bill", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyerToken)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        org.hamcrest.Matchers.containsString("filename=\"" + billNo + ".pdf\"")))
+                .andReturn();
+        assertEbillPdf(buyerResult.getResponse().getContentAsByteArray(), billNo, orderId);
+
+        // Seller can download and gets the same content (bill number stable).
+        // Compare extracted text rather than raw bytes: PDFBox embeds a
+        // non-deterministic document identifier, so byte equality is too strict.
+        MvcResult sellerResult = mockMvc.perform(get("/api/v1/vendors/b2b/orders/{orderId}/e-bill", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(sellerToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertEbillPdf(sellerResult.getResponse().getContentAsByteArray(), billNo, orderId);
+    }
+
+    @Test
+    void eBillRefusedForNonDeliveredStatus() throws Exception {
+        // PLACED.
+        Long placedId = placeOrderAndReturnId();
+        mockMvc.perform(get("/api/v1/vendors/b2b/orders/{orderId}/e-bill", placedId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyerToken)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("E_BILL_NOT_AVAILABLE"));
+
+        // ACCEPTED.
+        Long acceptedId = placeOrderAndReturnId();
+        acceptOrder(acceptedId);
+        mockMvc.perform(get("/api/v1/vendors/b2b/orders/{orderId}/e-bill", acceptedId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyerToken)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("E_BILL_NOT_AVAILABLE"));
+
+        // SHIPPED.
+        Long shippedId = placeOrderAndReturnId();
+        acceptOrder(shippedId);
+        shipOrder(shippedId);
+        mockMvc.perform(get("/api/v1/vendors/b2b/orders/{orderId}/e-bill", shippedId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyerToken)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("E_BILL_NOT_AVAILABLE"));
+    }
+
+    @Test
+    void eBillThirdVendorForbidden() throws Exception {
+        Long orderId = placeOrderAndReturnId();
+        acceptOrder(orderId);
+        shipOrder(orderId);
+        mockMvc.perform(post("/api/v1/vendors/b2b/orders/{orderId}/deliver", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(sellerToken)))
+                .andExpect(status().isOk());
+
+        // A third vendor with a non-approved profile must not download the e-bill.
+        User thirdUser = createUser("b2b-ebill-third-" + UUID.randomUUID() + "@test.com", PASSWORD, "FLORIST");
+        vendorProfileRepository.saveAndFlush(VendorProfile.builder()
+                .user(thirdUser)
+                .businessName("Third Florist")
+                .addressLine1("4 Third Street")
+                .serviceLocation(serviceLocationRepository.findById(locationId).orElseThrow())
+                .latitude(BigDecimal.TEN)
+                .longitude(BigDecimal.TEN)
+                .deliveryRadiusKm(new BigDecimal("5.00"))
+                .status(VendorProfile.Status.PENDING_APPROVAL)
+                .reviewCount(0)
+                .minOrderAmount(BigDecimal.ZERO)
+                .baseDeliveryFee(BigDecimal.ZERO)
+                .perKmFee(BigDecimal.ZERO)
+                .prepTimeMinutes(30)
+                .slotDurationMinutes(60)
+                .maxOrdersPerSlot(10)
+                .acceptingOrders(true)
+                .build());
+        String thirdToken = tokenFor(thirdUser);
+
+        mockMvc.perform(get("/api/v1/vendors/b2b/orders/{orderId}/e-bill", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(thirdToken)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("VENDOR_NOT_APPROVED"));
+    }
+
+    // ------------------------------------------------------------------
     // Fixtures and helpers
     // ------------------------------------------------------------------
 
@@ -661,5 +768,20 @@ class B2BOrderIntegrationTest extends AbstractIntegrationTest {
             digits.append((int) (Math.random() * 10));
         }
         return digits.toString();
+    }
+
+    private void assertThatBillNo(String billNo) {
+        assertThat(billNo).matches("EB-\\d{4}-\\d{6}");
+    }
+
+    private void assertEbillPdf(byte[] pdf, String billNo, Long orderId) throws Exception {
+        assertThat(pdf).isNotNull();
+        assertThat(pdf.length).isGreaterThan(0);
+        try (PDDocument document = PDDocument.load(pdf)) {
+            assertThat(document.getNumberOfPages()).isGreaterThan(0);
+            String text = new PDFTextStripper().getText(document).replaceAll("\\s+", " ");
+            assertThat(text).contains(billNo);
+            assertThat(text).contains("B2B-");
+        }
     }
 }

@@ -581,7 +581,7 @@ class B2BOrderServiceTest {
         approvedVendor(SELLER_ID, SELLER_EMAIL, "Seller Florist");
 
         B2BOrder order = newOrder(10L, Status.SHIPPED);
-        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(order));
         when(orderRepository.saveAndFlush(any(B2BOrder.class))).thenAnswer(inv -> inv.getArgument(0));
 
         B2BOrderResponse response = service.deliver(SELLER_EMAIL, 10L);
@@ -597,7 +597,7 @@ class B2BOrderServiceTest {
         approvedVendor(SELLER_ID, SELLER_EMAIL, "Seller Florist");
 
         B2BOrder order = newOrder(10L, Status.ACCEPTED);
-        when(orderRepository.findById(10L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.deliver(SELLER_EMAIL, 10L))
                 .isInstanceOf(BusinessException.class)

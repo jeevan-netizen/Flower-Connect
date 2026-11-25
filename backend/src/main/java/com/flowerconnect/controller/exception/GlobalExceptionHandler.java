@@ -192,6 +192,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case PAYLOAD_TOO_LARGE -> HttpStatus.REQUEST_ENTITY_TOO_LARGE;
             case SLOT_FULL -> HttpStatus.CONFLICT;
             case MINIMUM_ORDER -> HttpStatus.BAD_REQUEST;
+            case E_BILL_NOT_AVAILABLE -> HttpStatus.CONFLICT;
         };
     }
 
