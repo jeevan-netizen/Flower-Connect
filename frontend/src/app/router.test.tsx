@@ -635,6 +635,7 @@ describe("admin route protection", () => {
       undefined,
       "vendors",
       "users",
+      "proposals",
       "refunds",
       "orders/lookup",
       "disputes",

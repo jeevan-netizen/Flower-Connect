@@ -220,6 +220,50 @@ export const ADMIN_MAX_PAGE_SIZE = 100;
 export const ADMIN_REASON_MAX_LENGTH = 500;
 
 /* -------------------------------------------------------------------------- */
+/* Service location proposals (Phase 14 vendor registration)                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Mirrors `ServiceLocationProposalResponse` — only the fields the admin review
+ * screen needs to display and act on a pending proposal.
+ */
+export interface ServiceLocationProposal {
+  id: number;
+  city: string;
+  area: string;
+  pincode: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  proposedByEmail: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+/** Body of `POST /api/v1/locations/proposals/{id}/approve`. */
+export interface ApproveServiceLocationProposalRequest {
+  latitude: number;
+  longitude: number;
+  timezone: string;
+}
+
+/** Paginated wrapper for the pending proposal listing. */
+export interface ServiceLocationProposalPageResponse {
+  content: ServiceLocationProposal[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
+/** Proposals route path. */
+export const PROPOSALS_PATH = "/admin/proposals";
+
+/* -------------------------------------------------------------------------- */
 /* Refund queue (plan Phase 8, task 8.3)                                      */
 /* -------------------------------------------------------------------------- */
 

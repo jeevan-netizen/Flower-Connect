@@ -1,5 +1,7 @@
 package com.flowerconnect.geo;
 
+import com.flowerconnect.domain.ServiceLocation;
+import com.flowerconnect.repository.ServiceLocationRepository;
 import com.flowerconnect.test.AbstractIntegrationTest;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
@@ -8,6 +10,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 import static org.hamcrest.Matchers.greaterThan;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,6 +25,9 @@ class LocationApiIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ServiceLocationRepository serviceLocationRepository;
 
     @Test
     void shouldReturnAllLocationsHierarchical() throws Exception {
@@ -161,6 +169,9 @@ class LocationApiIntegrationTest extends AbstractIntegrationTest {
                   "password": "correct-horse-battery",
                   "fullName": "Location Picker Probe",
                   "businessName": "Probe Blooms",
+                  "city": "Bengaluru",
+                  "area": "Probe Layout",
+                  "pincode": "560099",
                   "addressLine1": "1 Probe Street",
                   "serviceLocationId": %d
                 }
@@ -172,6 +183,36 @@ class LocationApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.serviceLocationId").value(locationId))
                 .andExpect(jsonPath("$.status").value("PENDING_APPROVAL"));
+    }
+
+    /**
+     * End-to-end proof that an administrator-approved proposal appears in the
+     * public service-areas list: inserting a row directly (as `approveProposal`
+     * does) makes it visible to `GET /api/v1/locations`, so a vendor can then
+     * register against it.
+     */
+    @Test
+    @Transactional
+    void shouldListAnApprovedProposalAsAServiceLocation() throws Exception {
+        ServiceLocation location = serviceLocationRepository.save(
+                ServiceLocation.builder()
+                        .city("Bengaluru")
+                        .area("Probe Layout")
+                        .pincode("560099")
+                        .latitude(new BigDecimal("12.9352"))
+                        .longitude(new BigDecimal("77.6245"))
+                        .timezone("Asia/Kolkata")
+                        .build());
+
+        mockMvc.perform(get("/api/v1/locations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].city").value("Bengaluru"))
+                .andExpect(jsonPath("$[0].areas[*].area")
+                        .value(org.hamcrest.Matchers.hasItem("Probe Layout")))
+                .andExpect(jsonPath("$[0].areas[?(@.id == " + location.getId() + ")].area")
+                        .value(org.hamcrest.Matchers.hasItem("Probe Layout")));
+
+        serviceLocationRepository.delete(location);
     }
 
     private static int readJson(String json, String pointer) throws Exception {

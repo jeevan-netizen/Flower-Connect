@@ -55,6 +55,7 @@ import type {
   PaymentStateResponse,
 } from "@/features/payment/types";
 import type { PageResponse } from "@/shared/types";
+import type { ServiceLocationProposal } from "@/features/admin/types";
 
 /**
  * A profile fixture shaped exactly like `VendorProfileResponse`, so tests exercise
@@ -177,6 +178,29 @@ export function makeServiceLocations(
       ...overrides,
     },
   ];
+}
+
+/**
+ * A service-location proposal fixture shaped exactly like
+ * `ServiceLocationProposalResponse`, as `GET /api/v1/locations/proposals` sends it.
+ */
+export function makeServiceLocationProposal(
+  overrides: Partial<ServiceLocationProposal> = {},
+): ServiceLocationProposal {
+  return {
+    id: 1,
+    city: "Bengaluru",
+    area: "Bommanahalli",
+    pincode: "560068",
+    addressLine1: "12 MG Road",
+    addressLine2: null,
+    status: "PENDING",
+    proposedByEmail: "vendor@example.com",
+    rejectionReason: null,
+    createdAt: "2026-11-24T10:00:00",
+    reviewedAt: null,
+    ...overrides,
+  };
 }
 
 export function makePage<T>(

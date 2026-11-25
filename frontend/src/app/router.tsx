@@ -40,6 +40,7 @@ import { PaymentStatusPage } from "@/features/payment/pages/PaymentStatusPage";
 import RazorpayCheckoutPage from "@/features/payment/pages/RazorpayCheckoutPage";
 import { AdminRefundsPage } from "@/features/admin/pages/AdminRefundsPage";
 import { AdminOrderLookupPage } from "@/features/admin/pages/AdminOrderLookupPage";
+import { AdminLocationProposalsPage } from "@/features/admin/pages/AdminLocationProposalsPage";
 import { AdminDisputesPage } from "@/features/admin/pages/AdminDisputesPage";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
@@ -319,6 +320,7 @@ export const router = createBrowserRouter([
           { index: true, element: <AdminDashboardPage /> },
           { path: "vendors", element: <AdminVendorsPage /> },
           { path: "users", element: <AdminUsersPage /> },
+          { path: "proposals", element: <AdminLocationProposalsPage /> },
           { path: "refunds", element: <AdminRefundsPage /> },
           { path: "orders/lookup", element: <AdminOrderLookupPage /> },
           { path: "disputes", element: <AdminDisputesPage /> },

@@ -25,6 +25,7 @@ const NAV_ITEMS: AdminNavItem[] = [
   { to: "/admin", label: "Dashboard", end: true },
   { to: "/admin/vendors", label: "Vendors" },
   { to: "/admin/users", label: "Users" },
+  { to: "/admin/proposals", label: "Service Area Proposals" },
   { to: "/admin/billing", label: "Billing & Settlements" },
   { to: "/admin/reviews", label: "Review moderation" },
   { to: "/admin/analytics", label: "Analytics" },
