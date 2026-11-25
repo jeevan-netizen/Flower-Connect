@@ -93,6 +93,10 @@ public class SecurityConfig {
                 // own profile routes stay reachable while their profile is not approved.
                 // See docs/decisions.md (D-13).
                 .requestMatchers(HttpMethod.POST, "/api/v1/vendors/register").permitAll()
+                // Farmer self-service. Registration is the public entry point that
+                // creates the FARMER account; every other farmer route is FARMER-only.
+                .requestMatchers(HttpMethod.POST, "/api/v1/farmer/register").permitAll()
+                .requestMatchers("/api/v1/farmer/**").hasRole("FARMER")
                 // Customer address book (plan task 4.1): the caller's own
                 // addresses, resolved from the JWT subject. CUSTOMER-only —
                 // a florist or admin account is refused with 403 rather than
@@ -130,6 +134,10 @@ public class SecurityConfig {
                    // FLORIST rule alongside the plural /api/v1/vendors/** namespace used by the
                    // catalog, inventory, profile and slots routes.
                    .requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")
+                   // Farmer/vendor links owned by the authenticated florist's vendor (Stage 1 of
+                   // the farmer module). Declared before the broad /api/v1/vendor/** rule so it
+                   // matches first; both require FLORIST, ownership is enforced in the service.
+                   .requestMatchers("/api/v1/vendor/farmer-links/**").hasRole("FLORIST")
                    // Phase 8 vendor disputes (task 8.4): vendor views/responds to disputes on their orders.
                    .requestMatchers("/api/v1/vendor/disputes/**").hasRole("FLORIST")
                    // Phase 9 in-app notifications (task 9.2): every authenticated

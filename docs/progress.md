@@ -1115,8 +1115,29 @@ ew_value (VARCHAR(500) NULL) to udit_log, and seeded commission_rate_default = 
 - **All Phase 10 Tasks (10.1–10.7 + 10.T) fully complete and verified on branch `phase-10-billing-ledger`.**
 
 
+## Phase 11: Farmer Module
 
+### Stage 1 (Farmer role + farmer/vendor links) - COMPLETE (2026-11-25)
 
+Implemented on branch `farmer-module`, created from `phase-10-billing-ledger` (fe48d3b), which is **not** merged into `main` and is the appropriate base because the farmer module builds on the commission/ledger tables introduced in Phase 10.
 
+**Migration:** Additive `V35__create_farmer_vendor_links.sql` — seeds the `FARMER` role (id 4, idempotent `INSERT IGNORE` following V3) and creates `farmer_vendor_links` (`id`, `farmer_id` FK→`users`, `vendor_id` FK→`vendor_profiles`, `status` native ENUM `PENDING/ACTIVE/REJECTED/SUSPENDED`, `created_at`, `updated_at`), `UNIQUE(farmer_id, vendor_id)`, indexes on `(vendor_id, status)` and `(farmer_id, status)`. No existing migration edited (ADR-002/D-9).
 
+**Backend (`com.flowerconnect.farmer`):**
+- `FarmerVendorLink` entity (inner `Status` enum, `@Enumerated(EnumType.STRING)`, `@CreationTimestamp`/`@UpdateTimestamp`).
+- `FarmerVendorLinkRepository` (`JpaRepository` + `JpaSpecificationExecutor`) with ownership-scoped lookups (`findByIdAndVendorId`, `findByIdAndFarmerId`, `findByFarmerIdAndVendorId`, `findByVendorId`, `findByVendorIdAndStatus`).
+- `FarmerLinkService`: farmer registration (`POST`-backed, creates `FARMER` user reusing `email`/`password`/`fullName`/`phone`), `listEligibleVendors` (approved vendors per existing visibility rules, with caller's link status), `requestLink` (creates `PENDING`; re-uses a `REJECTED` row by flipping to `PENDING`; conflict on existing `PENDING`/`ACTIVE`/`SUSPENDED`), `listFarmerLinks` (own links only), `listVendorLinks` (own vendor's links, optional status filter), and vendor transitions `accept`/`reject`/`suspend`/`reactivate` enforcing the transition table (`PENDING→ACTIVE|REJECTED`, `ACTIVE→SUSPENDED`, `SUSPENDED→ACTIVE`) with `409 CONFLICT` on invalid transitions and `403 FORBIDDEN`/`404 NOT_FOUND` for foreign/missing links.
+- `FarmerLinkController`: `POST /api/v1/farmer/register` (permitAll), `GET /api/v1/farmer/vendors?query=`, `POST /api/v1/farmer/links`, `GET /api/v1/farmer/links` — all `FARMER`-except-register.
+- `VendorFarmerLinkController`: `GET /api/v1/vendor/farmer-links?status=`, `POST /api/v1/vendor/farmer-links/{id}/accept|reject|suspend|reactivate` — all `FLORIST`, ownership enforced in service.
+- `SecurityConfig`: `/api/v1/farmer/register` permitAll, `/api/v1/farmer/**` hasRole("FARMER"), `/api/v1/vendor/farmer-links/**` hasRole("FLORIST") (declared before broad `/api/v1/vendor/**`).
+- DTOs: `FarmerRegisterRequest/Response`, `FarmerLinkRequest`, `FarmerLinkResponse`, `FarmerVendorResponse`.
 
+**Tests:** `FarmerLinkServiceTest` (21), `FarmerLinkControllerTest` (15), `VendorFarmerLinkControllerTest` (15) — 51 tests, all green. Coverage: every valid and invalid transition, duplicate-request conflict, re-request after REJECTED, florist-vs-another-florist's link (403), farmer-vs-another-farmer's links, RBAC (401/403/200) for all new endpoints.
+
+**Verification:**
+- Backend unit: `./mvnw test` **1,373 passed, 0 failed, 0 errors**, BUILD SUCCESS (includes 51 new farmer tests).
+- Frontend (no changes): `npm test` **853 passed across 81 files**, `npm run typecheck` clean, `npm run lint` clean.
+- Role model: vendor role remains `FLORIST` (D-11); `FARMER` added as a distinct role. Money/decimal conventions (`BigDecimal`, `HALF_UP`, scale 2) unchanged — no new money fields in Stage 1.
+- Errors use `ErrorCode`, `BusinessException`, and the shared `ErrorResponse` envelope; `Clock` pattern unchanged (Hibernate `@CreationTimestamp`/`@UpdateTimestamp` used for link timestamps, consistent with `VendorProfile`).
+
+No frontend pages, deposits, collections, passbooks, customer checkout/cart/orders, or invoice logic touched in this stage.
