@@ -62,7 +62,7 @@ export function B2BStatementsPage() {
   >(null);
   const [actionError, setActionError] = useState<{ message: string } | null>(null);
 
-  const { data: sellers } = useSellers();
+  const { data: sellers } = useSellers(null);
   const sellerOptions = sellers ?? [];
 
   const preview = useB2BStatementPreview(buyerId, fromDate, toDate);
@@ -170,6 +170,37 @@ export function B2BStatementsPage() {
         title="Statements"
         description="Group delivered, unpaid B2B orders into statements and record payment."
       />
+
+      <div className="flex items-center gap-4 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => {
+            setView("create");
+            setSelectedStatement(null);
+          }}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            view === "create"
+              ? "border-brand-600 text-brand-900"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Generate statement
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setView("list");
+            setSelectedStatement(null);
+          }}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            view === "list" || view === "detail"
+              ? "border-brand-600 text-brand-900"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Statements list
+        </button>
+      </div>
 
       {/* 1. Create statement (seller only) */}
       {view === "create" && (

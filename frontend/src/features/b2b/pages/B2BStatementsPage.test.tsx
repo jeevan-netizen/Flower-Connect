@@ -102,4 +102,24 @@ describe("B2BStatementsPage", () => {
     expect(screen.getByRole("combobox", { name: /buyer/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /preview/i })).toBeInTheDocument();
   });
+
+  it("calls useSellers(null) and allows switching to Statements list", async () => {
+    const statement = makeB2BStatementResponse({
+      id: 101,
+      statementNo: "STM-1001",
+      status: "PAID",
+      totalAmount: 1823,
+    });
+    mockUseB2BStatements.mockReturnValue({
+      data: { content: [statement], page: 0, size: 20, totalElements: 1, totalPages: 1, first: true, last: true, empty: false },
+      isPending: false,
+      error: null,
+    } as unknown as UseQueryResult<B2BStatementPageResponse, Error>);
+
+    renderWithProviders(<B2BStatementsPage />, { route: "/vendor/b2b/statements" });
+    expect(mockUseSellers).toHaveBeenCalledWith(null);
+
+    fireEvent.click(screen.getByRole("button", { name: "Statements list" }));
+    await waitFor(() => expect(screen.getByText("#STM-1001")).toBeInTheDocument());
+  });
 });
