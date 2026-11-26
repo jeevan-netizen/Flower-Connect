@@ -20,6 +20,9 @@ import { VendorInventoryPage } from "@/features/vendor/pages/VendorInventoryPage
 import { VendorOrderBoardPage } from "@/features/vendor/orders/pages/VendorOrderBoardPage";
 import { VendorDisputesPage } from "@/features/vendor/disputes/pages/VendorDisputesPage";
 import { VendorBillingPage } from "@/features/vendor/pages/VendorBillingPage";
+import { VendorAnalyticsPage } from "@/features/vendor/pages/VendorAnalyticsPage";
+import { VendorPosPage } from "@/features/vendor/pages/VendorPosPage";
+import { VendorReviewsPage } from "@/features/vendor/pages/VendorReviewsPage";
 import { CartPage } from "@/features/cart/pages/CartPage";
 import { CheckoutPage } from "@/features/checkout/pages/CheckoutPage";
 import { BrowsePage } from "@/features/customer/pages/BrowsePage";
@@ -48,6 +51,8 @@ import { B2BPlaceOrderPage } from "@/features/b2b/pages/B2BPlaceOrderPage";
 import { B2BOrdersPage } from "@/features/b2b/pages/B2BOrdersPage";
 import { B2BOrderDetailPage } from "@/features/b2b/pages/B2BOrderDetailPage";
 import { B2BStatementsPage } from "@/features/b2b/pages/B2BStatementsPage";
+import { AdminReviewsPage } from "@/features/admin/pages/AdminReviewsPage";
+import { AdminAnalyticsPage } from "@/features/admin/pages/AdminAnalyticsPage";
 
 /** Seeded role name for customers (V3__seed_roles.sql). */
 const CUSTOMER_ROLE = "CUSTOMER";
@@ -280,6 +285,15 @@ export const router = createBrowserRouter([
           // Phase 11 vendor farmer management (Stage 3 of the farmer module).
           { path: "farmers", element: <VendorFarmersListPage /> },
           { path: "farmer-links/:linkId/passbook", element: <VendorFarmerPassbookPage /> },
+          { path: "pos", element: gated(<VendorPosPage />) },
+          // Phase 12 vendor analytics (task 12.5): marketplace and POS metrics
+          // for the vendor's own date range. FLORIST role only; suspended
+          // vendors can read (D-6).
+          { path: "analytics", element: <VendorAnalyticsPage /> },
+          // Phase 12 vendor reviews (task 12.2): the vendor's own reviews and
+          // replies. FLORIST role only; the backend enforces per-review
+          // ownership, and a suspended vendor can still reply (D-6).
+          { path: "reviews", element: <VendorReviewsPage /> },
         ],
       },
       {
@@ -301,6 +315,11 @@ export const router = createBrowserRouter([
           { path: "orders/lookup", element: <AdminOrderLookupPage /> },
           { path: "disputes", element: <AdminDisputesPage /> },
           { path: "billing", element: <AdminBillingPage /> },
+          // Phase 12 review moderation and analytics (task 12.4). ADMIN only;
+          // `SecurityConfig` matches `/api/v1/admin/reviews/**` with
+          // `hasRole("ADMIN")` on every request.
+          { path: "reviews", element: <AdminReviewsPage /> },
+          { path: "analytics", element: <AdminAnalyticsPage /> },
         ],
       },
     ],

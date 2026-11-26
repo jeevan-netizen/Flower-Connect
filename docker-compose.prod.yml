@@ -1,0 +1,87 @@
+services:
+  mysql:
+    build:
+      context: .
+      dockerfile: docker/mysql/Dockerfile
+    container_name: ${COMPOSE_PROJECT_NAME:-fc-prod}-mysql
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-prod_root_secret_change_me}
+      MYSQL_DATABASE: ${DB_NAME:-flowerconnect}
+      MYSQL_USER: ${DB_USER:-flowerconnect}
+      MYSQL_PASSWORD: ${DB_PASS:-prod_db_secret_change_me}
+    # No host port exposed for MySQL in production
+    volumes:
+      - prod-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u ${DB_USER:-flowerconnect} -p${DB_PASS:-prod_db_secret_change_me}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ${COMPOSE_PROJECT_NAME:-fc-prod}-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-flowerconnect}
+      DB_URL: "jdbc:mysql://mysql:3306/${DB_NAME:-flowerconnect}?useUnicode=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false"
+      DB_USER: ${DB_USER:-flowerconnect}
+      DB_PASS: ${DB_PASS:-prod_db_secret_change_me}
+      MAIL_HOST: ${MAIL_HOST:-smtp-relay.internal}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USER: ${MAIL_USER:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET}
+      APP_WEBHOOK_SECRET: ${APP_WEBHOOK_SECRET}
+      APP_CHECKOUT_QUOTE_SIGNING_SECRET: ${APP_CHECKOUT_QUOTE_SIGNING_SECRET}
+      APP_BASE_URL: ${APP_BASE_URL:-https://localhost:8443}
+      APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-https://localhost:8443,http://localhost:8088}
+      STORAGE_LOCAL_DIR: /var/lib/flowerconnect/uploads
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    # Backend runs on internal docker network; all requests proxy through frontend on single origin
+    volumes:
+      - prod-uploads:/var/lib/flowerconnect/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: ${COMPOSE_PROJECT_NAME:-fc-prod}-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      PORT: ${FRONTEND_PORT:-8443}
+      BACKEND_URL: http://backend:8080
+      VITE_API_BASE_URL: /api/v1
+      TLS_CERT: ${TLS_CERT:-/etc/flowerconnect/certs/localhost.pem}
+      TLS_KEY: ${TLS_KEY:-/etc/flowerconnect/certs/localhost-key.pem}
+    ports:
+      - "${PROD_FRONTEND_PORT:-8443}:${FRONTEND_PORT:-8443}"
+    volumes:
+      - ./certs:/etc/flowerconnect/certs:ro
+
+volumes:
+  prod-mysql-data:
+  prod-uploads:

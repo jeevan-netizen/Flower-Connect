@@ -229,14 +229,16 @@ export function VendorOrderBoardPage() {
         </div>
       )}
 
-      <RejectReasonDialog
-        orderName={rejectTarget?.orderName ?? "this order"}
-        open={rejectTarget !== null}
-        isSubmitting={runAction.isPending && rejectTarget !== null}
-        error={actionError?.code === "VALIDATION_FAILED" ? actionError.message : null}
-        onConfirm={confirmReject}
-        onCancel={() => setRejectTarget(null)}
-      />
+      {rejectTarget && (
+        <RejectReasonDialog
+          orderName={rejectTarget.orderName}
+          open={true}
+          isSubmitting={runAction.isPending && rejectTarget !== null}
+          error={actionError?.code === "VALIDATION_FAILED" ? actionError.message : null}
+          onConfirm={confirmReject}
+          onCancel={() => setRejectTarget(null)}
+        />
+      )}
 
       {cancelTarget && (
         <CancelReasonDialog

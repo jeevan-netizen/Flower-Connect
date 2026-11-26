@@ -54,7 +54,7 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @Operation(summary = "Get payment state for an order",
-            description = "Returns the current payment and order status for " +
+            description = "CUSTOMER. Returns the current payment and order status for " +
                     "the authenticated customer's own order. COD orders report " +
                     "their collected/pending state; ONLINE orders report the " +
                     "pending-payment state until resumed.")
@@ -74,7 +74,7 @@ public class PaymentController {
     }
 
     @Operation(summary = "Get payment group state",
-            description = "Returns the simulated payment intent state and all " +
+            description = "CUSTOMER. Returns the simulated payment intent state and all " +
                     "linked orders for the authenticated customer's own group.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Group state"),
@@ -93,7 +93,7 @@ public class PaymentController {
     }
 
     @Operation(summary = "Resume/pay a pending order",
-            description = "Confirms payment for an unexpired {@code PENDING_PAYMENT} " +
+            description = "CUSTOMER. Confirms payment for an unexpired {@code PENDING_PAYMENT} " +
                     "order (simulated/test-mode). Transitions the order to " +
                     "{@code PLACED} and the payment to {@code PAID}. Rejected " +
                     "with 409 if the order is not pending, already paid, or the " +

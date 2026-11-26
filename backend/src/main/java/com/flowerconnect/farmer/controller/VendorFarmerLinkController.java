@@ -5,6 +5,7 @@ import com.flowerconnect.farmer.domain.FarmerVendorLink;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.farmer.service.FarmerLinkService;
 import com.flowerconnect.repository.VendorProfileRepository;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,9 @@ public class VendorFarmerLinkController {
      * status ({@code PENDING}, {@code ACTIVE}, {@code REJECTED},
      * {@code SUSPENDED}).
      */
+    @Operation(summary = "List the vendor's farmer links",
+            description = "FLORIST only. Returns links belonging to the authenticated vendor's profile, "
+                    + "optionally filtered by status (PENDING, ACTIVE, REJECTED, SUSPENDED).")
     @GetMapping("/farmer-links")
     public ResponseEntity<List<FarmerLinkResponse>> listVendorLinks(Authentication authentication,
                                                                     @RequestParam(required = false)
@@ -45,6 +49,8 @@ public class VendorFarmerLinkController {
     /**
      * Accepts a pending link: {@code PENDING -> ACTIVE}.
      */
+    @Operation(summary = "Accept a pending farmer link",
+            description = "FLORIST only. Transitions a PENDING farmer-vendor link to ACTIVE.")
     @PostMapping("/farmer-links/{linkId}/accept")
     public ResponseEntity<FarmerLinkResponse> acceptLink(Authentication authentication,
                                                          @PathVariable Long linkId) {
@@ -55,6 +61,8 @@ public class VendorFarmerLinkController {
     /**
      * Rejects a pending link: {@code PENDING -> REJECTED}.
      */
+    @Operation(summary = "Reject a pending farmer link",
+            description = "FLORIST only. Transitions a PENDING farmer-vendor link to REJECTED.")
     @PostMapping("/farmer-links/{linkId}/reject")
     public ResponseEntity<FarmerLinkResponse> rejectLink(Authentication authentication,
                                                          @PathVariable Long linkId) {
@@ -65,6 +73,8 @@ public class VendorFarmerLinkController {
     /**
      * Suspends an active link: {@code ACTIVE -> SUSPENDED}.
      */
+    @Operation(summary = "Suspend an active farmer link",
+            description = "FLORIST only. Transitions an ACTIVE farmer-vendor link to SUSPENDED.")
     @PostMapping("/farmer-links/{linkId}/suspend")
     public ResponseEntity<FarmerLinkResponse> suspendLink(Authentication authentication,
                                                           @PathVariable Long linkId) {
@@ -75,6 +85,8 @@ public class VendorFarmerLinkController {
     /**
      * Reactivates a suspended link: {@code SUSPENDED -> ACTIVE}.
      */
+    @Operation(summary = "Reactivate a suspended farmer link",
+            description = "FLORIST only. Transitions a SUSPENDED farmer-vendor link back to ACTIVE.")
     @PostMapping("/farmer-links/{linkId}/reactivate")
     public ResponseEntity<FarmerLinkResponse> reactivateLink(Authentication authentication,
                                                              @PathVariable Long linkId) {

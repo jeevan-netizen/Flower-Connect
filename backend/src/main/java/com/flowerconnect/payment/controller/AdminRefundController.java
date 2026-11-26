@@ -57,7 +57,7 @@ public class AdminRefundController {
     private final PaymentService paymentService;
 
     @Operation(summary = "List pending refunds",
-            description = "Returns one page of payments whose status is "
+            description = "ADMIN. Returns one page of payments whose status is "
                     + "{@code REFUND_PENDING}, ordered newest first. Optional "
                     + "vendorId, fromDate and toDate filters are supported.")
     @ApiResponses({
@@ -89,7 +89,7 @@ public class AdminRefundController {
     }
 
     @Operation(summary = "Mark a refund as complete",
-            description = "Transitions a {@code REFUND_PENDING} payment to "
+            description = "ADMIN. Transitions a {@code REFUND_PENDING} payment to "
                     + "{@code REFUNDED}, updating both the payment and order "
                     + "payment status together. Requires a reference note. "
                     + "Idempotent when the payment is already {@code REFUNDED}.")

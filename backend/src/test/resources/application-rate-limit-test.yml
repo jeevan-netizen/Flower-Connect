@@ -33,3 +33,12 @@ app:
       register-requests-per-hour: 5
       forgot-password-requests-per-hour: 5
       reset-password-requests-per-hour: 5
+    sensitive:
+      checkout-requests-per-hour: 2
+      checkout-quote-requests-per-hour: 2
+      dispute-requests-per-hour: 2
+      review-requests-per-hour: 2
+      address-requests-per-hour: 2
+      cart-mutation-requests-per-hour: 2
+      upload-requests-per-hour: 2
+      pos-sale-requests-per-hour: 2

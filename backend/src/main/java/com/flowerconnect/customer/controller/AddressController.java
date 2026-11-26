@@ -103,7 +103,7 @@ public class AddressController {
     }
 
     @Operation(summary = "Replace an address",
-            description = "Full replacement of an address the caller owns (the D-15 precedent): "
+            description = "CUSTOMER. Full replacement of an address the caller owns (the D-15 precedent): "
                     + "every editable field is replaced from the request, an omitted line 2 "
                     + "clears it, and changing the service location recopies the new location's "
                     + "centroid. An omitted defaultAddress keeps the stored flag; an explicit value "

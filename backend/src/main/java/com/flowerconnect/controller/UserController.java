@@ -8,6 +8,10 @@ import com.flowerconnect.security.dto.ChangePasswordRequest;
 import com.flowerconnect.security.dto.ProfileUpdateRequest;
 import com.flowerconnect.security.dto.UserResponse;
 import com.flowerconnect.security.jwt.RefreshTokenService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +29,7 @@ import java.util.Map;
 
 @Slf4j
 @Validated
+@Tag(name = "Current user", description = "Self-service profile and password for the authenticated customer")
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {
@@ -44,6 +49,12 @@ public class UserController {
 
     @GetMapping("/me")
     @Transactional(readOnly = true)
+    @Operation(summary = "Get the current user's profile",
+            description = "Returns the authenticated user's profile. Requires a valid session.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "User profile"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
     public ResponseEntity<UserResponse> getCurrentUser(Authentication authentication) {
         String email = authentication.getName();
         User user = userRepository.findByEmailWithRole(email)
@@ -58,6 +69,15 @@ public class UserController {
      */
     @PatchMapping("/me")
     @Transactional
+    @Operation(summary = "Update the current user's profile",
+            description = "Updates the authenticated user's full name and phone. Email is not editable "
+                    + "through this endpoint. Requires a valid session.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile updated"),
+            @ApiResponse(responseCode = "400", description = "Validation failed"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "409", description = "Phone already in use")
+    })
     public ResponseEntity<UserResponse> updateProfile(
             Authentication authentication,
             @Valid @org.springframework.web.bind.annotation.RequestBody ProfileUpdateRequest request) {
@@ -88,6 +108,14 @@ public class UserController {
      */
     @PostMapping("/me/password")
     @Transactional
+    @Operation(summary = "Change the current user's password",
+            description = "Changes the authenticated user's password after verifying the current one. "
+                    + "Revokes all other refresh tokens on success. Requires a valid session.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Password updated"),
+            @ApiResponse(responseCode = "400", description = "Current password is incorrect or validation failed"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
     public ResponseEntity<Map<String, String>> changePassword(
             Authentication authentication,
             @Valid @org.springframework.web.bind.annotation.RequestBody ChangePasswordRequest request) {

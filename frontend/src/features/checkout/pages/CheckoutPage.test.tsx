@@ -698,6 +698,44 @@ beforeEach(() => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "Review order" })).toBeInTheDocument());
   });
 
+  it("places checkout with ONLINE payment method when online is selected", async () => {
+    const user = userEvent.setup();
+    primeCart();
+    primeAddresses();
+    primeSlots({ "7": [makeSlotResponse()] });
+    mockFetchCheckoutQuote.mockResolvedValue(makeCheckoutQuoteResponse());
+    mockPlaceCheckout.mockResolvedValue(
+      makeCheckoutResponse({ paymentMethod: "ONLINE", paymentGroupId: "pg-1001" }),
+    );
+
+    renderCheckout();
+
+    // Step 1: address — select online payment before proceeding to slots
+    await screen.findByRole("heading", { name: "Delivery address" });
+    await user.click(screen.getByRole("radio", { name: /Home/ }));
+    await user.click(screen.getByRole("radio", { name: /Online payment/i }));
+    await user.click(screen.getByRole("button", { name: /choose delivery slots/i }));
+
+    // Step 2: slots
+    await waitFor(() => {
+      expect(screen.getByText("Petal & Stem")).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("radio", { name: /10:00 AM — 11:00 AM/i }));
+    await user.click(screen.getByRole("button", { name: /review order/i }));
+
+    // Step 3: review
+    await waitFor(() => {
+      expect(screen.getByText("Order total")).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: /place order/i }));
+
+    await waitFor(() => {
+      expect(mockPlaceCheckout).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentMethod: "ONLINE" }),
+      );
+    });
+  });
+
   it("discards stale in-flight quote rejections when selections change before failure occurs", async () => {
     const user = userEvent.setup();
     primeCart();

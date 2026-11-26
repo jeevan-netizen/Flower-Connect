@@ -6,6 +6,11 @@ import com.flowerconnect.security.UserStatusService;
 import com.flowerconnect.security.dto.AdminUserPageResponse;
 import com.flowerconnect.security.dto.AdminUserResponse;
 import com.flowerconnect.security.dto.UserStatusUpdateRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -27,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Slf4j
 @Validated
+@Tag(name = "Admin users", description = "ADMIN-only: user listing and status changes")
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @RequiredArgsConstructor
@@ -39,6 +45,13 @@ public class AdminUserController {
      * Lists users, optionally filtered by role and status.
      */
     @GetMapping
+    @Operation(summary = "List users (admin)",
+            description = "Returns one page of users with optional role and status filters. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "User page"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account")
+    })
     public ResponseEntity<AdminUserPageResponse> listUsers(
             @RequestParam(required = false) String role,
             @RequestParam(required = false) User.Status status,
@@ -57,6 +70,17 @@ public class AdminUserController {
      * the {@code audit_log} row written for the change.
      */
     @PatchMapping("/{id}/status")
+    @Operation(summary = "Change a user's status (admin)",
+            description = "Changes a user's account status. The reason is mandatory and is stored on "
+                    + "the audit_log row written for the change. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Status changed"),
+            @ApiResponse(responseCode = "400", description = "Validation failed"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "User not found"),
+            @ApiResponse(responseCode = "409", description = "Self-targeting not allowed")
+    })
     public ResponseEntity<AdminUserResponse> updateStatus(
             Authentication authentication,
             @PathVariable @Positive(message = "User id must be positive") Long id,

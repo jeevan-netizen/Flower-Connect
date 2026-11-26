@@ -111,13 +111,13 @@ class AuthServiceTest {
             return saved;
         });
 
-        AuthResponse response = authService.register(request);
+        AuthService.AuthTokens tokens = authService.register(request);
 
-        assertNotNull(response);
-        assertEquals("access-token", response.getAccessToken());
-        assertEquals("refresh-token", response.getRefreshToken());
-        assertEquals("Bearer", response.getTokenType());
-        assertEquals(900000L, response.getExpiresIn());
+        assertNotNull(tokens.response());
+        assertEquals("access-token", tokens.response().getAccessToken());
+        assertEquals("refresh-token", tokens.refreshToken());
+        assertEquals("Bearer", tokens.response().getTokenType());
+        assertEquals(900000L, tokens.response().getExpiresIn());
 
         verify(userRepository).save(argThat(u -> com.flowerconnect.domain.User.Status.ACTIVE == u.getStatus()));
 
@@ -151,9 +151,9 @@ class AuthServiceTest {
             return saved;
         });
 
-        AuthResponse response = authService.register(request);
+        AuthService.AuthTokens tokens = authService.register(request);
 
-        assertNotNull(response);
+        assertNotNull(tokens.response());
         verify(userRepository).existsByEmail("test@example.com");
         verify(userRepository).save(argThat(u -> "test@example.com".equals(u.getEmail())));
     }
@@ -211,9 +211,9 @@ class AuthServiceTest {
             return saved;
         });
 
-        AuthResponse response = authService.register(request);
+        AuthService.AuthTokens tokens = authService.register(request);
 
-        assertNotNull(response);
+        assertNotNull(tokens.response());
         verify(userRepository, never()).existsByPhone(anyString());
         verify(userRepository).save(any(User.class));
     }
@@ -234,12 +234,12 @@ class AuthServiceTest {
         when(refreshTokenService.createRefreshToken(1L)).thenReturn("refresh-token");
         when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
 
-        AuthResponse response = authService.login(request);
+        AuthService.AuthTokens tokens = authService.login(request);
 
-        assertNotNull(response);
-        assertEquals("access-token", response.getAccessToken());
-        assertEquals("refresh-token", response.getRefreshToken());
-        assertEquals("Bearer", response.getTokenType());
+        assertNotNull(tokens.response());
+        assertEquals("access-token", tokens.response().getAccessToken());
+        assertEquals("refresh-token", tokens.refreshToken());
+        assertEquals("Bearer", tokens.response().getTokenType());
 
         verify(authenticationManager).authenticate(argThat(at -> "user@test.com".equals(at.getPrincipal())));
         verify(userRepository).findByIdWithRole(1L);
@@ -261,9 +261,9 @@ class AuthServiceTest {
         when(refreshTokenService.createRefreshToken(1L)).thenReturn("refresh-token");
         when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
 
-        AuthResponse response = authService.login(request);
+        AuthService.AuthTokens tokens = authService.login(request);
 
-        assertNotNull(response);
+        assertNotNull(tokens.response());
         verify(authenticationManager).authenticate(argThat(at -> "user@test.com".equals(at.getPrincipal())));
     }
 
@@ -361,11 +361,11 @@ class AuthServiceTest {
         when(jwtService.generateAccessToken(anyString(), anyString(), any())).thenReturn("new-access-token");
         when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
 
-        AuthResponse response = authService.refresh("old-refresh-token");
+        AuthService.AuthTokens tokens = authService.refresh("old-refresh-token");
 
-        assertNotNull(response);
-        assertEquals("new-access-token", response.getAccessToken());
-        assertEquals("new-refresh-token", response.getRefreshToken());
+        assertNotNull(tokens.response());
+        assertEquals("new-access-token", tokens.response().getAccessToken());
+        assertEquals("new-refresh-token", tokens.refreshToken());
 
         verify(refreshTokenService).validateAndReturnUser("old-refresh-token");
         verify(refreshTokenService).rotateRefreshToken("old-refresh-token");
@@ -403,9 +403,9 @@ class AuthServiceTest {
         when(refreshTokenService.createRefreshToken(2L)).thenReturn("refresh-token");
         when(jwtProperties.getAccessTtlMs()).thenReturn(900000L);
 
-        AuthResponse response = authService.login(request);
+        AuthService.AuthTokens tokens = authService.login(request);
 
-        assertNotNull(response);
+        assertNotNull(tokens.response());
         verify(jwtService).generateAccessToken(eq("user2@test.com"), eq("CUSTOMER"), any());
     }
 }

@@ -1,11 +1,18 @@
 package com.flowerconnect.payment.controller;
 
+import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.order.domain.Order;
 import com.flowerconnect.order.repository.OrderRepository;
 import com.flowerconnect.payment.dto.WebhookResponse;
 import com.flowerconnect.payment.provider.SimulatedPaymentProvider;
 import com.flowerconnect.payment.repository.PaymentRepository;
+import com.flowerconnect.repository.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -28,6 +35,7 @@ import jakarta.validation.constraints.Positive;
  * {@code POST /api/v1/payments/webhook}.
  */
 @Slf4j
+@Tag(name = "Payment simulator", description = "Test-mode pay/fail (simulated provider), !prod profile only, customer auth + ownership")
 @RequiredArgsConstructor
 @Profile("!prod")
 @RestController
@@ -35,18 +43,39 @@ import jakarta.validation.constraints.Positive;
 public class SimulatorController {
 
     private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
     private final SimulatedPaymentProvider provider;
 
     @PostMapping("/simulator/{orderId}/pay")
-    @Transactional(readOnly = true)
+    @Transactional
+    @Operation(summary = "Simulate a successful payment",
+            description = "Test-mode: delivers a successful provider event through the signed webhook path "
+                    + "for the authenticated customer's own order. Requires customer authentication and "
+                    + "order ownership. !prod profile only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Payment simulated"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Order belongs to another customer"),
+            @ApiResponse(responseCode = "404", description = "Order or payment not found")
+    })
     public ResponseEntity<WebhookResponse> pay(Authentication authentication,
                                                @PathVariable @Positive(message = "Order id must be positive") Long orderId) {
         return simulate(authentication, orderId, "pay");
     }
 
     @PostMapping("/simulator/{orderId}/fail")
-    @Transactional(readOnly = true)
+    @Transactional
+    @Operation(summary = "Simulate a failed payment",
+            description = "Test-mode: delivers a failed provider event through the signed webhook path "
+                    + "for the authenticated customer's own order. Requires customer authentication and "
+                    + "order ownership. !prod profile only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Payment failure simulated"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Order belongs to another customer"),
+            @ApiResponse(responseCode = "404", description = "Order or payment not found")
+    })
     public ResponseEntity<WebhookResponse> fail(Authentication authentication,
                                                 @PathVariable @Positive(message = "Order id must be positive") Long orderId) {
         return simulate(authentication, orderId, "fail");
@@ -55,7 +84,14 @@ public class SimulatorController {
     private ResponseEntity<WebhookResponse> simulate(Authentication authentication, Long orderId, String action) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
-        if (!order.getUser().getEmail().equals(authentication.getName())) {
+
+        // Resolve the authenticated customer by email (JWT subject) and compare
+        // user IDs via scalar queries, avoiding lazy-loading Order.user.
+        User actor = userRepository.findByEmailWithRole(authentication.getName())
+                .orElseThrow(() -> BusinessException.notFound("Authenticated user not found"));
+        Long orderCustomerId = orderRepository.findCustomerIdByOrderId(orderId)
+                .orElseThrow(() -> BusinessException.notFound("Order not found: " + orderId));
+        if (!orderCustomerId.equals(actor.getId())) {
             throw BusinessException.forbidden("Order " + orderId + " belongs to another customer");
         }
 

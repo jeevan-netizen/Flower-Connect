@@ -647,24 +647,37 @@ class AdminUserStatusIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String tokenFor(User user) throws Exception {
-        return login(user).getAccessToken();
+        MvcResult result = loginResult(user);
+        String body = result.getResponse().getContentAsString();
+        return objectMapper.readValue(body, AuthResponse.class).getAccessToken();
     }
 
     private String refreshTokenFromLogin(User user) throws Exception {
-        return login(user).getRefreshToken();
+        MvcResult result = loginResult(user);
+        return extractRefreshToken(result);
     }
 
-    private AuthResponse login(User user) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(LoginRequest.builder()
-                                .email(user.getEmail())
-                                .password(PASSWORD)
-                                .build())))
+    private MvcResult loginResult(User user) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(LoginRequest.builder()
+                        .email(user.getEmail())
+                        .password(PASSWORD)
+                        .build())))
                 .andExpect(status().isOk())
                 .andReturn();
-        return objectMapper.readValue(
-                result.getResponse().getContentAsString(), AuthResponse.class);
+    }
+
+    private String extractRefreshToken(MvcResult result) {
+        String setCookie = result.getResponse().getHeader("Set-Cookie");
+        if (setCookie == null) {
+            return null;
+        }
+        String cookiePart = setCookie.split(";")[0];
+        if (cookiePart.startsWith("refresh_token=")) {
+            return cookiePart.substring("refresh_token=".length());
+        }
+        return null;
     }
 
     private static String uniqueEmail() {

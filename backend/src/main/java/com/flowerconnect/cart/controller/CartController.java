@@ -48,7 +48,7 @@ public class CartController {
     private final CartService cartService;
 
     @Operation(summary = "Retrieve the caller's cart",
-            description = "Returns the authenticated customer's cart with per-item eligibility " +
+            description = "CUSTOMER. Returns the authenticated customer's cart with per-item eligibility " +
                     "flags (purchasable / notPurchasableReason) and per-vendor subtotals. " +
                     "An empty cart is returned if the customer has not added anything yet.")
     @ApiResponses({
@@ -62,7 +62,7 @@ public class CartController {
     }
 
     @Operation(summary = "Add or increment a line item",
-            description = "Adds a product to the caller's cart with the requested quantity. " +
+            description = "CUSTOMER. Adds a product to the caller's cart with the requested quantity. " +
                     "If the product is already in the cart, the quantity is incremented. " +
                     "The price snapshot is copied from the product's current base_price. " +
                     "Sufficient available stock is required; no reservation is made.")
@@ -86,7 +86,7 @@ public class CartController {
     }
 
     @Operation(summary = "Update a line item's quantity",
-            description = "Updates the quantity of one of the caller's cart items. " +
+            description = "CUSTOMER. Updates the quantity of one of the caller's cart items. " +
                     "A quantity of 0 deletes the line item. Increases are re-checked " +
                     "against current available stock.")
     @ApiResponses({
@@ -111,7 +111,7 @@ public class CartController {
     }
 
     @Operation(summary = "Remove a line item",
-            description = "Deletes one line item from the caller's cart. The cart itself " +
+            description = "CUSTOMER. Deletes one line item from the caller's cart. The cart itself " +
                     "is retained for future adds.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Item deleted"),
@@ -128,7 +128,7 @@ public class CartController {
     }
 
     @Operation(summary = "Clear the cart",
-            description = "Deletes every line item from the caller's cart. The cart row " +
+            description = "CUSTOMER. Deletes every line item from the caller's cart. The cart row " +
                     "itself is retained (empty) for future adds.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Cart cleared"),

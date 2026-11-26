@@ -9,7 +9,7 @@ COPY --chown=app:app .mvn/ ./.mvn/
 COPY --chown=app:app pom.xml ./
 COPY --chown=app:app src/ ./src/
 
-RUN chmod +x ./mvnw
+RUN sed -i 's/\r$//' ./mvnw && chmod +x ./mvnw
 
 FROM eclipse-temurin:17-jdk-alpine AS build
 

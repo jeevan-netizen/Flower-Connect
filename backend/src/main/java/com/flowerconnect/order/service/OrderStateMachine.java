@@ -181,7 +181,11 @@ public class OrderStateMachine {
         //    direct payment_status write that previously lived here.
         if (transition.sideEffect() == SideEffect.DELIVER &&
                 order.getPaymentMethod() == Order.PaymentMethod.COD) {
-            paymentService.collectPayment(order.getId());
+            if (actor != null) {
+                paymentService.collectPayment(order.getId(), actor.getEmail());
+            } else {
+                paymentService.collectPayment(order.getId());
+            }
         }
 
         // 8. Update the order status.

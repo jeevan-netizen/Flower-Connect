@@ -242,6 +242,9 @@ describe("application router", () => {
       "b2b/statements",
       "farmers",
       "farmer-links/:linkId/passbook",
+      "pos",
+      "analytics",
+      "reviews",
     ]);
   });
 
@@ -606,6 +609,8 @@ describe("admin route protection", () => {
       "orders/lookup",
       "disputes",
       "billing",
+      "reviews",
+      "analytics",
     ]);
   });
 

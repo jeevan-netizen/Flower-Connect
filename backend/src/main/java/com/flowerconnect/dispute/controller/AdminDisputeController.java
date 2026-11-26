@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -50,7 +51,7 @@ public class AdminDisputeController {
      * @return paginated dispute list
      */
     @Operation(summary = "List disputes",
-            description = "Returns one page of disputes, ordered newest first. Optional "
+            description = "ADMIN. Returns one page of disputes, ordered newest first. Optional "
                     + "status, from and to filters are supported.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Dispute queue page"),
@@ -76,7 +77,17 @@ public class AdminDisputeController {
      * private fields (customer email, vendor response, resolution note, refund amount).
      */
     @GetMapping("/{disputeId}")
-    public ResponseEntity<DisputeDetailResponse> getDispute(@PathVariable Long disputeId) {
+    @Operation(summary = "Get a dispute detail (admin)",
+            description = "ADMIN. Returns the full dispute record including private fields "
+                    + "(customer email, vendor response, resolution note, refund amount). "
+                    + "ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dispute detail"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Dispute not found")
+    })
+    public ResponseEntity<DisputeDetailResponse> getDispute(@PathVariable @Positive(message = "Dispute id must be positive") Long disputeId) {
         return ResponseEntity.ok(disputeService.getAdminDispute(disputeId));
     }
 
@@ -92,7 +103,7 @@ public class AdminDisputeController {
      *                           409 if dispute not resolvable or amount invalid
      */
     @Operation(summary = "Resolve a dispute",
-            description = "Resolves an OPEN or UNDER_REVIEW dispute to "
+            description = "ADMIN. Resolves an OPEN or UNDER_REVIEW dispute to "
                     + "RESOLVED_REFUND, RESOLVED_PARTIAL, or RESOLVED_REJECTED. "
                     + "Requires a resolution note. For refund outcomes, refundAmount is "
                     + "required and validated against the order total. For REJECTED, "
@@ -108,7 +119,7 @@ public class AdminDisputeController {
     @PostMapping("/{disputeId}/resolve")
     public ResponseEntity<DisputeDetailResponse> resolveDispute(
             Authentication authentication,
-            @PathVariable Long disputeId,
+            @PathVariable @Positive(message = "Dispute id must be positive") Long disputeId,
             @Valid @RequestBody ResolveDisputeRequest request) {
         DisputeDetailResponse response = disputeService.resolveDispute(
                 authentication.getName(), disputeId, request);

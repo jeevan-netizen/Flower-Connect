@@ -12,6 +12,7 @@ import com.flowerconnect.dispute.dto.VendorDisputeResponseRequest;
 import com.flowerconnect.dispute.event.DisputeOpened;
 import com.flowerconnect.dispute.event.DisputeResolved;
 import com.flowerconnect.dispute.repository.DisputeRepository;
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.order.domain.Order;
@@ -472,6 +473,7 @@ public class DisputeService {
         // Write audit log
         auditLogRepository.save(AuditLog.builder()
                 .actor(admin)
+                .actorType(AuditActorType.USER)
                 .actionType("DISPUTE_RESOLVED")
                 .entityType("DISPUTE")
                 .entityId(dispute.getId())

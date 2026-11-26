@@ -12,7 +12,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.core.annotation.Order;
+
 @Component
+@Order(10)
 @Slf4j
 public class AdminBootstrap implements ApplicationRunner {
 

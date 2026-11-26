@@ -48,7 +48,7 @@ public class B2BStatementController {
     private final B2BStatementService b2bStatementService;
 
     @Operation(summary = "Preview eligible orders for a statement",
-            description = "Returns the caller's delivered, unpaid orders for the selected buyer "
+            description = "FLORIST only. Returns the caller's delivered, unpaid orders for the selected buyer "
                     + "within the optional inclusive date range, plus their combined total. "
                     + "When omitted, {@code to} defaults to today and {@code from} defaults to "
                     + "15 days before {@code to}.")
@@ -66,7 +66,7 @@ public class B2BStatementController {
     }
 
     @Operation(summary = "Create a statement",
-            description = "Creates an {@code OPEN} statement from the currently eligible orders "
+            description = "FLORIST only. Creates an {@code OPEN} statement from the currently eligible orders "
                     + "for the caller (as seller) and the selected buyer. The total is computed "
                     + "server-side. Empty statements are rejected; concurrent creations cannot "
                     + "assign the same order to two statements.")
@@ -82,7 +82,7 @@ public class B2BStatementController {
     }
 
     @Operation(summary = "List the caller's statements",
-            description = "Returns the caller's statements as {@code SELLER} or {@code BUYER}, "
+            description = "FLORIST only. Returns the caller's statements as {@code SELLER} or {@code BUYER}, "
                     + "newest first. Page size is clamped to 1..100.")
     @GetMapping("/statements")
     public ResponseEntity<B2BStatementPageResponse> listStatements(
@@ -96,7 +96,7 @@ public class B2BStatementController {
     }
 
     @Operation(summary = "Read one statement",
-            description = "Returns a single statement. Only the seller or the buyer on the "
+            description = "FLORIST only. Returns a single statement. Only the seller or the buyer on the "
                     + "statement may read it.")
     @GetMapping("/statements/{statementId}")
     public ResponseEntity<B2BStatementResponse> getStatement(
@@ -108,7 +108,7 @@ public class B2BStatementController {
     }
 
     @Operation(summary = "Record payment for a statement",
-            description = "Seller only. Marks an {@code OPEN} statement {@code PAID} and marks "
+            description = "FLORIST only. Seller only. Marks an {@code OPEN} statement {@code PAID} and marks "
                     + "every linked order's {@code payment_status} {@code PAID} in one "
                     + "transaction. Full payment only; paying twice is rejected.")
     @PostMapping("/statements/{statementId}/payment")

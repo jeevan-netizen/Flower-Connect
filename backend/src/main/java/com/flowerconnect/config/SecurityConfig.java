@@ -118,6 +118,9 @@ public class SecurityConfig {
                  .requestMatchers(HttpMethod.POST, "/api/v1/orders/{orderId}/cancel")
                      .hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")
                  .requestMatchers("/api/v1/orders/**").hasRole("CUSTOMER")
+                 // Phase 12 customer review retrieval (task 12.2): a customer
+                 // fetches their own review; ownership is enforced in the service.
+                 .requestMatchers("/api/v1/reviews/**").hasRole("CUSTOMER")
 // Slot discovery endpoint - CUSTOMER only with address ownership and vendor approval checks in handler.
                   // The path must be written in the same shape as the controller's own mapping
                   // (SlotController: @RequestMapping("/api/v1/vendors") + @GetMapping("/{vendorId}/slots")).
@@ -129,30 +132,42 @@ public class SecurityConfig {
                    .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/slots").hasRole("CUSTOMER")
                    // Phase 8 customer disputes (task 8.4): customer raises/views own disputes.
                    .requestMatchers("/api/v1/disputes/**").hasRole("CUSTOMER")
-                   // Phase 6 vendor order API (task 6.2/6.4): the order action, list and summary
-                   // routes live under the singular /api/v1/vendor/ base, so they need their own
-                   // FLORIST rule alongside the plural /api/v1/vendors/** namespace used by the
-                   // catalog, inventory, profile and slots routes.
-                   .requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")
-                   // Farmer/vendor links owned by the authenticated florist's vendor (Stage 1 of
-                   // the farmer module). Declared before the broad /api/v1/vendor/** rule so it
-                   // matches first; both require FLORIST, ownership is enforced in the service.
-                   .requestMatchers("/api/v1/vendor/farmer-links/**").hasRole("FLORIST")
+                    // Phase 12 vendor analytics (task 12.5): the vendor's own
+                    // marketplace and POS analytics. FLORIST only; no approval
+                    // gate -- a suspended vendor can still read historical
+                    // analytics (D-6).
+                    .requestMatchers("/api/v1/vendor/analytics/**").hasRole("FLORIST")
+                    // Farmer/vendor links owned by the authenticated florist's vendor (Stage 1 of
+                    // the farmer module). Declared before the broad /api/v1/vendor/** rule so it
+                    // matches first; both require FLORIST, ownership is enforced in the service.
+                    .requestMatchers("/api/v1/vendor/farmer-links/**").hasRole("FLORIST")
                     // Phase 8 vendor disputes (task 8.4): vendor views/responds to disputes on their orders.
                     .requestMatchers("/api/v1/vendor/disputes/**").hasRole("FLORIST")
                     // Farmer/vendor collection decisions (Stage 3 of the farmer module): confirm and
                     // reject pending collections on the caller's vendor's links.
                     .requestMatchers("/api/v1/vendor/farmer-collections/**").hasRole("FLORIST")
+                    // Phase 6 vendor order API (task 6.2/6.4): the order action, list and summary
+                    // routes live under the singular /api/v1/vendor/ base, so they need their own
+                    // FLORIST rule alongside the plural /api/v1/vendors/** namespace used by the
+                    // catalog, inventory, profile and slots routes.
+                    .requestMatchers("/api/v1/vendor/**").hasRole("FLORIST")
                     // Phase 9 in-app notifications (task 9.2): every authenticated
-                   // role receives its own notifications, resolved from the JWT
-                   // subject. Ownership is enforced in the service layer, so no
-                   // route accepts a user id and cross-user access is impossible.
-                   .requestMatchers("/api/v1/notifications/**").hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")
+                    // role receives its own notifications, resolved from the JWT
+                    // subject. Ownership is enforced in the service layer, so no
+                    // route accepts a user id and cross-user access is impossible.
+                    .requestMatchers("/api/v1/notifications/**").hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")
+                    // Phase 11 POS (tasks 11.2, 11.3): walk-in sales for approved
+                    // vendors only. POS is commission-free and outside the ledger;
+                    // it is deliberately not gated by accepting_orders.
+                    .requestMatchers("/api/v1/pos/**").hasRole("FLORIST")
                 // Public customer discovery: storefront and product detail are readable
                 // anonymously; authorization/visibility is enforced per handler.
                 // These exceptions must precede the /api/v1/vendors/** FLORIST rule.
                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{id}/storefront").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/products/{id}").permitAll()
+                // Phase 12 public vendor reviews (task 12.2): readable without
+                // authentication for approved vendors; hidden reviews excluded.
+                .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/reviews").permitAll()
                 .requestMatchers("/api/v1/vendors/**").hasRole("FLORIST")
 // Phase 8 refund queue (task 8.3): admin-only listing of
                   // REFUND_PENDING payments and mark-refunded endpoint.
@@ -162,17 +177,29 @@ public class SecurityConfig {
                   // own namespaces below.
                   .requestMatchers("/api/v1/admin/disputes/**").hasRole("ADMIN")
                   .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                 .requestMatchers("/actuator/**").hasRole("ADMIN")
+                 // Actuator exposure is governed by management.endpoints.web.exposure.include
+                 // (application-prod.yml: health,info only). Non-exposed endpoints such as
+                 // metrics return 404 from the actuator layer; Spring Security must not
+                 // short-circuit them with 401/403, which would imply the endpoint exists
+                 // behind authentication. Health/info are permitAll above.
+                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(entryPoint)
                 .accessDeniedHandler(accessDeniedHandler)
             );
+        // Custom filters are all registered relative to UsernamePasswordAuthenticationFilter,
+        // which has a registered order (unlike the custom JwtAuthenticationFilter class).
+        // Call order determines the final sequence, so RateLimitFilter is added last so it
+        // runs after JWT authentication and can key sensitive endpoints by the authenticated
+        // principal rather than only by IP:
+        //   SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF
+        http.addFilterBefore(new SecurityHeadersFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
         if (rateLimitFilter != null) {
             http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         }
-        http.addFilterBefore(new JwtAuthenticationFilter(jwtService, userRepository, objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -199,7 +226,7 @@ public class SecurityConfig {
                 .toList();
         config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-FlowerConnect-Client"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

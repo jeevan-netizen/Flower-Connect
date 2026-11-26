@@ -13,7 +13,7 @@ describe("VendorCard", () => {
     expect(screen.getByText(/Koramangala, Bengaluru 560034/)).toBeInTheDocument();
     expect(screen.getByText("2.4 km away")).toBeInTheDocument();
     expect(screen.getByText("Ready in 30 min")).toBeInTheDocument();
-    expect(screen.getByText("4.5 (12 reviews)")).toBeInTheDocument();
+    expect(screen.getByText("4.5 stars (12 reviews)")).toBeInTheDocument();
   });
 
   it("reads as New for a florist with no rating yet", () => {

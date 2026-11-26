@@ -14,6 +14,10 @@ import type {
   RefundQueuePageResponse,
   RefundQueueFilters,
 } from "@/features/admin/types";
+import type {
+  AnalyticsDailyTrend,
+  AnalyticsOverviewResponse,
+} from "@/features/review/types";
 import { ADMIN_PAGE_SIZE } from "@/features/admin/types";
 
 /**
@@ -204,5 +208,52 @@ export async function adminCancelOrder(
     paymentStatus: string;
     refundPending: boolean;
   }>(`/orders/${orderId}/cancel`, { reason });
+  return response.data;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Analytics (plan Phase 12, task 12.4)                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `GET /api/v1/admin/analytics/overview` — summary metrics for a date range:
+ * delivered orders, marketplace sales, platform revenue, active
+ * vendors/customers, top vendors, dispute rate.
+ */
+export async function fetchAnalyticsOverview(
+  fromDate?: string,
+  toDate?: string,
+): Promise<AnalyticsOverviewResponse> {
+  const params: Record<string, string> = {};
+  if (fromDate) {
+    params.fromDate = fromDate;
+  }
+  if (toDate) {
+    params.toDate = toDate;
+  }
+  const response = await api.get<AnalyticsOverviewResponse>("/admin/analytics/overview", {
+    params,
+  });
+  return response.data;
+}
+
+/**
+ * `GET /api/v1/admin/analytics/daily-trends` — daily delivered-order trend
+ * series, zero-filled for days with no activity. Buckets are in UTC.
+ */
+export async function fetchAnalyticsDailyTrends(
+  fromDate?: string,
+  toDate?: string,
+): Promise<AnalyticsDailyTrend[]> {
+  const params: Record<string, string> = {};
+  if (fromDate) {
+    params.fromDate = fromDate;
+  }
+  if (toDate) {
+    params.toDate = toDate;
+  }
+  const response = await api.get<AnalyticsDailyTrend[]>("/admin/analytics/daily-trends", {
+    params,
+  });
   return response.data;
 }

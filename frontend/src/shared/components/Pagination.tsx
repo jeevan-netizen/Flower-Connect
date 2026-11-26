@@ -43,6 +43,7 @@ export function Pagination<T>({ page, onPageChange, disabled = false }: Paginati
           type="button"
           onClick={() => onPageChange(page.page - 1)}
           disabled={disabled || page.first || page.page === 0}
+          aria-disabled={disabled || page.first || page.page === 0}
           className={PAGE_BUTTON_CLASS}
         >
           Previous
@@ -51,6 +52,7 @@ export function Pagination<T>({ page, onPageChange, disabled = false }: Paginati
           type="button"
           onClick={() => onPageChange(page.page + 1)}
           disabled={disabled || page.last}
+          aria-disabled={disabled || page.last}
           className={PAGE_BUTTON_CLASS}
         >
           Next

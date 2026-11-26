@@ -18,6 +18,7 @@ package com.flowerconnect.billing.service;
 
 import com.flowerconnect.config.PlatformConfig;
 import com.flowerconnect.config.PlatformConfigRepository;
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.AuditLog;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.BusinessException;
@@ -99,6 +100,7 @@ public class PlatformConfigService {
 
         auditLogRepository.save(AuditLog.builder()
                 .actor(admin)
+                .actorType(AuditActorType.USER)
                 .actionType(actionType)
                 .entityType(ENTITY_TYPE)
                 .entityId(0L)

@@ -43,7 +43,7 @@ public class CheckoutController {
     private final CheckoutService checkoutService;
 
     @Operation(summary = "Generate a checkout quote",
-            description = "Validates the caller's cart against the provided address and per-vendor " +
+            description = "CUSTOMER. Validates the caller's cart against the provided address and per-vendor " +
                     "slot selection. Returns a per-shop breakdown with subtotals, delivery fees, " +
                     "platform fee, and the grand total. No side effects — no stock reservation, " +
                     "no order creation, no cart clearing. Price drift warnings are included so " +
@@ -67,7 +67,7 @@ public class CheckoutController {
     }
 
     @Operation(summary = "Place a checkout order",
-            description = "Validates the caller's cart, re-checks all prices and inventory under lock, " +
+            description = "CUSTOMER. Validates the caller's cart, re-checks all prices and inventory under lock, " +
                     "reserves stock, and creates one order per vendor. All-or-nothing: if any vendor " +
                     "fails validation, the entire checkout is rolled back. Requires a client-provided " +
                     "idempotency key ({@code clientOrderId}) and the {@code quoteHash} returned by " +

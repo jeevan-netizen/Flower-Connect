@@ -56,7 +56,7 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
     }
 
-    public AuthResponse register(RegisterRequest request) {
+    public AuthTokens register(RegisterRequest request) {
         String normalizedEmail = EmailNormalizer.normalize(request.getEmail());
         String normalizedPhone = request.getPhone() != null ? request.getPhone().trim() : null;
 
@@ -81,10 +81,10 @@ public class AuthService {
                 .build();
         userRepository.save(user);
 
-        return createAuthResponse(user);
+        return createAuthTokens(user);
     }
 
-    public AuthResponse login(LoginRequest request) {
+    public AuthTokens login(LoginRequest request) {
         String normalizedEmail = EmailNormalizer.normalize(request.getEmail());
         try {
             UsernamePasswordAuthenticationToken authToken =
@@ -103,13 +103,13 @@ public class AuthService {
                 throw new BadCredentialsException(AUTH_ERROR_MESSAGE);
             }
 
-            return createAuthResponse(user);
+            return createAuthTokens(user);
         } catch (BadCredentialsException e) {
             throw new BadCredentialsException(AUTH_ERROR_MESSAGE);
         }
     }
 
-    public AuthResponse refresh(String rawToken) {
+    public AuthTokens refresh(String rawToken) {
         User user = refreshTokenService.validateAndReturnUser(rawToken);
         String newRefreshToken = refreshTokenService.rotateRefreshToken(rawToken);
 
@@ -119,19 +119,23 @@ public class AuthService {
                 roleName,
                 List.of("ROLE_" + roleName));
 
-        return AuthResponse.of(accessToken, newRefreshToken, jwtProperties.getAccessTtlMs());
+        AuthResponse response = AuthResponse.of(accessToken, jwtProperties.getAccessTtlMs());
+        return new AuthTokens(response, newRefreshToken);
     }
 
     public void logout(String rawToken) {
         refreshTokenService.revokeRefreshToken(rawToken);
     }
 
-    private AuthResponse createAuthResponse(User user) {
+    private AuthTokens createAuthTokens(User user) {
         String roleName = user.getRole() != null ? user.getRole().getName() : "CUSTOMER";
         List<String> authorities = List.of("ROLE_" + roleName);
         String accessToken = jwtService.generateAccessToken(user.getEmail(), roleName, authorities);
         String refreshToken = refreshTokenService.createRefreshToken(user.getId());
 
-        return AuthResponse.of(accessToken, refreshToken, jwtProperties.getAccessTtlMs());
+        AuthResponse response = AuthResponse.of(accessToken, jwtProperties.getAccessTtlMs());
+        return new AuthTokens(response, refreshToken);
     }
+
+    public record AuthTokens(AuthResponse response, String refreshToken) {}
 }

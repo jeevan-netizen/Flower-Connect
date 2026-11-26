@@ -34,7 +34,7 @@ public class SmtpEmailSender implements EmailSender {
             message.setText(body);
             javaMailSender.send(message);
         } catch (Exception ex) {
-            log.error("Failed to send email to {}: {}", to, ex.getMessage(), ex);
+            log.error("Failed to send email: {}", ex.getMessage());
         }
     }
 

@@ -27,6 +27,11 @@ import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -42,11 +47,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
+/**
+ * Vendor billing ledger controller (plan Phase 10, task 10.4).
+ *
+ * <p>Endpoints are FLORIST-only and scoped to the calling vendor.
+ */
 @Slf4j
 @Validated
+@Tag(name = "Vendor billing ledger", description = "FLORIST-only: view your own ledger, outstanding balance, statement")
 @RestController
 @RequestMapping("/api/v1/vendor/billing")
 @RequiredArgsConstructor
@@ -58,6 +69,14 @@ public class VendorBillingLedgerController {
     private final StatementService statementService;
 
     @GetMapping("/ledger")
+    @Operation(summary = "List the vendor's ledger entries",
+            description = "Returns one page of the calling vendor's settlement entries "
+                    + "(attached and unattached) with optional date-range and type filters. FLORIST-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ledger page"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account")
+    })
     public ResponseEntity<SettlementEntryPageResponse> getLedger(
             Authentication authentication,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
@@ -76,6 +95,14 @@ public class VendorBillingLedgerController {
     }
 
     @GetMapping("/outstanding")
+    @Operation(summary = "Get the vendor's outstanding balance",
+            description = "Returns the calling vendor's signed outstanding balance. FLORIST-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Outstanding balance"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account"),
+            @ApiResponse(responseCode = "404", description = "Vendor not found")
+    })
     public ResponseEntity<OutstandingBalanceResponse> getOutstandingBalance(Authentication authentication) {
         User caller = userRepository.findByEmailWithRole(authentication.getName())
                 .orElseThrow(() -> BusinessException.unauthorized("Authenticated user not found"));
@@ -91,6 +118,16 @@ public class VendorBillingLedgerController {
     }
 
     @GetMapping("/statement")
+    @Operation(summary = "Download the vendor's statement CSV",
+            description = "Generates and downloads a CSV account statement for the calling vendor "
+                    + "over a date range. FLORIST-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "CSV statement"),
+            @ApiResponse(responseCode = "400", description = "Invalid date range"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not a FLORIST account"),
+            @ApiResponse(responseCode = "404", description = "Vendor not found")
+    })
     public ResponseEntity<byte[]> getStatement(
             Authentication authentication,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate periodStart,

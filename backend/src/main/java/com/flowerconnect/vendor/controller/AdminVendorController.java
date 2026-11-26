@@ -5,6 +5,11 @@ import com.flowerconnect.vendor.dto.VendorAdminReasonRequest;
 import com.flowerconnect.vendor.dto.VendorProfilePageResponse;
 import com.flowerconnect.vendor.dto.VendorProfileResponse;
 import com.flowerconnect.vendor.service.VendorAdminService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -27,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Slf4j
 @Validated
+@Tag(name = "Admin vendor management", description = "ADMIN-only: approve, reject, suspend, reinstate and list vendors")
 @RestController
 @RequestMapping("/api/v1/admin/vendors")
 @RequiredArgsConstructor
@@ -38,6 +44,14 @@ public class AdminVendorController {
      * Lists vendors, optionally filtered by approval status.
      */
     @GetMapping
+    @Operation(summary = "List vendors (admin)",
+            description = "Returns one page of vendor profiles, optionally filtered by "
+                    + "approval status. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vendor page"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account")
+    })
     public ResponseEntity<VendorProfilePageResponse> listVendors(
             @RequestParam(required = false) VendorProfile.Status status,
             @RequestParam(required = false) @Min(0) Integer page,
@@ -50,6 +64,15 @@ public class AdminVendorController {
     }
 
     @PostMapping("/{id}/approve")
+    @Operation(summary = "Approve a pending vendor",
+            description = "Approves a PENDING_APPROVAL vendor. Writes an audit-log row. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vendor approved"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Vendor not found"),
+            @ApiResponse(responseCode = "409", description = "Illegal transition")
+    })
     public ResponseEntity<VendorProfileResponse> approve(
             Authentication authentication,
             @PathVariable @Positive(message = "Vendor profile id must be positive") Long id) {
@@ -57,6 +80,17 @@ public class AdminVendorController {
     }
 
     @PostMapping("/{id}/reject")
+    @Operation(summary = "Reject a pending vendor",
+            description = "Rejects a PENDING_APPROVAL vendor; a non-blank reason is required. "
+                    + "Writes an audit-log row. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vendor rejected"),
+            @ApiResponse(responseCode = "400", description = "Reason missing"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Vendor not found"),
+            @ApiResponse(responseCode = "409", description = "Illegal transition")
+    })
     public ResponseEntity<VendorProfileResponse> reject(
             Authentication authentication,
             @PathVariable @Positive(message = "Vendor profile id must be positive") Long id,
@@ -66,6 +100,17 @@ public class AdminVendorController {
     }
 
     @PostMapping("/{id}/suspend")
+    @Operation(summary = "Suspend a vendor",
+            description = "Suspends an APPROVED vendor; a non-blank reason is required. "
+                    + "In-flight orders continue (D-6). Writes an audit-log row. ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vendor suspended"),
+            @ApiResponse(responseCode = "400", description = "Reason missing"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Vendor not found"),
+            @ApiResponse(responseCode = "409", description = "Illegal transition")
+    })
     public ResponseEntity<VendorProfileResponse> suspend(
             Authentication authentication,
             @PathVariable @Positive(message = "Vendor profile id must be positive") Long id,
@@ -75,6 +120,16 @@ public class AdminVendorController {
     }
 
     @PostMapping("/{id}/reinstate")
+    @Operation(summary = "Reinstate a suspended vendor",
+            description = "Reinstates a SUSPENDED vendor to APPROVED. Writes an audit-log row. "
+                    + "ADMIN-only.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vendor reinstated"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an ADMIN account"),
+            @ApiResponse(responseCode = "404", description = "Vendor not found"),
+            @ApiResponse(responseCode = "409", description = "Illegal transition")
+    })
     public ResponseEntity<VendorProfileResponse> reinstate(
             Authentication authentication,
             @PathVariable @Positive(message = "Vendor profile id must be positive") Long id) {

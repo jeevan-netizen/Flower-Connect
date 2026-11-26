@@ -26,9 +26,11 @@ import com.flowerconnect.billing.dto.FinalizeSettlementRequest;
 import com.flowerconnect.billing.dto.RunSettlementRequest;
 import com.flowerconnect.billing.service.SettlementService;
 import com.flowerconnect.config.TestClockConfig;
+import com.flowerconnect.domain.AuditActorType;
 import com.flowerconnect.domain.Role;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorProfile;
+import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.test.RoleBoundaryTester;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -91,13 +93,24 @@ class AdminSettlementControllerTest {
     @MockBean
     private SettlementService settlementService;
 
+    @MockBean
+    private UserRepository userRepository;
+
     private RoleBoundaryTester roleBoundaryTester;
     private VendorProfile vendor;
     private Settlement settlement;
+    private User adminUser;
 
     @BeforeEach
     void setUp() {
         roleBoundaryTester = new RoleBoundaryTester(mockMvc);
+
+        adminUser = User.builder()
+                .id(1L)
+                .email("admin@flowerconnect.com")
+                .build();
+        when(userRepository.findByEmailWithRole("admin@flowerconnect.com"))
+                .thenReturn(java.util.Optional.of(adminUser));
 
         vendor = VendorProfile.builder()
                 .id(10L)
@@ -137,7 +150,8 @@ class AdminSettlementControllerTest {
                 .periodEnd(LocalDate.of(2026, 10, 18))
                 .build();
 
-        when(settlementService.runSettlement(10L, req.getPeriodStart(), req.getPeriodEnd()))
+        when(settlementService.runSettlement(10L, req.getPeriodStart(), req.getPeriodEnd(),
+                AuditActorType.USER, adminUser))
                 .thenReturn(settlement);
 
         mockMvc.perform(post("/api/v1/admin/billing/settlements/run")
@@ -161,7 +175,8 @@ class AdminSettlementControllerTest {
                 .periodEnd(LocalDate.of(2026, 10, 18))
                 .build();
 
-        when(settlementService.runSettlementForAllVendors(req.getPeriodStart(), req.getPeriodEnd()))
+        when(settlementService.runSettlementForAllVendors(req.getPeriodStart(), req.getPeriodEnd(),
+                AuditActorType.USER, adminUser))
                 .thenReturn(List.of(settlement));
 
         mockMvc.perform(post("/api/v1/admin/billing/settlements/run")

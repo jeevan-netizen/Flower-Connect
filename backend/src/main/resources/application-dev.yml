@@ -73,6 +73,10 @@ app:
     max-dimension: 1600
     max-pixels: 40000000
     jpeg-quality: 0.85
+  seed:
+    enabled: ${APP_SEED_ENABLED:true}
+    demo-password: ${DEMO_USER_PASSWORD:${DEMO_PASSWORD:}}
+    admin-email: ${ADMIN_EMAIL:}
 
 logging:
   level:

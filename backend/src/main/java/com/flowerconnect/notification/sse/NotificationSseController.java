@@ -3,6 +3,10 @@ package com.flowerconnect.notification.sse;
 import com.flowerconnect.domain.User;
 import com.flowerconnect.exception.BusinessException;
 import com.flowerconnect.repository.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +34,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * connection.
  */
 @Slf4j
+@Tag(name = "Notifications SSE", description = "Authenticated SSE stream of the caller's own notifications (any authenticated role)")
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
@@ -39,6 +44,15 @@ public class NotificationSseController {
     private final UserRepository userRepository;
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Open a notification SSE stream",
+            description = "Opens a Server-Sent Events stream delivering the authenticated caller's own "
+                    + "notification updates. The recipient is derived from the JWT subject; no user id "
+                    + "is accepted, so cross-user subscription is not expressible.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "SSE stream opened"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Not an authenticated account")
+    })
     public SseEmitter stream(Authentication authentication, HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-cache, no-transform");
         response.setHeader("Connection", "keep-alive");

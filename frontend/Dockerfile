@@ -35,6 +35,6 @@ USER app
 EXPOSE 5173
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=20 \
-  CMD ["node", "-e", "fetch('http://localhost:5173/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+  CMD ["node", "-e", "const proto = (process.env.TLS_CERT && process.env.TLS_KEY) ? 'https' : 'http'; process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; fetch(`${proto}://localhost:${process.env.PORT || 5173}/`).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
 
 ENTRYPOINT ["node", "server.mjs"]

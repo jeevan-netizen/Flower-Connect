@@ -119,8 +119,6 @@ class SearchServiceTest {
                 .thenReturn(List.of(nearProduct, farProduct, outOfRangeProduct));
         when(inventoryRepository.findAllByProductIdIn(any())).thenReturn(List.of(
                 inventory(100L, 10, 0), inventory(200L, 10, 0), inventory(300L, 10, 0)));
-        when(productImageRepository.findByProductIdOrderBySortOrderAscIdAsc(100L)).thenReturn(List.of());
-        when(productImageRepository.findByProductIdOrderBySortOrderAscIdAsc(200L)).thenReturn(List.of());
 
         PageResponse<PublicProductResponse> response = searchService.search(1L, null, null, null, null, "distance", null, 0, 20);
 
@@ -146,7 +144,6 @@ class SearchServiceTest {
                 .thenReturn(List.of(active, draft));
         when(inventoryRepository.findAllByProductIdIn(any())).thenReturn(List.of(
                 inventory(100L, 10, 0), inventory(200L, 10, 0)));
-        when(productImageRepository.findByProductIdOrderBySortOrderAscIdAsc(100L)).thenReturn(List.of());
         PageResponse<PublicProductResponse> response = searchService.search(1L, null, null, null, null, null, null, 0, 20);
 
         assertThat(response.getContent()).hasSize(1);
@@ -169,7 +166,6 @@ class SearchServiceTest {
                 .thenReturn(List.of(inStock, outOfStock));
         when(inventoryRepository.findAllByProductIdIn(any())).thenReturn(List.of(
                 inventory(100L, 10, 0), inventory(200L, 0, 0)));
-        when(productImageRepository.findByProductIdOrderBySortOrderAscIdAsc(100L)).thenReturn(List.of());
 
         PageResponse<PublicProductResponse> response = searchService.search(1L, null, null, null, null, null, null, 0, 20);
 
@@ -198,10 +194,6 @@ class SearchServiceTest {
         when(inventoryRepository.findAllByProductIdIn(any())).thenReturn(List.of(
                 inventory(100L, 10, 0), inventory(200L, 10, 0),
                 inventory(300L, 10, 0), inventory(400L, 10, 0), inventory(500L, 10, 0)));
-        // Only the two products on page 0 are rendered, so only their image
-        // lookups happen.
-        when(productImageRepository.findByProductIdOrderBySortOrderAscIdAsc(100L)).thenReturn(List.of());
-        when(productImageRepository.findByProductIdOrderBySortOrderAscIdAsc(200L)).thenReturn(List.of());
 
         PageResponse<PublicProductResponse> page0 = searchService.search(1L, null, null, null, null, "name", null, 0, 2);
         assertThat(page0.getContent()).hasSize(2);

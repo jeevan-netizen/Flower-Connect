@@ -27,9 +27,13 @@ public class AuditLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "actor_user_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "actor_user_id", nullable = true)
     private User actor;
+
+    @Column(name = "actor_type", length = 16, nullable = false)
+    @Enumerated(EnumType.STRING)
+    private AuditActorType actorType;
 
     @Column(name = "action_type", length = 64, nullable = false)
     private String actionType;

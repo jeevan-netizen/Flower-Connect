@@ -57,7 +57,7 @@ public class B2BOrderController {
     private final B2BEbillService b2bEbillService;
 
     @Operation(summary = "Search other approved vendors",
-            description = "Returns approved vendors (excluding the caller) whose business name "
+            description = "FLORIST only. Returns approved vendors (excluding the caller) whose business name "
                     + "matches the optional query. Only approved vendors may be sellers in a B2B order.")
     @GetMapping("/sellers")
     public ResponseEntity<List<SellerSummary>> searchSellers(
@@ -69,7 +69,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "List a seller's orderable products",
-            description = "Returns the seller's ACTIVE products with catalog price and available "
+            description = "FLORIST only. Returns the seller's ACTIVE products with catalog price and available "
                     + "stock, for building a B2B order.")
     @GetMapping("/sellers/{sellerId}/products")
     public ResponseEntity<List<B2BProductSummary>> listSellerProducts(
@@ -82,7 +82,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "Place a B2B order",
-            description = "Creates a new PLACED order from the authenticated buyer to the selected "
+            description = "FLORIST only. Creates a new PLACED order from the authenticated buyer to the selected "
                     + "seller. Validates that the buyer is not the seller, every product belongs to "
                     + "the seller and is active, and quantities are positive with sufficient stock. "
                     + "Prices and totals are computed server-side and snapshotted.")
@@ -97,7 +97,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "List the caller's B2B orders",
-            description = "Returns the caller's orders as buyer or seller, newest first. "
+            description = "FLORIST only. Returns the caller's orders as buyer or seller, newest first. "
                     + "Optional status and role filters. Page size is clamped to 1..100.")
     @GetMapping("/orders")
     public ResponseEntity<B2BOrderPageResponse> listOrders(
@@ -113,7 +113,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "Read one B2B order",
-            description = "Returns a single B2B order. Only the buyer or the seller may read it.")
+            description = "FLORIST only. Returns a single B2B order. Only the buyer or the seller may read it.")
     @GetMapping("/orders/{orderId}")
     public ResponseEntity<B2BOrderResponse> getOrder(
             Authentication authentication,
@@ -123,7 +123,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "Accept a PLACED order",
-            description = "Seller only. Moves the order to ACCEPTED and deducts seller stock "
+            description = "FLORIST only. Seller only. Moves the order to ACCEPTED and deducts seller stock "
                     + "through the inventory service. Rejected with INSUFFICIENT_STOCK if stock "
                     + "is no longer sufficient.")
     @PostMapping("/orders/{orderId}/accept")
@@ -135,7 +135,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "Reject a PLACED order",
-            description = "Seller only. Moves the order to REJECTED with an optional reason.")
+            description = "FLORIST only. Seller only. Moves the order to REJECTED with an optional reason.")
     @PostMapping("/orders/{orderId}/reject")
     public ResponseEntity<B2BOrderResponse> reject(
             Authentication authentication,
@@ -147,7 +147,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "Cancel a B2B order",
-            description = "Buyer may cancel a PLACED order; either party may cancel an ACCEPTED "
+            description = "FLORIST only. Buyer may cancel a PLACED order; either party may cancel an ACCEPTED "
                     + "order, in which case the seller's deducted stock is restored. No "
                     + "cancellation after SHIPPED.")
     @PostMapping("/orders/{orderId}/cancel")
@@ -161,7 +161,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "Ship an ACCEPTED order",
-            description = "Seller only. Moves the order to SHIPPED. Requires a shipment reference; "
+            description = "FLORIST only. Seller only. Moves the order to SHIPPED. Requires a shipment reference; "
                     + "accepts an optional shipped-date note.")
     @PostMapping("/orders/{orderId}/ship")
     public ResponseEntity<B2BOrderResponse> ship(
@@ -173,7 +173,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "Deliver a SHIPPED order",
-            description = "Seller only. Moves the order to DELIVERED. The buyer's inventory is not "
+            description = "FLORIST only. Seller only. Moves the order to DELIVERED. The buyer's inventory is not "
                     + "increased; payment remains UNPAID in Stage 1.")
     @PostMapping("/orders/{orderId}/deliver")
     public ResponseEntity<B2BOrderResponse> deliver(
@@ -184,7 +184,7 @@ public class B2BOrderController {
     }
 
     @Operation(summary = "Download the e-bill PDF",
-            description = "Returns the e-bill PDF for a delivered B2B order. Only the buyer or the "
+            description = "FLORIST only. Returns the e-bill PDF for a delivered B2B order. Only the buyer or the "
                     + "seller on the order may download it; only DELIVERED orders have an e-bill. "
                     + "The response is application/pdf with a download filename based on the bill "
                     + "number.")

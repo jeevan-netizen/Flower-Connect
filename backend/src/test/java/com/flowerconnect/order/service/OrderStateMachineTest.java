@@ -48,6 +48,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
@@ -142,7 +144,7 @@ class OrderStateMachineTest {
         when(userRepository.findById(11L)).thenReturn(Optional.of(vendorUser));
         when(userRepository.findById(12L)).thenReturn(Optional.of(adminUser));
         when(orderItemRepository.findByOrderId(1L)).thenReturn(List.of(orderItem));
-        when(paymentService.collectPayment(any(Long.class))).thenAnswer(inv -> {
+        when(paymentService.collectPayment(any(Long.class), anyString())).thenAnswer(inv -> {
             order.setPaymentStatus(Order.PaymentStatus.COLLECTED);
             return null;
         });

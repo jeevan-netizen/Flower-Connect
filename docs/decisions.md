@@ -2773,3 +2773,236 @@ Keep `query === undefined` as the disabled sentinel (used when a search input is
 
 
 
+
+## D-63: POS idempotency semantics (Phase 11 task 11.2)
+
+**Status:** Accepted
+**Date:** Phase 11 Stage 1
+
+### Context
+
+Task 11.2 requires a quick-sale endpoint with an idempotency key against double submit. The key questions: what happens on replay, what header carries the key, how a same-key/different-body request is handled, and what concurrent identical requests produce.
+
+### Decision
+
+- **Required header `Idempotency-Key`.** A missing or non-canonical-UUID key returns 400 `VALIDATION_FAILED`. Key format/length are validated before any stock or database work.
+- **Replay returns the original response.** A completed sale with the same key and the same request fingerprint returns the stored transaction (re-queried items) and deducts nothing.
+- **Same key, different body â†’ 409.** The request fingerprint is the SHA-256 hex of the canonical body (sorted `productId:quantity` + `paymentMethod`). A mismatch rejects with `CONFLICT`.
+- **Same key, in-progress â†’ 409.** A row exists but `completed_at` is null, meaning a concurrent sale with the same key is mid-flight.
+- **Concurrent identical requests â†’ exactly one sale.** All writers serialize on the unique `(vendor_id, idempotency_key)` constraint. The loser rolls back its own deduction (releasing locks) and replays the winner's stored response, or receives a clean 409 if the payload differs.
+- **Transaction boundary.** The idempotency check, the stock lock, the deduction, the `pos_transactions` insert and the `pos_items` insert are all one `@Transactional` unit. Stock is never negative and never double-deducted.
+
+### Consequences
+
+- The idempotency key identifies the *sale attempt*, not the product set. A new ticket requires a new key; a retry after a network failure reuses the same key.
+- The unique constraint is the authority for "exactly one sale"; the application-level fingerprint check is the authority for "same body".
+- Stock deductions happen only after the idempotency/record check passes and after inventory rows are locked.
+
+## D-64: POS available-stock rule (Phase 11 task 11.3)
+
+**Status:** Accepted
+**Date:** Phase 11 Stage 1
+
+### Context
+
+Task 11.3 requires POS to draw from the same stock pool as marketplace orders, under the same locking discipline, while never consuming units reserved for pending orders.
+
+### Decision
+
+- **Sellability gate.** A product must exist (else 404), belong to the calling vendor (else 403), be `ACTIVE` and not expired (`expiryDate != null && expiryDate < today`, where `today` is `LocalDate.now(clock)` in the vendor's business zone, else 409), and have an inventory row (else 409).
+- **Available stock only.** `available = quantity âˆ’ reservedQuantity`. A sale may consume only available stock; it must never take units reserved for marketplace orders. If any line is short, return 409 `INSUFFICIENT_STOCK` naming the short product and persist nothing (all-or-nothing).
+- **Locking discipline.** Inventory rows are locked with `SELECT ... FOR UPDATE` via `InventoryRepository.findByProductIdForUpdate`, ordered by ascending product ID, exactly as checkout/accept/cancellation do (D-24). Ownership and sellability are checked *before* locking, so a foreign vendor cannot stall another vendor's row.
+- **One movement per line.** Each deducted line writes one `stock_movements` row of type `SALE_POS`, delta `-quantity`, `reference_id` = POS transaction id, `reference_type` = `pos-transaction`, actor = authenticated vendor. All through `InventoryService`/`StockService` â€” POS never writes inventory fields directly and never creates a second locking path.
+- **Duplicate product IDs** in one request are merged (quantities summed) and validated once.
+
+### Consequences
+
+- POS and marketplace sales race fairly for the last unit: exactly one succeeds; stock is never negative nor over-reserved.
+- Reserved units are invisible to POS: a product with `quantity = reservedQuantity` shows `available = 0` and is refused.
+
+## D-65: POS summary time-zone rule (Phase 11 task 11.5)
+
+**Status:** Accepted
+**Date:** Phase 11 Stage 1
+
+### Context
+
+Task 11.5 requires daily/weekly POS reports. The question: what does "today" mean, given vendors are in a single business time zone while timestamps persist in UTC.
+
+### Decision
+
+- **"Today" is the calendar day in the vendor's service-location `timezone`** (the `service_locations.timezone` column added in V13 per D-5), computed at report time from the injected `Clock`. UTC timestamps are converted to local day boundaries using that zone; the day is [local midnight, next local midnight) mapped back to a UTC half-open interval.
+- **Date ranges are validated and capped** (max 365 days) before querying.
+- Reports use `PosTransactionRepository.findByVendorIdAndCreatedAtBetween(vendorId, fromUtc, toUtc, pageable)`.
+
+### Consequences
+
+- A sale at 23:30 UTC that is still the same local calendar day counts in "today"; a sale just after local midnight starts the next day.
+- Fake-clock tests can verify boundaries at instants immediately before and after local midnight.
+
+## D-66: POS commission-free separation (Phase 11 task 11.5)
+
+**Status:** Accepted
+**Date:** Phase 11 Stage 1
+
+### Context
+
+Plan section 6.4 states POS is commission-free and outside the marketplace ledger: it creates no commission rows, `settlement_entries`, payment rows, or order/order-item rows, and POS revenue is reported separately from marketplace revenue.
+
+### Decision
+
+- **No ledger footprint.** A POS sale creates only `pos_transactions` and `pos_items`. It calls neither the order state machine nor `PaymentService`, and creates no commission, settlement-entry, payment, order or order-item row.
+- **Separate reporting.** POS revenue is reported in its own APIs/UI, labeled "commission-free", and is never netted into marketplace revenue (commission + platform fees from `orders`/`settlement_entries`).
+- **Payment methods are labels only.** `CASH`, `CARD`, `UPI` are stored as a `payment_method` label; no gateway, card, UPI or refund processing exists in v1.
+# #   D - 6 3 :   P O S   i d e m p o t e n c y   s e m a n t i c s   ( P h a s e   1 1   t a s k   1 1 . 2 )  
+ # #   D - 6 4 :   P O S   a v a i l a b l e - s t o c k   r u l e   ( P h a s e   1 1   t a s k   1 1 . 3 )  
+ # #   D - 6 5 :   P O S   s u m m a r y   t i m e - z o n e   r u l e   ( P h a s e   1 1   t a s k   1 1 . 5 )  
+ # #   D - 6 6 :   P O S   c o m m i s s i o n - f r e e   s e p a r a t i o n   ( P h a s e   1 1   t a s k   1 1 . 5 )  
+ 
+## D-67: Explicit endpoint access matrix + fail-closed sweep (Phase 13 Stage 1, task 13.6)
+
+**Status:** Accepted
+**Date:** Phase 13 Stage 1 (task 13.6)
+
+### Context
+
+Phase 13 Stage 1 requires a security hardening sweep: document every registered handler's intended role-based access, verify coverage is fail-closed (no handler uncovered, no duplicate rows), and exercise the real Spring Security filter chain across all roles rather than trusting slice tests.
+
+D-13 established that `@RequiresApprovedVendor` is per-handler and inert in `@WebMvcTest` slices, so method-level gating cannot be verified by a slice. The URL-layer rules live in `SecurityConfig`. No single source of truth previously listed every handler with its expected per-role status.
+
+### Decision
+
+- **`EndpointAccessMatrix.java`** (test-only, `com.flowerconnect.security`) is the single source of truth: `AccessRule` enum (ANY_AUTH, CUSTOMER, FLORIST, ADMIN, PUBLIC), `Entry` record (method, pathPattern, rule, per-role statuses, note, testPath), and a complete `ENTRIES` list covering every handler across all controllers (auth, users, locations, vendors, admin, cart, checkout, orders, analytics, billing, reviews, dispute, pos, images).
+- **`EndpointAccessSweepIT.java`** (test-only, `com.flowerconnect.security`) is a fail-closed coverage test: every registered handler (reflected from `RequestMappingInfo`) is covered by exactly one matrix row; no duplicate entries; every entry has a rule; a catch-all rule exists. 5 tests pass.
+- **`EndpointAccessMatrixRbacTest.java`** (test-only, `com.flowerconnect.security`) exercises the real filter chain via `MockMvc` seeded through `login()` for CUSTOMER/FLORIST/ADMIN plus anonymous, iterating all entries Ã— 4 roles, asserting exact 401/403 deny cases and non-401 allow cases. Infra paths (`/actuator`, `/swagger-ui`, `/v3/api-docs`) are handled leniently (springdoc oddity). All roleÃ—entry assertions pass.
+
+### Consequences
+
+- No production code changed; no migration.
+- The matrix is the maintenance reference: when a new handler is added, add a matching `Entry` to `ENTRIES` or the sweep test fails (fail-closed).
+- Because `@RequiresApprovedVendor` is inert in slices, the RBAC test uses `@SpringBootTest`+the real `SecurityFilterChain`, matching the D-13 rationale that method security must be verified at integration level.
+- `/api/v1/users/me` (GET/PATCH) and `/api/v1/users/me/password` (POST) resolve to ANY_AUTH (subject-resolved self-service, no `/api/v1/users/**` matcher) rather than CUSTOMER-only â€” the matrix reflects this and the RBAC test asserts it.
+
+### Verification
+
+- Backend unit suite: 1386/1386 pass, BUILD SUCCESS.
+- Sweep test: 5/5 pass.
+- RBAC test: all roleÃ—entry assertions pass.
+- Full integration suite: not re-run end-to-end (each Spring context ~15s; >1200 tests exceeds a single session window); key acceptance tests pass individually.
+
+
+## D-68: Rate limiting — per-profile activation, per-user/IP keys, config-driven limits, Caffeine per-instance
+
+**Status:** Accepted
+**Date:** Phase 13 Stage 4 (task 13.1)
+
+### Context
+
+Phase 13 Stage 1 required a rate-limit review and extension (plan §13). The Phase 1 `RateLimitFilter` existed but was inactive by default (`app.rate-limit.enabled` never set; `matchIfMissing=false`), only covered login/register/forgot-reset/webhook, trusted `X-Forwarded-For`/`X-Real-IP` unconditionally (IP spoofing), logged full request bodies (including passwords), bypassed entirely when the body had no email, and ran before `JwtAuthenticationFilter` so it could not key by authenticated user. Sensitive mutating endpoints (checkout, dispute creation, review submission, address creation, cart mutations, image uploads, POS sale) had no rate limit at all.
+
+### Decision
+
+- **Per-profile activation:** `app.rate-limit.enabled` gates the filter via `@ConditionalOnProperty`. Set to `true` in base `application.yml` (dev) and `application-prod.yml` (prod); `application-test.yml` keeps it `false` so existing integration tests are unaffected; the dedicated `application-rate-limit-test.yml` enables it with low limits for fast tests.
+- **Key strategy:** sensitive endpoints are keyed by the authenticated principal (JWT subject/email) so each user has an independent bucket, with a client-IP fallback for unauthenticated calls. Anonymous endpoints (login/register/forgot/reset) are keyed by email-from-body plus IP; a missing email no longer bypasses — it falls back to IP. Webhook is keyed by IP. Keys are SHA-256 hashes of the identifier (never raw email/token in logs or tests).
+- **Trusted proxies only:** `app.rate-limit.trusted-proxies` (default empty) lists proxy IPs/CIDRs whose `X-Forwarded-For`/`X-Real-IP` are honored. Empty by default ? `remoteAddr` is used ? safe-by-default, no IP spoofing via forged headers.
+- **No body logging:** the filter never logs request bodies or emails; only path and hashed key at debug.
+- **No multipart buffering:** upload bodies are never read or buffered by the filter; they pass through untouched.
+- **Filter ordering:** rate-limit filter registered before `UsernamePasswordAuthenticationFilter` (which has a registered order), after `SecurityHeadersFilter` and `JwtAuthenticationFilter`, so order is `SecurityHeadersFilter -> JwtAuthenticationFilter -> RateLimitFilter -> UPAMF` and the principal is available at rate-limit time.
+- **Limits in configuration only:** every threshold and window is a `RateLimitProperties` field (`app.rate-limit.auth.*`, `app.rate-limit.webhookRequestsPerHour`, `app.rate-limit.sensitive.*`). None are hard-coded in the filter or services. Sensitive endpoints: checkout 30/h, checkout/quote 60/h, dispute create 10/h, review submit 20/h, address create 20/h, cart mutation 60/h, image upload 30/h, POS sale 300/h. These are starting values chosen to avoid blocking normal workflows; they are documented as tunable and may be revisited with real usage.
+- **No shared store / Redis:** per-instance Caffeine buckets (expire-after-access 2h, max 10k). Limits are not globally consistent across multiple backend instances — acceptable for v1 single-instance, revisit if the service scales. No CAPTCHA (out of scope).
+
+### Consequences
+
+- Rate limiting is now active in dev and prod (was previously off). Limits are starting values; POS sale bursts or heavy cart usage in dev could hit them, but all are configurable with no code change.
+- `@RequiresApprovedVendor` remains inert in `@WebMvcTest` slices (D-13); rate-limit behavior is verified at integration level against the real filter chain.
+- No Flyway migration; no production code behavior change beyond activating and extending rate limiting.
+
+### Verification
+
+- `RateLimitFilterUnitTest` (8 tests): disabled pass-through, under/over limit, 429 body + `Retry-After`, authenticated-user key isolation, IP key isolation, trusted proxy honoring `X-Forwarded-For`, untrusted proxy ignoring it, multipart passthrough — all pass.
+- `RateLimitIntegrationTest` (8 tests) against real MySQL + production filter chain: sensitive endpoint rate limiting by authenticated user, user key isolation, anonymous IP isolation, 429 status + `Retry-After` + `RATE_LIMITED` code, regression of existing auth rate limits — all pass.
+- Backend unit suite: 1402/1402 pass, BUILD SUCCESS.
+
+
+## D-69: Audit-log coverage — typed actor model (USER / SYSTEM) for settlement run, refund pending, COD collection
+
+**Status:** Accepted
+**Date:** Phase 13 Stage 6 (task 13.5)
+
+### Context
+
+Phase 13 Stage 6 requires an audit-log coverage sweep. The existing `audit_log` table (V6 migration) is written by admin operations: vendor approval/rejection/suspension/reinstatement, user status changes, category mutations, platform and vendor commission rate changes, payment refunds, review hide/unhide, dispute resolution, and settlement finalization. Three security-sensitive mutations lacked audit rows: settlement cycle creation (`runSettlement`), payment refund-pending marking (`markRefundPending`), and COD payment collection (`collectPayment`). In addition, the weekly scheduled settlement run (via `SettlementScheduler`) had no audit row at all, which the plan's rule that "admin and settlement actions appear in the audit log" (plan §13, §14) requires to be closed.
+
+### Decision
+
+**Typed actor model:** audit rows carry an explicit `actor_type` (`USER` or `SYSTEM`) rather than inferring the actor from a nullable email. This avoids hiding missing user attribution behind a null email.
+
+- **Migration `V32__add_audit_log_actor_type.sql`:** adds `actor_type ENUM('USER','SYSTEM') NOT NULL DEFAULT 'USER'` to `audit_log`, makes `actor_user_id` nullable, and adds CHECK constraint `ck_audit_log_actor_user_consistency` enforcing `actor_type='USER' ? actor_user_id NOT NULL` and `actor_type='SYSTEM' ? actor_user_id IS NULL`. Existing rows default to USER; no data migration needed.
+- **New enum `com.flowerconnect.domain.AuditActorType`** (`USER`, `SYSTEM`).
+- **`AuditLog` entity:** added `actorType` field (`@Enumerated(EnumType.STRING)`), made `actor` optional (`nullable = true`).
+- **Settlement run:** `SettlementService.runSettlement` / `runSettlementForAllVendors` gained overloaded methods accepting `AuditActorType` + nullable `User actor`. Default (no-actor) overloads use SYSTEM. Admin-initiated runs pass USER + real user; scheduled scheduler runs pass SYSTEM + null actor. Every newly created settlement writes a `SETTLEMENT_CREATED` audit row. No fake or login-capable SYSTEM user is created.
+- **Refund pending:** `PaymentService.markRefundPending` gained an overloaded method accepting `String actorEmail`. Writes `PAYMENT_REFUND_PENDING` audit row as USER when actor email is non-null. Called from `CancellationService.cancel` with the authenticated caller's email.
+- **COD collection:** `PaymentService.collectPayment` gained an overloaded method accepting `String actorEmail`. Writes `PAYMENT_COLLECTED` audit row as USER when actor email is non-null. Called from `OrderStateMachine.transition` during DELIVERED (actor always a VENDOR user, non-null).
+- **Actor resolution:** from `userRepository.findByEmailWithRole(email)`. All audit writes join the same transaction; rollback on business transaction rollback.
+- **Intentionally unaudited:** dispute raise/respond, review submit/reply, order placement, POS sale (commission-free, D-66), and order status transitions (recorded in `order_status_history`, a separate append-only table). These are customer/vendor self-service actions or business actions with their own entity-level timestamps; adding audit rows would require schema or workflow changes and was deemed out of scope for this stage.
+
+### Consequences
+
+- Three new audit action types: `SETTLEMENT_CREATED`, `PAYMENT_REFUND_PENDING`, `PAYMENT_COLLECTED` (entity types `SETTLEMENT`, `PAYMENT`, `PAYMENT`).
+- Additive Flyway migration `V32`; no schema change to existing data; no existing audit behavior modified (all existing rows remain USER).
+- Actor email is nullable to accommodate system-initiated runs (settlement scheduler) where no real user exists.
+- Audit failures behave consistently with existing code — they join the same transaction and roll back with it.
+- All existing `AuditLog.builder()` call sites (DisputeService, PlatformConfigService, CategoryService, VendorAdminService, ReviewService, UserStatusService, AdminCommissionRateController) now explicitly set `actorType=AuditActorType.USER`.
+
+### Verification
+
+- `SettlementServiceTest`: new audit tests (admin-initiated run writes `SETTLEMENT_CREATED` as USER; system-initiated run writes `SETTLEMENT_CREATED` as SYSTEM with no user FK).
+- `PaymentServiceTest`: new audit tests (`collectPayment` with/without actor email; `markRefundPending` with/without actor email).
+- `SettlementCycleIntegrationTest`: 2/2 pass against real MySQL (end-to-end cycle writes both USER finalize and SYSTEM create audits; CHECK constraint rejects invalid actor_type/user-reference combinations).
+- `PaymentIntegrationTest`: 7/7 pass against real MySQL.
+- Backend unit suite: 2822/2822 pass, BUILD SUCCESS.
+- Backend compile: clean.
+
+
+## D-70: Dev demo seed data runner design and activation (Phase 14 Stage 1, task 14.5)
+
+### Context
+
+Phase 14 Stage 1 introduces rich, deterministic seed data for developer demonstrations, local UI inspection, and automated end-to-end testing. The dataset must cover realistic marketplace state (approved, pending, and suspended vendors; multi-level categories; catalog products with stock, near-expiry, low-stock, and images; customers with addresses; full order lifecycles including cancellations, refunds, and disputes; reviews; POS sales; and billing settlements).
+
+Hard architectural constraints:
+1. Seed code must never run in `prod` or `test` profiles.
+2. The runner must be strictly idempotent — repeated startup must not duplicate rows or corrupt totals.
+3. No raw SQL or repository bypasses: business records must be created strictly through service-layer methods and state machines to validate domain rules.
+4. No network dependencies or external hotlinking: images must be generated locally and documented with clear licensing.
+5. No passwords or secrets committed or printed.
+
+### Decision
+
+1. **Activation:**
+   - Dedicated Spring component `DemoSeedRunner` annotated with `@Profile("dev")`, `@ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true", matchIfMissing = true)`, and `@Order(100)`.
+   - `application.yml`, `application-prod.yml`, and `application-test.yml` explicitly configure `app.seed.enabled: false`. `application-dev.yml` enables it via `${APP_SEED_ENABLED:true}`.
+   - Activation tests (`DemoSeedActivationTest`) assert bean exclusion in `prod` and `test` profiles, and inclusion only under `dev` with `app.seed.enabled=true`.
+2. **Idempotency & Service-Layer Orchestration:**
+   - `DemoSeedService` orchestrates creation through existing domain services (`VendorService`, `CategoryService`, `ProductService`, `InventoryService`, `ProductImageService`, `AuthService`, `AddressService`, `CartService`, `CheckoutService`, `PaymentService`, `OrderStateMachine`, `CancellationService`, `DisputeService`, `ReviewService`, `PosService`, `SettlementService`).
+   - Idempotency checks rely on unique identifiers (e.g. `userRepository.existsByEmail`, `categoryRepository.findBySlug`, `inventoryRepository.findByProductId`, `orderRepository.findByUserIdOrderByCreatedAtDesc`, `settlementRepository.findByVendorIdAndPeriodStartAndPeriodEnd`).
+   - Re-running `seedAll()` executes safely and asserts zero row delta across all 13 underlying tables.
+3. **Procedural Local Images:**
+   - In-memory flower image generator `DemoImageGenerator` creates valid 400x400 JPEG images using Java 2D Graphics with smooth antialiased petals, stems, and banners.
+   - Images are uploaded through `ProductImageService` using `InMemoryMultipartFile`, satisfying `ImageValidationService` constraints without external dependencies.
+   - Provenance and Apache 2.0 licensing are recorded in `docs/credits.md`.
+4. **Secrets Management:**
+   - Dev credentials use environment variables `DEMO_PASSWORD` / `DEMO_USER_PASSWORD` and `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+   - If `DEMO_PASSWORD` is unset, the runner logs a clear warning and skips execution without failing the boot. No secrets are committed, printed in logs, or exposed via public endpoints.
+
+### Consequences
+
+- Local development boot with `dev` profile and `DEMO_PASSWORD` automatically populates a rich, representative marketplace.
+- Production and test environments are strictly isolated and never execute seed code.
+- Resetting the database is handled via clean container reset (`docker compose down -v && docker compose up -d`).
+
+### Verification
+
+- `DemoSeedActivationTest`: 4/4 pass (verifies exclusion in prod/test and activation in dev).
+- `DemoSeedRunnerUnitTest`: 3/3 pass (verifies image generation and skip on missing password).
+- `DemoSeedIntegrationTest`: 1/1 pass against real MySQL (verifies full dataset coverage, stock reconciliation, billing & settlement reconciliation, and zero row drift on re-run).

@@ -6,6 +6,7 @@ import com.flowerconnect.farmer.dto.FarmerCollectionResponse;
 import com.flowerconnect.farmer.dto.PassbookResponse;
 import com.flowerconnect.farmer.service.FarmerCollectionService;
 import com.flowerconnect.repository.VendorProfileRepository;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,9 @@ public class VendorCollectionController {
     /**
      * Returns the passbook for a link belonging to the caller's vendor.
      */
+    @Operation(summary = "Get farmer-link passbook (vendor view)",
+            description = "FLORIST only. Returns the passbook for a farmer-vendor link belonging to "
+                    + "the authenticated vendor: link summary, balance, and combined deposit/collection history.")
     @GetMapping("/farmer-links/{linkId}/passbook")
     public ResponseEntity<PassbookResponse> passbook(Authentication authentication,
                                                      @PathVariable Long linkId) {
@@ -44,6 +48,9 @@ public class VendorCollectionController {
      * Lists collections on the caller's vendor's links, narrowed by status
      * (defaults to {@code PENDING}).
      */
+    @Operation(summary = "List collections on the vendor's links",
+            description = "FLORIST only. Returns collection requests on the authenticated vendor's farmer links, "
+                    + "filtered by status (defaults to PENDING).")
     @GetMapping("/farmer-collections")
     public ResponseEntity<List<FarmerCollectionResponse>> listCollections(Authentication authentication,
                                                                           @RequestParam(required = false)
@@ -56,6 +63,9 @@ public class VendorCollectionController {
     /**
      * Confirms a pending collection belonging to the caller's vendor.
      */
+    @Operation(summary = "Confirm a pending collection",
+            description = "FLORIST only. Marks a PENDING collection as CONFIRMED on a link belonging to "
+                    + "the authenticated vendor.")
     @PostMapping("/farmer-collections/{paymentId}/confirm")
     public ResponseEntity<FarmerCollectionResponse> confirm(Authentication authentication,
                                                             @PathVariable Long paymentId) {
@@ -66,6 +76,9 @@ public class VendorCollectionController {
     /**
      * Rejects a pending collection belonging to the caller's vendor.
      */
+    @Operation(summary = "Reject a pending collection",
+            description = "FLORIST only. Marks a PENDING collection as REJECTED on a link belonging to "
+                    + "the authenticated vendor.")
     @PostMapping("/farmer-collections/{paymentId}/reject")
     public ResponseEntity<FarmerCollectionResponse> reject(Authentication authentication,
                                                            @PathVariable Long paymentId) {

@@ -8,6 +8,7 @@ import com.flowerconnect.farmer.dto.FarmerVendorResponse;
 import com.flowerconnect.farmer.service.FarmerLinkService;
 import com.flowerconnect.repository.UserRepository;
 import com.flowerconnect.repository.VendorProfileRepository;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,9 @@ public class FarmerLinkController {
      * Registers a farmer account. Public entry point; the client then signs in
      * through {@code POST /api/v1/auth/login}.
      */
+    @Operation(summary = "Register a farmer account",
+            description = "PUBLIC. Creates a new FARMER account. No authentication required. "
+                    + "The client then signs in through POST /api/v1/auth/login.")
     @PostMapping("/register")
     public ResponseEntity<FarmerRegisterResponse> register(
             @Valid @RequestBody FarmerRegisterRequest request) {
@@ -51,6 +55,9 @@ public class FarmerLinkController {
      * Lists vendors eligible to receive a link request (approved vendors), with
      * the caller's link status when one exists.
      */
+    @Operation(summary = "List vendors eligible for a link request",
+            description = "AUTHENTICATED FARMER only. Returns approved vendors (excluding those already linked), "
+                    + "with the caller's existing link status when one exists.")
     @GetMapping("/vendors")
     public ResponseEntity<List<FarmerVendorResponse>> listEligibleVendors(Authentication authentication,
                                                                           @RequestParam(required = false) String query) {
@@ -61,6 +68,9 @@ public class FarmerLinkController {
     /**
      * Creates a {@code PENDING} link request from the caller to a vendor.
      */
+    @Operation(summary = "Request a farmer-vendor link",
+            description = "AUTHENTICATED FARMER only. Creates a PENDING link request from the authenticated "
+                    + "farmer to the specified vendor.")
     @PostMapping("/links")
     public ResponseEntity<FarmerLinkResponse> requestLink(Authentication authentication,
                                                           @Valid @RequestBody FarmerLinkRequest request) {
@@ -72,6 +82,8 @@ public class FarmerLinkController {
     /**
      * Lists only the authenticated farmer's own links.
      */
+    @Operation(summary = "List the caller's farmer-vendor links",
+            description = "AUTHENTICATED FARMER only. Returns all links belonging to the authenticated farmer.")
     @GetMapping("/links")
     public ResponseEntity<List<FarmerLinkResponse>> listFarmerLinks(Authentication authentication) {
         Long farmerId = farmerId(authentication);

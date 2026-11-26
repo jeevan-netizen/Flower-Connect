@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import type { DiscoveryVendor } from "@/features/customer/types";
 import {
-  formatCustomerRating,
   formatDistanceKm,
   formatMoney,
   formatPrepTime,
 } from "@/features/customer/format";
+import { StarRating } from "@/features/review/components/StarRating";
 import { AnimatedCard } from "@/motion/AnimatedCard";
 import { PRESSABLE } from "@/motion/pressable";
 
@@ -57,7 +57,10 @@ export function VendorCard({ vendor }: VendorCardProps) {
           <div className="col-span-2">
             <dt className="text-xs uppercase tracking-wide text-slate-500">Rating</dt>
             <dd className="font-medium text-slate-900">
-              {formatCustomerRating(vendor.avgRating, vendor.reviewCount)}
+              <StarRating
+                rating={vendor.avgRating}
+                reviewCount={vendor.reviewCount}
+              />
             </dd>
           </div>
         </dl>

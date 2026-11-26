@@ -5,6 +5,7 @@ import com.flowerconnect.farmer.dto.FarmerDepositRequest;
 import com.flowerconnect.farmer.dto.FarmerDepositResponse;
 import com.flowerconnect.farmer.service.FarmerDepositService;
 import com.flowerconnect.repository.VendorProfileRepository;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,9 @@ public class FarmerDepositController {
      *
      * <p>Requires an {@code ACTIVE} link owned by the caller's vendor.
      */
+    @Operation(summary = "Record a flower deposit on a link",
+            description = "FLORIST only. Records a flower deposit entry on the given ACTIVE farmer-vendor link. "
+                    + "The link must belong to the authenticated vendor.")
     @PostMapping("/{linkId}/deposits")
     public ResponseEntity<FarmerDepositResponse> recordDeposit(Authentication authentication,
                                                                @PathVariable Long linkId,

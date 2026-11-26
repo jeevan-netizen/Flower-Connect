@@ -96,7 +96,7 @@ public class CancellationService {
         boolean refundPending = false;
         if (updated.getPaymentMethod() == PaymentMethod.ONLINE
                 && updated.getPaymentStatus() == PaymentStatus.PAID) {
-            paymentService.markRefundPending(updated.getId());
+            paymentService.markRefundPending(updated.getId(), authenticatedEmail);
             refundPending = true;
         }
 

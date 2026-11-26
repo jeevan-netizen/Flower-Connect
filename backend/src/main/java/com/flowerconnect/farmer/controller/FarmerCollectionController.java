@@ -5,6 +5,7 @@ import com.flowerconnect.farmer.dto.FarmerCollectionResponse;
 import com.flowerconnect.farmer.dto.PassbookResponse;
 import com.flowerconnect.farmer.service.FarmerCollectionService;
 import com.flowerconnect.repository.UserRepository;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,9 @@ public class FarmerCollectionController {
      * Returns the passbook for the caller's own link: link summary, outstanding
      * balance and a combined deposit/collection entry list with running balance.
      */
+    @Operation(summary = "Get farmer-link passbook (farmer view)",
+            description = "AUTHENTICATED FARMER only. Returns the passbook for the caller's own link: "
+                    + "link summary, outstanding balance, and a combined deposit/collection entry list.")
     @GetMapping("/{linkId}/passbook")
     public ResponseEntity<PassbookResponse> passbook(Authentication authentication,
                                                      @PathVariable Long linkId) {
@@ -45,6 +49,9 @@ public class FarmerCollectionController {
      * Requests a {@code PENDING} collection on the caller's own {@code ACTIVE}
      * link. At most one {@code PENDING} collection may exist per link.
      */
+    @Operation(summary = "Request a collection on a link",
+            description = "AUTHENTICATED FARMER only. Creates a PENDING collection request on the caller's "
+                    + "own ACTIVE farmer-vendor link. At most one PENDING collection may exist per link.")
     @PostMapping("/{linkId}/collections")
     public ResponseEntity<FarmerCollectionResponse> requestCollection(Authentication authentication,
                                                                       @PathVariable Long linkId,
