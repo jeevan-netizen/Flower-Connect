@@ -37,11 +37,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WebhookControllerStandaloneTest {
 
     private static final String SECRET = "test-webhook-secret-key-for-testing-phase-3-plus-at-least-32-chars";
+    private static final Instant FIXED_NOW = Instant.parse("2026-11-26T12:00:00Z");
 
     private WebhookSignatureService signatureService() {
         AppProperties app = new AppProperties();
         app.setWebhookSecret(SECRET);
-        return new WebhookSignatureService(app, Clock.fixed(Instant.now(), ZoneOffset.UTC));
+        return new WebhookSignatureService(app, Clock.fixed(FIXED_NOW, ZoneOffset.UTC));
     }
 
     private static byte[] hmac(String secret, String data) {
@@ -66,7 +67,7 @@ class WebhookControllerStandaloneTest {
             .providerEventId(providerEventId).paymentGroupId(paymentGroupId)
             .eventType("payment.succeeded").outcome(outcome).amount(new BigDecimal("299.00")).build();
         String body = new ObjectMapper().writeValueAsString(event);
-        long now = Instant.now().getEpochSecond();
+        long now = FIXED_NOW.getEpochSecond();
         String signature = "v1=" + hex(hmac(SECRET, Long.toString(now) + body));
         String content = tamperBody ? "{\"tampered\":true}" : body;
         return mvc.perform(post("/api/v1/payments/webhook")
@@ -85,7 +86,7 @@ class WebhookControllerStandaloneTest {
         AppProperties app = new AppProperties();
         app.setWebhookSecret(SECRET);
         WebhookController controller = new WebhookController(
-            service, new WebhookSignatureService(app, Clock.fixed(Instant.now(), ZoneOffset.UTC)), app,
+            service, signatureService(), app,
             new ObjectMapper());
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
@@ -102,7 +103,7 @@ class WebhookControllerStandaloneTest {
         AppProperties app = new AppProperties();
         app.setWebhookSecret(SECRET);
         WebhookController controller = new WebhookController(
-            service, new WebhookSignatureService(app, Clock.fixed(Instant.now(), ZoneOffset.UTC)), app,
+            service, signatureService(), app,
             new ObjectMapper());
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
