@@ -46,13 +46,11 @@ export function B2BPlaceOrderPage() {
     query || undefined,
   );
 
-  const sellerProducts = selectedSeller
-    ? useSellerProducts(selectedSeller.vendorId)
-    : { data: [], isPending: false, error: null };
+  const sellerProducts = useSellerProducts(selectedSeller?.vendorId ?? null);
 
   const products: B2BProductSummary[] = sellerProducts.data ?? [];
-  const productsPending = selectedSeller && sellerProducts.isPending;
-  const productsError = selectedSeller ? sellerProducts.error : null;
+  const productsPending = sellerProducts.isPending;
+  const productsError = sellerProducts.error;
 
   // Ensure every shown product has a line entry.
   useCallback(() => {

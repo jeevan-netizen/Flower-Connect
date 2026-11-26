@@ -58,7 +58,7 @@ describe("B2BStatementsPage", () => {
   });
 
   it("previews eligible orders and creates a statement", async () => {
-    mockUseB2BStatementPreview.mockReturnValueOnce({
+    mockUseB2BStatementPreview.mockReturnValue({
       data: {
         orders: [{ id: 1, orderNo: "B2B-1", status: "DELIVERED", paymentStatus: "UNPAID", total: 1823, deliveredAt: "2026-11-24T10:00:00", buyerId: 7, sellerId: 11 }],
         totalAmount: 1823,
@@ -70,11 +70,13 @@ describe("B2BStatementsPage", () => {
     renderWithProviders(<B2BStatementsPage />, { route: "/vendor/b2b/statements" });
 
     fireEvent.click(screen.getByRole("combobox", { name: /buyer/i }));
-    fireEvent.click(screen.getByText("Buyer Florist"));
+    fireEvent.change(screen.getByRole("combobox", { name: /buyer/i }), {
+      target: { value: "7" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /preview/i }));
 
     await waitFor(() => expect(screen.getByText("#B2B-1")).toBeInTheDocument());
-    expect(screen.getByText(/1,823\.00/)).toBeInTheDocument();
+    expect(screen.getAllByText(/1,823\.00/)).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: /create statement/i }));
     await waitFor(() => expect(screen.getByText(/STM-1001/)).toBeInTheDocument());

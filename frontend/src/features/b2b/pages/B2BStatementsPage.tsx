@@ -114,7 +114,7 @@ export function B2BStatementsPage() {
       });
       setActionError(null);
       setSelectedStatement(statement);
-      setView("list");
+      setView("detail");
     } catch (caught) {
       setActionError({ message: toApiError(caught).message });
     }
@@ -180,10 +180,11 @@ export function B2BStatementsPage() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="col-span-full sm:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="statement-buyer-select">
                   Buyer
                 </label>
                 <select
+                  id="statement-buyer-select"
                   value={buyerId ?? ""}
                   onChange={(event) =>
                     setBuyerId(event.target.value === "" ? null : Number(event.target.value))
@@ -199,10 +200,11 @@ export function B2BStatementsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="statement-from-date">
                   From
                 </label>
                 <input
+                  id="statement-from-date"
                   type="date"
                   value={fromDate}
                   onChange={(event) => setFromDate(event.target.value)}
@@ -210,10 +212,11 @@ export function B2BStatementsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="statement-to-date">
                   To
                 </label>
                 <input
+                  id="statement-to-date"
                   type="date"
                   value={toDate}
                   onChange={(event) => setToDate(event.target.value)}

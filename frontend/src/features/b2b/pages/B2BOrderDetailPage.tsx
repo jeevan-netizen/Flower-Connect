@@ -205,7 +205,7 @@ export function B2BOrderDetailPage() {
       )}
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         <div className="flex flex-wrap justify-between items-end gap-4">
-          <PageHeading title={`Order #${order.id}`} description={order.orderNo} />
+          <PageHeading title={`Order #${order.id}`} description={`#${order.orderNo}`} />
           <button
             type="button"
             onClick={() => navigate("/vendor/b2b/orders")}
@@ -366,40 +366,30 @@ export function B2BOrderDetailPage() {
               change goes to the backend state machine.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {allowedActions.map((action) => (
-                <button
-                  key={action}
-                  type="button"
-                  disabled={isActing}
-                  onClick={() =>
-                    void confirmAction(
-                      action as "accept" | "reject" | "cancel" | "ship" | "deliver",
-                    )
-                  }
-                  className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                    action === "accept"
-                      ? "border-brand-600 bg-brand-50 text-brand-900 hover:bg-brand-100"
-                      : action === "reject" || action === "cancel"
-                      ? "border-red-600 bg-red-50 text-red-900 hover:bg-red-100"
-                      : "border-slate-600 bg-slate-50 text-slate-900 hover:bg-slate-100"
-                  } disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
-                >
-                  {isActing ? "Working…" : actionLabel(action)}
-                </button>
-              ))}
-              {canDownloadEbill && (
-                <button
-                  type="button"
-                  disabled={isActing}
-                  onClick={downloadEbill}
-                  className="rounded-md border border-brand-600 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-900 hover:bg-brand-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isActing ? "Downloading…" : "Download e-bill"}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        {allowedActions.map((action) => (
+          <button
+            key={action}
+            type="button"
+            disabled={isActing}
+            onClick={() =>
+              void confirmAction(
+                action as "accept" | "reject" | "cancel" | "ship" | "deliver",
+              )
+            }
+            className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+              action === "accept"
+                ? "border-brand-600 bg-brand-50 text-brand-900 hover:bg-brand-100"
+                : action === "reject" || action === "cancel"
+                ? "border-red-600 bg-red-50 text-red-900 hover:bg-red-100"
+                : "border-slate-600 bg-slate-50 text-slate-900 hover:bg-slate-100"
+            } disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+          >
+            {isActing ? "Working…" : actionLabel(action)}
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
 
         {allowedActions.length === 0 && !isTerminalStatus(order.status) && (
           <p className="text-sm text-slate-500">
@@ -407,21 +397,27 @@ export function B2BOrderDetailPage() {
           </p>
         )}
 
-        {isTerminalStatus(order.status) && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            <p className="font-semibold">Order complete</p>
-            <p className="mt-1 text-sm">
-              {`This order is ${B2B_ORDER_STATUS_LABELS[order.status]}`}{" "}
-              and no further action is available.
-            </p>
-          </div>
-        )}
-
-        {canDownloadEbill && (
-          <p className="text-xs text-slate-500">
-            The e-bill is available because the order is delivered.
-          </p>
-        )}
+  {isTerminalStatus(order.status) && (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+      <p className="font-semibold">Order complete</p>
+      <p className="mt-1 text-sm">
+        {`This order is ${B2B_ORDER_STATUS_LABELS[order.status]}`}{" "}
+        and no further action is available.
+      </p>
+      {canDownloadEbill && (
+        <div className="mt-3">
+          <button
+            type="button"
+            disabled={isActing}
+            onClick={downloadEbill}
+            className="rounded-md border border-brand-600 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-900 hover:bg-brand-100 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isActing ? "Downloading…" : "Download e-bill"}
+          </button>
+        </div>
+      )}
+    </div>
+  )}
 
         <div className="mt-6 flex justify-end">
           <button

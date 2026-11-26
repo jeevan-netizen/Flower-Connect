@@ -38,7 +38,7 @@ export async function fetchSellers(
   query?: string | null,
   signal?: AbortSignal,
 ): Promise<SellerSummary[]> {
-  const response = await api.get<SellerSummary[]>("/b2b/sellers", {
+  const response = await api.get<SellerSummary[]>("/vendors/b2b/sellers", {
     params: query ? { query } : undefined,
     signal,
   });
@@ -54,7 +54,7 @@ export async function fetchSellerProducts(
   signal?: AbortSignal,
 ): Promise<B2BProductSummary[]> {
   const response = await api.get<B2BProductSummary[]>(
-    `/b2b/sellers/${sellerId}/products`,
+    `/vendors/b2b/sellers/${sellerId}/products`,
     { signal },
   );
   return response.data;
@@ -78,7 +78,7 @@ export async function placeB2BOrder(
       quantity,
     }),
   );
-  const response = await api.post<B2BOrderResponse>("/b2b/orders", {
+  const response = await api.post<B2BOrderResponse>("/vendors/b2b/orders", {
     sellerId: payload.sellerId,
     items,
     orderNote: payload.orderNote ?? null,
@@ -105,7 +105,7 @@ export async function fetchB2BOrders(
     params.status = filters.status;
   }
 
-  const response = await api.get<B2BOrderPageResponse>("/b2b/orders", {
+  const response = await api.get<B2BOrderPageResponse>("/vendors/b2b/orders", {
     params,
     signal,
   });
@@ -114,7 +114,7 @@ export async function fetchB2BOrders(
 
 /** `GET /api/v1/vendors/b2b/orders/{orderId}` — one B2B order. */
 export async function fetchB2BOrder(orderId: number): Promise<B2BOrderResponse> {
-  const response = await api.get<B2BOrderResponse>(`/b2b/orders/${orderId}`);
+  const response = await api.get<B2BOrderResponse>(`/vendors/b2b/orders/${orderId}`);
   return response.data;
 }
 
@@ -123,7 +123,7 @@ export async function acceptB2BOrder(
   orderId: number,
 ): Promise<B2BOrderResponse> {
   const response = await api.post<B2BOrderResponse>(
-    `/b2b/orders/${orderId}/accept`,
+    `/vendors/b2b/orders/${orderId}/accept`,
   );
   return response.data;
 }
@@ -137,7 +137,7 @@ export async function rejectB2BOrder(
   reason: string,
 ): Promise<B2BOrderResponse> {
   const response = await api.post<B2BOrderResponse>(
-    `/b2b/orders/${orderId}/reject`,
+    `/vendors/b2b/orders/${orderId}/reject`,
     { reason },
   );
   return response.data;
@@ -152,7 +152,7 @@ export async function cancelB2BOrder(
   reason: string,
 ): Promise<B2BOrderResponse> {
   const response = await api.post<B2BOrderResponse>(
-    `/b2b/orders/${orderId}/cancel`,
+    `/vendors/b2b/orders/${orderId}/cancel`,
     { reason },
   );
   return response.data;
@@ -167,7 +167,7 @@ export async function shipB2BOrder(
   shipmentReference: string,
 ): Promise<B2BOrderResponse> {
   const response = await api.post<B2BOrderResponse>(
-    `/b2b/orders/${orderId}/ship`,
+    `/vendors/b2b/orders/${orderId}/ship`,
     { shipmentReference },
   );
   return response.data;
@@ -178,7 +178,7 @@ export async function deliverB2BOrder(
   orderId: number,
 ): Promise<B2BOrderResponse> {
   const response = await api.post<B2BOrderResponse>(
-    `/b2b/orders/${orderId}/deliver`,
+    `/vendors/b2b/orders/${orderId}/deliver`,
   );
   return response.data;
 }
@@ -189,7 +189,7 @@ export async function deliverB2BOrder(
  * triggering a download.
  */
 export async function fetchB2BEbill(orderId: number): Promise<Blob> {
-  const response = await api.get<Blob>(`/b2b/orders/${orderId}/e-bill`, {
+  const response = await api.get<Blob>(`/vendors/b2b/orders/${orderId}/e-bill`, {
     responseType: "blob",
   });
   return response.data;
@@ -219,7 +219,7 @@ export async function previewB2BStatement(
   }
 
   const response = await api.get<B2BStatementPreviewResponse>(
-    "/b2b/statements/preview",
+    "/vendors/b2b/statements/preview",
     { params, signal },
   );
   return response.data;
@@ -232,7 +232,7 @@ export async function previewB2BStatement(
 export async function createB2BStatement(
   payload: CreateB2BStatementRequest,
 ): Promise<B2BStatementResponse> {
-  const response = await api.post<B2BStatementResponse>("/b2b/statements", {
+  const response = await api.post<B2BStatementResponse>("/vendors/b2b/statements", {
     buyerId: payload.buyerId,
     from: payload.from ?? null,
     to: payload.to ?? null,
@@ -260,7 +260,7 @@ export async function fetchB2BStatements(
     params.role = filters.role;
   }
 
-  const response = await api.get<B2BStatementPageResponse>("/b2b/statements", {
+  const response = await api.get<B2BStatementPageResponse>("/vendors/b2b/statements", {
     params,
     signal,
   });
@@ -272,7 +272,7 @@ export async function fetchB2BStatement(
   statementId: number,
 ): Promise<B2BStatementResponse> {
   const response = await api.get<B2BStatementResponse>(
-    `/b2b/statements/${statementId}`,
+    `/vendors/b2b/statements/${statementId}`,
   );
   return response.data;
 }
@@ -287,7 +287,7 @@ export async function recordB2BStatementPayment(
   payload: RecordB2BStatementPaymentRequest,
 ): Promise<B2BStatementResponse> {
   const response = await api.post<B2BStatementResponse>(
-    `/b2b/statements/${statementId}/payment`,
+    `/vendors/b2b/statements/${statementId}/payment`,
     {
       paymentMode: payload.paymentMode,
       paymentNote: payload.paymentNote ?? null,

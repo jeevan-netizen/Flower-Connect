@@ -68,7 +68,7 @@ describe("B2BOrderDetailPage", () => {
 
     expect(screen.getByText("#B2B-1001")).toBeInTheDocument();
     expect(screen.getByText("Red Rose Bouquet")).toBeInTheDocument();
-    expect(screen.getByText("1,823.00")).toBeInTheDocument();
+    expect(screen.getByText(/1,823\.00/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /accept order/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /reject order/i })).toBeInTheDocument();
   });

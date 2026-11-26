@@ -21,7 +21,7 @@ describe("B2BOrderActionDialogs", () => {
       />,
     );
 
-    expect(screen.getByRole("textarea")).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /reject order/i })).toBeDisabled();
   });
 
@@ -38,7 +38,7 @@ describe("B2BOrderActionDialogs", () => {
       />,
     );
 
-    await fireEvent.change(screen.getByRole("textarea"), { target: { value: "Wrong flowers" } });
+    await fireEvent.change(screen.getByRole("textbox"), { target: { value: "Wrong flowers" } });
     await fireEvent.click(screen.getByRole("button", { name: /reject order/i }));
 
     await waitFor(() => expect(onConfirm).toHaveBeenCalledWith({ reason: "Wrong flowers" }));

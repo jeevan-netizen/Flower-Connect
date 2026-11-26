@@ -46,7 +46,7 @@ describe("B2BOrdersPage", () => {
     renderWithProviders(<B2BOrdersPage />, { route: "/vendor/b2b/orders" });
 
     expect(screen.getByText("#B2B-1001")).toBeInTheDocument();
-    expect(screen.getByText("Seller Florist")).toBeInTheDocument();
+    expect(screen.getAllByText("Seller Florist")).toHaveLength(2);
   });
 
   it("switches to the selling tab", () => {
