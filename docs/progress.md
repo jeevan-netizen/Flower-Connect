@@ -1198,6 +1198,7 @@ Implemented on branch `b2b-module`, created from `farmer-module` at `f596764`, w
 
 No frontend changes in this stage. Customer checkout/cart/orders and invoice behavior untouched.
 
+
 ### Stage 3 (B2B statements and payment recording) - COMPLETE (2026-11-25)
 
 Implemented on branch `b2b-module`, on top of Stage 2 `b8cc4f2`, which is **not** merged into `main`.
@@ -1292,3 +1293,17 @@ Implemented on branch `farmer-module`, commit `7be8921` (Stage 2 refinements) as
 No frontend changes in this stage. Customer checkout/cart/orders and invoice behavior untouched.
 
 
+
+
+### B2B & Farmer Demo Verification (Real Browser) - COMPLETE (2026-11-26)
+
+Verified end-to-end on branch `b2b-module` against the live Docker Compose stack (`mysql`, `mailhog`, `backend`, `frontend`) using Playwright real Chromium with separate browser contexts per user:
+
+- **B2B full flow (`frontend/tests/e2e/b2b-full-flow.test.ts`):** place order → accept (stock drops) → ship with reference → deliver → timeline updates on both screens → e-bill PDF download and text verification (bill number, order number, seller/buyer, items, quantities, rates, grand total) → pre-delivery `409` and third-vendor `403` refusal → Statements preview (15-day default), generate, record payment (`PAID`), re-preview excludes paid orders, buyer read-only view → cancel accepted order restores stock.
+- **Farmer & Passbook full flow (`frontend/tests/e2e/farmer-full-flow.test.ts`):** farmer search + request to join → vendor accept → 4 deposits at ₹100/kg (`9.5→0→9.5 / ₹950`, `20→2→18 / ₹1,800`, `32→3→29 / ₹2,900`, `55→5→50 / ₹5,000`) with live preview, saved rows, and backend passbook verification → farmer passbook breakdown columns + 2nd vendor isolation → collection above balance refused → valid collection pending → confirm (balance drops on both screens) → reject (balance unchanged) → suspend blocks deposits/collections while passbook stays visible → reactivate restores deposits → foreign passbook refused.
+- **Seeded-account browser logins (`frontend/tests/e2e/test-seeded-logins.test.ts`):** all 4 seeded accounts (`admin@flowerconnect.local`, `farmer.demo@flowerconnect.test`, `seller.demo@flowerconnect.test`, `buyer.demo@flowerconnect.test`) verified in separate browser contexts.
+- **Bugs fixed during verification:**
+  - `9948c6a`: `B2BOrderActionDialogs.tsx` merged backdrop and dialog into one flex container so the overlay no longer intercepted clicks; `B2BOrderDetailPage.tsx` changed dialog `isSubmitting` from `isActing` to `runAction.isPending`.
+  - `262325c`: `B2BStatementsPage.tsx` added `Statements list` tab and changed `useSellers()` to `useSellers(null)` so buyers load immediately.
+  - `7405c31`: `FarmerPassbookPage.tsx` added `CollectionForm` and deposit breakdown columns; `DepositForm.tsx` and `CollectionForm.tsx` added `valueAsNumber: true`, `mode: "onChange"`, and `reset()`; `farmer/queries.ts` fixed `useRequestLink` prefix invalidation and added `passbook` + `vendorLinks` invalidation to `useConfirmCollection`/`useRejectCollection`.
+  - Updated `frontend/src/features/b2b/api.test.ts` (`/b2b/...` → `/vendors/b2b/...` to match `ce87e24`), fixed `sellerId: 11` in `B2BOrderDetailPage.test.tsx`, and added `playwright.demo.config.ts` to `frontend/tsconfig.json` `include` to resolve ESLint error.
