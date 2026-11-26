@@ -190,11 +190,11 @@ public class B2BDemoSeeder implements ApplicationRunner {
                 .orElseThrow(() -> new IllegalStateException("Roses category not found"));
 
         var farmer = findOrCreateUser(farmerEmail, farmerPassword, farmerRole,
-                "Demo Farmer");
+                "Demo Farmer", "+919000000001");
         var seller = findOrCreateUser(sellerEmail, sellerPassword, floristRole,
-                "Demo Seller");
+                "Demo Seller", "+919000000002");
         var buyer = findOrCreateUser(buyerEmail, buyerPassword, floristRole,
-                "Demo Buyer");
+                "Demo Buyer", "+919000000003");
 
         var sellerProfile = findOrCreateVendorProfile(seller, "Demo Seller Florist", location);
         var buyerProfile = findOrCreateVendorProfile(buyer, "Demo Buyer Florist", location);
@@ -221,7 +221,13 @@ public class B2BDemoSeeder implements ApplicationRunner {
         var product = createProduct(sellerProfile, roses, "Demo Red Roses",
                 new BigDecimal("199.00"));
         var inventory = inventoryRepository.findByProductId(product.getId())
-                .orElseThrow();
+                .orElseGet(() -> inventoryRepository.saveAndFlush(
+                        Inventory.builder()
+                                .product(product)
+                                .quantity(0)
+                                .reservedQuantity(0)
+                                .lowStockThreshold(0)
+                                .build()));
         inventory.setQuantity(100);
         inventory.setReservedQuantity(0);
         inventoryRepository.save(inventory);
@@ -273,11 +279,11 @@ public class B2BDemoSeeder implements ApplicationRunner {
             throw new IllegalStateException("B2B demo seed requires environment variable "
                     + name + " to be set");
         }
-        return value.trim().toLowerCase();
+        return value.trim();
     }
 
     private User findOrCreateUser(String email, String password, Role role,
-                                  String fullName) {
+                                  String fullName, String phone) {
         return userRepository.findByEmail(email)
                 .map(existing -> {
                     log.debug("Reusing existing demo user {}", email);
@@ -288,7 +294,7 @@ public class B2BDemoSeeder implements ApplicationRunner {
                             .email(email)
                             .passwordHash(passwordEncoder.encode(password))
                             .fullName(fullName)
-                            .phone("+919000000000")
+                            .phone(phone)
                             .role(role)
                             .status(User.Status.ACTIVE)
                             .build();
