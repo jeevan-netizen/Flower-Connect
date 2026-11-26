@@ -44,6 +44,10 @@ import { FarmerVendorBrowsePage } from "@/features/farmer/pages/FarmerVendorBrow
 import { FarmerPassbookPage } from "@/features/farmer/pages/FarmerPassbookPage";
 import { VendorFarmersListPage } from "@/features/vendor/pages/VendorFarmersListPage";
 import { VendorFarmerPassbookPage } from "@/features/vendor/pages/VendorFarmerPassbookPage";
+import { B2BPlaceOrderPage } from "@/features/b2b/pages/B2BPlaceOrderPage";
+import { B2BOrdersPage } from "@/features/b2b/pages/B2BOrdersPage";
+import { B2BOrderDetailPage } from "@/features/b2b/pages/B2BOrderDetailPage";
+import { B2BStatementsPage } from "@/features/b2b/pages/B2BStatementsPage";
 
 /** Seeded role name for customers (V3__seed_roles.sql). */
 const CUSTOMER_ROLE = "CUSTOMER";
@@ -263,6 +267,16 @@ export const router = createBrowserRouter([
           { path: "orders", element: <VendorOrderBoardPage /> },
           { path: "disputes", element: <VendorDisputesPage /> },
           { path: "billing", element: <VendorBillingPage /> },
+          // Phase 3 Stage 3 B2B module (Stage 4 of the B2B module): place an
+          // order, list and detail orders, and statements with payment
+          // recording. Place-order and statements are vendor transactions, so
+          // they are approval-gated at the UX layer; orders list/detail are
+          // read-only over the caller's own orders like the vendor order board
+          // (D-6).
+          { path: "b2b/place-order", element: gated(<B2BPlaceOrderPage />) },
+          { path: "b2b/orders", element: <B2BOrdersPage /> },
+          { path: "b2b/orders/:orderId", element: <B2BOrderDetailPage /> },
+          { path: "b2b/statements", element: gated(<B2BStatementsPage />) },
           // Phase 11 vendor farmer management (Stage 3 of the farmer module).
           { path: "farmers", element: <VendorFarmersListPage /> },
           { path: "farmer-links/:linkId/passbook", element: <VendorFarmerPassbookPage /> },

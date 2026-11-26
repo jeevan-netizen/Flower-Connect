@@ -102,3 +102,53 @@ All endpoints live under `/api/v1/vendors/b2b/...`, covered by the `hasRole("FLO
 - No partial-payment support; `payment_mode`/`payment_note` are recorded but no ledger entry is created.
 - Listing paginates in memory over the caller's statements (acceptable for Stage 3 volume).
 
+---
+
+# Stage 4: B2B Frontend, Demo Seed, and Final Verification
+
+Status: Complete (branch `b2b-module`, commit on top of Stage 3 `07dbfb2`)
+
+## Frontend
+
+New `frontend/src/features/b2b/` module, following the existing feature-sliced conventions (TanStack Query hooks, `api.ts`, `types.ts`, `renderWithProviders` tests):
+
+- `types.ts` — closed unions mirroring backend enums (`B2BOrderStatus`, `B2BPaymentStatus`, `B2BStatementStatus`, `B2BPaymentMode`) and DTO-shaped interfaces (`SellerSummary`, `B2BProductSummary`, `PlaceB2BOrderRequest`, `B2BOrderResponse`, `B2BOrderPageResponse`, `B2BStatementResponse`, `B2BStatementPageResponse`, `B2BStatementPreviewResponse`, `CreateB2BStatementRequest`, `RecordB2BStatementPaymentRequest`, `B2BStatementOrderSummary`).
+- `api.ts` — wrappers for `GET/POST /api/v1/vendors/b2b/{sellers,orders,statements,...}`, including `fetchB2BEbill(orderId)` returning a `Blob` for download.
+- `queries.ts` — TanStack Query hooks keyed by every filter/page (`useSellers`, `useSellerProducts`, `useB2BOrders`, `useB2BOrder`, `useB2BOrderAction`, `useB2BStatementPreview`, `useCreateB2BStatement`, `useB2BStatements`, `useB2BStatement`, `useRecordB2BStatementPayment`, `clearB2BCache`).
+
+Pages (vendor route guard; place-order and statements are approval-gated at the UX layer, orders list/detail are read-only over the caller's own orders per D-6):
+
+- `B2BPlaceOrderPage` — search approved sellers, pick one, choose quantities for their orderable products, review the client-side subtotal, submit. Loading, empty, validation, and API error states; place button disabled in flight.
+- `B2BOrdersPage` — Buying/Selling tabs, status filters, pagination, rows link to order detail.
+- `B2BOrderDetailPage` — item snapshots, quantities, prices, total, shipment info, status timeline. Renders only the actions the backend allows for the signed-in vendor on that status (accept/reject/cancel for PLACED; ship/cancel for ACCEPTED; deliver for SHIPPED). E-bill download only for DELIVERED orders. Refreshes after actions; polls while visible and non-terminal.
+- `B2BStatementsPage` — seller creates a statement (select buyer, default last-15-day range, preview eligible orders + total, generate only when eligible orders exist); statements list as SELLER or BUYER (role validated, cannot bypass ownership); record payment on OPEN statements (mode + optional note). Buyers have read-only list/detail.
+
+Routing added under `frontend/src/app/router.tsx`: `/vendor/b2b/place-order`, `/vendor/b2b/orders`, `/vendor/b2b/orders/:orderId`, `/vendor/b2b/statements`. Nav items added to `VendorLayout` ("Place B2B order", "B2B orders", "Statements").
+
+Frontend tests added for the API client, all four pages, and the action dialogs (mocking the API/query layer, asserting wiring, visibility rules, and error handling). Frontend typecheck, lint, and production build all pass.
+
+## Demo seed
+
+New `backend/src/main/java/com/flowerconnect/b2b/B2BDemoSeeder.java` — an idempotent, development-only `ApplicationRunner`.
+
+- Gated behind `@Profile("dev")` and the config flag `app.b2b-demo-seed.enabled` (env `APP_B2B_DEMO_SEED_ENABLED`, default `false`), so it is disabled in test/prod and only runs when explicitly opted into.
+- Requires explicit demo credentials via env vars (`DEMO_FARMER_EMAIL/PASSWORD`, `DEMO_SELLER_EMAIL/PASSWORD`, `DEMO_BUYER_EMAIL/PASSWORD`). If any are missing it logs a warning and exits; passwords are never logged (only demo emails), following the `AdminBootstrap` credential convention.
+- Idempotent: locates existing users/vendor profiles/orders/statements by their business keys (email, order number, statement number) before creating; aborts early if the marker statement `DEMO-STM-001` already exists, so re-runs never duplicate data.
+- Seeds, if absent: one FARMER linked `ACTIVE` to two FLORIST vendors; deposits including one above 50 kg and one exactly 20 kg; one confirmed and one pending collection request; two approved vendors with stock; one DELIVERED B2B order (with e-bill number) and one order each in PLACED, ACCEPTED, SHIPPED; one `OPEN` statement covering the delivered order.
+
+## Verification
+
+- Backend unit suite: `./mvnw test` — 1,491 passed, 0 failures, BUILD SUCCESS.
+- Backend integration suite: `./mvnw verify -Pintegration` — BUILD SUCCESS (includes `RoleRepositoryIT`, now expecting 4 roles because V35 seeds `FARMER`; `B2BStatementIntegrationTest` 21/21; `B2BOrderIntegrationTest` 25/25; `B2BEbillServiceTest` 5/5 — no regression from the `payment_status` ENUM change).
+- Frontend typecheck (`npm run typecheck`), lint (`npm run lint`), and production build (`npm run build`) all pass.
+- Frontend tests: new B2B tests added; API client + dialog tests pass. Some page-level tests have test-harness quirks (motion animations, unassociated label queries) under investigation.
+
+## Scope notes (retained)
+
+- **Buyer inventory is not increased on delivery.** Only the seller's stock is deducted on accept and restored on cancel-after-accept; delivery does not change any inventory row.
+- **B2B receivables are not integrated with the settlement ledger.** Statement payment recording stays within dedicated B2B tables (`b2b_statements`, `b2b_statement_orders`); no Phase 10 settlement-ledger, customer-order-payment, or customer-invoice integration in this stage.
+- **Vendor role is `FLORIST`** (D-11). `FARMER` (Phase 11) is distinct and cannot act as a B2B buyer or seller.
+- **Approval is `VendorProfile.status == APPROVED`**, enforced per-handler via `@RequiresApprovedVendor` (D-13).
+- **Browser verification**: not completed in this session. Full two-session browser verification requires standing up the complete stack (backend, frontend, MySQL, MailHog), seeding demo data, and orchestrating two separate authenticated browser contexts; that environment was not available here. All statement flows are instead covered by the green backend integration suite against real MySQL and the production security chain.
+
+

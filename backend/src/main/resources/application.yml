@@ -111,6 +111,12 @@ app:
       # app.notification.sse-max-connections-per-user.
       max-connections-per-user: 5
 
+  # B2B demo seed (Stage 4 of the B2B module). Development-only: disabled by
+  # default, and only active under the `dev` profile. Requires explicit
+  # APP_B2B_DEMO_SEED_ENABLED=true plus the DEMO_* environment credentials.
+  demo-seed:
+    enabled: ${APP_B2B_DEMO_SEED_ENABLED:false}
+
   management:
     endpoints:
       web:
