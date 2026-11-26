@@ -41,9 +41,11 @@ export function CollectionForm({
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isValid },
   } = useForm<z.infer<typeof COLLECTION_SCHEMA>>({
     resolver: zodResolver(COLLECTION_SCHEMA),
+    mode: "onChange",
     defaultValues: { amount: 0, mode: "CASH", note: "" },
   });
 
@@ -54,6 +56,7 @@ export function CollectionForm({
         linkId,
         payload: values as FarmerCollectionRequest,
       });
+      reset();
       onSuccess?.();
     } catch (e) {
       const err = e as { response?: { data?: { message?: string } } };
@@ -80,7 +83,7 @@ export function CollectionForm({
             aria-invalid={errors.amount ? true : undefined}
             aria-describedby={errors.amount ? "amount-note" : undefined}
             className={`${CONTROL_CLASS} ${errors.amount ? "border-red-500" : ""}`}
-            {...register("amount")}
+            {...register("amount", { valueAsNumber: true })}
           />
           <FieldMessage id="amount-note" message={errors.amount?.message} reserve />
         </div>

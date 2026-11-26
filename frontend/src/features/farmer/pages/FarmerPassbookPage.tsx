@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useFarmerPassbook } from "@/features/farmer/queries";
 import { Card, PageHeading, StatCard } from "@/features/vendor/components/StatCard";
 import { FarmerErrorState } from "@/features/farmer/components/FarmerErrorState";
+import { CollectionForm } from "@/features/farmer/components/CollectionForm";
 import { formatMoney } from "@/features/vendor/format";
 import { formatLinkStatus, LINK_STATUS_TONES } from "@/features/farmer/types";
 import { formatDateTime } from "@/features/vendor/format";
@@ -59,6 +60,19 @@ export function FarmerPassbookPage() {
         />
       </AnimatedList>
 
+      <Card title="Request a collection">
+        {passbook.linkStatus !== "ACTIVE" && (
+          <p className="mb-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+            This link is {passbook.linkStatus.toLowerCase()}. New collection requests are blocked while the link is not active, though your passbook remains visible.
+          </p>
+        )}
+        <CollectionForm
+          linkId={passbook.linkId}
+          disabled={passbook.linkStatus !== "ACTIVE"}
+          onSuccess={() => void refetch()}
+        />
+      </Card>
+
       <Card title="Ledger entries">
         {passbook.entries.length === 0 ? (
           <p className="text-sm text-slate-600">
@@ -70,6 +84,10 @@ export function FarmerPassbookPage() {
               <tr>
                 <th className="text-left font-semibold text-slate-600 px-3 py-2">Date</th>
                 <th className="text-left font-semibold text-slate-600 px-3 py-2">Entry</th>
+                <th className="text-right font-semibold text-slate-600 px-3 py-2">Gross</th>
+                <th className="text-right font-semibold text-slate-600 px-3 py-2">Deduction</th>
+                <th className="text-right font-semibold text-slate-600 px-3 py-2">Net</th>
+                <th className="text-right font-semibold text-slate-600 px-3 py-2">Rate</th>
                 <th className="text-right font-semibold text-slate-600 px-3 py-2">Amount</th>
                 <th className="text-right font-semibold text-slate-600 px-3 py-2">Running balance</th>
               </tr>
@@ -101,6 +119,18 @@ export function FarmerPassbookPage() {
                           : `Money collection ${entry.mode ?? ""}`}
                       </span>
                     </div>
+                  </td>
+                  <td className="text-right px-3 py-2 text-slate-700">
+                    {entry.type === "DEPOSIT" && entry.grossKg != null ? `${entry.grossKg.toFixed(2)} kg` : "—"}
+                  </td>
+                  <td className="text-right px-3 py-2 text-slate-700">
+                    {entry.type === "DEPOSIT" && entry.deductionKg != null ? `${entry.deductionKg.toFixed(2)} kg` : "—"}
+                  </td>
+                  <td className="text-right px-3 py-2 text-slate-700">
+                    {entry.type === "DEPOSIT" && entry.netKg != null ? `${entry.netKg.toFixed(2)} kg` : "—"}
+                  </td>
+                  <td className="text-right px-3 py-2 text-slate-700">
+                    {entry.type === "DEPOSIT" && entry.pricePerKg != null ? `${formatMoney(entry.pricePerKg)}/kg` : "—"}
                   </td>
                   <td className="text-right px-3 py-2">
                     {entry.type === "DEPOSIT" ? "+" : "-"}

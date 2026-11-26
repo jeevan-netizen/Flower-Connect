@@ -68,7 +68,7 @@ export function useRequestLink() {
     onSuccess: (_link, _vendorId) => {
       void queryClient.invalidateQueries({ queryKey: farmerKeys.links });
       void queryClient.invalidateQueries({
-        queryKey: [...farmerKeys.eligibleVendors, undefined],
+        queryKey: farmerKeys.eligibleVendors,
       });
     },
   });
@@ -200,10 +200,12 @@ export function useConfirmCollection() {
 
   return useMutation({
     mutationFn: (paymentId: number) => confirmCollection(paymentId),
-    onSuccess: () => {
+    onSuccess: (collection) => {
       void queryClient.invalidateQueries({ queryKey: farmerKeys.vendorCollections("PENDING") });
       // The collection's passbook row is replaced by the server's response.
       void queryClient.invalidateQueries({ queryKey: farmerKeys.vendorCollections("CONFIRMED") });
+      void queryClient.invalidateQueries({ queryKey: farmerKeys.passbook(collection.linkId) });
+      void queryClient.invalidateQueries({ queryKey: farmerKeys.vendorLinks });
     },
   });
 }
@@ -214,9 +216,11 @@ export function useRejectCollection() {
 
   return useMutation({
     mutationFn: (paymentId: number) => rejectCollection(paymentId),
-    onSuccess: (_collection, _paymentId) => {
+    onSuccess: (collection) => {
       void queryClient.invalidateQueries({ queryKey: farmerKeys.vendorCollections("PENDING") });
       void queryClient.invalidateQueries({ queryKey: farmerKeys.vendorCollections("REJECTED") });
+      void queryClient.invalidateQueries({ queryKey: farmerKeys.passbook(collection.linkId) });
+      void queryClient.invalidateQueries({ queryKey: farmerKeys.vendorLinks });
     },
   });
 }

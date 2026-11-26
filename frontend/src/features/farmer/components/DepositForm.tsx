@@ -37,9 +37,11 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
     register,
     handleSubmit,
     watch,
+    reset,
     formState: { errors, isValid },
   } = useForm<DepositFormValues>({
     resolver: zodResolver(DEPOSIT_SCHEMA),
+    mode: "onChange",
     defaultValues: { flowerType: "", grossKg: 0, pricePerKg: 0, depositedAt: undefined },
   });
 
@@ -57,6 +59,7 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
           depositedAt: formValues.depositedAt || undefined,
         },
       });
+      reset();
       onSuccess?.();
     } catch (e) {
       const err = e as { response?: { data?: { message?: string } } };
@@ -68,8 +71,8 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
 
   // Live preview mirrors the backend's WeightDeductionPolicy brackets:
   // below 10 → 0, 10–<20 → 1, 20–<30 → 2, 30–<40 → 3, 40–<50 → 4, 50+ → 5.
-  const grossKg = values.grossKg ?? 0;
-  const pricePerKg = values.pricePerKg ?? 0;
+  const grossKg = Number.isFinite(values.grossKg) ? values.grossKg : 0;
+  const pricePerKg = Number.isFinite(values.pricePerKg) ? values.pricePerKg : 0;
   let deductionKg = 0;
   if (grossKg >= 50) deductionKg = 5;
   else if (grossKg >= 40) deductionKg = 4;
@@ -112,7 +115,7 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
             aria-invalid={errors.grossKg ? true : undefined}
             aria-describedby={errors.grossKg ? "grossKg-note" : undefined}
             className={`${CONTROL_CLASS} ${errors.grossKg ? "border-red-500" : ""}`}
-            {...register("grossKg")}
+            {...register("grossKg", { valueAsNumber: true })}
           />
           <FieldMessage id="grossKg-note" message={errors.grossKg?.message} reserve />
         </div>
@@ -129,7 +132,7 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
             aria-invalid={errors.pricePerKg ? true : undefined}
             aria-describedby={errors.pricePerKg ? "pricePerKg-note" : undefined}
             className={`${CONTROL_CLASS} ${errors.pricePerKg ? "border-red-500" : ""}`}
-            {...register("pricePerKg")}
+            {...register("pricePerKg", { valueAsNumber: true })}
           />
           <FieldMessage id="pricePerKg-note" message={errors.pricePerKg?.message} reserve />
         </div>
