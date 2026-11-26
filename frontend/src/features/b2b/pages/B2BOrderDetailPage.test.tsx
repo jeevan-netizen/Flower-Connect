@@ -129,7 +129,7 @@ describe("B2BOrderDetailPage", () => {
         orderNo: "B2B-1001",
         status: "ACCEPTED",
         buyerId: 20,
-        sellerId: 10,
+        sellerId: 11,
       }),
       isPending: false,
       error: null,

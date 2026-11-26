@@ -40,7 +40,7 @@ describe("B2B API client", () => {
 
     const result = await apiModule.fetchSellers("rose");
 
-    expect(mockGet).toHaveBeenCalledWith("/b2b/sellers", { params: { query: "rose" }, signal: undefined });
+    expect(mockGet).toHaveBeenCalledWith("/vendors/b2b/sellers", { params: { query: "rose" }, signal: undefined });
     expect(result).toEqual(sellers);
   });
 
@@ -52,7 +52,7 @@ describe("B2B API client", () => {
 
     const result = await apiModule.fetchSellerProducts(11);
 
-    expect(mockGet).toHaveBeenCalledWith("/b2b/sellers/11/products", { signal: undefined });
+    expect(mockGet).toHaveBeenCalledWith("/vendors/b2b/sellers/11/products", { signal: undefined });
     expect(result).toEqual(products);
   });
 
@@ -84,7 +84,7 @@ describe("B2B API client", () => {
       orderNote: "Please wrap",
     });
 
-    expect(mockPost).toHaveBeenCalledWith("/b2b/orders", {
+    expect(mockPost).toHaveBeenCalledWith("/vendors/b2b/orders", {
       sellerId: 11,
       items: [{ productId: 101, quantity: 2 }],
       orderNote: "Please wrap",
@@ -107,7 +107,7 @@ describe("B2B API client", () => {
 
     await apiModule.fetchB2BOrders({ role: "SELLER", status: "DELIVERED", page: 1, size: 10 });
 
-    expect(mockGet).toHaveBeenCalledWith("/b2b/orders", {
+    expect(mockGet).toHaveBeenCalledWith("/vendors/b2b/orders", {
       params: { role: "SELLER", status: "DELIVERED", page: 1, size: 10 },
       signal: undefined,
     });
@@ -119,7 +119,7 @@ describe("B2B API client", () => {
 
     await apiModule.previewB2BStatement(7, "2026-11-10", "2026-11-24");
 
-    expect(mockGet).toHaveBeenCalledWith("/b2b/statements/preview", {
+    expect(mockGet).toHaveBeenCalledWith("/vendors/b2b/statements/preview", {
       params: { buyerId: 7, from: "2026-11-10", to: "2026-11-24" },
       signal: undefined,
     });
@@ -148,7 +148,7 @@ describe("B2B API client", () => {
 
     const result = await apiModule.createB2BStatement({ buyerId: 7, from: "2026-11-10", to: "2026-11-24" });
 
-    expect(mockPost).toHaveBeenCalledWith("/b2b/statements", {
+    expect(mockPost).toHaveBeenCalledWith("/vendors/b2b/statements", {
       buyerId: 7,
       from: "2026-11-10",
       to: "2026-11-24",
@@ -171,7 +171,7 @@ describe("B2B API client", () => {
 
     await apiModule.fetchB2BStatements({ role: "BUYER", page: 2, size: 5 });
 
-    expect(mockGet).toHaveBeenCalledWith("/b2b/statements", {
+    expect(mockGet).toHaveBeenCalledWith("/vendors/b2b/statements", {
       params: { role: "BUYER", page: 2, size: 5 },
       signal: undefined,
     });
@@ -203,7 +203,7 @@ describe("B2B API client", () => {
       paymentNote: "Received",
     });
 
-    expect(mockPost).toHaveBeenCalledWith("/b2b/statements/1/payment", {
+    expect(mockPost).toHaveBeenCalledWith("/vendors/b2b/statements/1/payment", {
       paymentMode: "UPI",
       paymentNote: "Received",
       paidAt: null,
