@@ -433,7 +433,7 @@ export function B2BOrderDetailPage() {
       <B2BOrderActionDialogs
         orderName={`Order #${order.id}`}
         openAction={openAction}
-        isSubmitting={isActing}
+        isSubmitting={runAction.isPending}
         error={
           actionError?.message &&
           (openAction === "reject" || openAction === "cancel" || openAction === "ship")

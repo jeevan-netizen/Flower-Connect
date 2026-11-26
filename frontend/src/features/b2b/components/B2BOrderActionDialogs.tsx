@@ -55,14 +55,13 @@ export function B2BOrderActionDialogs({
   return (
     <>
       {openAction && (
-        <>
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
-            variants={backdropVariants}
-            initial={reduceMotion ? false : "hidden"}
-            animate={openAction !== null ? "visible" : "hidden"}
-            exit={reduceMotion ? undefined : "exit"}
-          />
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          variants={backdropVariants}
+          initial={reduceMotion ? false : "hidden"}
+          animate={openAction !== null ? "visible" : "hidden"}
+          exit={reduceMotion ? undefined : "exit"}
+        >
           <motion.div
             role="dialog"
             aria-modal="true"
@@ -172,7 +171,7 @@ export function B2BOrderActionDialogs({
               </div>
             </form>
           </motion.div>
-        </>
+        </motion.div>
       )}
     </>
   );

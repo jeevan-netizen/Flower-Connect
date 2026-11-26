@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 
 import { B2BOrderDetailPage } from "@/features/b2b/pages/B2BOrderDetailPage";
 import * as b2bQueries from "@/features/b2b/queries";
@@ -120,5 +120,38 @@ describe("B2BOrderDetailPage", () => {
 
     expect(screen.getByText("#B2B-1001")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /download e-bill/i })).not.toBeInTheDocument();
+  });
+
+  it("enables the Ship order dialog submit button when a shipment reference is entered", async () => {
+    mockUseB2BOrder.mockReturnValue({
+      data: makeB2BOrderResponse({
+        id: 1,
+        orderNo: "B2B-1001",
+        status: "ACCEPTED",
+        buyerId: 20,
+        sellerId: 10,
+      }),
+      isPending: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as UseQueryResult<ReturnType<typeof makeB2BOrderResponse>, Error>);
+    mockUseVendorProfile.mockReturnValue({
+      data: sellerProfile,
+      isPending: false,
+      error: null,
+    } as unknown as UseQueryResult<VendorProfile, Error>);
+
+    renderWithProviders(<B2BOrderDetailPage />, { route: "/vendor/b2b/orders/1" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Ship order" }));
+    const dialog = await screen.findByRole("dialog");
+    const input = screen.getByTestId("shipment-reference");
+    fireEvent.change(input, { target: { value: "TRACK-123" } });
+
+    const submitBtn = Array.from(dialog.querySelectorAll("button")).find(
+      (b) => b.getAttribute("type") === "submit",
+    );
+    expect(submitBtn).toBeEnabled();
+    expect(submitBtn).toHaveTextContent("Ship order");
   });
 });
