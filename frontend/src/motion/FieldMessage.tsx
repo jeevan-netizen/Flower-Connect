@@ -55,7 +55,7 @@ export function FieldMessage({ id, message, hint, reserve = false }: FieldMessag
     <p
       id={id}
       className={`mt-1 ${reserve ? RESERVED_LINE : ""} ${
-        message ? "text-sm text-danger" : "text-xs text-bolder-muted"
+        message ? "text-sm text-bolder-danger" : "text-xs text-bolder-muted"
       }`}
     >
       <AnimatePresence>

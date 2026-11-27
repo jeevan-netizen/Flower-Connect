@@ -17,7 +17,7 @@ export function FarmerLedgerPage() {
 
   if (isPending) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Loading your ledger…
       </div>
     );
@@ -47,13 +47,13 @@ export function FarmerLedgerPage() {
 
       {(links?.length ?? 0) === 0 ? (
         <Card title="Your ledger is empty">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-bolder-muted">
             You have no linked florists yet. Browse vendors and send a join
             request to start receiving deposits and collections.
           </p>
           <Link
             to="/farmer/vendors"
-            className="mt-3 inline-block text-sm font-medium text-brand-700 hover:text-brand-900"
+            className="mt-3 inline-block text-base font-medium text-bolder-rose-strong hover:text-bolder-rose-deep"
           >
             Browse vendors →
           </Link>
@@ -62,37 +62,37 @@ export function FarmerLedgerPage() {
         <Card title="Your florists">
           <AnimatedList className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {(links ?? []).map((link) => (
-              <div
-                key={link.id}
-                className="rounded-lg border border-slate-200 bg-white p-4"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-semibold text-slate-900">{link.vendorName}</h3>
-                    <p className="mt-0.5 text-sm text-slate-600">
-                      {formatLinkStatus(link.status)}
-                    </p>
+                <div
+                  key={link.id}
+                  className="rounded-lg border bolder-line bg-bolder-surface p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold text-bolder-text">{link.vendorName}</h3>
+                      <p className="mt-0.5 text-sm text-bolder-muted">
+                        {formatLinkStatus(link.status)}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        LINK_STATUS_TONES[link.status]
+                      }`}
+                    >
+                      {link.status}
+                    </span>
                   </div>
-                  <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      LINK_STATUS_TONES[link.status]
-                    }`}
-                  >
-                    {link.status}
-                  </span>
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-bolder-text">
+                      Outstanding {formatMoney(Number(link.outstandingBalance ?? 0))}
+                    </span>
+                    <Link
+                      to={`/farmer/links/${link.id}/passbook`}
+                      className="text-base font-medium text-bolder-rose-strong hover:text-bolder-rose-deep"
+                    >
+                      Open passbook →
+                    </Link>
+                  </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-900">
-                    Outstanding {formatMoney(Number(link.outstandingBalance ?? 0))}
-                  </span>
-                  <Link
-                    to={`/farmer/links/${link.id}/passbook`}
-                    className="text-sm font-medium text-brand-700 hover:text-brand-900"
-                  >
-                    Open passbook →
-                  </Link>
-                </div>
-              </div>
             ))}
           </AnimatedList>
         </Card>

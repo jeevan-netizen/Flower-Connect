@@ -163,7 +163,7 @@ export function FarmerRegisterPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full rounded-md border border-transparent bg-bolder-rose-action py-2.5 px-4 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
+            className={`w-full rounded-md border border-transparent bg-bolder-rose-action py-3 px-4 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
           >
             {isLoading ? "Creating account..." : "Create account"}
           </button>

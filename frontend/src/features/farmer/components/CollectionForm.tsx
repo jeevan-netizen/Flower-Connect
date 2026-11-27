@@ -7,7 +7,7 @@ import type { FarmerCollectionRequest } from "@/features/farmer/types";
 import { COLLECTION_MODES, COLLECTION_MODE_LABELS } from "@/features/farmer/types";
 import { FieldMessage } from "@/motion/FieldMessage";
 import { FadeIn } from "@/motion/FadeIn";
-import { PRESSABLE } from "@/motion/pressable";
+import { PRESSABLE, FIELD_TRANSITION } from "@/motion/pressable";
 
 const COLLECTION_SCHEMA = z.object({
   amount: z.number({ required_error: "Amount is required" }).positive("Amount must be positive"),
@@ -15,7 +15,7 @@ const COLLECTION_SCHEMA = z.object({
   note: z.string().max(500, "Note must not exceed 500 characters").optional().or(z.literal("")),
 });
 
-const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
 
 interface CollectionFormProps {
   linkId: number;
@@ -70,7 +70,7 @@ export function CollectionForm({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="amount" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="amount" className="block text-sm font-medium text-bolder-text">
             Amount (INR)
           </label>
           <input
@@ -82,13 +82,13 @@ export function CollectionForm({
             required
             aria-invalid={errors.amount ? true : undefined}
             aria-describedby={errors.amount ? "amount-note" : undefined}
-            className={`${CONTROL_CLASS} ${errors.amount ? "border-red-500" : ""}`}
+            className={`${CONTROL_CLASS} ${errors.amount ? "border-bolder-danger-border" : ""}`}
             {...register("amount", { valueAsNumber: true })}
           />
           <FieldMessage id="amount-note" message={errors.amount?.message} reserve />
         </div>
         <div>
-          <label htmlFor="mode" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="mode" className="block text-sm font-medium text-bolder-text">
             Mode
           </label>
           <select
@@ -96,7 +96,7 @@ export function CollectionForm({
             required
             aria-invalid={errors.mode ? true : undefined}
             aria-describedby={errors.mode ? "mode-note" : undefined}
-            className={`${CONTROL_CLASS} ${errors.mode ? "border-red-500" : ""}`}
+            className={`${CONTROL_CLASS} ${errors.mode ? "border-bolder-danger-border" : ""}`}
             {...register("mode")}
           >
             {COLLECTION_MODES.map((mode) => (
@@ -109,7 +109,7 @@ export function CollectionForm({
         </div>
       </div>
       <div>
-        <label htmlFor="note" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="note" className="block text-sm font-medium text-bolder-text">
           Note
         </label>
         <textarea
@@ -118,20 +118,20 @@ export function CollectionForm({
           placeholder="Optional note"
           aria-invalid={errors.note ? true : undefined}
           aria-describedby={errors.note ? "note-note" : undefined}
-          className={`${CONTROL_CLASS} ${errors.note ? "border-red-500" : ""}`}
+          className={`${CONTROL_CLASS} ${errors.note ? "border-bolder-danger-border" : ""}`}
           {...register("note")}
         />
         <FieldMessage id="note-note" message={errors.note?.message} reserve />
       </div>
       {submitError && (
-        <FadeIn role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <FadeIn role="alert" className="rounded-md bg-bolder-danger-surface p-3 text-sm text-bolder-danger">
           {submitError}
         </FadeIn>
       )}
       <button
         type="submit"
         disabled={disabled || isPending || !isValid}
-        className={`w-full rounded-md border border-transparent bg-brand-600 py-2.5 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE}`}
+        className={`w-full rounded-md border border-transparent bg-bolder-rose-action py-3 px-4 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE}`}
       >
         {isPending ? "Requesting…" : disabled ? "Cannot request" : "Request collection"}
       </button>

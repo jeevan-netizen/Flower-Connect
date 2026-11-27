@@ -27,7 +27,7 @@ export function FarmerDashboardPage() {
 
   if (linksPending) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Loading your links…
       </div>
     );
@@ -85,7 +85,7 @@ export function FarmerDashboardPage() {
           Send a join request to any approved florist. Once they accept, you are
           linked and they can record flower deposits against you.
         </p>
-        <Link to="/farmer/vendors" className="mt-3 inline-block text-sm font-medium text-brand-700 hover:text-brand-900">
+        <Link to="/farmer/vendors" className="mt-3 inline-block text-base font-medium text-bolder-rose-strong hover:text-bolder-rose-deep">
           Browse vendors →
         </Link>
       </Card>

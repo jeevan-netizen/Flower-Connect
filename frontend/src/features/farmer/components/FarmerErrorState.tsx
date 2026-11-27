@@ -22,7 +22,7 @@ export function FarmerErrorState({ error, onRetry }: FarmerErrorStateProps) {
 
   if (isVendorNotApproved(error)) {
     return (
-      <FadeIn role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <FadeIn role="alert" className="rounded-lg border bolder-warning-border bg-bolder-warning-surface p-4 text-sm text-bolder-warning">
         <p className="font-semibold">Vendor not approvable yet</p>
         <p className="mt-1">That florist cannot accept link requests at the moment.</p>
       </FadeIn>
@@ -31,7 +31,7 @@ export function FarmerErrorState({ error, onRetry }: FarmerErrorStateProps) {
 
   if (info.status === 404) {
     return (
-      <FadeIn role="alert" className="rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800">
+      <FadeIn role="alert" className="rounded-lg border bolder-line-control bg-bolder-bg p-4 text-sm text-bolder-text">
         <p className="font-semibold">Not found</p>
         <p className="mt-1">That link or vendor does not belong to your account.</p>
       </FadeIn>
@@ -40,26 +40,26 @@ export function FarmerErrorState({ error, onRetry }: FarmerErrorStateProps) {
 
   if (info.status === 403) {
     return (
-      <FadeIn role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+      <FadeIn role="alert" className="rounded-lg border bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
         <p className="font-semibold">Not permitted</p>
         <p className="mt-1">{info.message}</p>
       </FadeIn>
     );
   }
 
-  return (
-    <FadeIn role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-      <p className="font-semibold">Something went wrong</p>
-      <p className="mt-1">{info.message}</p>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className={`mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 ${PRESSABLE} ${FOCUS_RING}`}
-        >
-          Try again
-        </button>
-      )}
-    </FadeIn>
-  );
+    return (
+      <FadeIn role="alert" className="rounded-lg border bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
+        <p className="font-semibold">Something went wrong</p>
+        <p className="mt-1">{info.message}</p>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className={`mt-3 rounded-md border bolder-danger-border bg-bolder-danger-surface px-3 py-1.5 text-xs font-medium text-bolder-danger hover:bg-bolder-danger-surface ${PRESSABLE} ${FOCUS_RING}`}
+          >
+            Try again
+          </button>
+        )}
+      </FadeIn>
+    );
 }
