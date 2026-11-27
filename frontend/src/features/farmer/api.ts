@@ -4,6 +4,7 @@ import type {
   FarmerCollectionRequest,
   FarmerDeposit,
   FarmerLink,
+  FarmerProfile,
   FarmerVendor,
   Passbook,
 } from "@/features/farmer/types";
@@ -18,6 +19,15 @@ import type {
  */
 export async function fetchFarmerLinks(): Promise<FarmerLink[]> {
   const response = await api.get<FarmerLink[]>("/farmer/links");
+  return response.data;
+}
+
+/**
+ * `GET /api/v1/farmer/profile` — the authenticated farmer's own profile: name,
+ * mobile number and address. Requires `ROLE_FARMER`.
+ */
+export async function fetchFarmerProfile(): Promise<FarmerProfile> {
+  const response = await api.get<FarmerProfile>("/farmer/profile");
   return response.data;
 }
 

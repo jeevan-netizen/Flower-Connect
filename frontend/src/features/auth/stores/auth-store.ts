@@ -15,10 +15,16 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   hasLoadedInitial: boolean;
+  // true only for the page load in which the user just signed in through the
+  // login form. RequireUnauth uses it to let LoginPage complete its own
+  // role-based redirect (or show its refusal error) instead of unmounting the
+  // form and sending the user to "/".
+  justLoggedIn: boolean;
 
   setAuth: (auth: AuthResponse) => void;
   setError: (error: string | null) => void;
   setHasLoadedInitial: (value: boolean) => void;
+  setJustLoggedIn: (value: boolean) => void;
   logout: () => void;
 
   login: (email: string, password: string) => Promise<void>;
@@ -35,6 +41,7 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       error: null,
       hasLoadedInitial: false,
+      justLoggedIn: false,
 
       setAuth: (auth: AuthResponse) => {
         set({
@@ -44,6 +51,7 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
+      setJustLoggedIn: (value: boolean) => set({ justLoggedIn: value }),
       setError: (error: string | null) => set({ error }),
       setHasLoadedInitial: (value: boolean) => set({ hasLoadedInitial: value }),
 
@@ -53,6 +61,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           user: null,
           isAuthenticated: false,
+          justLoggedIn: false,
           error: null,
         });
       },
@@ -62,6 +71,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const auth = await loginApi({ email, password });
           get().setAuth(auth);
+          get().setJustLoggedIn(true);
           await get().loadCurrentUser();
         } catch (e) {
           const message = extractErrorMessage(e);

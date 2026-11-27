@@ -2192,3 +2192,39 @@ Merged `main` (34 commits ahead: Phases 11–14, POS, reviews/analytics, securit
 - Fresh-DB Flyway verification: **38/38 migrations** (V1–V13, V15–V33, V35–V40) applied cleanly to an empty schema without `outOfOrder`.
 - Frontend on merged `HEAD`: `npx vitest run` **922/922 passed across 92 test files**; `npm run typecheck`, `npm run lint`, and `npm run build` pass.
 - Playwright demo suite (`b2b-full-flow.test.ts`, `farmer-full-flow.test.ts`, `test-seeded-logins.test.ts`): **5/6 passed, 1 failed** (`b2b-full-flow.test.ts:92` failed on the buyer `Order #` heading timeout; not rerun).
+
+### Farmer sign-in and farmer portal (branch `codex/farmer-portal`, base `origin/main` f2e9163) - COMPLETE
+
+Implemented a Farmer sign-in entry and farmer portal on top of the merged B2B/farmer modules (main f2e9163), in a separate Git worktree so the existing checkout and its uncommitted local changes (`docs/b2b-module-merge-review.md`) remain untouched. Nothing committed or pushed.
+
+**Backend**
+- Additive Flyway migration `V41__add_address_to_users.sql`: nullable `address VARCHAR(255)` column on `users` (after `phone`). No existing column/constraint/index altered.
+- `User` entity: added `address` field.
+- `FarmerRegisterRequest`/`FarmerRegisterResponse`: added optional `address`; `FarmerLinkService.register` persists it.
+- New `FarmerProfileService` + `FarmerProfileController` (`GET /api/v1/farmer/profile`, FARMER-role namespace already covered by `SecurityConfig`) returning the authenticated farmer's `id`, `email`, `fullName`, `phone`, `address`, `role` — scoped to the caller via the JWT subject.
+- New `FarmerProfileControllerTest` (7 tests): unauthenticated 401, CUSTOMER/FLORIST/ADMIN 403, farmer 200 with name/phone/address, null-address handling, shared error-envelope shape.
+- Backend unit suite: **1,660 tests, 0 failures, 0 errors, BUILD SUCCESS** (`./mvnw -o test`).
+
+**Frontend**
+- `FarmerProfile` type + `fetchFarmerProfile` API + `useFarmerProfile` hook (cache key `["farmer","profile"]`, cleared on logout via `clearFarmerCache`).
+- `FarmerProfilePage`: name, mobile, address, email, role/account id + Log out button (clears farmer cache, logs out, navigates to `/`).
+- `FarmerLayout`: sidebar nav Overview (`/farmer`), My Ledger (`/farmer/ledger`), Profile (`/farmer/profile`) + Log out; works on mobile and desktop.
+- `FarmerLedgerPage`: vendor-separated ledger directory — each linked vendor shown with outstanding balance and an "Open passbook" link to the existing `FarmerPassbookPage`; loading/empty/error states.
+- `FarmerDashboardPage` (Overview): summary cards for current balance and pending collections (computed from each link's passbook, live API data) plus linked vendors and the vendor list.
+- HomePage: "Farmer sign-in" button/link to `/login` with `state={{ from: "/farmer", farmerEntry: true }}`; general login entry retained.
+- LoginPage: successful FARMER login via the farmer entry point navigates to `/farmer`; a non-farmer using the farmer entry point is refused with a clear message (no farmer data exposed) and stays on the login page.
+- Router: `/farmer` shell switched from `VendorLayout` to `FarmerLayout`; added `/farmer/ledger` and `/farmer/profile` routes.
+- Tests: `FarmerProfilePage.test.tsx` (4), `FarmerLedgerPage.test.tsx` (3), `FarmerDashboardPage.test.tsx` (2), `LoginPage.test.tsx` +2 role-handling tests. Full frontend suite **933 tests across 95 files, 0 failures**; `npm run typecheck`, `npm run lint`, `npm run build` all clean.
+
+**Verification data / limitations**
+- Profile data source: `GET /api/v1/farmer/profile` (backend `FarmerProfileService` reading the authenticated farmer's `users` row). Address is `NULL` for farmers registered before V41 and rendered honestly as "Not provided" — nothing invented or hardcoded.
+- Ledger: reuses the existing per-vendor passbook (`GET /api/v1/farmer/links/{linkId}/passbook`); records are separated by vendor (one card per vendor on My Ledger, vendor name prominent on the passbook). Backend calculations (outstanding balance, running balance, pending collections) are authoritative — no UI-only balance math.
+- Browser/end-to-end verification of the farmer sign-in flow was not performed (no running stack in this session); coverage is the unit/integration suites above.
+
+**Sign-in routing fix (this session):** `RequireUnauth` previously unmounted `LoginPage` and redirected any authenticated user to `/` the moment `isAuthenticated` became true, so `LoginPage` could never run its role-based navigation and a farmer using the Farmer Login entry was sent to `/` instead of `/farmer`. Added a `justLoggedIn` flag to the auth store (set on successful login) and gated `RequireUnauth`'s redirect on it: `justLoggedIn` is read live (not captured in a mount-time ref) so the guard does not redirect while a login is in progress. After a successful role check, `LoginPage` navigates before resetting the flag; on non-farmer refusal, the shared logout action clears it and ends the session. A fresh page load leaves `justLoggedIn=false`, so an authenticated user revisiting `/login` or `/register` is redirected away instead of seeing the login form again. General login behaviour is unchanged.
+
+**Non-farmer refusal fix (this session):** The Farmer Login refusal now logs the non-farmer out through the shared auth-store logout action, which clears authentication state and resets `justLoggedIn`. `LoginPage` then restores the clear refusal message through the shared error state. This keeps the user on the ordinary unauthenticated login route, prevents the farmer portal from rendering, and ensures `RequireUnauth` remains active for subsequent visits to `/login` and `/register`. Router regression coverage confirms the refusal message, cleared auth state, logout API call, and unauthenticated access behavior on both routes.
+
+**Router-level regression tests (new):** `src/app/login-router.test.tsx` exercises the real `/login` route and its guards through the exported router: a farmer signing in via the Farmer Login entry reaches `/farmer`; a non-farmer using the same entry is refused with a clear message and stays on `/login` (no farmer data exposed); general login preserves its existing redirect target; and after a successful login, revisiting `/login` redirects away instead of rendering the login form again.
+
+- All changes left **uncommitted** in the `codex/farmer-portal` worktree; original checkout's local work intact.

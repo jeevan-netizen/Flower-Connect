@@ -15,18 +15,28 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
+/** Seeded role name for farmers (V35 migration). */
+const FARMER_ROLE = "FARMER";
+
 /** The two inputs share one control treatment; only the type and id differ. */
 const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoading, error } = useAuthStore();
+  const { login, isLoading, error, setError, setJustLoggedIn, logout } = useAuthStore();
   // `registeredEmail` is set by the vendor registration page on success, so a florist
   // who just applied only types their password. `from` is already used by
   // `ProtectedRoute` to remember where an unauthenticated visitor was heading.
-  const locationState = location.state as { from?: string; registeredEmail?: string } | null;
+  // `farmerEntry` marks the farmer entry point from the front page, so a successful
+  // farmer login is sent to the farmer portal and a non-farmer is refused clearly.
+  const locationState = location.state as {
+    from?: string;
+    farmerEntry?: boolean;
+    registeredEmail?: string;
+  } | null;
   const from = locationState?.from || "/";
+  const farmerEntry = locationState?.farmerEntry === true;
   const registeredEmail = locationState?.registeredEmail ?? "";
 
   const {
@@ -40,9 +50,31 @@ export function LoginPage() {
 
   const onSubmit = async (data: LoginFormData) => {
     await login(data.email, data.password);
-    const { isAuthenticated } = useAuthStore.getState();
+    const { isAuthenticated, user } = useAuthStore.getState();
     if (isAuthenticated) {
+      if (farmerEntry && user?.role !== FARMER_ROLE) {
+        // Refuse the farmer entry point for non-farmer accounts without exposing
+        // any farmer data; the general login remains available.
+        const refusalMessage =
+          `Farmer sign-in is for farmer accounts. Your account is registered as ${user?.role}. Use the general login instead.`;
+        // End the non-farmer session so the normal unauthenticated guard remains
+        // active, then show the explanation on the login page.
+        logout();
+        setError(refusalMessage);
+        // Keep the explanation visible, but switch this page to the ordinary
+        // login flow so the user can retry without the farmer-entry restriction.
+        navigate("/login", {
+          replace: true,
+          state: { from: "/", farmerEntry: false, registeredEmail },
+        });
+        return;
+      }
       navigate(from, { replace: true });
+      // Defer the reset past this commit so RequireUnauth (mounted above this
+      // page while LoginPage unmounts) does not race with the navigation. Once
+      // LoginPage has unmounted, nothing reacts to the flag and a later
+      // revisit to /login by an authenticated user is redirected away.
+      setTimeout(() => setJustLoggedIn(false), 0);
     }
   };
 

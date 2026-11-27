@@ -66,6 +66,16 @@ export interface FarmerVendor {
   linkStatus: LinkStatus | null;
 }
 
+/** Mirrors `FarmerProfileResponse` (GET /api/v1/farmer/profile). */
+export interface FarmerProfile {
+  id: number;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  address: string | null;
+  role: string;
+}
+
 /** Mirrors `FarmerCollectionRequest`. */
 export interface FarmerCollectionRequest {
   amount: number;

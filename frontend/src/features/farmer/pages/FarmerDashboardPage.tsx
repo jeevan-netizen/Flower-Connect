@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
-import { useFarmerLinks } from "@/features/farmer/queries";
+import { useQueries } from "@tanstack/react-query";
+import { useFarmerLinks, farmerKeys } from "@/features/farmer/queries";
+import { fetchFarmerPassbook } from "@/features/farmer/api";
 import { Card, PageHeading, StatCard } from "@/features/vendor/components/StatCard";
 import { FarmerErrorState } from "@/features/farmer/components/FarmerErrorState";
 import { formatLinkStatus, LINK_STATUS_TONES } from "@/features/farmer/types";
@@ -12,12 +14,23 @@ import { AnimatedList } from "@/motion/AnimatedList";
  * Lists the vendors this farmer is linked to, each link's status and the
  * outstanding balance the farmer is owed across active links. The balance is the
  * backend's own `sum(deposits) - sum(CONFIRMED collections)` per link, so the
- * browser never recomputes it.
+ * browser never recomputes it. Pending collections are computed from each link's
+ * passbook (live API data) and shown on the overview cards.
  */
 export function FarmerDashboardPage() {
-  const { data: links, isPending, error, refetch } = useFarmerLinks();
+  const { data: links, isPending: linksPending, error: linksError, refetch: refetchLinks } =
+    useFarmerLinks();
 
-  if (isPending) {
+  // One passbook query per link so the overview cards can surface pending
+  // collections without the browser inventing a balance.
+  const passbookResults = useQueries({
+    queries: (links ?? []).map((link) => ({
+      queryKey: farmerKeys.passbook(link.id),
+      queryFn: () => fetchFarmerPassbook(link.id),
+    })),
+  });
+
+  if (linksPending) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
         Loading your links…
@@ -25,8 +38,8 @@ export function FarmerDashboardPage() {
     );
   }
 
-  if (error) {
-    return <FarmerErrorState error={error} onRetry={() => void refetch()} />;
+  if (linksError) {
+    return <FarmerErrorState error={linksError} onRetry={() => void refetchLinks()} />;
   }
 
   const outstanding = (links ?? []).reduce(
@@ -34,22 +47,42 @@ export function FarmerDashboardPage() {
     0,
   );
 
+  const pendingCollections = passbookResults.reduce((total, result) => {
+    const passbook = result.data;
+    if (!passbook) return total;
+    return (
+      total +
+      passbook.entries.reduce(
+        (sum, entry) =>
+          entry.type === "COLLECTION" && entry.status === "PENDING"
+            ? sum + Number(entry.amount ?? 0)
+            : sum,
+        0,
+      )
+    );
+  }, 0);
+
   return (
     <div className="space-y-6">
       <PageHeading
-        title="My florists"
-        description="Vendors you are linked to and what they owe you."
+        title="Overview"
+        description="Your linked florists and what they owe you."
       />
 
+      <StatCard
+        label="Current balance"
+        value={formatMoney(outstanding)}
+        hint="Deposits minus confirmed collections"
+      />
+      <StatCard
+        label="Pending collections"
+        value={formatMoney(pendingCollections)}
+        hint="Collections requested but not yet confirmed"
+      />
       <StatCard
         label="Linked vendors"
         value={String(links?.length ?? 0)}
         hint={links?.some((l) => l.status === "PENDING") ? "A request is awaiting a vendor decision" : "All links decided"}
-      />
-      <StatCard
-        label="Outstanding balance"
-        value={formatMoney(outstanding)}
-        hint="Deposits minus confirmed collections"
       />
 
       <Card title="Your links">

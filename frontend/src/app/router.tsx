@@ -45,6 +45,9 @@ import { AdminBillingPage } from "@/features/admin/pages/AdminBillingPage";
 import { FarmerDashboardPage } from "@/features/farmer/pages/FarmerDashboardPage";
 import { FarmerVendorBrowsePage } from "@/features/farmer/pages/FarmerVendorBrowsePage";
 import { FarmerPassbookPage } from "@/features/farmer/pages/FarmerPassbookPage";
+import { FarmerLayout } from "@/features/farmer/components/FarmerLayout";
+import { FarmerLedgerPage } from "@/features/farmer/pages/FarmerLedgerPage";
+import { FarmerProfilePage } from "@/features/farmer/pages/FarmerProfilePage";
 import { VendorFarmersListPage } from "@/features/vendor/pages/VendorFarmersListPage";
 import { VendorFarmerPassbookPage } from "@/features/vendor/pages/VendorFarmerPassbookPage";
 import { B2BPlaceOrderPage } from "@/features/b2b/pages/B2BPlaceOrderPage";
@@ -228,21 +231,23 @@ export const router = createBrowserRouter([
           </RequireUnauth>
         ),
       },
-      {
-        // Phase 11 farmer dashboard shell. Guarded by FARMER role; the backend
-        // re-checks the role on every request.
-        path: "farmer",
-        element: (
-          <ProtectedRoute roles={[FARMER_ROLE]}>
-            <VendorLayout />
-          </ProtectedRoute>
-        ),
-        children: [
-          { index: true, element: <FarmerDashboardPage /> },
-          { path: "vendors", element: <FarmerVendorBrowsePage /> },
-          { path: "links/:linkId/passbook", element: <FarmerPassbookPage /> },
-        ],
-      },
+        {
+          // Phase 11 farmer dashboard shell. Guarded by FARMER role; the backend
+          // re-checks the role on every request.
+          path: "farmer",
+          element: (
+            <ProtectedRoute roles={[FARMER_ROLE]}>
+              <FarmerLayout />
+            </ProtectedRoute>
+          ),
+          children: [
+            { index: true, element: <FarmerDashboardPage /> },
+            { path: "vendors", element: <FarmerVendorBrowsePage /> },
+            { path: "ledger", element: <FarmerLedgerPage /> },
+            { path: "profile", element: <FarmerProfilePage /> },
+            { path: "links/:linkId/passbook", element: <FarmerPassbookPage /> },
+          ],
+        },
       {
         // Phase 2 vendor dashboard shell. The guard is UX gating only — the
         // backend re-checks ROLE_FLORIST (and, for approved-only vendor

@@ -36,6 +36,9 @@ public class User {
     @Column(name = "phone", length = 32, unique = true)
     private String phone;
 
+    @Column(name = "address", length = 255)
+    private String address;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private Status status;
