@@ -16,7 +16,7 @@ export const PRESSABLE =
 
 /** The focus ring shared by every control, so keyboard focus looks the same app-wide. */
 export const FOCUS_RING =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2";
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bolder-rose focus-visible:ring-offset-2";
 
 /**
  * The focus ring for the dark landing surface.

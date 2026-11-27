@@ -33,80 +33,150 @@
     --fc-motion-distance-lift: -2px;
 
     /*
-     * Landing design tokens — the single source of truth for the dark landing
-     * palette, glass surfaces, radii and type stacks.
+     * Editorial design tokens — the single source of truth for the warm ivory
+     * palette, the rose action colour, botanical green, glass surfaces, radii
+     * and type stacks.
      *
      * `tailwind.config.ts` re-exports each name as a utility (`bg-bolder-bg`,
      * `text-bolder-muted`, `rounded-card`, `font-display`, `shadow-glass`, ...),
-     * so no component ever names a colour, radius or font. A light landing theme
-     * is a matter of overriding these same names under a theme selector; the
-     * component tree needs no change.
+     * so no component ever names a colour, radius or font.
+     *
+     * Contrast is part of the token, not a per-screen opinion:
+     * - `--color-text-muted` clears 5.8:1 on the ivory canvas.
+     * - `--color-placeholder` clears 5.1:1.
+     * - `--color-line-control` clears 3.75:1, the WCAG non-text minimum, so a
+     *   form field's boundary is visible; `--color-line` stays light for
+     *   dividers, which are not the only indication of a control.
+     * - `--color-rose-action` carries white text at roughly 8:1.
+     * - `--color-gold` clears 4.1:1: it is an icon accent, not small text.
      */
-    --color-bg: #1a0d17;
-    --color-text: #f4e6ec;
-    --color-text-muted: #cdb8c4;
-    --color-placeholder: #7a6572;
+    --color-bg: #faf6ef;
+    --color-surface: #fffcf7;
+    --color-surface-muted: #f2eae0;
+    --color-text: #241f1c;
+    --color-text-muted: #6b5e57;
+    --color-placeholder: #75665d;
 
-    --color-rose: #f27a9b;
-    --color-rose-strong: #e8567f;
-    --color-rose-deep: #d63f6c;
-    /*
-     * Action surface for a solid rose button. `--color-rose` measures 2.61:1
-     * against white text and `--color-rose-deep` 4.39:1, so neither can carry
-     * the button label at WCAG AA; this deeper rose reaches 5.49:1 while staying
-     * in the supplied family. `--color-rose` itself is unchanged and still
-     * drives the accents (the italic headline word, the focus ring, the icon
-     * tiles) where it is used as a large-text or non-text colour.
-     */
-    --color-rose-action: #c22d5c;
+    --color-line: #e3d7cb;
+    --color-line-strong: #cfbfb1;
+    --color-line-control: #8f7b6c;
 
-    --color-blush: #f7b8c8;
-    --color-blush-light: #fac1d0;
+    --color-rose: #b96b7b;
+    --color-rose-strong: #9c4c5f;
+    --color-rose-deep: #7d3547;
+    --color-rose-action: #8a3149;
 
-    --color-leaf: #5fae91;
-    --color-leaf-text: #8fd0b6;
-    --color-leaf-dark: #3e8f73;
+    --color-blush: #e9cdd2;
+    --color-blush-light: #f4e3e5;
 
-    --color-gold: #f2b84b;
-    --color-plum: #3a1b33;
+    --color-leaf: #55705c;
+    --color-leaf-text: #55705c;
+    --color-leaf-dark: #3e5545;
+    --color-leaf-surface: #e7ede6;
+
+    --color-gold: #9a7030;
+    --color-plum: #4e2f38;
 
     /* Icon tiles behind the line icons; solid, because they must stay legible
        on a glass surface without relying on a second alpha layer. */
-    --tile-leaf: rgba(143, 208, 182, 0.16);
-    --tile-rose: rgba(242, 122, 155, 0.16);
+    --tile-leaf: #e7ede6;
+    --tile-rose: #f4e3e5;
 
-    --glass-bg: rgba(255, 255, 255, 0.09);
-    --glass-bg-soft: rgba(255, 255, 255, 0.06);
-    --glass-border: rgba(255, 255, 255, 0.18);
-    --glass-border-soft: rgba(255, 255, 255, 0.12);
+    --glass-bg: rgba(255, 252, 247, 0.78);
+    --glass-bg-soft: rgba(255, 252, 247, 0.6);
+    --glass-border: rgba(143, 123, 108, 0.35);
+    --glass-border-soft: rgba(143, 123, 108, 0.22);
     /* Solid stand-ins, used only where `backdrop-filter` is unsupported. */
-    --glass-bg-fallback: #33202f;
-    --glass-bg-soft-fallback: #2a1a27;
+    --glass-bg-fallback: #fffcf7;
+    --glass-bg-soft-fallback: #f9f3ea;
+
+    /* Interaction tokens. */
+    --color-focus-ring: #8a3149;
+    --color-focus-ring-offset: #faf6ef;
+    --color-overlay: rgba(36, 31, 28, 0.55);
+
+    /* Status text / surface / border. Never share a value with `brand`. */
+    --color-success: #3e6b4f;
+    --color-success-surface: #e6efe7;
+    --color-success-border: #b9cfbe;
+    --color-warning: #8a6420;
+    --color-warning-surface: #f7eedc;
+    --color-warning-border: #e3c98f;
+    --color-danger: #8c3a3a;
+    --color-danger-surface: #f6e3e1;
+    --color-danger-border: #e0b4b0;
+    --color-info: #3f5f73;
+    --color-info-surface: #e5edf1;
+    --color-info-border: #b7cbd8;
+    --color-neutral: #5f5751;
+    --color-neutral-surface: #efe8df;
+    --color-neutral-border: #d8ccc0;
+    --color-disabled: #8f7b6c;
+    --color-disabled-surface: #efe8df;
 
     --radius-pill: 999px;
-    --radius-card: 20px;
-    --radius-chip: 18px;
-    --radius-glass-card: 18px;
+    --radius-card: 16px;
+    --radius-chip: 10px;
+    --radius-control: 10px;
+    --radius-glass-card: 16px;
 
     --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
     --font-body: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
     --glow-rose: radial-gradient(
       circle,
-      rgba(242, 122, 155, 0.3) 0%,
-      rgba(214, 63, 108, 0.14) 42%,
-      rgba(26, 13, 23, 0) 70%
+      rgba(185, 107, 123, 0.22) 0%,
+      rgba(185, 107, 123, 0.08) 45%,
+      rgba(250, 246, 239, 0) 72%
     );
     --glow-leaf: radial-gradient(
       circle,
-      rgba(95, 174, 145, 0.26) 0%,
-      rgba(62, 143, 115, 0.12) 45%,
-      rgba(26, 13, 23, 0) 72%
+      rgba(85, 112, 92, 0.16) 0%,
+      rgba(85, 112, 92, 0.07) 50%,
+      rgba(250, 246, 239, 0) 74%
     );
 
-    --shadow-glass: 0 18px 40px rgba(10, 4, 9, 0.45);
-    --shadow-search: 0 18px 44px rgba(10, 4, 9, 0.55);
-    --shadow-button: 0 10px 24px rgba(194, 45, 92, 0.35);
+    --shadow-card: 0 1px 2px rgba(72, 52, 40, 0.04), 0 12px 28px rgba(72, 52, 40, 0.07);
+    --shadow-glass: 0 12px 32px rgba(72, 52, 40, 0.1);
+    --shadow-search: 0 18px 48px rgba(72, 52, 40, 0.14);
+    --shadow-button: 0 8px 20px rgba(138, 49, 73, 0.22);
+  }
+}
+
+/*
+ * Base surface. `overflow-x` is deliberately not clipped here: a horizontal
+ * scrollbar is a signal that an element overflows, and hiding it at the root
+ * would conceal the layout bug instead of fixing it. The decorative hero layer
+ * clips itself inside its own `overflow-hidden` parent.
+ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: var(--color-blush);
+    color: var(--color-text);
+  }
+
+  /*
+   * Fallback focus indicator for any interactive element that has not
+   * composed the shared ring. `:where()` keeps specificity at zero, so a
+   * component's own `focus-visible:outline-none` + ring utilities still win.
+   */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
   }
 }
 
@@ -314,7 +384,7 @@
   font-size: 380px;
   line-height: 1;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.05);
+  color: rgba(36, 31, 28, 0.045);
   pointer-events: none;
   user-select: none;
 }

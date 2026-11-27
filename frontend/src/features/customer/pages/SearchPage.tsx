@@ -11,6 +11,12 @@ import { CustomerErrorState } from "@/features/customer/components/CustomerError
 import { PageHeading } from "@/features/vendor/components/StatCard";
 import { Pagination } from "@/shared/components/Pagination";
 import { FadeIn } from "@/motion/FadeIn";
+import {
+  EMPTY_DESCRIPTION,
+  EMPTY_STATE,
+  EMPTY_TITLE,
+  PAGE_CONTAINER,
+} from "@/shared/ui/classes";
 
 interface PriceBounds {
   min: number | null;
@@ -139,12 +145,14 @@ export function SearchPage() {
 
   if (locationId === null) {
     return (
-      <div className="space-y-6">
-        <PageHeading
-          title="Search products"
-          description="Find flowers from florists who deliver to your area."
-        />
-        <LocationPrompt />
+      <div className={PAGE_CONTAINER}>
+        <div className="space-y-8">
+          <PageHeading
+            title="Search products"
+            description="Find flowers from florists who deliver to your area."
+          />
+          <LocationPrompt />
+        </div>
       </div>
     );
   }
@@ -156,70 +164,72 @@ export function SearchPage() {
   const products = results.data?.content ?? [];
 
   return (
-    <div className="space-y-6">
-      <PageHeading
-        title="Search products"
-        description={
-          selected
-            ? `Showing what can be delivered to ${selected.area}, ${selected.pincode}.`
-            : undefined
-        }
-      />
-
-      <SearchFilters
-        search={searchInput}
-        onSearchChange={setSearchInput}
-        onSearchSubmit={applySearchTerm}
-        categoryId={filters.categoryId}
-        onCategoryChange={(categoryId) => apply({ categoryId })}
-        categories={categories.data?.content ?? []}
-        priceMin={priceMinInput}
-        priceMax={priceMaxInput}
-        onPriceChange={(bound, value) => {
-          if (bound === "min") {
-            setPriceMinInput(value);
-          } else {
-            setPriceMaxInput(value);
+    <div className={PAGE_CONTAINER}>
+      <div className="space-y-8">
+        <PageHeading
+          title="Search products"
+          description={
+            selected
+              ? `Showing what can be delivered to ${selected.area}, ${selected.pincode}.`
+              : undefined
           }
-        }}
-        onPriceCommit={applyPriceBounds}
-        priceError={bounds.error}
-        sort={filters.sort}
-        onSortChange={(sort) => apply({ sort })}
-        onClear={clearFilters}
-      />
-
-      {results.isPending ? (
-        <FadeIn role="status" aria-busy="true" className="text-sm text-slate-600">
-          Searching...
-        </FadeIn>
-      ) : results.error ? (
-        <CustomerErrorState
-          error={results.error}
-          onRetry={() => void results.refetch()}
-          notFoundTitle="Nothing to show"
-          notFoundDescription="We could not read the products for this area."
         />
-      ) : products.length === 0 ? (
-        <FadeIn className="rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">No products match</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Try a different search term, or clear the filters to see everything.
-          </p>
-        </FadeIn>
-      ) : (
-        <ProductGrid
-          products={products}
-          detailPathBase="/search/products"
-          locationId={locationId}
+
+        <SearchFilters
+          search={searchInput}
+          onSearchChange={setSearchInput}
+          onSearchSubmit={applySearchTerm}
+          categoryId={filters.categoryId}
+          onCategoryChange={(categoryId) => apply({ categoryId })}
+          categories={categories.data?.content ?? []}
+          priceMin={priceMinInput}
+          priceMax={priceMaxInput}
+          onPriceChange={(bound, value) => {
+            if (bound === "min") {
+              setPriceMinInput(value);
+            } else {
+              setPriceMaxInput(value);
+            }
+          }}
+          onPriceCommit={applyPriceBounds}
+          priceError={bounds.error}
+          sort={filters.sort}
+          onSortChange={(sort) => apply({ sort })}
+          onClear={clearFilters}
         />
-      )}
 
-      {results.data && !results.isPending && !results.error && (
-        <Pagination page={results.data} onPageChange={(page) => setPage(page)} />
-      )}
+        {results.isPending ? (
+          <FadeIn role="status" aria-busy="true" className="text-sm text-bolder-muted">
+            Searching...
+          </FadeIn>
+        ) : results.error ? (
+          <CustomerErrorState
+            error={results.error}
+            onRetry={() => void results.refetch()}
+            notFoundTitle="Nothing to show"
+            notFoundDescription="We could not read the products for this area."
+          />
+        ) : products.length === 0 ? (
+          <FadeIn className={EMPTY_STATE}>
+            <h2 className={EMPTY_TITLE}>No products match</h2>
+            <p className={EMPTY_DESCRIPTION}>
+              Try a different search term, or clear the filters to see everything.
+            </p>
+          </FadeIn>
+        ) : (
+          <ProductGrid
+            products={products}
+            detailPathBase="/search/products"
+            locationId={locationId}
+          />
+        )}
 
-      <Outlet context={outletContext} />
+        {results.data && !results.isPending && !results.error && (
+          <Pagination page={results.data} onPageChange={(page) => setPage(page)} />
+        )}
+
+        <Outlet context={outletContext} />
+      </div>
     </div>
   );
 }

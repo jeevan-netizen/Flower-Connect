@@ -37,7 +37,7 @@ export function ProductGrid({
   emptyMessage = "No products to show yet.",
 }: ProductGridProps) {
   if (products.length === 0) {
-    return <p className="text-sm text-slate-600">{emptyMessage}</p>;
+    return <p className="text-sm text-bolder-muted">{emptyMessage}</p>;
   }
 
   return (

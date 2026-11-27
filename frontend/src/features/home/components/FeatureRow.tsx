@@ -44,13 +44,13 @@ const FEATURES: readonly Feature[] = [
     title: "Simple ordering",
     subtitle: "A few taps to checkout",
     Icon: CheckCircleIcon,
-    accent: "text-bolder-blush",
+    accent: "text-bolder-rose-strong",
   },
 ];
 
-/** Glass-soft surface shared by the four cards. No `backdrop-filter` here. */
+/** Paper surface shared by the four cards. No `backdrop-filter` here. */
 const CARD =
-  "flex items-center gap-[14px] rounded-card border border-glass-border-soft bg-glass-soft p-[22px]";
+  "flex items-center gap-[14px] rounded-card border border-bolder-line bg-bolder-surface p-[22px] shadow-card";
 
 /**
  * The feature row below the hero.

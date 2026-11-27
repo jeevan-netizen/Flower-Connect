@@ -4,7 +4,7 @@ import { VendorErrorState } from "@/features/vendor/components/VendorErrorState"
 import { VendorStatusBanner } from "@/features/vendor/components/VendorStatusBanner";
 import { countOpenDays } from "@/features/vendor/format";
 import { FlowerLoader } from "@/motion/FlowerLoader";
-import { FOCUS_RING } from "@/motion/pressable";
+import { navLinkClass } from "@/shared/ui/classes";
 
 interface VendorNavItem {
   to: string;
@@ -44,15 +44,7 @@ const NAV_ITEMS: VendorNavItem[] = [
 ];
 
 function navClass({ isActive }: { isActive: boolean }): string {
-  return [
-    // Duration/easing come from the motion tokens via `tailwind.config.ts`;
-    // `focus-visible` keeps a visible ring on the keyboard path.
-    "block rounded-md px-3 py-2 text-sm font-medium transition-colors duration-micro ease-standard",
-    FOCUS_RING,
-    isActive
-      ? "bg-brand-600 text-white"
-      : "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
-  ].join(" ");
+  return navLinkClass(isActive);
 }
 
 /**
@@ -71,15 +63,15 @@ export function VendorLayout() {
   const { data: profile, isPending, error, refetch } = useVendorProfile();
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:flex-row">
+    <div className="min-h-[60vh] bg-bolder-bg">
+      <div className="mx-auto flex w-full max-w-app flex-col gap-6 px-4 py-6 sm:px-6 md:flex-row lg:px-8">
         <aside className="md:w-60 md:shrink-0">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-lg font-bold text-brand-700">FlowerConnect</p>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Vendor area</p>
+          <div className="rounded-card border border-bolder-line bg-bolder-surface p-4 shadow-card">
+            <p className="font-display text-xl text-bolder-text">FlowerConnect</p>
+            <p className="mt-1 text-xs text-bolder-muted">Vendor area</p>
           </div>
 
-          <nav className="mt-4 rounded-lg border border-slate-200 bg-white p-2 shadow-sm" aria-label="Vendor">
+          <nav className="mt-4 rounded-card border border-bolder-line bg-bolder-surface p-2 shadow-card" aria-label="Vendor">
             <ul className="flex flex-col gap-1 md:flex-col">
               {NAV_ITEMS.filter((item) => !item.requiresApproval || profile?.status === "APPROVED").map(
                 (item) => (
@@ -99,7 +91,7 @@ export function VendorLayout() {
             <FlowerLoader
               label="Loading your vendor profile..."
               showLabel
-              className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600"
+              className="flex items-center gap-3 rounded-card border border-bolder-line bg-bolder-surface p-4 text-sm text-bolder-muted"
             />
           )}
 
@@ -108,7 +100,7 @@ export function VendorLayout() {
           {profile && (
             <>
               <VendorStatusBanner status={profile.status} />
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-bolder-muted">
                 Signed in as {profile.ownerEmail} · {countOpenDays(profile.hours)} of 7 days open
               </p>
             </>

@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
 import { clearFarmerCache } from "@/features/farmer/queries";
-import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
+import { BUTTON_SECONDARY, navLinkClass } from "@/shared/ui/classes";
 
 interface FarmerNavItem {
   to: string;
@@ -25,11 +25,7 @@ const NAV_ITEMS: FarmerNavItem[] = [
 ];
 
 function navClass({ isActive }: { isActive: boolean }): string {
-  return [
-    "block rounded-md px-3 py-2 text-sm font-medium transition-colors duration-micro ease-standard",
-    FOCUS_RING,
-    isActive ? "bg-brand-600 text-white" : "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
-  ].join(" ");
+  return navLinkClass(isActive);
 }
 
 export function FarmerLayout() {
@@ -44,15 +40,15 @@ export function FarmerLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:flex-row">
+    <div className="min-h-[60vh] bg-bolder-bg">
+      <div className="mx-auto flex w-full max-w-app flex-col gap-6 px-4 py-6 sm:px-6 md:flex-row lg:px-8">
         <aside className="md:w-60 md:shrink-0">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-lg font-bold text-brand-700">FlowerConnect</p>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Farmer area</p>
+          <div className="rounded-card border border-bolder-line bg-bolder-surface p-4 shadow-card">
+            <p className="font-display text-xl text-bolder-text">FlowerConnect</p>
+            <p className="mt-1 text-xs text-bolder-muted">Farmer area</p>
           </div>
 
-          <nav className="mt-4 rounded-lg border border-slate-200 bg-white p-2 shadow-sm" aria-label="Farmer">
+          <nav className="mt-4 rounded-card border border-bolder-line bg-bolder-surface p-2 shadow-card" aria-label="Farmer">
             <ul className="flex flex-col gap-1 md:flex-col">
               {NAV_ITEMS.map((item) => (
                 <li key={item.to}>
@@ -67,7 +63,7 @@ export function FarmerLayout() {
           <button
             type="button"
             onClick={handleLogout}
-            className={`mt-4 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
+            className={`mt-4 w-full ${BUTTON_SECONDARY}`}
           >
             Log out
           </button>

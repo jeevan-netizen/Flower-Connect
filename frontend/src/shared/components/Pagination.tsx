@@ -2,7 +2,7 @@ import { displayPageNumber } from "@/shared/format";
 import type { PageResponse } from "@/shared/types";
 import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
-const PAGE_BUTTON_CLASS = `rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
+const PAGE_BUTTON_CLASS = `rounded-md border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-sm font-medium text-bolder-text hover:bg-bolder-surface-muted disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
 
 interface PaginationProps<T> {
   /** The page response as the backend returned it. */
@@ -26,14 +26,14 @@ interface PaginationProps<T> {
 export function Pagination<T>({ page, onPageChange, disabled = false }: PaginationProps<T>) {
   return (
     <nav
-      className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4"
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-bolder-line pt-4"
       aria-label="Pagination"
     >
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-bolder-muted">
         {page.totalElements === 0
           ? "No results"
           : `Page ${displayPageNumber(page.page)} of ${Math.max(page.totalPages, 1)}`}
-        <span className="ml-2 text-slate-500">
+        <span className="ml-2 text-bolder-muted">
           {page.totalElements} total{page.totalElements === 1 ? "" : "s"}
         </span>
       </p>

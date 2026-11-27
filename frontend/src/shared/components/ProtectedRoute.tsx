@@ -53,10 +53,10 @@ export function ProtectedRoute({ roles, children }: ProtectedRouteProps) {
 
   if (roles && roles.length > 0 && (!user || !roles.includes(user.role))) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-        <div className="max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
-          <h1 className="text-lg font-semibold text-slate-900">Not available for your account</h1>
-          <p className="mt-2 text-sm text-slate-600">
+      <div className="min-h-screen flex items-center justify-center bg-bolder-bg px-4">
+        <div className="max-w-md rounded-lg border border-bolder-line bg-bolder-surface p-6 text-center shadow-sm">
+          <h1 className="text-lg font-semibold text-bolder-text">Not available for your account</h1>
+          <p className="mt-2 text-sm text-bolder-muted">
             Your account does not have access to this area.
           </p>
         </div>

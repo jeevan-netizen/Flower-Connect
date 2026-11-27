@@ -15,7 +15,7 @@ interface AddToCartButtonProps {
 }
 
 const BUTTON_CLASS =
-  "rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:cursor-not-allowed disabled:opacity-50";
 
 /**
  * Adds a product to the customer's cart.
@@ -101,13 +101,13 @@ export function AddToCartButton({
       </button>
 
       {added && !addItem.isPending && (
-        <p role="status" className="mt-2 text-sm text-green-700">
+        <p role="status" className="mt-2 text-sm text-bolder-success">
           {productName} added to your cart.
         </p>
       )}
 
       {error && (
-        <p role="alert" className="mt-2 text-sm text-red-600">
+        <p role="alert" className="mt-2 text-sm text-bolder-danger">
           {error}
         </p>
       )}

@@ -24,7 +24,7 @@ export function FlowerLoader({
 }: FlowerLoaderProps) {
   return (
     <div role="status" className={className ?? "flex items-center justify-center"}>
-      <span aria-hidden="true" className="fc-flower-spinner shrink-0 text-brand-500">
+      <span aria-hidden="true" className="fc-flower-spinner shrink-0 text-bolder-rose-action">
         <span />
         <span />
         <span />

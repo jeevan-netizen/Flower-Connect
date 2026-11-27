@@ -20,7 +20,7 @@ interface FlowerSuccessProps {
 export function FlowerSuccess({ message, className }: FlowerSuccessProps) {
   return (
     <div role="status" className={className ?? "flex items-center gap-2"}>
-      <span aria-hidden="true" className="fc-bloom-in inline-flex h-6 w-6 shrink-0 text-brand-600">
+      <span aria-hidden="true" className="fc-bloom-in inline-flex h-6 w-6 shrink-0 text-bolder-rose-action">
         <svg viewBox="0 0 24 24" className="h-6 w-6" focusable="false">
           {PETAL_ANGLES.map((angle) => (
             <ellipse

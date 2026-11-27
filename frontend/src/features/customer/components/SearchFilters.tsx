@@ -3,7 +3,7 @@ import type { Category } from "@/features/vendor/types";
 import { SORT_LABELS, SORT_OPTIONS, type SortOption } from "@/features/customer/types";
 import { FIELD_TRANSITION, FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
-const CONTROL_CLASS = `mt-1 block rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
+const CONTROL_CLASS = `mt-1 block rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
 
 interface SearchFiltersProps {
   /** The raw search box value, untrimmed: trimming while typing eats spaces. */
@@ -89,7 +89,7 @@ export function SearchFilters({
     priceMax.trim() !== "";
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-bolder-line bg-bolder-surface p-4 shadow-sm">
       <form
         className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4"
         onSubmit={(event) => {
@@ -98,7 +98,7 @@ export function SearchFilters({
         }}
       >
         <div>
-          <label htmlFor={searchId} className="block text-sm font-medium text-slate-700">
+          <label htmlFor={searchId} className="block text-sm font-medium text-bolder-text">
             Search products
           </label>
           <div className="mt-1 flex gap-2">
@@ -115,7 +115,7 @@ export function SearchFilters({
             <button
               type="submit"
               disabled={disabled}
-              className={`rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+              className={`rounded-md bg-bolder-rose-action px-3 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
             >
               Search
             </button>
@@ -123,7 +123,7 @@ export function SearchFilters({
         </div>
 
         <div>
-          <label htmlFor={priceMinId} className="block text-sm font-medium text-slate-700">
+          <label htmlFor={priceMinId} className="block text-sm font-medium text-bolder-text">
             Minimum price
           </label>
           <input
@@ -144,7 +144,7 @@ export function SearchFilters({
         </div>
 
         <div>
-          <label htmlFor={priceMaxId} className="block text-sm font-medium text-slate-700">
+          <label htmlFor={priceMaxId} className="block text-sm font-medium text-bolder-text">
             Maximum price
           </label>
           <input
@@ -163,14 +163,14 @@ export function SearchFilters({
             className={`${CONTROL_CLASS} w-full`}
           />
           {priceError && (
-            <p id={priceErrorId} role="alert" className="mt-1 text-sm text-red-600">
+            <p id={priceErrorId} role="alert" className="mt-1 text-sm text-bolder-danger">
               {priceError}
             </p>
           )}
         </div>
 
         <div>
-          <label htmlFor={sortId} className="block text-sm font-medium text-slate-700">
+          <label htmlFor={sortId} className="block text-sm font-medium text-bolder-text">
             Sort by
           </label>
           <select
@@ -191,7 +191,7 @@ export function SearchFilters({
 
       {categories.length > 0 && (
         <div role="group" aria-label="Filter by category" className="mt-4">
-          <span className="block text-sm font-medium text-slate-700">Category</span>
+          <span className="block text-sm font-medium text-bolder-text">Category</span>
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
             <button
               type="button"
@@ -200,8 +200,8 @@ export function SearchFilters({
               disabled={disabled}
               className={`whitespace-nowrap rounded-full border px-3 py-1 text-sm ${
                 categoryId === null
-                  ? "border-brand-600 bg-brand-50 font-medium text-brand-800"
-                  : "border-slate-300 bg-white text-slate-700 hover:border-brand-300"
+                  ? "border-bolder-rose-action bg-bolder-blush-light font-medium text-bolder-rose-deep"
+                  : "border-bolder-line-control bg-bolder-surface text-bolder-text hover:border-bolder-rose"
               } disabled:opacity-50 ${FOCUS_RING}`}
             >
               All categories
@@ -217,8 +217,8 @@ export function SearchFilters({
                 disabled={disabled}
                 className={`whitespace-nowrap rounded-full border px-3 py-1 text-sm ${
                   categoryId === category.id
-                    ? "border-brand-600 bg-brand-50 font-medium text-brand-800"
-                    : "border-slate-300 bg-white text-slate-700 hover:border-brand-300"
+                    ? "border-bolder-rose-action bg-bolder-blush-light font-medium text-bolder-rose-deep"
+                    : "border-bolder-line-control bg-bolder-surface text-bolder-text hover:border-bolder-rose"
                 } disabled:opacity-50 ${FOCUS_RING}`}
               >
                 {category.name}
@@ -233,7 +233,7 @@ export function SearchFilters({
           type="button"
           onClick={onClear}
           disabled={disabled}
-          className={`mt-3 text-sm font-medium text-brand-700 hover:text-brand-900 disabled:opacity-50 ${FOCUS_RING}`}
+          className={`mt-3 text-sm font-medium text-bolder-rose-strong hover:text-bolder-rose-deep disabled:opacity-50 ${FOCUS_RING}`}
         >
           Clear filters
         </button>

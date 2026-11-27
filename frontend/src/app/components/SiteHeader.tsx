@@ -23,19 +23,19 @@ const FARMER_ROLE = "FARMER";
 const CUSTOMER_ROLE = "CUSTOMER";
 
 /**
- * Header link treatment on the dark landing surface: 15px, weight 500, blush on
- * hover, and the shared dark focus ring so keyboard focus is visible against the
- * near-black background.
+ * Header link treatment on the ivory surface: 15px, weight 500, rose on hover,
+ * and the shared focus ring so keyboard focus is always visible.
  */
 const NAV_LINK =
-  "rounded-sm text-[15px] font-medium text-bolder-text transition-colors duration-micro ease-standard hover:text-bolder-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bolder-rose focus-visible:ring-offset-2 focus-visible:ring-offset-bolder-bg";
+  "rounded-sm text-[15px] font-medium text-bolder-text transition-colors duration-micro ease-standard hover:text-bolder-rose-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bolder-rose focus-visible:ring-offset-2 focus-visible:ring-offset-bolder-bg";
 
 /**
  * The pill in the right-hand cluster. Signed out it is the way in; signed in it
- * is the way out, so the two states share one shape and one focus ring.
+ * is the way out, so the two states share one shape and one focus ring. The
+ * primary action is rose; green is reserved for the botanical accents.
  */
 const NAV_PILL =
-  `inline-flex items-center rounded-pill border-[1.5px] border-bolder-blush px-6 py-[11px] text-[15px] font-medium text-bolder-blush transition-colors duration-micro ease-standard hover:bg-bolder-rose hover:text-bolder-bg hover:border-bolder-rose ${FOCUS_RING_DARK}`;
+  `inline-flex items-center rounded-pill border-[1.5px] border-transparent bg-bolder-rose-action px-6 py-[11px] text-[15px] font-medium text-white transition-colors duration-micro ease-standard hover:bg-bolder-rose-deep ${FOCUS_RING_DARK}`;
 
 /**
  * Three overlapping circles standing in for a rose head, sized by the design.
@@ -189,7 +189,7 @@ export function SiteHeader() {
               >
                 Cart
                 {cart?.totalItems && (
-                  <span className="ml-1 inline-flex items-center justify-center min-w-[1.5rem] h-[1.5rem] rounded-full bg-bolder-rose px-[6px] text-[10px] font-bold text-bolder-bg">
+                  <span className="ml-1 inline-flex h-[1.5rem] min-w-[1.5rem] items-center justify-center rounded-full bg-bolder-rose-action px-[6px] text-[10px] font-bold text-white">
                     {cart.totalItems}
                   </span>
                 )}
@@ -245,10 +245,10 @@ export function SiteHeader() {
   );
 
   return (
-    <header className="relative bg-bolder-bg text-bolder-text">
+    <header className="relative border-b border-bolder-line bg-bolder-bg text-bolder-text">
         <nav
           aria-label="Main"
-          className="mx-auto flex w-full max-w-landing items-center justify-between gap-4 sm:gap-6 px-5 py-4 sm:px-8 lg:px-14"
+          className="mx-auto flex w-full max-w-landing items-center justify-between gap-4 px-5 py-4 sm:gap-6 sm:px-8 lg:px-14"
         >
         <Link
           to="/"
@@ -291,7 +291,7 @@ export function SiteHeader() {
       {!isWide && menuOpen && (
         <div
           id={panelId}
-          className="absolute inset-x-0 top-full z-50 border-t border-glass-border bg-bolder-bg px-5 pb-6 pt-4 shadow-glass sm:px-8"
+          className="absolute inset-x-0 top-full z-50 border-t border-bolder-line bg-bolder-bg px-5 pb-6 pt-4 shadow-glass sm:px-8"
         >
           {renderLinks("flex flex-col items-start gap-5")}
         </div>

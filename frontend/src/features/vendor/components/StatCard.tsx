@@ -1,4 +1,5 @@
 import { AnimatedCard } from "@/motion/AnimatedCard";
+import { CARD, PAGE_DESCRIPTION, PAGE_TITLE } from "@/shared/ui/classes";
 
 interface StatCardProps {
   label: string;
@@ -14,13 +15,10 @@ interface StatCardProps {
  */
 export function StatCard({ label, value, hint }: StatCardProps) {
   return (
-    <AnimatedCard
-      hoverable={false}
-      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-    >
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+    <AnimatedCard hoverable={false} className={`${CARD} p-4 sm:p-5`}>
+      <p className="text-xs font-medium text-bolder-muted">{label}</p>
+      <p className="mt-2 font-display text-2xl leading-none text-bolder-text">{value}</p>
+      {hint && <p className="mt-2 text-xs text-bolder-muted">{hint}</p>}
     </AnimatedCard>
   );
 }
@@ -28,20 +26,17 @@ export function StatCard({ label, value, hint }: StatCardProps) {
 export function PageHeading({ title, description }: { title: string; description?: string }) {
   return (
     <div>
-      <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-      {description && <p className="mt-1 text-sm text-slate-600">{description}</p>}
+      <h1 className={PAGE_TITLE}>{title}</h1>
+      {description && <p className={PAGE_DESCRIPTION}>{description}</p>}
     </div>
   );
 }
 
 export function Card({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <AnimatedCard
-      hoverable={false}
-      className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
-    >
+    <AnimatedCard hoverable={false} className={`${CARD} p-5 sm:p-6`}>
       <section className="h-full">
-        {title && <h2 className="text-base font-semibold text-slate-900">{title}</h2>}
+        {title && <h2 className="font-display text-xl text-bolder-text">{title}</h2>}
         <div className={title ? "mt-4" : ""}>{children}</div>
       </section>
     </AnimatedCard>

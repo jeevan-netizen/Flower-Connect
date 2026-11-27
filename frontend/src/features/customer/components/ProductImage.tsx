@@ -42,7 +42,7 @@ export function ProductImage({
     <div
       role={hasImage ? undefined : "img"}
       aria-label={image ? alt : `No photo available for ${productName}`}
-      className={`flex aspect-[4/3] w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-center ${className}`}
+      className={`flex aspect-[4/3] w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-bolder-line bg-bolder-bg p-3 text-center ${className}`}
     >
       {hasImage ? (
         <img
@@ -53,18 +53,18 @@ export function ProductImage({
         />
       ) : (
         <>
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Photo</span>
+          <span className="text-xs font-medium uppercase tracking-wide text-bolder-muted">Photo</span>
           {image ? (
             <>
-              <span className="w-full truncate text-sm font-medium text-slate-700">
+              <span className="w-full truncate text-sm font-medium text-bolder-text">
                 {image.originalFilename ?? "Unnamed file"}
               </span>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-bolder-muted">
                 {image.mimeType} · {image.fileSize} bytes
               </span>
             </>
           ) : (
-            <span className="text-sm text-slate-500">No photo yet</span>
+            <span className="text-sm text-bolder-muted">No photo yet</span>
           )}
         </>
       )}

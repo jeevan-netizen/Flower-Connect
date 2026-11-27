@@ -5,6 +5,7 @@ import { ProductImage } from "@/features/customer/components/ProductImage";
 import { createOverlayState } from "@/features/customer/navigation";
 import { AnimatedCard } from "@/motion/AnimatedCard";
 import { PRESSABLE } from "@/motion/pressable";
+import { CARD } from "@/shared/ui/classes";
 
 interface ProductCardProps {
   product: PublicProduct;
@@ -59,12 +60,12 @@ export function ProductCard({
   const overlayState = createOverlayState();
 
   return (
-    <AnimatedCard className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <article className="flex h-full flex-col gap-3">
+    <AnimatedCard className={`${CARD} flex p-4`}>
+      <article className="flex h-full w-full flex-col gap-3">
         <Link
           to={detailPath}
           state={overlayState}
-          className="block focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 rounded-lg"
+          className="block rounded-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bolder-rose focus-visible:ring-offset-2"
         >
           <ProductImage
             productId={product.id}
@@ -75,28 +76,28 @@ export function ProductCard({
         </Link>
 
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-slate-900">
+          <h3 className="text-sm font-semibold text-bolder-text">
             <Link
               to={detailPath}
               state={overlayState}
-              className="hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 rounded"
+              className="hover:text-bolder-rose-strong focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 rounded"
             >
               {product.name}
             </Link>
           </h3>
-          <p className="mt-1 text-xs text-slate-500">{product.vendorName}</p>
-          <p className="mt-1 text-xs text-slate-500">{product.categoryName}</p>
+          <p className="mt-1 text-xs text-bolder-muted">{product.vendorName}</p>
+          <p className="mt-1 text-xs text-bolder-muted">{product.categoryName}</p>
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          <span className="text-base font-semibold text-slate-900">
+          <span className="text-base font-semibold text-bolder-text">
             {formatMoney(product.basePrice)}
           </span>
           <span
             className={
               product.available !== null && product.available <= 3
-                ? "text-xs font-medium text-amber-700"
-                : "text-xs text-slate-500"
+                ? "text-xs font-medium text-bolder-warning"
+                : "text-xs text-bolder-muted"
             }
           >
             {formatAvailability(product.available)}
@@ -109,7 +110,7 @@ export function ProductCard({
             onClick={() => onAddToCart(product)}
             disabled={isAdding || product.available === 0}
             aria-label={`Add ${product.name} to cart`}
-            className={`w-full rounded-md border border-transparent bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE}`}
+            className={`w-full rounded-md border border-transparent bg-bolder-rose-action px-3 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE}`}
           >
             {isAdding ? "Adding..." : "Add to cart"}
           </button>

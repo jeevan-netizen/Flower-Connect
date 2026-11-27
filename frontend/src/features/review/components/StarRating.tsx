@@ -61,7 +61,7 @@ export function StarRating({
   if (!hasReviews && !interactive) {
     return (
       <span
-        className={`inline-flex items-center gap-1 text-slate-500 text-sm ${className ?? ""}`}
+        className={`inline-flex items-center gap-1 text-bolder-muted text-sm ${className ?? ""}`}
         aria-label="No reviews yet"
       >
         {emptyLabel}
@@ -89,8 +89,8 @@ export function StarRating({
                 aria-label={`Rate ${starValue} of 5`}
                 aria-pressed={value === starValue}
                 onClick={() => onSelect?.(starValue)}
-                className={`p-1 text-slate-300 hover:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500 rounded ${
-                  starValue <= (value ?? 0) ? "text-amber-400" : ""
+                className={`p-1 text-bolder-muted hover:text-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose rounded ${
+                  starValue <= (value ?? 0) ? "text-bolder-rose-deep" : ""
                 }`}
               >
                 {star}
@@ -98,7 +98,7 @@ export function StarRating({
             );
           })
         : stars}
-      <span className="ml-1 text-sm text-slate-600">{label}</span>
+      <span className="ml-1 text-sm text-bolder-muted">{label}</span>
     </div>
   );
 }

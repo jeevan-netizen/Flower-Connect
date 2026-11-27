@@ -10,7 +10,15 @@ import { CustomerErrorState } from "@/features/customer/components/CustomerError
 import { formatAvailability, formatMoney } from "@/features/customer/format";
 import { PageHeading } from "@/features/vendor/components/StatCard";
 import { CART_MAX_QUANTITY } from "@/features/cart/types";
-import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
+import { FOCUS_RING } from "@/motion/pressable";
+import {
+  BUTTON_SECONDARY,
+  CARD,
+  CONTROL,
+  OVERLAY,
+  PAGE_CONTAINER,
+  PAGE_TITLE,
+} from "@/shared/ui/classes";
 
 /** The backend caps the gift note at 1000 characters (`@Size(max = 1000)`). */
 const NOTE_MAX_LENGTH = 1000;
@@ -104,39 +112,47 @@ export function ProductDetailPage() {
 
   if (!validProductId) {
     return (
-      <CustomerErrorState
-        error={MALFORMED_PRODUCT_ID_ERROR}
-        notFoundTitle="This product is not available"
-        notFoundDescription="It may be sold out, or the shop may not deliver to your area."
-      />
+      <div className={PAGE_CONTAINER}>
+        <CustomerErrorState
+          error={MALFORMED_PRODUCT_ID_ERROR}
+          notFoundTitle="This product is not available"
+          notFoundDescription="It may be sold out, or the shop may not deliver to your area."
+        />
+      </div>
     );
   }
 
   if (locationId === null) {
     return (
-      <div className="space-y-6">
-        <PageHeading title="Product" />
-        <LocationPrompt />
+      <div className={PAGE_CONTAINER}>
+        <div className="space-y-8">
+          <PageHeading title="Product" />
+          <LocationPrompt />
+        </div>
       </div>
     );
   }
 
   if (product.isPending) {
     return (
-      <p role="status" aria-busy="true" className="text-sm text-slate-600">
-        Loading product...
-      </p>
+      <div className={PAGE_CONTAINER}>
+        <p role="status" aria-busy="true" className="text-sm text-bolder-muted">
+          Loading product...
+        </p>
+      </div>
     );
   }
 
   if (product.error) {
     return (
-      <CustomerErrorState
-        error={product.error}
-        onRetry={() => void product.refetch()}
-        notFoundTitle="This product is not available"
-        notFoundDescription="It may be sold out, or the shop may not deliver to your area."
-      />
+      <div className={PAGE_CONTAINER}>
+        <CustomerErrorState
+          error={product.error}
+          onRetry={() => void product.refetch()}
+          notFoundTitle="This product is not available"
+          notFoundDescription="It may be sold out, or the shop may not deliver to your area."
+        />
+      </div>
     );
   }
 
@@ -151,7 +167,7 @@ export function ProductDetailPage() {
       {!isOverlay && returnPath && (
         <Link
           to={returnPath}
-          className={`inline-flex items-center text-sm font-medium text-brand-700 hover:text-brand-900 ${FOCUS_RING}`}
+          className={`inline-flex items-center text-sm font-medium text-bolder-rose-strong hover:text-bolder-rose-deep ${FOCUS_RING}`}
         >
           Back to {returnLabel}
         </Link>
@@ -166,28 +182,28 @@ export function ProductDetailPage() {
         />
 
         <div>
-          <p className="text-sm text-slate-500">{item.vendorName}</p>
-          <h1 id={titleId} className="mt-1 text-2xl font-bold text-slate-900">
+          <p className="text-sm text-bolder-muted">{item.vendorName}</p>
+          <h1 id={titleId} className={`mt-1 ${PAGE_TITLE}`}>
             {item.name}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">{item.categoryName}</p>
-          <p className="mt-3 text-2xl font-semibold text-slate-900">
+          <p className="mt-1 text-sm text-bolder-muted">{item.categoryName}</p>
+          <p className="mt-4 font-display text-3xl text-bolder-text">
             {formatMoney(item.basePrice)}
           </p>
-          <p className="mt-1 text-sm text-slate-600">{formatAvailability(item.available)}</p>
+          <p className="mt-1 text-sm text-bolder-muted">{formatAvailability(item.available)}</p>
 
           {item.description && (
-            <p className="mt-4 text-sm text-slate-700">{item.description}</p>
+            <p className="mt-4 text-sm leading-relaxed text-bolder-muted">{item.description}</p>
           )}
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">Add to your cart</h2>
+      <div className={`${CARD} p-5 sm:p-6`}>
+        <h2 className="font-display text-2xl text-bolder-text">Add to your cart</h2>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor={quantityId} className="block text-sm font-medium text-slate-700">
+            <label htmlFor={quantityId} className="block text-sm font-medium text-bolder-text">
               Quantity
             </label>
             <input
@@ -200,12 +216,12 @@ export function ProductDetailPage() {
               value={quantityInput}
               onChange={(event) => setQuantityInput(event.target.value)}
               onBlur={() => setQuantityInput(String(quantity))}
-              className="mt-1 block w-24 rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+              className={`mt-1 w-24 ${CONTROL}`}
             />
           </div>
 
           <div>
-            <label htmlFor={noteId} className="block text-sm font-medium text-slate-700">
+            <label htmlFor={noteId} className="block text-sm font-medium text-bolder-text">
               Gift note (optional)
             </label>
             <textarea
@@ -215,9 +231,9 @@ export function ProductDetailPage() {
               rows={3}
               onChange={(event) => setNote(event.target.value)}
               placeholder="Add a message with the flowers..."
-              className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+              className={`mt-1 ${CONTROL}`}
             />
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-bolder-muted">
               {note.length} of {NOTE_MAX_LENGTH} characters
             </p>
           </div>
@@ -236,23 +252,18 @@ export function ProductDetailPage() {
   );
 
   if (!isOverlay) {
-    return detail;
+    return <div className={PAGE_CONTAINER}>{detail}</div>;
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-4 sm:p-8"
-    >
-      <div className="mx-auto max-w-3xl rounded-lg bg-slate-50 p-5 shadow-xl">
+    <div role="dialog" aria-modal="true" aria-labelledby={titleId} className={OVERLAY}>
+      <div className="mx-auto w-full max-w-3xl rounded-card border border-bolder-line bg-bolder-bg p-5 shadow-glass sm:p-6">
         <div className="flex justify-end">
           <button
             type="button"
             onClick={() => close?.()}
             aria-label="Close product details"
-            className={`rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
+            className={`${BUTTON_SECONDARY} px-3 py-1.5`}
           >
             Close
           </button>

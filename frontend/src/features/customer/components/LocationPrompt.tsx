@@ -44,10 +44,10 @@ export function LocationPrompt({
           a screen reader.
         */}
         <div role="region" aria-labelledby={headingId}>
-          <h2 id={headingId} className="text-lg font-semibold text-slate-900">
+          <h2 id={headingId} className="text-lg font-semibold text-bolder-text">
             {title}
           </h2>
-          <p className="mt-1 text-sm text-slate-600">{description}</p>
+          <p className="mt-1 text-sm text-bolder-muted">{description}</p>
 
           <div className="mt-4 max-w-sm">
             <LocationPicker

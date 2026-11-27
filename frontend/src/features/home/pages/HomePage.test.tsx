@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { HomePage } from "./HomePage";
@@ -8,23 +8,12 @@ import { makeServiceLocations } from "@/test/factories";
 import type { ServiceLocationGroup } from "@/features/location/types";
 
 /**
- * `HomePage` lazy-loads the bouquet, so these tests drive the pending state
- * rather than waiting for a chunk: the stub suspends forever on demand and is
- * released for the cases that need the scene mounted. What matters here is the
- * page's own contract — the heading, copy, location picker, calls to action,
- * feature row and decoration are outside the canvas, in the initial chunk, and
- * usable while the 3D scene is still loading or has failed.
+ * The hero transitions from a lazy 3D scene to a static inline illustration, so
+ * these tests no longer drive a suspense state. What matters is the page's own
+ * contract — the heading, copy, location picker, calls to action, feature row
+ * and decoration — all of which render immediately and without any network
+ * request for the artwork.
  */
-const hero = vi.hoisted(() => ({ pending: true }));
-
-vi.mock("@/features/home/hero/BouquetHero", () => ({
-  default: function BouquetHeroStub() {
-    if (hero.pending) {
-      throw new Promise<void>(() => {});
-    }
-    return <div data-testid="stub-hero" />;
-  },
-}));
 
 /**
  * The hero's location picker reads the shared locations query and the real
@@ -69,10 +58,6 @@ function renderHome() {
   );
 }
 
-afterEach(() => {
-  hero.pending = false;
-});
-
 describe("HomePage", () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -83,23 +68,18 @@ describe("HomePage", () => {
     mockQueryState.error = null;
   });
 
-  it("renders the heading, copy and calls to action while the scene is still loading", async () => {
-    hero.pending = true;
+  it("renders the heading, copy and calls to action with the static illustration", () => {
     renderHome();
-    // Let the dynamic import settle; the stub keeps suspending afterwards, so
-    // the fallback is still what the visitor sees.
-    await act(async () => {});
 
     expect(
       screen.getByRole("heading", { name: /flowers, beautifully delivered/i, level: 1 }),
     ).toBeInTheDocument();
     expect(screen.getByText("Local florists near you")).toBeInTheDocument();
     expect(screen.getByText(/discover independent florists/i)).toBeInTheDocument();
-    expect(screen.getByTestId("hero-fallback")).toBeInTheDocument();
+    expect(screen.getByTestId("botanical-hero")).toBeInTheDocument();
   });
 
   it("gives the location field a real label rather than only a placeholder", () => {
-    hero.pending = true;
     renderHome();
 
     // The hero's picker is a select over the seeded areas, not free text: a
@@ -113,7 +93,6 @@ describe("HomePage", () => {
 
   it("stores the chosen area for the session when the visitor picks one", async () => {
     const user = userEvent.setup();
-    hero.pending = true;
     renderHome();
 
     await user.selectOptions(screen.getByLabelText("Delivery location"), "4");
@@ -137,7 +116,6 @@ describe("HomePage", () => {
 
   it("navigates to the browse route with the session holding the selection", async () => {
     const user = userEvent.setup();
-    hero.pending = true;
     renderHome();
 
     await user.selectOptions(screen.getByLabelText("Delivery location"), "3");
@@ -151,7 +129,6 @@ describe("HomePage", () => {
 
   it("still navigates to the browse route with no area chosen", async () => {
     const user = userEvent.setup();
-    hero.pending = true;
     renderHome();
 
     await user.click(screen.getByRole("button", { name: "Explore Flowers" }));
@@ -161,7 +138,6 @@ describe("HomePage", () => {
   });
 
   it("disables the picker and explains the state while the areas load", async () => {
-    hero.pending = true;
     mockQueryState.cities = undefined;
     mockQueryState.isPending = true;
     mockQueryState.isSuccess = false;
@@ -178,7 +154,6 @@ describe("HomePage", () => {
 
   it("explains a failed fetch and offers a retry without breaking navigation", async () => {
     const user = userEvent.setup();
-    hero.pending = true;
     mockQueryState.cities = undefined;
     mockQueryState.isPending = false;
     mockQueryState.isSuccess = false;
@@ -195,7 +170,6 @@ describe("HomePage", () => {
   });
 
   it("explains an empty region instead of offering an unusable picker", async () => {
-    hero.pending = true;
     mockQueryState.cities = [];
     renderHome();
 
@@ -204,7 +178,6 @@ describe("HomePage", () => {
   });
 
   it("points the florist call to action at the existing vendor registration route", () => {
-    hero.pending = true;
     renderHome();
 
     expect(screen.getByRole("link", { name: /become a florist/i })).toHaveAttribute(
@@ -215,7 +188,6 @@ describe("HomePage", () => {
   });
 
   it("keeps the florist call to action usable while the scene is still loading", async () => {
-    hero.pending = true;
     renderHome();
 
     await userEvent.click(screen.getByRole("link", { name: /become a florist/i }));
@@ -224,14 +196,12 @@ describe("HomePage", () => {
   });
 
   it("describes the bouquet in text for anyone who never sees the canvas", () => {
-    hero.pending = true;
     renderHome();
 
     expect(screen.getByText(/hand-tied bouquet of rose, blush and gold/i)).toBeInTheDocument();
   });
 
   it("hides the decorative background layer from assistive technology and the pointer", () => {
-    hero.pending = true;
     const { container } = renderHome();
 
     const backdrop = container.querySelector('[aria-hidden="true"].pointer-events-none');
@@ -240,7 +210,6 @@ describe("HomePage", () => {
   });
 
   it("lists the four capabilities with no invented numbers or social proof", () => {
-    hero.pending = true;
     renderHome();
 
     expect(
@@ -257,11 +226,10 @@ describe("HomePage", () => {
     expect(screen.queryByText(/\d+\+?\s*(rating|review|customer|florist)/i)).not.toBeInTheDocument();
   });
 
-  it("mounts the scene without disturbing the page once it has loaded", async () => {
-    hero.pending = false;
+  it("keeps the illustration decorative and the calls to action intact", () => {
     renderHome();
 
-    expect(await screen.findByTestId("stub-hero")).toBeInTheDocument();
+    expect(screen.getByTestId("botanical-hero")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: /flowers, beautifully delivered/i, level: 1 }),
     ).toBeInTheDocument();
@@ -272,7 +240,6 @@ describe("HomePage", () => {
   });
 
   it("composes the shared press feedback and focus ring on the search button", () => {
-    hero.pending = true;
     renderHome();
 
     const cta = screen.getByRole("button", { name: "Explore Flowers" });
@@ -282,7 +249,6 @@ describe("HomePage", () => {
   });
 
   it("gives every hero control a visible focus indicator", () => {
-    hero.pending = true;
     renderHome();
 
     // The picker's own outline is suppressed because the pill around it lights

@@ -63,7 +63,7 @@ export function HeroSearch() {
       <form
         role="search"
         onSubmit={handleSubmit}
-        className="flex w-full flex-col gap-2 rounded-pill bg-white/95 p-2 pl-5 shadow-search transition-shadow duration-micro ease-standard focus-within:ring-2 focus-within:ring-bolder-rose sm:flex-row sm:items-center sm:gap-3 sm:pl-6"
+        className="flex w-full flex-col gap-2 rounded-pill border border-bolder-line bg-bolder-surface/95 p-2 pl-5 shadow-search transition-shadow duration-micro ease-standard focus-within:ring-2 focus-within:ring-bolder-rose sm:flex-row sm:items-center sm:gap-3 sm:pl-6"
       >
         <label htmlFor="home-location" className="sr-only">
           Delivery location
@@ -94,7 +94,7 @@ export function HeroSearch() {
         <button
           type="button"
           onClick={refetch}
-          className={`mt-1 inline-flex rounded-sm text-[14px] font-medium text-bolder-blush underline underline-offset-2 ${PRESSABLE} ${FOCUS_RING_DARK}`}
+          className={`mt-1 inline-flex rounded-sm text-[14px] font-medium text-bolder-rose-strong underline underline-offset-2 ${PRESSABLE} ${FOCUS_RING_DARK}`}
         >
           Try again
         </button>

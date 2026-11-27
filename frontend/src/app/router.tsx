@@ -104,8 +104,10 @@ function Layout() {
           </AnimatedPage>
         </AnimatePresence>
       </main>
-      <footer className="border-t border-glass-border-soft bg-bolder-bg py-4 text-center text-sm text-bolder-muted">
-        &copy; 2026 FlowerConnect
+      <footer className="border-t border-bolder-line bg-bolder-bg py-8">
+        <p className="mx-auto w-full max-w-landing px-5 text-center text-sm text-bolder-muted sm:px-8 lg:px-14">
+          &copy; 2026 FlowerConnect
+        </p>
       </footer>
     </div>
   );

@@ -11,7 +11,7 @@ describe("StatusPill", () => {
   });
 
   it("forwards rest props so a screen can keep its own test hook", () => {
-    render(<StatusPill tone="bg-slate-200 text-slate-800" label="Rejected" data-testid="pill" />);
+    render(<StatusPill tone="bg-bolder-blush-light text-bolder-rose-deep" label="Rejected" data-testid="pill" />);
 
     expect(screen.getByTestId("pill")).toHaveTextContent("Rejected");
   });
@@ -25,7 +25,7 @@ describe("StatusPill", () => {
   it("shows the new label and not the old one when the status changes", () => {
     const { rerender } = render(<StatusPill tone="bg-amber-100 text-amber-800" label="Awaiting approval" />);
 
-    rerender(<StatusPill tone="bg-brand-100 text-brand-900" label="Approved" />);
+    rerender(<StatusPill tone="bg-bolder-blush-light text-bolder-rose-deep" label="Approved" />);
 
     expect(screen.getByText("Approved")).toBeInTheDocument();
     expect(screen.queryByText("Awaiting approval")).not.toBeInTheDocument();

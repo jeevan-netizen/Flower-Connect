@@ -15,18 +15,18 @@ interface StorefrontHoursProps {
  */
 export function StorefrontHours({ hours }: StorefrontHoursProps) {
   if (hours.length === 0) {
-    return <p className="text-sm text-slate-600">Opening hours have not been published.</p>;
+    return <p className="text-sm text-bolder-muted">Opening hours have not been published.</p>;
   }
 
   return (
-    <ul className="divide-y divide-slate-100">
+    <ul className="divide-y divide-bolder-line">
       {hours.map((hour) => (
         <li
           key={hour.weekday}
           className="flex items-center justify-between gap-4 py-2 text-sm"
         >
-          <span className="font-medium text-slate-700">{formatWeekday(hour.weekday)}</span>
-          <span className={hour.closed ? "text-slate-500" : "text-slate-900"}>
+          <span className="font-medium text-bolder-text">{formatWeekday(hour.weekday)}</span>
+          <span className={hour.closed ? "text-bolder-muted" : "text-bolder-text"}>
             {formatOpeningHours(hour.openTime, hour.closeTime, hour.closed)}
           </span>
         </li>
