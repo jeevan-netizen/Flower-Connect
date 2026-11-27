@@ -62,14 +62,14 @@ export function AdminReviewsPage() {
       />
 
       {/* Filter */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap items-center gap-3">
-        <label className="text-xs font-medium text-slate-700">Filter</label>
+      <div className="rounded-lg border border-bolder-line bg-bolder-surface p-4 shadow-sm flex flex-wrap items-center gap-3">
+        <label className="text-xs font-medium text-bolder-muted">Filter</label>
         <button
           onClick={() => setHiddenFilter(null)}
           className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
             hiddenFilter === null
-              ? "bg-brand-600 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              ? "bg-bolder-rose-action text-white"
+              : "bg-bolder-bg text-bolder-text hover:bg-bolder-bg-muted"
           } ${FOCUS_RING} ${PRESSABLE}`}
         >
           All
@@ -78,8 +78,8 @@ export function AdminReviewsPage() {
           onClick={() => setHiddenFilter(false)}
           className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
             hiddenFilter === false
-              ? "bg-brand-600 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              ? "bg-bolder-rose-action text-white"
+              : "bg-bolder-bg text-bolder-text hover:bg-bolder-bg-muted"
           } ${FOCUS_RING} ${PRESSABLE}`}
         >
           Visible
@@ -88,8 +88,8 @@ export function AdminReviewsPage() {
           onClick={() => setHiddenFilter(true)}
           className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
             hiddenFilter === true
-              ? "bg-brand-600 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              ? "bg-bolder-rose-action text-white"
+              : "bg-bolder-bg text-bolder-text hover:bg-bolder-bg-muted"
           } ${FOCUS_RING} ${PRESSABLE}`}
         >
           Hidden
@@ -97,13 +97,13 @@ export function AdminReviewsPage() {
       </div>
 
       {/* Review list */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm">
         {adminReviews.isPending ? (
-          <FadeIn role="status" aria-busy="true" className="text-sm text-slate-600">
+          <FadeIn role="status" aria-busy="true" className="text-sm text-bolder-muted">
             Loading reviews…
           </FadeIn>
         ) : hasData && reviewData.length === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-bolder-muted">
             No reviews match this filter.
           </p>
         ) : (
@@ -111,7 +111,7 @@ export function AdminReviewsPage() {
             {reviewData.map((review) => (
               <li
                 key={review.id}
-                className="flex flex-col gap-2 pt-4 border-t border-slate-100 first:pt-0 first:border-0"
+                className="flex flex-col gap-2 pt-4 border-t border-bolder-line first:pt-0 first:border-0"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -120,16 +120,16 @@ export function AdminReviewsPage() {
                       reviewCount={1}
                       className="text-sm"
                     />
-                    <span className="text-xs font-medium text-slate-900">
+                    <span className="text-xs font-medium text-bolder-text">
                       {review.customerName}
                     </span>
                     {review.hidden && (
-                      <span className="text-[10px] font-medium text-amber-600 bg-amber-50 rounded px-2 py-0.5 border border-amber-100">
+                      <span className="text-[10px] font-medium text-bolder-warning bg-bolder-warning-surface rounded px-2 py-0.5 border border-bolder-warning-border">
                         Hidden
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-bolder-muted">
                     Order #{review.orderId} ·
                     {new Date(review.createdAt).toLocaleDateString(undefined, {
                       year: "numeric",
@@ -140,15 +140,15 @@ export function AdminReviewsPage() {
                 </div>
 
                 {review.comment && (
-                  <p className="text-sm text-slate-700">{review.comment}</p>
+                  <p className="text-sm text-bolder-text">{review.comment}</p>
                 )}
 
                 {review.vendorReply && (
-                  <div className="mt-1 rounded-lg border border-brand-100 bg-brand-50 p-2 text-sm">
-                    <p className="text-xs font-semibold text-brand-900">
+                  <div className="mt-1 rounded-lg border border-bolder-blush-light bg-bolder-blush-light p-2 text-sm">
+                    <p className="text-xs font-semibold text-bolder-rose-deep">
                       Vendor reply:
                     </p>
-                    <p className="mt-0.5 text-brand-700">{review.vendorReply}</p>
+                    <p className="mt-0.5 text-bolder-rose-strong">{review.vendorReply}</p>
                   </div>
                 )}
 
@@ -166,8 +166,8 @@ export function AdminReviewsPage() {
                       disabled={isModerating && moderateTarget !== null}
                       className={`text-xs font-medium rounded-md border border-transparent px-2.5 py-1.5 ${
                         isModerating && moderateTarget !== null
-                          ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                          : "bg-red-600 text-white hover:bg-red-700 ${PRESSABLE} ${FOCUS_RING}"
+                          ? "bg-bolder-bg text-bolder-muted cursor-not-allowed"
+                          : "bg-bolder-rose-action text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}"
                       }`}
                     >
                       {isModerating && moderateTarget === review.id
@@ -181,8 +181,8 @@ export function AdminReviewsPage() {
                       disabled={isModerating && moderateTarget !== null}
                       className={`text-xs font-medium rounded-md border border-transparent px-2.5 py-1.5 ${
                         isModerating && moderateTarget !== null
-                          ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                          : "bg-brand-600 text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}"
+                          ? "bg-bolder-bg text-bolder-muted cursor-not-allowed"
+                          : "bg-bolder-rose-action text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}"
                       }`}
                     >
                       {isModerating && moderateTarget === review.id

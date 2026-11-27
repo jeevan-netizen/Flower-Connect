@@ -52,10 +52,10 @@ interface MetricCardProps {
 /** KPI card for an overview metric. */
 function MetricCard({ label, value, sublabel }: MetricCardProps) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
-      {sublabel && <p className="mt-0.5 text-xs text-slate-500">{sublabel}</p>}
+    <div className="rounded-lg border border-bolder-line bg-bolder-surface p-4 shadow-sm">
+      <p className="text-xs uppercase tracking-wide text-bolder-muted">{label}</p>
+      <p className="mt-1 text-xl font-bold text-bolder-text">{value}</p>
+      {sublabel && <p className="mt-0.5 text-xs text-bolder-muted">{sublabel}</p>}
     </div>
   );
 }
@@ -74,8 +74,8 @@ function DailyTrendChart({ trends }: { trends: AnalyticsDailyTrend[] }) {
   const barWidth = 14;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-slate-900 mb-4">
+    <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm">
+      <h2 className="text-base font-semibold text-bolder-text mb-4">
         Daily delivered orders
       </h2>
       <div className="flex items-end gap-1 h-[160px] pb-4">
@@ -87,18 +87,18 @@ function DailyTrendChart({ trends }: { trends: AnalyticsDailyTrend[] }) {
               <svg
                 width={barWidth}
                 height={barHeight}
-                className="text-brand-600"
+                className="text-bolder-rose-action"
               >
                 <rect width={barWidth} height={barHeight} rx={2} className="fill-current" />
               </svg>
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] text-bolder-muted">
                 {formatDisplayDate(trend.date)}
               </span>
             </div>
           );
         })}
       </div>
-      <div className="mt-2 flex justify-between text-[10px] text-slate-500">
+      <div className="mt-2 flex justify-between text-[10px] text-bolder-muted">
         <span>Orders per day</span>
         <span>UTC buckets</span>
       </div>
@@ -109,12 +109,12 @@ function DailyTrendChart({ trends }: { trends: AnalyticsDailyTrend[] }) {
 /** Data table for the daily trend series (always rendered, accessibility fallback). */
 function DailyTrendTable({ trends }: { trends: AnalyticsDailyTrend[] }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm mt-6">
-      <h2 className="text-base font-semibold text-slate-900 mb-3">
+    <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm mt-6">
+      <h2 className="text-base font-semibold text-bolder-text mb-3">
         Daily trend detail
       </h2>
-      <table className="w-full text-left text-sm divide-y divide-slate-100">
-        <thead className="text-xs uppercase tracking-wide text-slate-500">
+      <table className="w-full text-left text-sm divide-y divide-bolder-line">
+        <thead className="text-xs uppercase tracking-wide text-bolder-muted">
           <tr>
             <th scope="col" className="py-3 pr-4 font-medium">
               Date
@@ -127,16 +127,16 @@ function DailyTrendTable({ trends }: { trends: AnalyticsDailyTrend[] }) {
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-50">
+        <tbody className="divide-y divide-bolder-line">
           {trends.map((trend) => (
             <tr key={trend.date} className="align-top">
-              <td className="py-3 pr-4 text-slate-900">
+              <td className="py-3 pr-4 text-bolder-text">
                 {formatDisplayDate(trend.date)}
               </td>
-              <td className="py-3 pr-4 text-right text-slate-900">
+              <td className="py-3 pr-4 text-right text-bolder-text">
                 {trend.orderCount}
               </td>
-              <td className="py-3 font-medium text-right text-slate-900">
+              <td className="py-3 font-medium text-right text-bolder-text">
                 {formatMoney(trend.revenue)}
               </td>
             </tr>
@@ -227,8 +227,8 @@ export function AdminAnalyticsPage() {
       />
 
       {/* Date range */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-wrap items-center gap-4">
-        <label className="text-xs font-medium text-slate-700">Date range</label>
+      <div className="rounded-lg border border-bolder-line bg-bolder-surface p-4 shadow-sm flex flex-wrap items-center gap-4">
+        <label className="text-xs font-medium text-bolder-text">Date range</label>
         <div className="flex items-center gap-2">
           <input
             data-testid="from-date-input"
@@ -237,9 +237,9 @@ export function AdminAnalyticsPage() {
             onChange={(e) => setDraftFromDate(e.target.value)}
             min={formatDateInput(minDate)}
             max={formatDateInput(defaultTo)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="rounded-md border-bolder-line-control bg-bolder-surface px-3 py-2 text-sm text-bolder-text focus:outline-none focus:ring-2 focus:ring-bolder-rose"
           />
-          <span className="text-slate-500">to</span>
+          <span className="text-bolder-muted">to</span>
           <input
             data-testid="to-date-input"
             type="date"
@@ -247,25 +247,25 @@ export function AdminAnalyticsPage() {
             onChange={(e) => setDraftToDate(e.target.value)}
             min={formatDateInput(minDate)}
             max={formatDateInput(defaultTo)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="rounded-md border-bolder-line-control bg-bolder-surface px-3 py-2 text-sm text-bolder-text focus:outline-none focus:ring-2 focus:ring-bolder-rose"
           />
         </div>
         {draftRangeError ? (
-          <span data-testid="range-error" className="text-xs text-red-600 font-medium ml-2">
+          <span data-testid="range-error" className="text-xs text-bolder-danger font-medium ml-2">
             {draftRangeError}
           </span>
         ) : null}
         <button
           data-testid="apply-range-button"
           onClick={handleApply}
-          className="text-xs font-medium rounded-md border border-brand-600 bg-brand-600 px-3 py-1.5 text-white hover:bg-brand-700 disabled:opacity-50 disabled:pointer-events-none"
+          className="text-xs font-medium rounded-md border border-bolder-rose-action bg-bolder-blush-light px-3 py-1.5 text-bolder-rose-deep hover:bg-bolder-rose-action"
         >
           Apply
         </button>
         <button
           data-testid="reset-range-button"
           onClick={handleReset}
-          className="text-xs font-medium rounded-md border border-slate-300 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-100"
+          className="text-xs font-medium rounded-md border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-bolder-text hover:bg-bolder-bg"
         >
           Reset to 30 days
         </button>
@@ -273,7 +273,7 @@ export function AdminAnalyticsPage() {
           <button
             data-testid="clear-range-button"
             onClick={handleClear}
-            className="text-xs font-medium rounded-md border border-slate-300 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-100"
+            className="text-xs font-medium rounded-md border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-bolder-text hover:bg-bolder-bg"
           >
             Clear range
           </button>
@@ -319,17 +319,17 @@ export function AdminAnalyticsPage() {
       </div>
 
       {/* Top vendors */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">
+      <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-bolder-text mb-4">
           Top vendors by marketplace sales
         </h2>
         {data?.topVendors?.length === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-bolder-muted">
             No vendors with delivered orders in range.
           </p>
         ) : (
-          <table className="w-full text-left text-sm divide-y divide-slate-100">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <table className="w-full text-left text-sm divide-y divide-bolder-line">
+            <thead className="text-xs uppercase tracking-wide text-bolder-muted">
               <tr>
                 <th scope="col" className="py-3 pr-4 font-medium">
                   Vendor
@@ -342,16 +342,16 @@ export function AdminAnalyticsPage() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-bolder-line">
               {data?.topVendors?.map((vendor) => (
                 <tr key={vendor.vendorId} className="align-top">
-                  <td className="py-3 pr-4 text-slate-900">
+                  <td className="py-3 pr-4 text-bolder-text">
                     {vendor.businessName}
                   </td>
-                  <td className="py-3 pr-4 text-right text-slate-900">
+                  <td className="py-3 pr-4 text-right text-bolder-text">
                     {formatMoney(vendor.marketplaceSales)}
                   </td>
-                  <td className="py-3 font-medium text-right text-slate-900">
+                  <td className="py-3 font-medium text-right text-bolder-text">
                     {vendor.deliveredOrders}
                   </td>
                 </tr>

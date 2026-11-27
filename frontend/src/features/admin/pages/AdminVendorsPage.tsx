@@ -137,11 +137,11 @@ export function AdminVendorsPage() {
         description="List vendor applications and move them between approval states."
       />
 
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-bolder-line bg-bolder-surface p-4 shadow-sm">
         <div>
           <label
             htmlFor="vendor-status-filter"
-            className="block text-sm font-medium text-slate-700"
+            className="block text-sm font-medium text-bolder-text"
           >
             Approval status
           </label>
@@ -157,7 +157,7 @@ export function AdminVendorsPage() {
                 page: 0,
               });
             }}
-            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500`}
+            className={`mt-1 block rounded-md border-bolder-line-control text-sm shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose`}
           >
             {STATUS_FILTER_OPTIONS.map((option) => (
               <option key={option.label} value={option.value ?? ""}>
@@ -171,7 +171,7 @@ export function AdminVendorsPage() {
       <SuccessMessage message={success} />
 
       {isPending && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           Loading vendors...
         </div>
       )}
@@ -181,7 +181,7 @@ export function AdminVendorsPage() {
       )}
 
       {!isPending && !error && data && data.empty && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           {filters.status
             ? `No vendors have status ${filters.status.replace(/_/g, " ")}.`
             : "No vendor profiles exist yet."}
@@ -191,11 +191,11 @@ export function AdminVendorsPage() {
       {!isPending && !error && data && !data.empty && (
         <FadeIn
           key={listingKey}
-          className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+          className="overflow-x-auto rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm"
         >
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Vendor profiles and available admin actions</caption>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-bolder-muted">
               <tr>
                 <th scope="col" className="py-2 pr-4 font-medium">Business</th>
                 <th scope="col" className="py-2 pr-4 font-medium">Owner</th>
@@ -205,27 +205,27 @@ export function AdminVendorsPage() {
                 <th scope="col" className="py-2 font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-bolder-line">
               {data.content.map((vendor) => {
                 const actions = vendorActionsFor(vendor.status);
 
                 return (
-                  <tr key={vendor.id} className="border-t border-slate-100 align-top">
+                  <tr key={vendor.id} className="align-top">
                     <td className="py-3 pr-4">
-                      <p className="font-medium text-slate-900">{vendor.businessName}</p>
-                      <p className="text-xs text-slate-500">{vendor.addressLine1}</p>
+                      <p className="font-medium text-bolder-text">{vendor.businessName}</p>
+                      <p className="text-xs text-bolder-muted">{vendor.addressLine1}</p>
                     </td>
-                    <td className="py-3 pr-4 text-slate-700">{vendor.ownerEmail}</td>
-                    <td className="py-3 pr-4 text-slate-700">
+                    <td className="py-3 pr-4 text-bolder-text">{vendor.ownerEmail}</td>
+                    <td className="py-3 pr-4 text-bolder-text">
                       {vendor.area}, {vendor.city} — {vendor.pincode}
                     </td>
                     <td className="py-3 pr-4">
                       <AdminVendorStatusBadge status={vendor.status} />
                     </td>
-                    <td className="py-3 pr-4 text-slate-600">{formatDateTime(vendor.createdAt)}</td>
+                    <td className="py-3 pr-4 text-bolder-muted">{formatDateTime(vendor.createdAt)}</td>
                     <td className="py-3">
                       {actions.length === 0 ? (
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-bolder-muted">
                           No further action available
                         </span>
                       ) : (
@@ -239,7 +239,7 @@ export function AdminVendorsPage() {
                               // in flight, so one submission cannot race another and
                               // a double click cannot fire the same transition twice.
                               disabled={runAction.isPending}
-                              className={`rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+                              className={`rounded-md border border-bolder-line-control bg-bolder-surface px-2.5 py-1 text-xs font-medium text-bolder-text hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
                             >
                               {VENDOR_ACTION_LABELS[action]}
                             </button>
@@ -263,11 +263,9 @@ export function AdminVendorsPage() {
         </FadeIn>
       )}
 
-      {/*
-        `AnimatePresence` gives the dialog its exit animation when it closes.
-        `mode="wait"` keeps one dialog on screen at a time, so switching the
-        pending target cannot show two overlapping modals.
-      */}
+      {/* `AnimatePresence` gives the dialog its exit animation when it closes.
+          `mode="wait"` keeps one dialog on screen at a time, so switching the
+          pending target cannot show two overlapping modals. */}
       <AnimatePresence mode="wait">
         {pending && (
           <ReasonDialog

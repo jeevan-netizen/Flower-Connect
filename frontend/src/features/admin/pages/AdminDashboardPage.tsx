@@ -9,7 +9,7 @@ import { FadeIn } from "@/motion/FadeIn";
 
 /** The two "manage" affordances read as one set. */
 const CARD_LINK_CLASS =
-  "mt-4 inline-block text-sm font-medium text-brand-700 transition-colors duration-micro ease-standard hover:text-brand-900";
+  "mt-4 inline-block text-sm font-medium text-bolder-rose-strong transition-colors duration-micro ease-standard hover:text-bolder-rose-deep";
 
 /**
  * Admin dashboard (plan task 2.10: "admin dashboard shell").
@@ -60,7 +60,7 @@ export function AdminDashboardPage() {
 
       <AnimatedList className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card title="Vendor management">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-bolder-muted">
             List vendors by approval status, then approve, reject, suspend or reinstate. Rejections
             and suspensions record a reason on the audit log.
           </p>
@@ -70,7 +70,7 @@ export function AdminDashboardPage() {
         </Card>
 
         <Card title="User management">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-bolder-muted">
             List accounts by role and status, then suspend, disable or reactivate. Every change
             records a reason and signs the account out everywhere.
           </p>
@@ -81,25 +81,24 @@ export function AdminDashboardPage() {
       </AnimatedList>
 
       {vendorError && <AdminErrorState error={vendorError} onRetry={() => void vendors.refetch()} />}
-
       {vendors.isPending ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           Loading pending vendor applications...
         </div>
       ) : (
         vendors.data &&
         (vendors.data.empty ? (
-          <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+          <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
             No vendor applications are awaiting approval.
           </div>
         ) : (
           <FadeIn
             key={vendorRowsKey}
-            className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+            className="overflow-x-auto rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm"
           >
-            <h2 className="text-base font-semibold text-slate-900">Awaiting approval</h2>
+            <h2 className="text-base font-semibold text-bolder-text">Awaiting approval</h2>
             <table className="mt-3 w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
+              <thead className="text-xs uppercase tracking-wide text-bolder-muted">
                 <tr>
                   <th scope="col" className="py-2 pr-4 font-medium">Business</th>
                   <th scope="col" className="py-2 pr-4 font-medium">Owner</th>
@@ -107,24 +106,24 @@ export function AdminDashboardPage() {
                   <th scope="col" className="py-2 font-medium">Applied</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-bolder-line">
                 {vendors.data.content.map((vendor) => (
-                  <tr key={vendor.id} className="border-t border-slate-100">
-                    <td className="py-2 pr-4 font-medium text-slate-900">{vendor.businessName}</td>
-                    <td className="py-2 pr-4 text-slate-700">{vendor.ownerEmail}</td>
-                    <td className="py-2 pr-4 text-slate-700">
+                  <tr key={vendor.id} className="align-top">
+                    <td className="py-2 pr-4 font-medium text-bolder-text">{vendor.businessName}</td>
+                    <td className="py-2 pr-4 text-bolder-text">{vendor.ownerEmail}</td>
+                    <td className="py-2 pr-4 text-bolder-text">
                       {vendor.area}, {vendor.city}
                     </td>
-                    <td className="py-2 text-slate-600">{formatDateTime(vendor.createdAt)}</td>
+                    <td className="py-2 text-bolder-muted">{formatDateTime(vendor.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {vendors.data.totalElements > vendors.data.content.length && (
-              <p className="mt-3 text-sm text-slate-600">
+              <p className="mt-3 text-sm text-bolder-muted">
                 <Link
                   to="/admin/vendors?status=PENDING_APPROVAL"
-                  className="font-medium text-brand-700 transition-colors duration-micro ease-standard hover:text-brand-900"
+                  className="font-medium text-bolder-rose-strong hover:text-bolder-rose-deep transition-colors duration-micro ease-standard"
                 >
                   View all {vendors.data.totalElements} pending applications
                 </Link>
@@ -133,27 +132,25 @@ export function AdminDashboardPage() {
           </FadeIn>
         ))
       )}
-
       {userError && <AdminErrorState error={userError} onRetry={() => void users.refetch()} />}
-
       {users.isPending ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           Loading suspended users...
         </div>
       ) : (
         users.data &&
         (users.data.empty ? (
-          <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+          <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
             No user accounts are suspended.
           </div>
         ) : (
           <FadeIn
             key={userRowsKey}
-            className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+            className="overflow-x-auto rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm"
           >
-            <h2 className="text-base font-semibold text-slate-900">Suspended users</h2>
+            <h2 className="text-base font-semibold text-bolder-text">Suspended users</h2>
             <table className="mt-3 w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
+              <thead className="text-xs uppercase tracking-wide text-bolder-muted">
                 <tr>
                   <th scope="col" className="py-2 pr-4 font-medium">Name</th>
                   <th scope="col" className="py-2 pr-4 font-medium">Email</th>
@@ -161,12 +158,12 @@ export function AdminDashboardPage() {
                   <th scope="col" className="py-2 font-medium">Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-bolder-line">
                 {users.data.content.map((user) => (
-                  <tr key={user.id} className="border-t border-slate-100">
-                    <td className="py-2 pr-4 font-medium text-slate-900">{user.fullName}</td>
-                    <td className="py-2 pr-4 text-slate-700">{user.email}</td>
-                    <td className="py-2 pr-4 text-slate-700">{user.role}</td>
+                  <tr key={user.id} className="align-top">
+                    <td className="py-2 pr-4 font-medium text-bolder-text">{user.fullName}</td>
+                    <td className="py-2 pr-4 text-bolder-text">{user.email}</td>
+                    <td className="py-2 pr-4 text-bolder-text">{user.role}</td>
                     <td className="py-2">
                       <AdminUserStatusBadge status={user.status} />
                     </td>
@@ -175,10 +172,10 @@ export function AdminDashboardPage() {
               </tbody>
             </table>
             {users.data.totalElements > users.data.content.length && (
-              <p className="mt-3 text-sm text-slate-600">
+              <p className="mt-3 text-sm text-bolder-muted">
                 <Link
                   to="/admin/users?status=SUSPENDED"
-                  className="font-medium text-brand-700 transition-colors duration-micro ease-standard hover:text-brand-900"
+                  className="font-medium text-bolder-rose-strong hover:text-bolder-rose-deep transition-colors duration-micro ease-standard"
                 >
                   View all {users.data.totalElements} suspended accounts
                 </Link>

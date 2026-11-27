@@ -145,9 +145,9 @@ export function AdminUsersPage() {
         description="List accounts by role and status, and change an account's status. Every change revokes that account's sessions."
       />
 
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-bolder-line bg-bolder-surface p-4 shadow-sm">
         <div>
-          <label htmlFor="user-role-filter" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="user-role-filter" className="block text-sm font-medium text-bolder-text">
             Role
           </label>
           <select
@@ -156,7 +156,7 @@ export function AdminUsersPage() {
             onChange={(event) =>
               applyFilter({ role: event.target.value === "" ? null : (event.target.value as AdminRole) })
             }
-            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500`}
+            className={`mt-1 block rounded-md border-bolder-line-control text-sm shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose`}
           >
             {ROLE_OPTIONS.map((option) => (
               <option key={option.label} value={option.value ?? ""}>
@@ -167,7 +167,7 @@ export function AdminUsersPage() {
         </div>
 
         <div>
-          <label htmlFor="user-status-filter" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="user-status-filter" className="block text-sm font-medium text-bolder-text">
             Status
           </label>
           <select
@@ -178,7 +178,7 @@ export function AdminUsersPage() {
                 status: event.target.value === "" ? null : (event.target.value as UserStatus),
               })
             }
-            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500`}
+            className={`mt-1 block rounded-md border-bolder-line-control text-sm shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose`}
           >
             {STATUS_OPTIONS.map((option) => (
               <option key={option.label} value={option.value ?? ""}>
@@ -192,7 +192,7 @@ export function AdminUsersPage() {
       <SuccessMessage message={success} />
 
       {isPending && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           Loading users...
         </div>
       )}
@@ -202,7 +202,7 @@ export function AdminUsersPage() {
       )}
 
       {!isPending && !error && data && data.empty && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           No user accounts match these filters.
         </div>
       )}
@@ -210,11 +210,11 @@ export function AdminUsersPage() {
       {!isPending && !error && data && !data.empty && (
         <FadeIn
           key={listingKey}
-          className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+          className="overflow-x-auto rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm"
         >
           <table className="w-full text-left text-sm">
             <caption className="sr-only">User accounts and available status actions</caption>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-bolder-muted">
               <tr>
                 <th scope="col" className="py-2 pr-4 font-medium">Name</th>
                 <th scope="col" className="py-2 pr-4 font-medium">Email</th>
@@ -224,30 +224,30 @@ export function AdminUsersPage() {
                 <th scope="col" className="py-2 font-medium">Change status</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-bolder-line">
               {data.content.map((user) => {
                 const isSelf = currentUserId !== null && user.id === currentUserId;
 
                 return (
-                  <tr key={user.id} className="border-t border-slate-100 align-top">
-                    <td className="py-3 pr-4 font-medium text-slate-900">
+                  <tr key={user.id} className="align-top">
+                    <td className="py-3 pr-4 font-medium text-bolder-text">
                       {user.fullName}
-                      {isSelf && <span className="ml-2 text-xs text-slate-500">(you)</span>}
+                      {isSelf && <span className="ml-2 text-xs text-bolder-muted">(you)</span>}
                     </td>
-                    <td className="py-3 pr-4 text-slate-700">
+                    <td className="py-3 pr-4 text-bolder-text">
                       {user.email}
                       {user.phone && (
-                        <p className="text-xs text-slate-500">{user.phone}</p>
+                        <p className="text-xs text-bolder-muted">{user.phone}</p>
                       )}
                     </td>
-                    <td className="py-3 pr-4 text-slate-700">{formatRole(user.role)}</td>
+                    <td className="py-3 pr-4 text-bolder-text">{formatRole(user.role)}</td>
                     <td className="py-3 pr-4">
                       <AdminUserStatusBadge status={user.status} />
                     </td>
-                    <td className="py-3 pr-4 text-slate-600">{formatDateTime(user.createdAt)}</td>
+                    <td className="py-3 pr-4 text-bolder-muted">{formatDateTime(user.createdAt)}</td>
                     <td className="py-3">
                       {isSelf ? (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-bolder-muted">
                           An administrator cannot change their own account status.
                         </p>
                       ) : (
@@ -258,7 +258,7 @@ export function AdminUsersPage() {
                               type="button"
                               onClick={() => openDialog(status, user)}
                               disabled={updateStatus.isPending}
-                              className={`rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+                              className={`rounded-md border border-bolder-line-control bg-bolder-surface px-2.5 py-1 text-xs font-medium text-bolder-text hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
                             >
                               {formatUserStatus(status)}
                             </button>

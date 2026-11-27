@@ -132,9 +132,9 @@ export function AdminDisputesPage() {
     <div className="space-y-6">
       <PageHeading title="Disputes" description="Customer disputes awaiting resolution." />
 
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-bolder-line bg-bolder-surface p-4 shadow-sm">
         <div className="flex-1 min-w-[200px]">
-          <label htmlFor="dispute-status-filter" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="dispute-status-filter" className="block text-sm font-medium text-bolder-text">
             Status
           </label>
           <select
@@ -144,7 +144,7 @@ export function AdminDisputesPage() {
               const v = e.target.value;
               setFilters({ ...filters, status: v === "" ? null : (v as DisputeStatus), page: 0 });
             }}
-            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FOCUS_RING}`}
+            className={`mt-1 block rounded-md border-bolder-line-control text-sm shadow-sm ${FOCUS_RING}`}
           >
             <option value="">All statuses</option>
             {DISPUTE_STATUSES.map((s) => (
@@ -155,7 +155,7 @@ export function AdminDisputesPage() {
           </select>
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label htmlFor="dispute-from" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="dispute-from" className="block text-sm font-medium text-bolder-text">
             From date
           </label>
           <input
@@ -163,11 +163,11 @@ export function AdminDisputesPage() {
             type="date"
             value={filters.from ?? ""}
             onChange={(e) => setFilters({ ...filters, from: e.target.value || null, page: 0 })}
-            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FOCUS_RING}`}
+            className={`mt-1 block rounded-md border-bolder-line-control text-sm shadow-sm ${FOCUS_RING}`}
           />
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label htmlFor="dispute-to" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="dispute-to" className="block text-sm font-medium text-bolder-text">
             To date
           </label>
           <input
@@ -175,30 +175,30 @@ export function AdminDisputesPage() {
             type="date"
             value={filters.to ?? ""}
             onChange={(e) => setFilters({ ...filters, to: e.target.value || null, page: 0 })}
-            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FOCUS_RING}`}
+            className={`mt-1 block rounded-md border-bolder-line-control text-sm shadow-sm ${FOCUS_RING}`}
           />
         </div>
       </div>
 
       {isPending && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           Loading disputes...
         </div>
       )}
 
       {!isPending && data && data.empty && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
-          <h3 className="text-base font-semibold text-slate-900">No disputes</h3>
-          <p className="mt-2 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
+          <h3 className="text-base font-semibold text-bolder-text">No disputes</h3>
+          <p className="mt-2 text-sm text-bolder-muted">
             No disputes match the current filters.
           </p>
         </div>
       )}
 
       {!isPending && data && !data.empty && (
-        <FadeIn className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <FadeIn className="overflow-x-auto rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-bolder-muted">
               <tr>
                 <th scope="col" className="py-2 pr-4 font-medium">Dispute</th>
                 <th scope="col" className="py-2 pr-4 font-medium">Order</th>
@@ -209,19 +209,19 @@ export function AdminDisputesPage() {
                 <th scope="col" className="py-2 font-medium">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-bolder-line">
               {items.map((item) => (
                 <tr key={item.id} className="align-top">
-                  <td className="py-3 pr-4 font-medium text-slate-900">#{item.id}</td>
-                  <td className="py-3 pr-4 text-slate-700">Order #{item.orderId}</td>
-                  <td className="py-3 pr-4 text-slate-700">{item.customerName}</td>
-                  <td className="py-3 pr-4 text-slate-700">{item.vendorName}</td>
+                  <td className="py-3 pr-4 font-medium text-bolder-text">#{item.id}</td>
+                  <td className="py-3 pr-4 text-bolder-text">Order #{item.orderId}</td>
+                  <td className="py-3 pr-4 text-bolder-text">{item.customerName}</td>
+                  <td className="py-3 pr-4 text-bolder-text">{item.vendorName}</td>
                   <td className="py-3 pr-4">
-                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border border-slate-200 bg-slate-50 text-slate-800">
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border border-bolder-line bg-bolder-bg text-bolder-text">
                       {DISPUTE_STATUS_LABELS[item.status]}
                     </span>
                   </td>
-                  <td className="py-3 pr-4 text-right font-medium text-slate-900">
+                  <td className="py-3 pr-4 text-right font-medium text-bolder-text">
                     {formatMoney(item.orderTotal)}
                   </td>
                   <td className="py-3">
@@ -230,13 +230,13 @@ export function AdminDisputesPage() {
                         type="button"
                         disabled={resolveDispute.isPending}
                         onClick={() => openResolveDialog(item)}
-                        className={`rounded-md border border-transparent bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                        className={`rounded-md border border-transparent bg-bolder-rose-action px-3 py-1.5 text-xs font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
                       >
                         Resolve
                       </button>
                     )}
                     {item.status.startsWith("RESOLVED_") && item.refundAmount != null && (
-                      <span className="text-xs text-slate-600">
+                      <span className="text-xs text-bolder-muted">
                         Refund: {formatMoney(item.refundAmount)}
                       </span>
                     )}
@@ -257,14 +257,14 @@ export function AdminDisputesPage() {
       )}
 
       {resolveTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-bolder-overlay">
+          <div className="w-full max-w-md rounded-lg border border-bolder-line bg-bolder-surface p-6 shadow-lg">
+            <h2 className="text-lg font-semibold text-bolder-text mb-4">
               Resolve dispute #{resolveTarget.id}
             </h2>
             <form onSubmit={handleSubmit(onSubmitResolve)} className="space-y-4">
               <div>
-                <label htmlFor="resolve-status" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="resolve-status" className="block text-sm font-medium text-bolder-text">
                   Outcome
                 </label>
                 <select
@@ -278,7 +278,7 @@ export function AdminDisputesPage() {
                       setValue("refundAmount", String(resolveTarget.orderTotal));
                     }
                   }}
-                  className={`mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm ${FOCUS_RING}`}
+                  className={`mt-1 block w-full rounded-md border-bolder-line-control text-sm shadow-sm ${FOCUS_RING}`}
                 >
                   <option value="RESOLVED_REFUND">Full refund</option>
                   <option value="RESOLVED_PARTIAL">Partial refund</option>
@@ -288,7 +288,7 @@ export function AdminDisputesPage() {
 
               {(selectedStatus === "RESOLVED_REFUND" || selectedStatus === "RESOLVED_PARTIAL") && (
                 <div>
-                  <label htmlFor="refundAmount" className="block text-sm font-medium text-slate-700">
+                  <label htmlFor="refundAmount" className="block text-sm font-medium text-bolder-text">
                     Refund amount (INR)
                   </label>
                   <input
@@ -296,35 +296,35 @@ export function AdminDisputesPage() {
                     type="number"
                     step="0.01"
                     {...register("refundAmount")}
-                    className={`mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm ${FOCUS_RING}`}
+                    className={`mt-1 block w-full rounded-md border-bolder-line-control text-sm shadow-sm ${FOCUS_RING}`}
                   />
                   {errors.refundAmount && (
-                    <p className="mt-1 text-xs text-red-700">{errors.refundAmount.message}</p>
+                    <p className="mt-1 text-xs text-bolder-danger">{errors.refundAmount.message}</p>
                   )}
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-bolder-muted">
                     Order total: {formatMoney(resolveTarget.orderTotal)}. Max: {formatMoney(resolveTarget.orderTotal)}.
                   </p>
                 </div>
               )}
 
               <div>
-                <label htmlFor="resolutionNote" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="resolutionNote" className="block text-sm font-medium text-bolder-text">
                   Resolution note
                 </label>
                 <textarea
                   id="resolutionNote"
                   {...register("resolutionNote")}
                   rows={3}
-                  className={`mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm ${FOCUS_RING}`}
+                  className={`mt-1 block w-full rounded-md border-bolder-line-control text-sm shadow-sm ${FOCUS_RING}`}
                   placeholder="Explain the resolution..."
                 />
                 {errors.resolutionNote && (
-                  <p className="mt-1 text-xs text-red-700">{errors.resolutionNote.message}</p>
+                  <p className="mt-1 text-xs text-bolder-danger">{errors.resolutionNote.message}</p>
                 )}
               </div>
 
               {actionError && (
-                <p className="text-sm text-red-800 bg-red-50 rounded-lg p-2 border border-red-100">
+                <p className="text-sm text-bolder-danger bg-bolder-danger-surface rounded-lg p-2 border bolder-danger-border">
                   {actionError.message}
                 </p>
               )}
@@ -333,14 +333,14 @@ export function AdminDisputesPage() {
                 <button
                   type="button"
                   onClick={closeResolveDialog}
-                  className={`rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
+                  className={`rounded-md border border-bolder-line-control bg-bolder-surface px-4 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg ${PRESSABLE} ${FOCUS_RING}`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || resolveDispute.isPending}
-                  className={`rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                  className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
                 >
                   {isSubmitting || resolveDispute.isPending ? "Resolving…" : "Resolve dispute"}
                 </button>

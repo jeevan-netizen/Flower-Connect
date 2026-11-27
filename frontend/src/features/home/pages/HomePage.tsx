@@ -14,7 +14,7 @@ import { BotanicalHero } from "@/shared/ui/Botanical";
  * its meaning instead, which is why it is on the page rather than in an `alt`.
  */
 const BOUQUET_DESCRIPTION =
-  "A hand-tied bouquet of rose, blush and gold blooms with green foliage, wrapped in plum paper.";
+  "A soft bouquet of pink, peach and cream flowers with green foliage in a fluted cream ceramic vase.";
 
 const FLORIST_CTA =
   `inline-flex w-fit items-center gap-2 rounded-sm border-b border-bolder-leaf text-[15px] font-medium text-bolder-leaf-text transition-colors duration-micro ease-standard hover:border-bolder-leaf-text hover:text-bolder-leaf-dark ${FOCUS_RING_DARK}`;
@@ -22,11 +22,10 @@ const FLORIST_CTA =
 /**
  * The public landing page.
  *
- * The hero is a static, token-coloured inline illustration rather than a
- * photograph or a 3D scene: nothing is downloaded, nothing claims to be a
- * product, and the frame cannot shift once a chunk arrives. The layout is one
- * column below `lg` and text-first at every width, so the heading, the delivery
- * picker and the two account entry points are readable before any decoration.
+ * The hero is a static inline still-life illustration rather than a product
+ * photograph or 3D scene. The layout is one column below `lg` and text-first at
+ * every width, so the heading, delivery picker, and account entry points remain
+ * readable before the decorative bouquet.
  */
 export function HomePage() {
   return (
@@ -100,11 +99,6 @@ export function HomePage() {
             </AnimatedList>
 
             <div className="relative min-w-0">
-              {/* Decorative rings, behind the arrangement. Desktop-only: below
-                  the two-column breakpoint a 620px ring would sit under the copy. */}
-              <span aria-hidden="true" className="fc-ring fc-ring-solid hidden lg:block" />
-              <span aria-hidden="true" className="fc-ring fc-ring-dashed hidden lg:block" />
-
               <BotanicalHero className="fc-slide-up-in" />
               <HeroFloatingCards />
 

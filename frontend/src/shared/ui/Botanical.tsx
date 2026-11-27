@@ -14,7 +14,7 @@ interface IllustrationProps {
   className?: string;
 }
 
-/** A rose head made of six overlapping petals and a centre. */
+/** A layered flower head, used for the landing bouquet and small sprigs. */
 function Rose({
   cx,
   cy,
@@ -28,22 +28,35 @@ function Rose({
   petal: string;
   centre: string;
 }) {
-  const petals = [0, 60, 120, 180, 240, 300];
+  const petals = [0, 45, 90, 135, 180, 225, 270, 315];
   return (
     <g transform={`translate(${cx} ${cy}) scale(${scale})`}>
       {petals.map((angle) => (
         <ellipse
           key={angle}
           cx="0"
-          cy="-12"
-          rx="10"
-          ry="14"
+          cy="-11"
+          rx="9"
+          ry="15"
           className={petal}
           transform={`rotate(${angle})`}
-          opacity="0.92"
+          opacity="0.82"
+        />
+      ))}
+      {petals.filter((_, index) => index % 2 === 0).map((angle) => (
+        <ellipse
+          key={`inner-${angle}`}
+          cx="0"
+          cy="-7"
+          rx="6"
+          ry="10"
+          className={petal}
+          transform={`rotate(${angle + 22})`}
+          opacity="0.98"
         />
       ))}
       <circle r="5" className={centre} />
+      <circle cx="-1.5" cy="-1.5" r="1.5" className={petal} opacity="0.8" />
     </g>
   );
 }
@@ -73,13 +86,13 @@ function Leaf({
 }
 
 /**
- * The landing hero still life: an arched paper panel holding a hand-tied
- * bouquet of rose, blush and gold blooms with botanical foliage.
+ * The landing hero still life: a soft, sunlit bouquet of rose and blush blooms
+ * arranged in a fluted cream ceramic vase.
  */
 export function BotanicalHero({ className = "" }: IllustrationProps) {
   return (
     <div
-      className={`relative mx-auto w-full max-w-[460px] overflow-hidden rounded-t-[230px] rounded-b-card border border-bolder-line bg-[radial-gradient(circle_at_50%_18%,var(--color-blush-light)_0%,var(--color-surface)_62%,var(--color-surface-muted)_100%)] shadow-card ${className}`}
+      className={`relative mx-auto w-full max-w-[500px] overflow-visible bg-[radial-gradient(ellipse_at_54%_46%,rgba(239,226,206,0.72)_0%,rgba(248,245,237,0.42)_43%,rgba(248,245,237,0)_74%)] ${className}`}
       data-testid="botanical-hero"
     >
       <svg
@@ -89,17 +102,19 @@ export function BotanicalHero({ className = "" }: IllustrationProps) {
         focusable="false"
         className="h-full w-full"
       >
-        {/* A soft ring behind the arrangement, echoing a florist's paper cone. */}
-        <circle
-          cx="210"
-          cy="205"
-          r="150"
-          fill="none"
-          className="stroke-bolder-blush"
-          strokeWidth="1"
-          strokeDasharray="3 9"
-          opacity="0.9"
-        />
+        <defs>
+          <linearGradient id="fc-ceramic-glaze" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#d5c9b6" />
+            <stop offset="0.2" stopColor="#f5efe4" />
+            <stop offset="0.5" stopColor="#fffaf0" />
+            <stop offset="0.8" stopColor="#e7dccb" />
+            <stop offset="1" stopColor="#cfc2af" />
+          </linearGradient>
+          <radialGradient id="fc-floor-shadow">
+            <stop offset="0" stopColor="#82745e" stopOpacity="0.24" />
+            <stop offset="1" stopColor="#82745e" stopOpacity="0" />
+          </radialGradient>
+        </defs>
 
         {/* Stems. */}
         <g fill="none" className="stroke-bolder-leaf" strokeLinecap="round">
@@ -134,30 +149,32 @@ export function BotanicalHero({ className = "" }: IllustrationProps) {
         <circle cx="298" cy="226" r="4" className="fill-bolder-blush" opacity="0.9" />
         <circle cx="252" cy={170} r="3.5" className="fill-bolder-gold" opacity="0.9" />
 
-        {/* Wrapped paper. */}
+        {/* Soft tabletop shadow anchors the vase in the scene. */}
+        <ellipse cx="210" cy="458" rx="128" ry="18" fill="url(#fc-floor-shadow)" />
+
+        {/* Fluted cream ceramic vase, with a visible opening and warm glaze. */}
         <path
-          d="M154 326H266L246 430C240 458 180 458 174 430L154 326Z"
-          className="fill-bolder-surface-muted stroke-bolder-line-strong"
-          strokeWidth="1.2"
+          d="M159 327C167 348 171 375 168 403C165 428 168 444 180 452C194 461 226 461 240 452C252 444 255 428 252 403C249 375 253 348 261 327Z"
+          fill="url(#fc-ceramic-glaze)"
+          stroke="#c9bcaa"
+          strokeWidth="1.4"
         />
         <path
-          d="M154 326C176 340 244 340 266 326"
-          fill="none"
-          className="stroke-bolder-line-strong"
-          strokeWidth="1.2"
+          d="M159 327C180 338 240 338 261 327L256 342C236 350 184 350 164 342Z"
+          fill="#e8ddce"
+          stroke="#c9bcaa"
+          strokeWidth="1.1"
         />
-        <path
-          d="M175 344C190 352 230 352 245 344"
-          fill="none"
-          className="stroke-bolder-line"
-          strokeWidth="1"
-        />
-        {/* A paper band. */}
-        <path
-          d="M170 374C194 382 226 382 250 374L247 392C222 400 198 400 173 392Z"
-          className="fill-bolder-blush"
-          opacity="0.85"
-        />
+        <ellipse cx="210" cy="328" rx="51" ry="9" fill="#cbbdaa" />
+        <ellipse cx="210" cy="326" rx="44" ry="5.5" fill="#777061" opacity="0.34" />
+        <g fill="none" stroke="#c9bda9" strokeLinecap="round" opacity="0.58">
+          <path d="M176 353C181 377 177 420 182 446" />
+          <path d="M188 350C192 380 189 431 194 455" />
+          <path d="M201 350C203 384 202 435 203 459" />
+          <path d="M216 350C215 384 218 435 217 459" />
+          <path d="M229 350C225 380 229 431 224 455" />
+          <path d="M242 353C237 377 241 420 236 446" />
+        </g>
       </svg>
     </div>
   );

@@ -45,7 +45,7 @@ export function AdminFarmerDetailPage() {
 
   if (isPending) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border border-bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Loading farmer…
       </div>
     );
@@ -57,7 +57,7 @@ export function AdminFarmerDetailPage() {
 
   if (!data) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border border-bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Farmer not found.
       </div>
     );
@@ -114,18 +114,18 @@ export function AdminFarmerDetailPage() {
 
       <SuccessMessage message={success} />
 
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm">
         <div className="flex flex-wrap items-start gap-4 md:flex-nowrap md:items-center">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">
+            <h2 className="text-lg font-bold text-bolder-text">
               {data.fullName ?? "Unnamed farmer"}
             </h2>
-            <p className="mt-0.5 text-sm text-slate-500">{data.email}</p>
+            <p className="mt-0.5 text-sm text-bolder-muted">{data.email}</p>
             {data.phone && (
-              <p className="mt-0.5 text-sm text-slate-500">{data.phone}</p>
+              <p className="mt-0.5 text-sm text-bolder-muted">{data.phone}</p>
             )}
             {data.address && (
-              <p className="mt-0.5 text-sm text-slate-500">{data.address}</p>
+              <p className="mt-0.5 text-sm text-bolder-muted">{data.address}</p>
             )}
           </div>
 
@@ -139,7 +139,7 @@ export function AdminFarmerDetailPage() {
                 type="button"
                 onClick={() => openDialog(action.status)}
                 disabled={updateStatus.isPending}
-                className={`rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+                className={`rounded-md border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-sm font-medium text-bolder-text hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
               >
                 {action.label}
               </button>
@@ -149,18 +149,18 @@ export function AdminFarmerDetailPage() {
 
         <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 sm:gap-y-4 sm:gap-x-8">
           <div className="sm:col-span-2">
-            <dt className="text-xs uppercase tracking-wide text-slate-500">
+            <dt className="text-xs uppercase tracking-wide text-bolder-muted">
               Account status
             </dt>
-            <dd className="mt-0.5 text-sm font-medium text-slate-900">
+            <dd className="mt-0.5 text-sm font-medium text-bolder-text">
               {formatUserStatus(data.status)}
             </dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-xs uppercase tracking-wide text-slate-500">
+            <dt className="text-xs uppercase tracking-wide text-bolder-muted">
               Registered
             </dt>
-            <dd className="mt-0.5 text-sm text-slate-600">
+            <dd className="mt-0.5 text-sm text-bolder-muted">
               {formatDateTime(data.createdAt)}
             </dd>
           </div>
@@ -168,32 +168,32 @@ export function AdminFarmerDetailPage() {
       </div>
 
       {(data.linkedVendors?.length ?? 0) > 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-base font-semibold text-slate-900 mb-4">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm">
+          <h3 className="text-base font-semibold text-bolder-text mb-4">
             Ledger by florist
           </h3>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {data.linkedVendors.map((vendor) => (
               <div
                 key={vendor.vendorId}
-                className="rounded-lg border border-slate-200 bg-white p-4"
+                className="rounded-lg border border-bolder-line bg-bolder-surface p-4"
               >
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <h4 className="font-medium text-slate-900">
+                    <h4 className="font-medium text-bolder-text">
                       {vendor.vendorName}
                     </h4>
-                    <p className="mt-0.5 text-sm text-slate-500">
+                    <p className="mt-0.5 text-sm text-bolder-muted">
                       Linked {formatDateTime(vendor.linkCreatedAt)}
                     </p>
                   </div>
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                       vendor.linkStatus === "ACTIVE"
-                        ? "bg-brand-100 text-brand-900"
+                        ? "bg-bolder-blush-light text-bolder-rose-deep"
                         : vendor.linkStatus === "SUSPENDED"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-slate-200 text-slate-800"
+                          ? "bg-bolder-warning-surface text-bolder-warning"
+                          : "bg-bolder-bg text-bolder-text"
                     }`}
                   >
                     {vendor.linkStatus}
@@ -201,10 +201,10 @@ export function AdminFarmerDetailPage() {
                 </div>
 
                 <div className="mt-3 mb-3">
-                  <dt className="text-xs uppercase tracking-wide text-slate-500">
+                  <dt className="text-xs uppercase tracking-wide text-bolder-muted">
                     Outstanding balance
                   </dt>
-                  <dd className="mt-0.5 text-sm font-medium text-slate-900">
+                  <dd className="mt-0.5 text-sm font-medium text-bolder-text">
                     {formatMoney(Number(vendor.outstandingBalance ?? 0))}
                   </dd>
                 </div>
@@ -212,36 +212,36 @@ export function AdminFarmerDetailPage() {
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr>
-                      <th className="pb-2 pr-2 font-medium text-slate-500">Date</th>
-                      <th className="pb-2 pr-2 font-medium text-slate-500">Type</th>
-                      <th className="pb-2 pr-2 font-medium text-slate-500 text-right">
+                      <th className="pb-2 pr-2 font-medium text-bolder-muted">Date</th>
+                      <th className="pb-2 pr-2 font-medium text-bolder-muted">Type</th>
+                      <th className="pb-2 pr-2 font-medium text-bolder-muted text-right">
                         Amount
                       </th>
-                      <th className="pb-2 font-medium text-slate-500 text-right">
+                      <th className="pb-2 font-medium text-bolder-muted text-right">
                         Running balance
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y divide-bolder-line">
                     {(vendor.entries ?? []).map((entry) => (
-                      <tr key={entry.id} className="bg-white">
-                        <td className="py-1.5 pr-2 text-slate-600">
+                      <tr key={entry.id} className="bg-bolder-surface">
+                        <td className="py-1.5 pr-2 text-bolder-muted">
                           {formatDateTime(entry.date)}
                         </td>
-                        <td className="py-1.5 pr-2 text-slate-700">
+                        <td className="py-1.5 pr-2 text-bolder-text">
                           {ENTRY_TYPE_LABELS[entry.type]}
                         </td>
-                        <td className="py-1.5 pr-2 text-right text-slate-700">
+                        <td className="py-1.5 pr-2 text-right text-bolder-text">
                           {formatMoney(Number(entry.amount ?? 0))}
                         </td>
-                        <td className="py-1.5 text-right text-slate-700">
+                        <td className="py-1.5 text-right text-bolder-text">
                           {formatMoney(Number(entry.runningBalance ?? 0))}
                         </td>
                       </tr>
                     ))}
                     {(vendor.entries?.length ?? 0) === 0 && (
                       <tr>
-                        <td colSpan={4} className="py-3 text-center text-slate-500">
+                        <td colSpan={4} className="py-3 text-center text-bolder-muted">
                           No entries yet.
                         </td>
                       </tr>
@@ -255,7 +255,7 @@ export function AdminFarmerDetailPage() {
       )}
 
       {(data.linkedVendors?.length ?? 0) === 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           This farmer has no linked florists yet, so there is no ledger to show.
         </div>
       )}

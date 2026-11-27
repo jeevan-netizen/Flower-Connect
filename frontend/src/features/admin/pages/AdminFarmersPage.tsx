@@ -133,11 +133,11 @@ export function AdminFarmersPage() {
         description="List farmer accounts and suspend or reactivate an account. Every change revokes that account's sessions."
       />
 
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-bolder-line bg-bolder-surface p-4 shadow-sm">
         <div className="min-w-[220px]">
           <label
             htmlFor="farmer-search"
-            className="block text-sm font-medium text-slate-700"
+            className="block text-sm font-medium text-bolder-text"
           >
             Search
           </label>
@@ -146,14 +146,14 @@ export function AdminFarmersPage() {
             value={filters.search ?? ""}
             onChange={(event) => applySearch(event.target.value)}
             placeholder="Name, email or mobile"
-            className={`mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500`}
+            className={`mt-1 block w-full rounded-md border-bolder-line-control text-sm shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose`}
           />
         </div>
 
         <div>
           <label
             htmlFor="farmer-status-filter"
-            className="block text-sm font-medium text-slate-700"
+            className="block text-sm font-medium text-bolder-text"
           >
             Account status
           </label>
@@ -165,7 +165,7 @@ export function AdminFarmersPage() {
                 status: event.target.value === "" ? null : (event.target.value as AdminFarmer["status"]),
               })
             }
-            className={`mt-1 block rounded-md border-slate-300 text-sm shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500`}
+            className={`mt-1 block rounded-md border-bolder-line-control text-sm shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose`}
           >
             {STATUS_FILTER_OPTIONS.map((option) => (
               <option key={option.label} value={option.value ?? ""}>
@@ -179,7 +179,7 @@ export function AdminFarmersPage() {
       <SuccessMessage message={success} />
 
       {isPending && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           Loading farmers…
         </div>
       )}
@@ -189,7 +189,7 @@ export function AdminFarmersPage() {
       )}
 
       {!isPending && !error && data && data.empty && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           {filters.search || filters.status
             ? "No farmer accounts match these filters."
             : "No farmer accounts exist yet."}
@@ -199,11 +199,11 @@ export function AdminFarmersPage() {
       {!isPending && !error && data && !data.empty && (
         <FadeIn
           key={listingKey}
-          className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+          className="overflow-x-auto rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm"
         >
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Farmer accounts and available status actions</caption>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-bolder-muted">
               <tr>
                 <th scope="col" className="py-2 pr-4 font-medium">Name</th>
                 <th scope="col" className="py-2 pr-4 font-medium">Email</th>
@@ -218,23 +218,23 @@ export function AdminFarmersPage() {
                 const actions = farmerActionsFor(farmer.status);
 
                 return (
-                  <tr key={farmer.id} className="border-t border-slate-100 align-top">
-                    <td className="py-3 pr-4 font-medium text-slate-900">
+                  <tr key={farmer.id} className="border-t border-bolder-line align-top">
+                    <td className="py-3 pr-4 font-medium text-bolder-text">
                       <Link
                         to={`/admin/farmers/${farmer.id}`}
-                        className="text-brand-700 hover:text-brand-900 hover:underline"
+                        className="text-bolder-rose-strong hover:text-bolder-rose-deep hover:underline"
                       >
                         {farmer.fullName}
                       </Link>
                     </td>
-                    <td className="py-3 pr-4 text-slate-700">{farmer.email}</td>
-                    <td className="py-3 pr-4 text-slate-700">
+                    <td className="py-3 pr-4 text-bolder-text">{farmer.email}</td>
+                    <td className="py-3 pr-4 text-bolder-text">
                       {farmer.phone ?? "—"}
                     </td>
                     <td className="py-3 pr-4">
                       <AdminUserStatusBadge status={farmer.status} />
                     </td>
-                    <td className="py-3 pr-4 text-slate-600">
+                    <td className="py-3 pr-4 text-bolder-muted">
                       {formatDateTime(farmer.createdAt)}
                     </td>
                     <td className="py-3">
@@ -245,7 +245,7 @@ export function AdminFarmersPage() {
                             type="button"
                             onClick={() => openDialog(action.status, farmer)}
                             disabled={updateStatus.isPending}
-                            className={`rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+                            className={`rounded-md border border-bolder-line-control bg-bolder-surface px-2.5 py-1 text-xs font-medium text-bolder-text hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
                           >
                             {action.label}
                           </button>

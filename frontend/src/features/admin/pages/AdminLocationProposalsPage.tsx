@@ -122,7 +122,7 @@ export function AdminLocationProposalsPage() {
       <SuccessMessage message={success} />
 
       {isPending && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           Loading proposals...
         </div>
       )}
@@ -132,16 +132,16 @@ export function AdminLocationProposalsPage() {
       )}
 
       {!isPending && !error && proposals.length === 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 text-sm text-bolder-muted">
           No pending proposals.
         </div>
       )}
 
       {!isPending && !error && proposals.length > 0 && (
-        <FadeIn className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <FadeIn className="overflow-x-auto rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Pending service-area proposals awaiting admin review</caption>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-bolder-muted">
               <tr>
                 <th scope="col" className="py-3 pr-4 font-medium">Area</th>
                 <th scope="col" className="py-3 pr-4 font-medium">Proposing vendor</th>
@@ -149,22 +149,22 @@ export function AdminLocationProposalsPage() {
                 <th scope="col" className="py-3 font-medium">Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-bolder-line">
               {proposals.map((proposal) => (
                 <tr
                   key={proposal.id}
-                  className="border-t border-slate-100 align-top"
+                  className="align-top"
                 >
                   <td className="py-3 pr-4">
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-bolder-text">
                       {proposal.area}, {proposal.city}
                     </p>
-                    <p className="text-xs text-slate-500">{proposal.pincode}</p>
+                    <p className="text-xs text-bolder-muted">{proposal.pincode}</p>
                   </td>
-                  <td className="py-3 pr-4 text-slate-700">
+                  <td className="py-3 pr-4 text-bolder-text">
                     {proposal.proposedByEmail ?? "unknown"}
                   </td>
-                  <td className="py-3 pr-4 text-slate-600">
+                  <td className="py-3 pr-4 text-bolder-muted">
                     {proposal.createdAt}
                   </td>
                   <td className="py-3">
@@ -175,7 +175,7 @@ export function AdminLocationProposalsPage() {
                         disabled={
                           approveProposal.isPending || rejectProposal.isPending
                         }
-                        className={`rounded-md border border-brand-600 bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                        className={`rounded-md border border-bolder-rose-action bg-bolder-rose-action px-3 py-1.5 text-xs font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
                       >
                         Approve
                       </button>
@@ -185,7 +185,7 @@ export function AdminLocationProposalsPage() {
                         disabled={
                           approveProposal.isPending || rejectProposal.isPending
                         }
-                        className={`rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                        className={`rounded-md border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-xs font-medium text-bolder-text hover:bg-bolder-bg disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
                       >
                         Reject
                       </button>
@@ -264,7 +264,7 @@ function ProposalApproveDialog({
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bolder-overlay p-4"
       initial="hidden"
       animate="visible"
       exit="exit"
@@ -272,15 +272,15 @@ function ProposalApproveDialog({
       <motion.div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
+        className="w-full max-w-md rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-lg"
         initial="hidden"
         animate="visible"
         exit="exit"
       >
-        <h2 className="text-base font-semibold text-slate-900">
+        <h2 className="text-base font-semibold text-bolder-text">
           Approve service-area proposal
         </h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-bolder-muted">
           {proposal.area}, {proposal.city} — proposed by {proposal.proposedByEmail}.
           Supply the coordinates and timezone for this area.
         </p>
@@ -297,52 +297,52 @@ function ProposalApproveDialog({
           />
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-bolder-text">
               Latitude
             </label>
             <input
               type="number"
               step="any"
               {...register("latitude")}
-              className={`mt-1 block w-full rounded-md border-slate-300 shadow-sm sm:text-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 ${
-                errors.latitude ? "border-red-500" : ""
+              className={`mt-1 block w-full rounded-md border-bolder-line-control shadow-sm sm:text-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose ${
+                errors.latitude ? "border-bolder-danger-border" : ""
               }`}
             />
             {errors.latitude && (
-              <p className="text-xs text-red-600">{errors.latitude.message}</p>
+              <p className="mt-1 text-xs text-bolder-danger">{errors.latitude.message}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-bolder-text">
               Longitude
             </label>
             <input
               type="number"
               step="any"
               {...register("longitude")}
-              className={`mt-1 block w-full rounded-md border-slate-300 shadow-sm sm:text-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 ${
-                errors.longitude ? "border-red-500" : ""
+              className={`mt-1 block w-full rounded-md border-bolder-line-control shadow-sm sm:text-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose ${
+                errors.longitude ? "border-bolder-danger-border" : ""
               }`}
             />
             {errors.longitude && (
-              <p className="text-xs text-red-600">{errors.longitude.message}</p>
+              <p className="mt-1 text-xs text-bolder-danger">{errors.longitude.message}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-bolder-text">
               Timezone
             </label>
             <input
               type="text"
               {...register("timezone")}
-              className={`mt-1 block w-full rounded-md border-slate-300 shadow-sm sm:text-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 ${
-                errors.timezone ? "border-red-500" : ""
+              className={`mt-1 block w-full rounded-md border-bolder-line-control shadow-sm sm:text-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose ${
+                errors.timezone ? "border-bolder-danger-border" : ""
               }`}
             />
             {errors.timezone && (
-              <p className="text-xs text-red-600">{errors.timezone.message}</p>
+              <p className="mt-1 text-xs text-bolder-danger">{errors.timezone.message}</p>
             )}
           </div>
 
@@ -351,14 +351,14 @@ function ProposalApproveDialog({
               type="button"
               onClick={onCancel}
               disabled={isSubmitting}
-              className={`rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+              className={`rounded-md border border-bolder-line-control bg-bolder-surface px-3 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`rounded-md border border-brand-600 bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+              className={`rounded-md border border-transparent bg-bolder-rose-action px-3 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
             >
               {isSubmitting ? "Approving…" : "Approve"}
             </button>
