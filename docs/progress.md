@@ -2173,3 +2173,22 @@ Verified end-to-end on branch `b2b-module` against the live Docker Compose stack
   - Updated `frontend/src/features/b2b/api.test.ts` (`/b2b/...` → `/vendors/b2b/...` to match `ce87e24`), fixed `sellerId: 11` in `B2BOrderDetailPage.test.tsx`, and added `playwright.demo.config.ts` to `frontend/tsconfig.json` `include` to resolve ESLint error.
   - Fixed `WebhookControllerStandaloneTest` 1-second boundary race by using a single `FIXED_NOW` instant for both `Clock.fixed(...)` and the signed request timestamp (`@PostConstruct` `init()` is not invoked when `WebhookSignatureService` is instantiated directly outside Spring, leaving `toleranceSeconds == 0`).
   - **Verification:** `./mvnw test` **1,491 passed, 0 failed, 0 errors, 0 skipped** (`BUILD SUCCESS`); frontend `npm run test` **890 passed across 89 files**; `npm run typecheck`, `npm run lint`, `npm run build` pass; Playwright demo suite (`b2b-full-flow.test.ts`, `farmer-full-flow.test.ts`, `test-seeded-logins.test.ts`) **6 passed**. Note: `docker-compose.yml` demo-seed env passthroughs and local scratch files remain uncommitted in the working tree.
+
+### main → b2b-module Merge (2026-11-26) - COMPLETE
+
+Merged `main` (34 commits ahead: Phases 11–14, POS, reviews/analytics, security hardening, production readiness, clean-clone verification) into `b2b-module` via `git merge --no-ff`. Merge commit: `c9cdeb8`. Post-merge fixup commit: `01070d2`.
+
+**Conflicts resolved (10 files):** `SecurityConfig.java`, `InventoryService.java`, `application-test.yml`, `docker-compose.yml`, `docs/demo-script.md`, `docs/known-issues.md`, `docs/progress.md`, `frontend/src/app/router.test.tsx`, `frontend/src/app/router.tsx`, `frontend/src/features/vendor/components/VendorLayout.tsx`.
+
+**Post-merge fixes applied:**
+- `SearchApiIntegrationTest.java`: added missing Hamcrest static imports (`hasItem`, `greaterThanOrEqualTo`, `not`) introduced by main's last commit but absent at the merge base.
+- Applied Flyway migrations V30–V33 (`pos_transactions`, `reviews`, `audit_log actor_type`, `performance_indexes`) to local test DB via `mvnw flyway:migrate -DoutOfOrder=true`; these existed on disk post-merge but had not been applied to the branch's local MySQL instance.
+- Added `@Operation` annotations with access-role keywords to all 32 handler methods across 7 B2B/Farmer controllers (`B2BOrderController`, `B2BStatementController`, `FarmerLinkController`, `VendorFarmerLinkController`, `VendorCollectionController`, `FarmerDepositController`, `FarmerCollectionController`) to satisfy `OpenApiRoleCoverageTest` (plan task 14.3).
+
+**Flyway state post-merge:** V1–V33 (no V34 — pre-existing gap, never existed on either branch in final history) + V35–V40.
+
+**Validation post-merge (`01070d2`):**
+- Backend `./mvnw test`: **1,653/1,653 passed, 0 failures, 0 errors** (`BUILD SUCCESS`).
+- Fresh-DB Flyway verification: **38/38 migrations** (V1–V13, V15–V33, V35–V40) applied cleanly to an empty schema without `outOfOrder`.
+- Frontend on merged `HEAD`: `npx vitest run` **922/922 passed across 92 test files**; `npm run typecheck`, `npm run lint`, and `npm run build` pass.
+- Playwright demo suite (`b2b-full-flow.test.ts`, `farmer-full-flow.test.ts`, `test-seeded-logins.test.ts`): **5/6 passed, 1 failed** (`b2b-full-flow.test.ts:92` failed on the buyer `Order #` heading timeout; not rerun).

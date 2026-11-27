@@ -569,9 +569,11 @@ issues were found and fixed. None are production defects unless noted.
 | Frontend | `B2BOrderDetailPage` nested the "Download e-bill" button inside `{allowedActions.length > 0 ...}`, so it never rendered for terminal `DELIVERED` orders (empty actions list). Moved it into the terminal "Order complete" block and render `#B2B-<no>` in the header. | Commit `ce87e24`. |
 | Frontend | `B2BOrderActionDialogs`, `B2BOrderDetailPage`, `B2BOrdersPage`, `B2BStatementsPage` tests used wrong ARIA roles (`textarea` instead of `textbox`), wrong text (`"Buyer Florist"` vs rendered `"Buyer Florist (Indiranagar)"`), wrong money text (`"1,823.00"` vs rendered `"?1,823.00"`), wrong order number (`"B2B-1001"` vs rendered `"#B2B-1001"`), `fireEvent.click` on a `<select>` option (does not fire `onChange`), `mockReturnValueOnce` consumed by the initial render, and an async create without `waitFor`. Fixed all assertions and mock usage. | Commit `69046d5` (test fixes) + `ce87e24` (component fixes). |
 
-## Known limitation (not fixed)
+## Known limitation (resolved)
 
-Real-browser verification of the full demo was completed only for the **place-order ? accept ? stock-drop** flow. The farmer deposit/passbook/collection flow, B2B ship/deliver/e-bill/statement flow, and browser logins for all seeded accounts could not be completed in this session because the Playwright E2E harness hit timing issues (async view rendering, input re-mounting on the deposit form, selector timing). These flows work at the API level (unit + integration tests pass) but were not observed end-to-end in a real browser. Recommended follow-up before the demo: complete the farmer-flow browser verification.
+Real-browser verification was initially completed only for the **place-order → accept → stock-drop** flow, while the farmer deposit/passbook/collection flow, B2B ship/deliver/e-bill/statement flow, and seeded-account browser logins were blocked by Playwright timing issues. Those remaining flows were subsequently verified end-to-end in real Chromium against the Docker Compose stack (`bb68aeb`, `bc8276f`): `b2b-full-flow.test.ts`, `farmer-full-flow.test.ts`, and `test-seeded-logins.test.ts` (6 Playwright tests passed).
+
+Post-merge validation on integrated `b2b-module` (`01070d2`): backend `./mvnw test` **1,653 passed**, frontend `npx vitest run` **922 passed** (92 files) with typecheck, lint, and build passing, fresh-DB Flyway **38/38** migrations passed without `outOfOrder`, and the Playwright demo suite ran **5/6 passed** (`farmer-full-flow.test.ts` and `test-seeded-logins.test.ts` passed; `b2b-full-flow.test.ts:92` failed on the buyer `Order #` heading 5000ms timeout; not rerun).
 
 ## Phase 14 Stage 7 Findings (task 14.4: responsive layout and accessibility pass)
 
