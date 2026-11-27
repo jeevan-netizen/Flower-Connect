@@ -208,9 +208,10 @@ describe("SiteHeader navigation", () => {
     expect(
       screen.getByRole("button", { name: /close menu/i }),
     ).toHaveAttribute("aria-expanded", "true");
-    for (const name of ["Home", "Browse", "Orders", "Register", "For florists", "Login"]) {
+    for (const name of ["Home", "Browse", "Profile", "Register", "For florists", "Login"]) {
       expect(screen.getAllByRole("link", { name })).toHaveLength(1);
     }
+    expect(screen.queryByRole("link", { name: "Orders" })).not.toBeInTheDocument();
   });
 
   it("closes the panel on Escape and returns focus to the toggle", async () => {
@@ -254,7 +255,7 @@ describe("SiteHeader navigation", () => {
     // The link carries the item count in a badge, so its accessible name is
     // "Cart" for an empty cart and "Cart 2" for a cart with two items.
     expect(screen.getByRole("link", { name: /^Cart/ })).toHaveAttribute("href", "/cart");
-    expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
     expect(screen.queryByRole("link", { name: "Vendor" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Register" })).not.toBeInTheDocument();
   });
@@ -271,16 +272,14 @@ describe("SiteHeader navigation", () => {
     expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
   });
 
-  it("logs out from the panel too", async () => {
+  it("offers the shared profile entry to a signed-in florist", async () => {
     mockState.isAuthenticated = true;
     mockState.user = florist();
     narrowViewport();
     renderAt();
 
     await userEvent.click(screen.getByRole("button", { name: /open menu/i }));
-    await userEvent.click(screen.getByRole("button", { name: /log out/i }));
-
-    expect(mockState.logout).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
   });
 
   it("does not ask for the customer cart as an anonymous visitor", () => {

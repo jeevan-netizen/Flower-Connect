@@ -3,6 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Outlet } from "react-router-dom";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
+import { VendorProfilePage } from "@/features/vendor/pages/VendorProfilePage";
 import { vendorKeys } from "@/features/vendor/queries";
 import { renderWithProviders, createTestQueryClient } from "@/test/render";
 import { makeVendorProfile } from "@/test/factories";
@@ -48,7 +49,6 @@ describe("VendorLayout", () => {
 
     const dashboard = screen.getByRole("link", { name: "Dashboard" });
     expect(dashboard).toHaveAttribute("href", "/vendor");
-    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/vendor/profile");
     expect(screen.getByRole("link", { name: "Delivery settings" })).toHaveAttribute("href", "/vendor/settings");
     expect(screen.getByRole("link", { name: "Operating hours" })).toHaveAttribute("href", "/vendor/hours");
   });
@@ -80,7 +80,7 @@ describe("VendorLayout", () => {
       expect(screen.queryByRole("link", { name: new RegExp(label, "i") })).not.toBeInTheDocument();
     });
     // The areas a pending vendor still needs stay reachable.
-    expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
   });
 
   it("does not link to the Phase 5/6 areas that have no API yet", async () => {
@@ -126,9 +126,9 @@ describe("VendorLayout", () => {
     expect(await screen.findByText(/no vendor profile/i)).toBeInTheDocument();
   });
 
-  it("drops cached vendor data on logout so the next account starts clean", async () => {
+  it("drops cached vendor data on logout from the shared profile so the next account starts clean", async () => {
     const queryClient = createTestQueryClient();
-    renderLayout(queryClient);
+    renderWithProviders(<VendorProfilePage />, { queryClient, route: "/profile" });
 
     await waitFor(() => {
       expect(queryClient.getQueryData(vendorKeys.profile)).toBeDefined();

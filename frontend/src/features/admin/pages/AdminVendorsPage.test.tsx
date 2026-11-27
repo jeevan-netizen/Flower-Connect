@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Link, Route, Routes } from "react-router-dom";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
@@ -155,10 +155,9 @@ describe("AdminVendorsPage", () => {
     await waitForRows();
 
     const dialog = await openDialog(/^reject$/i);
-    await userEvent.type(
-      within(dialog).getByLabelText(/reason/i),
-      "x".repeat(501),
-    );
+    fireEvent.change(within(dialog).getByLabelText(/reason/i), {
+      target: { value: "x".repeat(501) },
+    });
     await userEvent.click(within(dialog).getByRole("button", { name: "Reject" }));
 
     expect(

@@ -188,6 +188,10 @@ public class SecurityConfig {
                   // disputes and detail. Customer/vendor endpoints have their
                   // own namespaces below.
                   .requestMatchers("/api/v1/admin/disputes/**").hasRole("ADMIN")
+                  // Admin farmer management (Phase 14): farmer list, detail and
+                  // account status changes. ADMIN-only; the frontend guard is
+                  // supplementary and never the authorization authority.
+                  .requestMatchers("/api/v1/admin/farmers/**").hasRole("ADMIN")
                   .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                  // Actuator exposure is governed by management.endpoints.web.exposure.include
                  // (application-prod.yml: health,info only). Non-exposed endpoints such as

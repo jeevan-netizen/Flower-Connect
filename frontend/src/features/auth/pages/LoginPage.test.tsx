@@ -72,7 +72,7 @@ describe("LoginPage", () => {
     );
 
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
   });
 
@@ -97,7 +97,7 @@ describe("LoginPage", () => {
     );
 
     await userEvent.type(screen.getByLabelText(/email address/i), "not-an-email");
-    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "password123");
 
     fireEvent.submit(document.querySelector("form")!);
 
@@ -154,7 +154,7 @@ describe("LoginPage", () => {
     );
 
     await userEvent.type(screen.getByLabelText(/email address/i), "user@test.com");
-    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "password123");
 
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
@@ -199,7 +199,7 @@ describe("LoginPage", () => {
     expect(screen.getByLabelText(/email address/i)).toHaveValue("petal@example.com");
     expect(screen.getByText(/florist application is in/i)).toBeInTheDocument();
     // The password is never carried across, even though the email is.
-    expect(screen.getByLabelText(/password/i)).toHaveValue("");
+    expect(screen.getByLabelText(/^password$/i)).toHaveValue("");
   });
 
   it("should not prefill anything on an ordinary login visit", () => {
@@ -232,7 +232,7 @@ describe("LoginPage", () => {
     );
 
     await userEvent.type(screen.getByLabelText(/email address/i), "user@test.com");
-    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "password123");
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
@@ -264,7 +264,7 @@ describe("LoginPage", () => {
     );
 
     await userEvent.type(screen.getByLabelText(/email address/i), "user@test.com");
-    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "password123");
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {

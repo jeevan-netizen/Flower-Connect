@@ -1,6 +1,11 @@
 import api from "@/shared/lib/api";
 import type { VendorProfile } from "@/features/vendor/types";
 import type {
+  AdminFarmer,
+  AdminFarmerDetail,
+  AdminFarmerFilters,
+  AdminFarmerPageResponse,
+  AdminFarmerStatusRequest,
   AdminRole,
   AdminUser,
   AdminUserPageResponse,
@@ -302,5 +307,56 @@ export async function fetchAnalyticsDailyTrends(
   const response = await api.get<AnalyticsDailyTrend[]>("/admin/analytics/daily-trends", {
     params,
   });
+  return response.data;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Farmer administration (Admin Farmer Management)                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `GET /api/v1/admin/farmers` — page of farmer accounts, optionally narrowed to
+ * one account status and/or a free-text search over name, email and mobile
+ * number. ADMIN-only.
+ */
+export async function fetchAdminFarmers(
+  filters: AdminFarmerFilters,
+): Promise<AdminFarmerPageResponse> {
+  const params: Record<string, string> = {
+    page: String(filters.page),
+    size: String(ADMIN_PAGE_SIZE),
+  };
+  if (filters.search) {
+    params.search = filters.search;
+  }
+  if (filters.status) {
+    params.status = filters.status;
+  }
+
+  const response = await api.get<AdminFarmerPageResponse>("/admin/farmers", { params });
+  return response.data;
+}
+
+/**
+ * `GET /api/v1/admin/farmers/{id}` — one farmer's profile, linked florists and
+ * a vendor-separated read-only ledger overview. ADMIN-only.
+ */
+export async function fetchAdminFarmerDetail(
+  farmerId: number,
+): Promise<AdminFarmerDetail> {
+  const response = await api.get<AdminFarmerDetail>(`/admin/farmers/${farmerId}`);
+  return response.data;
+}
+
+/**
+ * `POST /api/v1/admin/farmers/{id}/status` — suspends or reactivates a farmer
+ * account. A non-blank reason is mandatory and is stored on the audit record.
+ * ADMIN-only.
+ */
+export async function updateFarmerStatus(
+  farmerId: number,
+  payload: AdminFarmerStatusRequest,
+): Promise<AdminFarmer> {
+  const response = await api.patch<AdminFarmer>(`/admin/farmers/${farmerId}/status`, payload);
   return response.data;
 }

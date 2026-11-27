@@ -37,6 +37,7 @@ import {
   type Weekday,
 } from "@/features/vendor/types";
 import type { PageResponse } from "@/shared/types";
+import type { PassbookEntry } from "@/features/farmer/types";
 
 export type {
   VendorHours,
@@ -315,3 +316,76 @@ export interface RefundQueuePageResponse {
   last: boolean;
   empty: boolean;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Farmer administration (Admin Farmer Management)                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Account statuses a farmer account can hold. Mirrors `User.Status`; the admin
+ * list can be narrowed to any of them, while the status change action offers
+ * suspend (→ SUSPENDED) and reactivate (→ ACTIVE).
+ */
+export const FARMER_STATUSES = ["ACTIVE", "SUSPENDED", "DISABLED"] as const;
+export type FarmerStatus = (typeof FARMER_STATUSES)[number];
+
+/**
+ * Reads a `?status=` search parameter as a farmer status filter. An unknown
+ * value is discarded (`null` = no filter) rather than forwarded, because the
+ * backend binds `status` to `User.Status` and answers anything else with 400.
+ */
+export function parseFarmerStatusParam(value: string | null): FarmerStatus | null {
+  return FARMER_STATUSES.find((status) => status === value) ?? null;
+}
+
+/** Mirrors `FarmerAdminSummary` — one row of the admin farmer list. */
+export interface AdminFarmer {
+  id: number;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  status: UserStatus;
+  createdAt: string;
+}
+
+/** Filters for `GET /api/v1/admin/farmers`. */
+export interface AdminFarmerFilters {
+  /** Free-text match over name, email and mobile number. */
+  search: string | null;
+  status: FarmerStatus | null;
+  page: number;
+}
+
+export type AdminFarmerPageResponse = PageResponse<AdminFarmer>;
+
+/** Mirrors `FarmerAdminDetail`. Address is shown only on the detail view. */
+export interface AdminFarmerDetail {
+  id: number;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  address: string | null;
+  status: UserStatus;
+  createdAt: string;
+  linkedVendors: FarmerLedgerVendorOverview[];
+}
+
+/** Mirrors `FarmerVendorLedgerOverview`. Financial figures come from the backend. */
+export interface FarmerLedgerVendorOverview {
+  vendorId: number;
+  vendorName: string;
+  linkStatus: string;
+  linkCreatedAt: string | null;
+  outstandingBalance: number | null;
+  entries: PassbookEntry[];
+}
+
+/** Body of `POST /api/v1/admin/farmers/{id}/status`. */
+export interface AdminFarmerStatusRequest {
+  status: UserStatus;
+  reason: string;
+}
+
+/** Farmer administration route paths. */
+export const FARMERS_PATH = "/admin/farmers";
+export const FARMER_DETAIL_PATH = (farmerId: number) => `/admin/farmers/${farmerId}`;

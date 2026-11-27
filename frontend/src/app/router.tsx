@@ -61,6 +61,8 @@ import { B2BOrderDetailPage } from "@/features/b2b/pages/B2BOrderDetailPage";
 import { B2BStatementsPage } from "@/features/b2b/pages/B2BStatementsPage";
 import { AdminReviewsPage } from "@/features/admin/pages/AdminReviewsPage";
 import { AdminAnalyticsPage } from "@/features/admin/pages/AdminAnalyticsPage";
+import { AdminFarmersPage } from "@/features/admin/pages/AdminFarmersPage";
+import { AdminFarmerDetailPage } from "@/features/admin/pages/AdminFarmerDetailPage";
 
 /** Seeded role name for customers (V3__seed_roles.sql). */
 const CUSTOMER_ROLE = "CUSTOMER";
@@ -387,6 +389,11 @@ export const router = createBrowserRouter([
           // `hasRole("ADMIN")` on every request.
           { path: "reviews", element: <AdminReviewsPage /> },
           { path: "analytics", element: <AdminAnalyticsPage /> },
+          // Admin farmer management: list and detail. Backend enforces
+          // `hasRole("ADMIN")` on `/api/v1/admin/farmers/**`; the route guard is
+          // routing UX only.
+          { path: "farmers", element: <AdminFarmersPage /> },
+          { path: "farmers/:farmerId", element: <AdminFarmerDetailPage /> },
         ],
       },
     ],

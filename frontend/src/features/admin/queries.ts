@@ -8,6 +8,8 @@ import {
   approveVendor,
   adminCancelOrder,
   approveServiceLocationProposal,
+  fetchAdminFarmers,
+  fetchAdminFarmerDetail,
   fetchAdminUsers,
   fetchAdminVendors,
   fetchRefundQueue,
@@ -17,9 +19,13 @@ import {
   rejectVendor,
   reinstateVendor,
   suspendVendor,
+  updateFarmerStatus,
   updateUserStatus,
 } from "@/features/admin/api";
 import type {
+  AdminFarmerDetail,
+  AdminFarmerFilters,
+  AdminFarmerStatusRequest,
   AdminUser,
   UserStatusUpdateRequest,
   VendorAdminMutation,
@@ -60,6 +66,18 @@ export const adminKeys = {
         filters.vendorId ?? null,
         filters.fromDate ?? null,
         filters.toDate ?? null,
+        filters.page,
+      ] as const,
+  },
+  farmers: {
+    all: ["admin", "farmers"] as const,
+    list: (filters: AdminFarmerFilters) =>
+      [
+        "admin",
+        "farmers",
+        "list",
+        filters.search ?? null,
+        filters.status ?? null,
         filters.page,
       ] as const,
   },
@@ -200,6 +218,47 @@ export function useUpdateUserStatus() {
       updateUserStatus(userId, payload),
     onSuccess: (_user: AdminUser) => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.users.all });
+    },
+  });
+}
+
+/**
+ * `GET /api/v1/admin/farmers` — page of farmer accounts, keyed by every filter
+ * so a filter change is a cache miss rather than a stale render.
+ */
+export function useAdminFarmers(filters: AdminFarmerFilters) {
+  return useQuery({
+    queryKey: adminKeys.farmers.list(filters),
+    queryFn: () => fetchAdminFarmers(filters),
+  });
+}
+
+/**
+ * `GET /api/v1/admin/farmers/{id}` — one farmer's profile and vendor-separated
+ * ledger overview. Disabled when no id is supplied.
+ */
+export function useAdminFarmerDetail(farmerId: number | null) {
+  return useQuery<AdminFarmerDetail>({
+    queryKey: ["admin", "farmers", "detail", farmerId],
+    queryFn: () => fetchAdminFarmerDetail(farmerId as number),
+    enabled: farmerId !== null,
+  });
+}
+
+/**
+ * `POST /api/v1/admin/farmers/{id}/status` — suspends or reactivates a farmer
+ * account. On success the whole farmer listing is invalidated so the updated
+ * status is reflected everywhere.
+ */
+export function useUpdateFarmerStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ farmerId, ...payload }: AdminFarmerStatusRequest & {
+      farmerId: number;
+    }) => updateFarmerStatus(farmerId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.farmers.all });
     },
   });
 }

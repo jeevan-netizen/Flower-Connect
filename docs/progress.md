@@ -2285,3 +2285,40 @@ Integrated the saved florist/customer/admin improvements and the farmer portal a
 - Validation is pending for this combined working tree; prior checks from the source branches do not prove this integrated state.
 - The shared `/profile` route dispatches FARMER accounts to `FarmerProfilePage`. The farmer portal itself keeps only Overview and My Ledger navigation; farmers use the global Profile link for account details.
 - Removed the repeated “Your links” list from the farmer Overview; vendor-specific records remain in My Ledger, while overview cards keep the aggregate live balances and pending collections.
+
+## Admin Farmer Management (Phase 14) - COMPLETE (2026-11-27)
+
+Added an admin-only Farmer Management section to the existing Admin area. Backend endpoints are protected by `hasRole("ADMIN")`; frontend route guards are supplementary only.
+
+### Backend (`com.flowerconnect.controller`, `com.flowerconnect.farmer.service`)
+- `GET /api/v1/admin/farmers` — paginated farmer list with optional `search` (name/email/mobile) and `status` (ACTIVE/SUSPENDED/DISABLED) filters. Server-side pagination, page size clamped 1..100.
+- `GET /api/v1/admin/farmers/{id}` — farmer detail: profile (name, email, mobile, status, registration date, address when present), linked florists (vendor name, link status, link date), and a read-only vendor-separated ledger overview (deposit/collection entries with backend-reported outstanding balance and running balance).
+- `POST /api/v1/admin/farmers/{id}/status` — suspend or reactivate a farmer account; non-blank reason mandatory; records acting admin, timestamp, action, reason on `audit_log` via `UserStatusService` (which also revokes the target's refresh tokens). Refuses self-targeting and non-farmer targets (404), returns 409 on invalid transitions.
+- New DTOs: `FarmerAdminSummary`, `FarmerAdminDetail`, `FarmerVendorLedgerOverview` (reuses `PassbookEntry` so figures match the farmer/vendor passbooks exactly).
+- `AdminFarmerService` backs list/detail; `FarmerCollectionService.getPassbookForAdmin` reuses the same merge/running-balance calculation as the farmer passbook (access boundary only).
+- `SecurityConfig`: `/api/v1/admin/farmers/**` mapped to `hasRole("ADMIN")` before the broad `/api/v1/admin/**` rule.
+- `EndpointAccessMatrix`: added 3 rows (list/detail/status) under the ADMIN section so the fail-closed sweep covers the new handlers.
+- No Flyway migration (reads existing `users`, `farmer_vendor_links`, `farmer_deposits`, `farmer_payments`); no password hashes, reset tokens, or unrelated fields exposed; no identity-verification or CSV export.
+- Tests: `AdminFarmerControllerTest` (23 WebMvc/RBAC tests), `AdminFarmerServiceTest` (9 service tests) — all green.
+
+### Frontend (`src/features/admin`)
+- `types.ts`: `AdminFarmer`, `AdminFarmerFilters`, `AdminFarmerPageResponse`, `AdminFarmerDetail`, `FarmerLedgerVendorOverview`, `AdminFarmerStatusRequest`, `FARMER_STATUSES`, `parseFarmerStatusParam`, route paths.
+- `api.ts`: `fetchAdminFarmers`, `fetchAdminFarmerDetail`, `updateFarmerStatus`.
+- `queries.ts`: `useAdminFarmers`, `useAdminFarmerDetail`, `useUpdateFarmerStatus`, `adminKeys.farmers`.
+- `AdminFarmersPage`: paginated list with search input, status filter, status pills, per-row suspend/reactivate via `ReasonDialog` (reason required), loading/empty/error/retry/success states.
+- `AdminFarmerDetailPage`: profile (incl. address, shown only here), linked florists with vendor-separated ledger overview and entries table; read-only; suspend/reactivate action.
+- `router.tsx`: `/admin/farmers` and `/admin/farmers/:farmerId` routes (ADMIN guard).
+- `AdminLayout.tsx`: "Farmers" nav item.
+- Tests: `AdminFarmersPage.test.tsx` (15 tests), `AdminFarmerDetailPage.test.tsx` (11 tests) — all green.
+- Verification: frontend lint clean, typecheck clean, 26 new tests pass, production build clean.
+- Frontend route guards are supplementary only; authorization is enforced server-side on every endpoint.
+
+### Files changed
+- Backend: `controller/AdminFarmerController.java` (new), `farmer/service/AdminFarmerService.java` (new), `farmer/dto/FarmerAdminSummary.java` (new), `farmer/dto/FarmerAdminDetail.java` (new), `farmer/dto/FarmerVendorLedgerOverview.java` (new), `farmer/service/FarmerCollectionService.java` (+`getPassbookForAdmin`), `config/SecurityConfig.java` (+farmers ADMIN matcher), `test/java/com/flowerconnect/security/EndpointAccessMatrix.java` (+3 ADMIN rows), `test/java/com/flowerconnect/controller/AdminFarmerControllerTest.java` (new, 23 tests), `test/java/com/flowerconnect/farmer/service/AdminFarmerServiceTest.java` (new, 9 tests)
+- Frontend: `features/admin/types.ts`, `features/admin/api.ts`, `features/admin/queries.ts`, `features/admin/pages/AdminFarmersPage.tsx` (new), `features/admin/pages/AdminFarmerDetailPage.tsx` (new), `features/admin/pages/AdminFarmersPage.test.tsx` (new, 15 tests), `features/admin/pages/AdminFarmerDetailPage.test.tsx` (new, 11 tests), `app/router.tsx`, `features/admin/components/AdminLayout.tsx`
+
+### Verification
+- Backend production and test sources compile with the standard Maven configuration. A fresh run of `AdminFarmerControllerTest` / `AdminFarmerServiceTest` did not complete in this environment: the Surefire fork reported an attach-pipe error and stalled; Docker is unavailable for integration tests. The earlier reported 23 + 9 pass result has not been reproduced in this run.
+- Focused frontend run: **136/136 passed** across the affected auth, router, admin farmer, vendor registration/layout, farmer overview, and admin layout files. Follow-up focused checks: **59/59 passed** for SiteHeader, AdminVendorsPage, and ProductDetailPage; the AdminVendorsPage file also passed **24/24** after replacing slow character-by-character typing in its 501-character validation test.
+- Frontend full suite: **978/979 passed** (98/99 files) on the first full rerun. Its sole failure was that character-by-character 501-character test hitting Vitest's 30-second timeout under suite load. The direct input-change replacement passed in the focused 24-test rerun; the entire suite was not rerun after that test-only speed improvement.
+- Frontend typecheck and lint passed. Production build passed (819 modules; Vite reported the existing large-chunk warning for the main bundles).

@@ -174,13 +174,12 @@ describe("ProductDetailPage", () => {
     expect(screen.getByText("A dozen deep red roses.")).toBeInTheDocument();
   });
 
-  it("renders a placeholder rather than an image", async () => {
+  it("renders the product image when one is available", async () => {
     useLocationStore.setState({ selected: KORAMANGALA });
 
-    const { container } = renderProduct();
+    renderProduct();
 
     await screen.findByRole("heading", { name: "Red Rose Bouquet", level: 1 });
-    expect(container.querySelector("img")).toBeNull();
     expect(screen.getByRole("img", { name: /Photo of Red Rose Bouquet/ })).toBeInTheDocument();
   });
 

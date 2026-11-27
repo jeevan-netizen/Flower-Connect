@@ -226,7 +226,6 @@ describe("application router", () => {
     // read as a product id.
     expect(vendorRoute?.children?.map((child) => child.path)).toEqual([
       undefined,
-      "profile",
       "settings",
       "hours",
       "catalog",
@@ -258,7 +257,7 @@ describe("application router", () => {
   });
 
   it("renders the profile editor for a florist", async () => {
-    renderAt("/vendor/profile");
+    renderAt("/profile");
 
     await waitFor(() => {
       expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();
@@ -345,7 +344,7 @@ describe("application router", () => {
   it("keeps a customer out of every vendor route", async () => {
     mockState.user = { ...florist(), role: "CUSTOMER" };
 
-    renderAt("/vendor/profile");
+    renderAt("/vendor");
 
     await waitFor(() => {
       expect(screen.getByText(/does not have access to this area/i)).toBeInTheDocument();
@@ -590,7 +589,7 @@ describe("admin route protection", () => {
     mockFetchServiceLocations.mockResolvedValue(makeServiceLocations());
   });
 
-  it("adds the three admin paths under a guarded /admin namespace", () => {
+  it("adds the admin paths under a guarded /admin namespace", () => {
     const adminRoute = appRouter.routes
       .flatMap((route) => route.children ?? [])
       .find((child) => child.path === "admin") as RouteObject | undefined;
@@ -605,12 +604,15 @@ describe("admin route protection", () => {
       undefined,
       "vendors",
       "users",
+      "proposals",
       "refunds",
       "orders/lookup",
       "disputes",
       "billing",
       "reviews",
       "analytics",
+      "farmers",
+      "farmers/:farmerId",
     ]);
   });
 
@@ -710,7 +712,7 @@ describe("admin route protection", () => {
   it("leaves the vendor routes working for a florist after the admin routes were added", async () => {
     mockState.user = florist();
 
-    renderAt("/vendor/profile");
+    renderAt("/profile");
 
     await waitFor(() => {
       expect(screen.getByLabelText(/business name/i)).toBeInTheDocument();

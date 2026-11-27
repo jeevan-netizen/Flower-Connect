@@ -3,6 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
+import { AdminProfilePage } from "@/features/admin/pages/AdminProfilePage";
 import { adminKeys } from "@/features/admin/queries";
 import { renderWithProviders } from "@/test/render";
 import { makePage } from "@/test/factories";
@@ -13,8 +14,10 @@ const mockLogout = vi.hoisted(() => vi.fn());
 const mockCurrentUser = vi.hoisted(() => ({ user: null as UserResponse | null }));
 
 vi.mock("@/features/auth/stores/auth-store", () => ({
-  useAuthStore: (selector: (state: { user: UserResponse | null; logout: () => void }) => unknown) =>
-    selector({ user: mockCurrentUser.user, logout: mockLogout }),
+  useAuthStore: (selector?: (state: { user: UserResponse | null; logout: () => void }) => unknown) => {
+    const state = { user: mockCurrentUser.user, logout: mockLogout };
+    return selector ? selector(state) : state;
+  },
 }));
 
 function adminUser(): UserResponse {
@@ -38,6 +41,10 @@ function renderShell() {
   );
 }
 
+function renderAdminProfile() {
+  return renderWithProviders(<AdminProfilePage />, { route: "/profile" });
+}
+
 describe("AdminLayout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -52,6 +59,7 @@ describe("AdminLayout", () => {
     expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/admin");
     expect(screen.getByRole("link", { name: "Vendors" })).toHaveAttribute("href", "/admin/vendors");
     expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
+    expect(screen.getByRole("link", { name: "Farmers" })).toHaveAttribute("href", "/admin/farmers");
 
     // Catalog, orders and delivery have no admin API in Phase 2, so they are
     // absent rather than rendered as dead links.
@@ -71,7 +79,7 @@ describe("AdminLayout", () => {
   });
 
   it("clears the admin query cache on logout so the next account sees nothing of this one", async () => {
-    const { queryClient } = renderShell();
+    const { queryClient } = renderAdminProfile();
     queryClient.setQueryData(adminKeys.users.list({ role: null, status: null, page: 0 }), makePage<AdminUser>([]));
 
     await userEvent.click(screen.getByRole("button", { name: /log out/i }));

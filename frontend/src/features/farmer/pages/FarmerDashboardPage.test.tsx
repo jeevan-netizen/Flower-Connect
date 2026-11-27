@@ -70,7 +70,9 @@ describe("FarmerDashboardPage", () => {
 
     renderWithProviders(<FarmerDashboardPage />, { route: "/farmer" });
 
-    expect(screen.getByText("Green Acres Florist")).toBeInTheDocument();
+    // The overview is intentionally summary-only; vendor-separated records are
+    // available from My Ledger instead of being repeated here.
+    expect(screen.queryByText("Green Acres Florist")).not.toBeInTheDocument();
     expect(screen.getByText("Current balance")).toBeInTheDocument();
     expect(screen.getByText("₹1,800.00")).toBeInTheDocument();
     expect(screen.getByText("Pending collections")).toBeInTheDocument();
@@ -80,7 +82,7 @@ describe("FarmerDashboardPage", () => {
     });
   });
 
-  it("shows an empty state when the farmer has no linked vendors", () => {
+  it("shows the compact zero-link overview when the farmer has no linked vendors", () => {
     mockUseFarmerLinks.mockReturnValue({
       data: [],
       isPending: false,
@@ -95,6 +97,11 @@ describe("FarmerDashboardPage", () => {
 
     renderWithProviders(<FarmerDashboardPage />, { route: "/farmer" });
 
-    expect(screen.getByText(/You have no linked florists yet/)).toBeInTheDocument();
+    expect(screen.getByText("Linked vendors")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /browse vendors/i })).toHaveAttribute(
+      "href",
+      "/farmer/vendors",
+    );
   });
 });

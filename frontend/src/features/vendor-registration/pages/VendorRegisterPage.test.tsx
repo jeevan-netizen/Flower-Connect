@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
 import { renderWithProviders } from "@/test/render";
@@ -28,9 +28,19 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>, opti
   await user.type(screen.getByLabelText(/confirm password/i), "correct-horse");
   await user.type(screen.getByLabelText(/business name/i), "Petal & Stem");
   await user.type(screen.getByLabelText(/address line 1/i), "12 MG Road");
+  await user.type(screen.getByLabelText(/^city$/i), "Bengaluru");
+  await user.type(screen.getByLabelText(/area \/ locality/i), "Indiranagar");
+  await user.type(screen.getByLabelText(/pincode/i), "560038");
   if (options?.phone) {
     await user.type(screen.getByLabelText(/phone number/i), options.phone);
   }
+}
+
+async function chooseServiceArea(user: ReturnType<typeof userEvent.setup>, area = "Indiranagar") {
+  const picker = screen.getByRole("combobox", { name: /service area/i });
+  await waitFor(() => expect(picker).toBeEnabled());
+  await user.type(picker, area);
+  await user.click(await screen.findByRole("option", { name: new RegExp(area, "i") }));
 }
 
 describe("VendorRegisterPage", () => {
@@ -93,7 +103,7 @@ describe("VendorRegisterPage", () => {
     await fillRequiredFields(user);
     await user.clear(screen.getByLabelText(/confirm password/i));
     await user.type(screen.getByLabelText(/confirm password/i), "different");
-    await user.selectOptions(screen.getByLabelText(/service area/i), "3");
+    await chooseServiceArea(user);
     await user.click(screen.getByRole("button", { name: /submit application/i }));
 
     expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument();
@@ -108,7 +118,7 @@ describe("VendorRegisterPage", () => {
       expect(screen.getByLabelText(/service area/i)).toBeInTheDocument();
     });
     await fillRequiredFields(user, { phone: "12345" });
-    await user.selectOptions(screen.getByLabelText(/service area/i), "3");
+    await chooseServiceArea(user);
     await user.click(screen.getByRole("button", { name: /submit application/i }));
 
     expect(await screen.findByText(/valid phone number/i)).toBeInTheDocument();
@@ -119,17 +129,17 @@ describe("VendorRegisterPage", () => {
     const user = userEvent.setup();
     renderWithProviders(<VendorRegisterPage />);
 
-    const picker = await screen.findByLabelText(/service area/i);
-    // The field is rendered before the data arrives, so wait for the options rather
-    // than the label.
-    expect(
-      await within(picker).findByRole("option", { name: "Indiranagar (560038)" }),
-    ).toHaveValue("3");
-    expect(within(picker).getByRole("option", { name: "Koramangala (560034)" })).toHaveValue("4");
-    expect(within(picker).getByRole("group", { name: "Bengaluru" })).toBeInTheDocument();
+    const picker = await screen.findByRole("combobox", { name: /service area/i });
+    await waitFor(() => expect(picker).toBeEnabled());
+    await user.click(picker);
+    await user.keyboard("{ArrowDown}");
+    expect(await screen.findByRole("option", { name: "Indiranagar (560038)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Koramangala (560034)" })).toBeInTheDocument();
 
     await fillRequiredFields(user);
-    await user.selectOptions(picker, "4");
+    await user.click(picker);
+    await user.keyboard("{ArrowDown}");
+    await user.click(await screen.findByRole("option", { name: "Koramangala (560034)" }));
     await user.click(screen.getByRole("button", { name: /submit application/i }));
 
     await waitFor(() => {
@@ -141,6 +151,9 @@ describe("VendorRegisterPage", () => {
         businessName: "Petal & Stem",
         addressLine1: "12 MG Road",
         serviceLocationId: 4,
+        city: "Bengaluru",
+        area: "Indiranagar",
+        pincode: "560038",
       }),
     );
   });
@@ -153,7 +166,7 @@ describe("VendorRegisterPage", () => {
       expect(screen.getByLabelText(/service area/i)).toBeInTheDocument();
     });
     await fillRequiredFields(user);
-    await user.selectOptions(screen.getByLabelText(/service area/i), "3");
+    await chooseServiceArea(user);
     await user.click(screen.getByRole("button", { name: /submit application/i }));
 
     await waitFor(() => {
@@ -174,7 +187,7 @@ describe("VendorRegisterPage", () => {
       expect(screen.getByLabelText(/service area/i)).toBeInTheDocument();
     });
     await fillRequiredFields(user);
-    await user.selectOptions(screen.getByLabelText(/service area/i), "3");
+    await chooseServiceArea(user);
     await user.click(screen.getByRole("button", { name: /submit application/i }));
 
     expect(await screen.findByRole("heading", { name: /application received/i })).toBeInTheDocument();
@@ -198,7 +211,7 @@ describe("VendorRegisterPage", () => {
       expect(screen.getByLabelText(/service area/i)).toBeInTheDocument();
     });
     await fillRequiredFields(user);
-    await user.selectOptions(screen.getByLabelText(/service area/i), "3");
+    await chooseServiceArea(user);
     await user.click(screen.getByRole("button", { name: /submit application/i }));
 
     expect(await screen.findByText("Business name is required")).toBeInTheDocument();
@@ -215,7 +228,7 @@ describe("VendorRegisterPage", () => {
       expect(screen.getByLabelText(/service area/i)).toBeInTheDocument();
     });
     await fillRequiredFields(user);
-    await user.selectOptions(screen.getByLabelText(/service area/i), "3");
+    await chooseServiceArea(user);
     await user.click(screen.getByRole("button", { name: /submit application/i }));
 
     expect(await screen.findByText("Email already in use")).toBeInTheDocument();
@@ -269,7 +282,8 @@ describe("VendorRegisterPage", () => {
         expect(screen.getByLabelText(/service area/i)).toBeEnabled();
       });
       expect(mockFetchServiceLocations).toHaveBeenCalledTimes(2);
-      expect(screen.getByRole("option", { name: "Indiranagar (560038)" })).toBeInTheDocument();
+      await user.type(screen.getByRole("combobox", { name: /service area/i }), "Indiranagar");
+      expect(await screen.findByRole("option", { name: "Indiranagar (560038)" })).toBeInTheDocument();
     });
 
     it("reports an empty region instead of offering an unusable picker", async () => {
@@ -279,7 +293,7 @@ describe("VendorRegisterPage", () => {
 
       expect(await screen.findByText(/no service areas are configured yet/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/service area/i)).toBeDisabled();
-      expect(within(screen.getByLabelText(/service area/i)).getAllByRole("option")).toHaveLength(1);
+      expect(screen.queryByRole("option")).not.toBeInTheDocument();
     });
   });
 
@@ -323,7 +337,7 @@ describe("VendorRegisterPage", () => {
       expect(screen.getByLabelText(/service area/i)).toBeInTheDocument();
     });
     await fillRequiredFields(user);
-    await user.selectOptions(screen.getByLabelText(/service area/i), "3");
+    await chooseServiceArea(user);
     await user.click(screen.getByRole("button", { name: /submit application/i }));
 
     expect(await screen.findByText(/Renamed Shop/)).toBeInTheDocument();
@@ -342,7 +356,7 @@ describe("VendorRegisterPage", () => {
       expect(screen.getByLabelText(/service area/i)).toBeInTheDocument();
     });
     await fillRequiredFields(user);
-    await user.selectOptions(screen.getByLabelText(/service area/i), "3");
+    await chooseServiceArea(user);
     await user.click(screen.getByRole("button", { name: /submit application/i }));
 
     expect(await screen.findByRole("heading", { name: /application received/i })).toBeInTheDocument();

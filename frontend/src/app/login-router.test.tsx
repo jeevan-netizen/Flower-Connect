@@ -168,7 +168,7 @@ describe("Farmer sign-in routing (/login)", () => {
     });
 
     await userEvent.type(screen.getByLabelText(/email address/i), "farmer@test.com");
-    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "password123");
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     // justLoggedIn is true during login, so RequireUnauth does not redirect;
@@ -191,7 +191,7 @@ describe("Farmer sign-in routing (/login)", () => {
     });
 
     await userEvent.type(screen.getByLabelText(/email address/i), "customer@test.com");
-    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "password123");
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     // Refusal ends the non-farmer session, then keeps the explanation visible
@@ -243,7 +243,7 @@ describe("Farmer sign-in routing (/login)", () => {
     });
 
     await userEvent.type(screen.getByLabelText(/email address/i), "customer@test.com");
-    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.type(screen.getByLabelText(/^password$/i), "password123");
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     // General login sends the customer to their intended page ("/orders"), not

@@ -217,6 +217,40 @@ public class FarmerCollectionService {
     }
 
     /**
+     * Returns the passbook for a link without the farmer/vendor ownership check,
+     * so an administrator may view any link's ledger. The calculation
+     * (outstanding balance, merged entries, running balance) is identical to
+     * {@link #getPassbook}; only the access boundary differs.
+     */
+    @Transactional(readOnly = true)
+    public PassbookResponse getPassbookForAdmin(Long linkId) {
+        FarmerVendorLink link = linkRepository.findById(linkId)
+                .orElseThrow(() -> BusinessException.notFound("Link not found"));
+
+        BigDecimal balance = outstandingBalance(linkId);
+
+        List<FarmerDeposit> deposits = depositRepository.findByLinkId(linkId);
+        List<FarmerPayment> collections = paymentRepository.findByLinkId(linkId);
+        List<PassbookEntryResponse> entries = mergeEntries(deposits, collections);
+
+        String farmerName = userRepository.findById(link.getFarmerId())
+                .map(User::getFullName).orElse("unknown");
+        String vendorName = vendorProfileRepository.findById(link.getVendorId())
+                .map(VendorProfile::getBusinessName).orElse("unknown");
+
+        return PassbookResponse.builder()
+                .linkId(link.getId())
+                .farmerId(link.getFarmerId())
+                .farmerName(farmerName)
+                .vendorId(link.getVendorId())
+                .vendorName(vendorName)
+                .linkStatus(link.getStatus().name())
+                .outstandingBalance(balance)
+                .entries(entries)
+                .build();
+    }
+
+    /**
      * Lists collections on links belonging to the given vendor, filtered by
      * status, for the vendor's collection queue.
      */

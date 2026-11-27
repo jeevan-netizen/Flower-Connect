@@ -12,6 +12,7 @@ import com.flowerconnect.inventory.domain.Inventory;
 import com.flowerconnect.inventory.repository.InventoryRepository;
 import com.flowerconnect.repository.ServiceLocationRepository;
 import com.flowerconnect.search.dto.PublicProductResponse;
+import com.flowerconnect.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,9 @@ class PublicProductServiceTest {
     @Mock
     private ProductImageRepository productImageRepository;
 
+    @Mock
+    private StorageService storageService;
+
     private PublicProductService publicProductService;
 
     private ServiceLocation origin;
@@ -50,7 +54,8 @@ class PublicProductServiceTest {
     void setUp() {
         publicProductService = new PublicProductService(
                 serviceLocationRepository, productRepository,
-                inventoryRepository, productImageRepository, new GeoService());
+                inventoryRepository, productImageRepository, new GeoService(),
+                storageService);
 
         origin = ServiceLocation.builder()
                 .id(1L)
