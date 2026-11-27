@@ -249,14 +249,14 @@ export function CustomerProfilePage() {
             />
           </form>
 
-          <dl className="space-y-3 pt-2 border-t border-slate-200">
+          <dl className="space-y-3 pt-2 border-t bolder-line">
             <ReadOnlyRow label="Email" value={user?.email ?? "—"} />
             <ReadOnlyRow label="Role" value={user?.role ?? "—"} />
             <ReadOnlyRow label="Customer id" value={user?.id?.toString() ?? "—"} />
             <ReadOnlyRow label="Member since" value={user?.createdAt ?? "—"} />
           </dl>
 
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-bolder-muted">
             Want to change your password?{" "}
             <a
               href="/settings/password"
@@ -280,7 +280,7 @@ export function CustomerProfilePage() {
               type="button"
               onClick={onAddAddress}
               disabled={mode !== "none"}
-              className={`inline-flex items-center rounded-md border border-transparent bg-bolder-rose px-4 py-2 text-sm font-medium text-bolder-bg hover:bg-bolder-rose-strong focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:opacity-60 ${PRESSABLE}`}
+              className={`inline-flex items-center rounded-md border border-transparent bg-bolder-rose px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-strong focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:opacity-60 ${PRESSABLE}`}
             >
               {mode === "add" ? "Adding…" : "Add address"}
             </button>
@@ -295,14 +295,14 @@ export function CustomerProfilePage() {
           ) : null}
 
           {addressesPending ? (
-            <p className="text-sm text-slate-600">Loading your addresses…</p>
+            <p className="text-sm text-bolder-muted">Loading your addresses…</p>
           ) : addresses.length === 0 ? (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-bolder-muted">
               You have no saved addresses yet. Add one to speed up checkout.
             </p>
           ) : (
             <>
-              <ul role="list" className="divide-y divide-slate-200">
+              <ul role="list" className="divide-y divide-bolder-line">
                 {addresses.map((address) => (
                   <li
                     key={address.id}
@@ -352,7 +352,7 @@ export function CustomerProfilePage() {
       <button
         type="button"
         onClick={handleLogout}
-        className={`w-full inline-flex justify-center rounded-md border border-transparent bg-bolder-rose px-4 py-2.5 text-sm font-medium text-bolder-bg hover:bg-bolder-rose-strong focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 ${PRESSABLE}`}
+        className={`w-full inline-flex justify-center rounded-md border border-transparent bg-bolder-rose px-4 py-2.5 text-sm font-medium text-white hover:bg-bolder-rose-strong focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 ${PRESSABLE}`}
       >
         Log out
       </button>
@@ -391,8 +391,8 @@ function AddressRow({ address, isDefault, onEdit, onDelete }: AddressRowProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
       <div>
-        <p className="text-sm font-medium text-slate-900">{address.label}</p>
-        <p className="text-xs text-slate-500">
+        <p className="text-sm font-medium text-bolder-text">{address.label}</p>
+        <p className="text-xs text-bolder-muted">
           {address.line1}{address.line2 ? `, ${address.line2}` : ""} —{' '}
           {address.area}, {address.city} {address.pincode}
         </p>
@@ -401,7 +401,7 @@ function AddressRow({ address, isDefault, onEdit, onDelete }: AddressRowProps) {
         className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-tighter ${
           isDefault
             ? "border-bolder-rose bg-bolder-rose/10 text-bolder-rose"
-            : "border-slate-300 bg-slate-50 text-slate-600"
+            : "border-bolder-line-control bg-bolder-bg text-bolder-muted"
         }`}
       >
         {isDefault ? "Default" : "Saved"}
@@ -417,7 +417,7 @@ function AddressRow({ address, isDefault, onEdit, onDelete }: AddressRowProps) {
         <button
           type="button"
           onClick={onDelete}
-          className={`text-[12px] font-medium underline underline-offset-4 hover:text-red-600 ${PRESSABLE}`}
+          className={`text-[12px] font-medium underline underline-offset-4 hover:text-bolder-danger ${PRESSABLE}`}
         >
           Delete
         </button>
@@ -503,17 +503,17 @@ function AddressForm({
           registration={register("line2")}
         />
         {locationsPending ? (
-          <p className="text-sm text-slate-600">Loading service areas…</p>
+          <p className="text-sm text-bolder-muted">Loading service areas…</p>
         ) : (
           <div>
-            <label htmlFor={selectId} className="block text-sm font-medium text-slate-700">
+            <label htmlFor={selectId} className="block text-sm font-medium text-bolder-text">
               Service area
             </label>
             <select
               id={selectId}
               {...register("serviceLocationId")}
-              className={`mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm ${
-                errors.serviceLocationId ? "border-red-500" : ""
+              className={`mt-1 block w-full rounded-md border-bolder-line-control shadow-sm sm:text-sm ${
+                errors.serviceLocationId ? "border-bolder-danger-border" : ""
               }`}
             >
               <option value="">Select a service area</option>
@@ -524,7 +524,7 @@ function AddressForm({
               ))}
             </select>
             {errors.serviceLocationId && (
-              <p className="mt-1 text-xs text-red-600">{errors.serviceLocationId.message}</p>
+              <p className="mt-1 text-xs text-bolder-danger">{errors.serviceLocationId.message}</p>
             )}
           </div>
         )}
@@ -542,7 +542,7 @@ function AddressForm({
             type="button"
             onClick={onCancel}
             disabled={isPending}
-            className={`inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 ${PRESSABLE}`}
+            className={`inline-flex items-center rounded-md border border-bolder-line-control bg-bolder-surface px-4 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg disabled:opacity-60 ${PRESSABLE}`}
           >
             Cancel
           </button>
@@ -635,17 +635,17 @@ function AddressEditForm({
           registration={register("line2")}
         />
         {locationsPending ? (
-          <p className="text-sm text-slate-600">Loading service areas…</p>
+          <p className="text-sm text-bolder-muted">Loading service areas…</p>
         ) : (
           <div>
-            <label htmlFor={selectId} className="block text-sm font-medium text-slate-700">
+            <label htmlFor={selectId} className="block text-sm font-medium text-bolder-text">
               Service area
             </label>
             <select
               id={selectId}
               {...register("serviceLocationId")}
-              className={`mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm ${
-                errors.serviceLocationId ? "border-red-500" : ""
+              className={`mt-1 block w-full rounded-md border-bolder-line-control shadow-sm sm:text-sm ${
+                errors.serviceLocationId ? "border-bolder-danger-border" : ""
               }`}
             >
               <option value="">Select a service area</option>
@@ -656,7 +656,7 @@ function AddressEditForm({
               ))}
             </select>
             {errors.serviceLocationId && (
-              <p className="mt-1 text-xs text-red-600">{errors.serviceLocationId.message}</p>
+              <p className="mt-1 text-xs text-bolder-danger">{errors.serviceLocationId.message}</p>
             )}
           </div>
         )}
@@ -674,7 +674,7 @@ function AddressEditForm({
             type="button"
             onClick={onCancel}
             disabled={isPending || isSubmitting}
-            className={`inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 ${PRESSABLE}`}
+            className={`inline-flex items-center rounded-md border border-bolder-line-control bg-bolder-surface px-4 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg disabled:opacity-60 ${PRESSABLE}`}
           >
             Cancel
           </button>

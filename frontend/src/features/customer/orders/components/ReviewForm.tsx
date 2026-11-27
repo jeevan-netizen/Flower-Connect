@@ -48,7 +48,7 @@ export function ReviewForm({ orderId, onSuccess }: ReviewFormProps) {
 
   if (submitted) {
     return (
-      <div className="rounded-lg border border-green-100 bg-green-50 p-4 text-sm text-green-800">
+      <div className="rounded-lg border bolder-success-border bg-bolder-success-surface p-4 text-sm text-bolder-success">
         <p className="font-semibold">Thank you for your review!</p>
         <p className="mt-1 text-sm">
           Your review has been submitted and will appear on the shop's storefront.
@@ -60,10 +60,10 @@ export function ReviewForm({ orderId, onSuccess }: ReviewFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+      className="space-y-4 rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm"
     >
       <div>
-        <h3 className="text-sm font-semibold text-slate-900 mb-2">
+        <h3 className="text-sm font-semibold text-bolder-text mb-2">
           Rate your experience
         </h3>
         <StarRating
@@ -75,14 +75,14 @@ export function ReviewForm({ orderId, onSuccess }: ReviewFormProps) {
           emptyLabel="Select a rating"
         />
         {!rating && !isSubmitting && (
-          <p className="mt-1 text-xs text-red-600">Please select a rating.</p>
+          <p className="mt-1 text-xs text-bolder-danger">Please select a rating.</p>
         )}
       </div>
 
       <div>
         <label
           htmlFor="review-comment"
-          className="block text-xs font-medium text-slate-700"
+          className="block text-xs font-medium text-bolder-text"
         >
           Comment (optional)
         </label>
@@ -92,16 +92,16 @@ export function ReviewForm({ orderId, onSuccess }: ReviewFormProps) {
           onChange={(e) => setComment(e.target.value)}
           maxLength={1000}
           rows={3}
-          className={`mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500 ${FOCUS_RING}`}
+          className={`mt-1 block w-full rounded-md border border-bolder-line-control bg-bolder-surface px-3 py-2 text-sm text-bolder-text focus:outline-none focus:ring-2 focus:ring-bolder-rose ${FOCUS_RING}`}
           placeholder="Share your thoughts about this order..."
         />
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-bolder-muted">
           {comment.length}/1000 characters
         </p>
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2 border border-red-100">
+        <p className="text-sm text-bolder-danger bg-bolder-danger-surface rounded-lg p-2 border bolder-danger-border">
           {error}
         </p>
       )}
@@ -110,7 +110,7 @@ export function ReviewForm({ orderId, onSuccess }: ReviewFormProps) {
         <button
           type="submit"
           disabled={!canSubmit}
-          className={`inline-flex items-center rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+          className={`inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
         >
           {isSubmitting ? "Submitting…" : "Submit review"}
         </button>

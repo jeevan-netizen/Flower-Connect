@@ -44,7 +44,7 @@ export function CartPage() {
   if (isPending || !cart) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <FlowerLoader label="Loading your cart" showLabel className="text-sm text-slate-600" />
+        <FlowerLoader label="Loading your cart" showLabel className="text-sm text-bolder-muted" />
       </div>
     );
   }
@@ -58,7 +58,7 @@ export function CartPage() {
         />
         <Link
           to="/browse"
-          className={`mt-6 inline-flex items-center rounded-md border border-bolder-blush bg-white px-5 py-2.5 text-sm font-medium text-bolder-blush hover:bg-amber-50 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`mt-6 inline-flex items-center rounded-md border border-bolder-line-control bg-bolder-surface px-5 py-2.5 text-sm font-medium text-bolder-rose-action hover:bg-bolder-surface-muted ${PRESSABLE} ${FOCUS_RING}`}
         >
           Start browsing
         </Link>
@@ -143,8 +143,8 @@ function CartShopSection({ shop, items, adjusting, setAdjusting, onQuantityChang
           />
         ))}
         <div className="flex justify-between items-baseline pt-3 border-t border-glass-border-soft">
-          <span className="text-base font-semibold text-slate-900">Shop subtotal</span>
-          <span className="text-lg font-bold text-slate-900">{formatMoney(shop.subtotal)}</span>
+          <span className="text-base font-semibold text-bolder-text">Shop subtotal</span>
+          <span className="text-lg font-bold text-bolder-text">{formatMoney(shop.subtotal)}</span>
         </div>
       </div>
     </Card>
@@ -168,20 +168,20 @@ function CartItem({ item, shopPurchasable, isAdjusting, onAdjustingChange, onQua
   return (
     <div className="flex items-center gap-4 border-b border-glass-border-soft pb-3 last:border-0 last:pb-0">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-900 truncate">{item.productName}</p>
-        <p className="text-xs text-slate-500 truncate">{item.productSlug}</p>
+        <p className="text-sm font-medium text-bolder-text truncate">{item.productName}</p>
+        <p className="text-xs text-bolder-muted truncate">{item.productSlug}</p>
         {priceChanged && (
-          <p className="mt-1 text-xs font-medium text-amber-800">
+          <p className="mt-1 text-xs font-medium text-bolder-warning">
             Price changed since you added this: {formatMoney(item.currentPrice)} now
           </p>
         )}
         {!purchasable && (
-          <p className="mt-1 text-xs font-medium text-red-700">{item.notPurchasableReason ?? "Not available right now."}</p>
+          <p className="mt-1 text-xs font-medium text-bolder-danger">{item.notPurchasableReason ?? "Not available right now."}</p>
         )}
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        <span className="text-sm font-medium text-slate-700 w-16 text-right">{formatMoney(item.priceSnapshot)}</span>
+        <span className="text-sm font-medium text-bolder-text w-16 text-right">{formatMoney(item.priceSnapshot)}</span>
 
         <div className="flex items-center gap-1.5 border border-glass-border rounded-sm">
           <button
@@ -191,12 +191,12 @@ function CartItem({ item, shopPurchasable, isAdjusting, onAdjustingChange, onQua
               onAdjustingChange(true);
               onQuantityChange(item.id, item.quantity - QUANTITY_STEP);
             }}
-            className={`rounded-l-sm p-1.5 text-slate-600 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`rounded-l-sm p-1.5 text-bolder-muted hover:bg-bolder-surface-muted ${PRESSABLE} ${FOCUS_RING} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
             aria-label={`Reduce ${item.productName} quantity`}
           >
             −
           </button>
-          <span className="text-sm font-medium text-slate-900 min-w-[2rem] text-center">{item.quantity}</span>
+          <span className="text-sm font-medium text-bolder-text min-w-[2rem] text-center">{item.quantity}</span>
           <button
             type="button"
             disabled={item.quantity >= CART_MAX_QUANTITY || disabled}
@@ -204,7 +204,7 @@ function CartItem({ item, shopPurchasable, isAdjusting, onAdjustingChange, onQua
               onAdjustingChange(true);
               onQuantityChange(item.id, item.quantity + QUANTITY_STEP);
             }}
-            className={`rounded-r-sm p-1.5 text-slate-600 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`rounded-r-sm p-1.5 text-bolder-muted hover:bg-bolder-surface-muted ${PRESSABLE} ${FOCUS_RING} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
             aria-label={`Increase ${item.productName} quantity`}
           >
             +
@@ -218,7 +218,7 @@ function CartItem({ item, shopPurchasable, isAdjusting, onAdjustingChange, onQua
             onAdjustingChange(true);
             onRemove(item.id);
           }}
-          className={`text-xs font-medium text-red-700 hover:bg-red-50 ${PRESSABLE} ${FOCUS_RING} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`text-xs font-medium text-bolder-danger hover:bg-bolder-danger-surface ${PRESSABLE} ${FOCUS_RING} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           aria-label={`Remove ${item.productName} from cart`}
         >
           Remove
@@ -238,21 +238,21 @@ function CartSummary({ subtotal, allPurchasable, onCheckout }: CartSummaryProps)
   return (
     <Card>
       <div className="flex justify-between items-baseline mb-4 border-b border-glass-border-soft pb-3">
-        <span className="text-base font-semibold text-slate-900">Cart total</span>
-        <span className="text-xl font-bold text-slate-900">{formatMoney(subtotal)}</span>
+        <span className="text-base font-semibold text-bolder-text">Cart total</span>
+        <span className="text-xl font-bold text-bolder-text">{formatMoney(subtotal)}</span>
       </div>
 
       <button
         type="button"
         disabled={!allPurchasable}
         onClick={onCheckout}
-        className={`w-full rounded-md bg-brand-600 px-5 py-3 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+        className={`w-full rounded-md bg-bolder-rose-action px-5 py-3 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
       >
         Proceed to checkout
       </button>
 
       {!allPurchasable && (
-        <p className="mt-3 text-xs text-amber-800">
+        <p className="mt-3 text-xs text-bolder-warning">
           Some items in your cart are not available right now. Update or remove them before checking out.
         </p>
       )}

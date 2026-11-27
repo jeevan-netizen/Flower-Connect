@@ -205,7 +205,7 @@ export function CheckoutPage() {
   if (step !== "confirmation" && (cartPending || addressesPending || !cart)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <FlowerLoader label="Preparing checkout" showLabel className="text-sm text-slate-600" />
+        <FlowerLoader label="Preparing checkout" showLabel className="text-sm text-bolder-muted" />
       </div>
     );
   }
@@ -316,7 +316,7 @@ function LinkToBrowse() {
   return (
     <a
       href="/browse"
-      className={`inline-flex items-center rounded-md border border-bolder-blush bg-white px-5 py-2.5 text-sm font-medium text-bolder-blush hover:bg-amber-50 ${PRESSABLE} ${FOCUS_RING}`}
+      className={`inline-flex items-center rounded-md border border-bolder-line-control bg-bolder-surface px-5 py-2.5 text-sm font-medium text-bolder-rose-action hover:bg-bolder-surface-muted ${PRESSABLE} ${FOCUS_RING}`}
     >
       Start browsing
     </a>
@@ -359,7 +359,7 @@ function AddressStep({
   if (isPending) {
     return (
       <Card>
-        <FlowerLoader label="Loading your addresses" showLabel className="text-sm text-slate-600" />
+        <FlowerLoader label="Loading your addresses" showLabel className="text-sm text-bolder-muted" />
       </Card>
     );
   }
@@ -367,8 +367,8 @@ function AddressStep({
   if (addresses.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-slate-600">You have no saved addresses yet.</p>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="text-sm text-bolder-muted">You have no saved addresses yet.</p>
+        <p className="mt-2 text-xs text-bolder-muted">
           Save an address in your account, then return here to check out.
         </p>
       </Card>
@@ -378,7 +378,7 @@ function AddressStep({
   return (
     <Card>
       <fieldset className="border-0 p-0 m-0">
-        <legend className="text-sm font-semibold text-slate-900 mb-4">Delivery address</legend>
+        <legend className="text-sm font-semibold text-bolder-text mb-4">Delivery address</legend>
         <div className="space-y-3">
           {addresses.map((address) => (
             <label key={address.id} className="block">
@@ -390,11 +390,11 @@ function AddressStep({
                 className={`${PRESSABLE} ${FOCUS_RING}`}
               />
               <div className="ml-3">
-                <p className="text-sm font-medium text-slate-900">{address.label}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-medium text-bolder-text">{address.label}</p>
+                <p className="text-xs text-bolder-muted">
                   {address.line1} {address.line2 ?? ""} — {address.area}, {address.city} {address.pincode}
                 </p>
-                {address.defaultAddress && <span className="text-[10px] font-medium text-brand-700 uppercase tracking-tighter">Default</span>}
+                {address.defaultAddress && <span className="text-[10px] font-medium text-bolder-rose-strong uppercase tracking-tighter">Default</span>}
               </div>
             </label>
           ))}
@@ -402,7 +402,7 @@ function AddressStep({
       </fieldset>
 
       <fieldset className="border-0 p-0 m-0 mt-6">
-        <legend className="text-sm font-semibold text-slate-900 mb-4">Payment method</legend>
+        <legend className="text-sm font-semibold text-bolder-text mb-4">Payment method</legend>
         <div className="space-y-2">
           {PAYMENT_METHODS.map((method) => (
             <label key={method} className="block cursor-pointer">
@@ -414,10 +414,10 @@ function AddressStep({
                 className={`${PRESSABLE} ${FOCUS_RING}`}
               />
               <div className="ml-3">
-                <p className="text-sm font-medium text-slate-900">
+                <p className="text-sm font-medium text-bolder-text">
                   {method === "COD" ? "Cash on delivery" : "Online payment"}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-bolder-muted">
                   {method === "COD"
                     ? "Pay the florist in cash when your flowers are delivered."
                     : "Pay online now; your payment is confirmed through a secure test-mode provider."}
@@ -488,10 +488,10 @@ function SlotRow({
     <fieldset key={vendorId} className="border border-glass-border rounded-lg p-4 m-0">
       <legend className="text-sm font-semibold text-slate-900">{vendorName}</legend>
       {slotsPending && (
-        <p className="mt-2 text-xs text-slate-500">Loading slots for {deliveryDate}...</p>
+        <p className="mt-2 text-xs text-bolder-muted">Loading slots for {deliveryDate}...</p>
       )}
       {!slotsPending && availableSlots.length === 0 && (
-        <p className="mt-2 text-xs text-red-700">No available slots on {deliveryDate} for this shop.</p>
+        <p className="mt-2 text-xs text-bolder-danger">No available slots on {deliveryDate} for this shop.</p>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         {availableSlots.map((slot) => {
@@ -510,10 +510,10 @@ function SlotRow({
                 className="peer sr-only"
               />
               <span
-                className={`inline-block px-3 py-1.5 text-xs font-medium rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 peer-focus-visible:ring-offset-2 ${
+                className={`inline-block px-3 py-1.5 text-xs font-medium rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-bolder-rose peer-focus-visible:ring-offset-2 ${
                   isSelected
-                    ? "bg-brand-600 border-brand-600 text-white"
-                    : "border-glass-border bg-white text-slate-700 hover:bg-slate-50"
+                    ? "bg-bolder-rose-action border-bolder-rose-action text-white"
+                    : "border-bolder-line-control bg-bolder-surface text-bolder-text hover:bg-bolder-bg"
                 }`}
               >
                 {formatSlotTime(slot.slotStart)} — {formatSlotTime(slot.slotEnd)}
@@ -523,7 +523,7 @@ function SlotRow({
         })}
       </div>
       {!selected && !slotsPending && availableSlots.length > 0 && (
-        <p className="mt-2 text-xs text-slate-500">Select a delivery window.</p>
+        <p className="mt-2 text-xs text-bolder-muted">Select a delivery window.</p>
       )}
     </fieldset>
   );
@@ -545,16 +545,16 @@ function SlotStep({
   return (
     <Card>
       <fieldset className="border-0 p-0 m-0">
-        <legend className="text-sm font-semibold text-slate-900 mb-4">Delivery date</legend>
+        <legend className="text-sm font-semibold text-bolder-text mb-4">Delivery date</legend>
         <div className="flex items-center gap-3 mb-6">
-          <label htmlFor="delivery-date" className="text-sm text-slate-600">Deliver on</label>
+          <label htmlFor="delivery-date" className="text-sm text-bolder-muted">Deliver on</label>
           <input
             id="delivery-date"
             type="date"
             value={deliveryDate}
             onChange={(e) => onDateChange(e.target.value)}
             min={getBrowserLocalDate()}
-            className={`rounded-sm border border-glass-border bg-white px-3 py-1.5 text-sm text-slate-900 focus:border-brand-500 focus:ring-brand-500 ${FIELD_TRANSITION}`}
+            className={`rounded-sm border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-sm text-bolder-text focus:border-bolder-rose focus:ring-bolder-rose ${FIELD_TRANSITION}`}
           />
         </div>
       </fieldset>
@@ -647,7 +647,7 @@ function ReviewStep({
   if (isPending || !quote) {
     return (
       <Card>
-        <FlowerLoader label="Preparing your quote" showLabel className="text-sm text-slate-600" />
+        <FlowerLoader label="Preparing your quote" showLabel className="text-sm text-bolder-muted" />
       </Card>
     );
   }
@@ -658,51 +658,51 @@ function ReviewStep({
         {quote.shops.map((shop) => (
           <div key={shop.vendorId} className="border border-glass-border rounded-lg p-4">
             <div className="flex justify-between items-baseline mb-3">
-              <p className="text-sm font-semibold text-slate-900">{shop.vendorName}</p>
-              <span className="text-sm font-bold text-slate-900">{formatMoney(shop.total)}</span>
+              <p className="text-sm font-semibold text-bolder-text">{shop.vendorName}</p>
+              <span className="text-sm font-bold text-bolder-text">{formatMoney(shop.total)}</span>
             </div>
 
             <div className="space-y-2 text-sm">
               {shop.items.map((item) => (
                 <div key={item.productId} className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-900 truncate">{item.productName}</p>
-                    <p className="text-xs text-slate-500 truncate">Qty {item.quantity} • {formatMoney(item.priceSnapshot)} each</p>
+                    <p className="font-medium text-bolder-text truncate">{item.productName}</p>
+                    <p className="text-xs text-bolder-muted truncate">Qty {item.quantity} • {formatMoney(item.priceSnapshot)} each</p>
                     {item.priceChanged && (
-                      <p className="mt-1 text-xs font-medium text-amber-800">
+                      <p className="mt-1 text-xs font-medium text-bolder-warning">
                         Price changed: {formatMoney(item.currentPrice)} now
                       </p>
                     )}
                   </div>
-                  <span className="text-slate-900">{formatMoney(item.subtotal)}</span>
+                  <span className="text-bolder-text">{formatMoney(item.subtotal)}</span>
                 </div>
               ))}
               {!shop.minOrderMet && (
-                <p className="text-xs font-medium text-red-700">
+                <p className="text-xs font-medium text-bolder-danger">
                   Below the {shop.vendorName} minimum order of {formatMoney(shop.minOrderAmount)}.
                 </p>
               )}
               {!shop.withinRadius && (
-                <p className="text-xs font-medium text-red-700">
+                <p className="text-xs font-medium text-bolder-danger">
                   Delivery address is outside {shop.vendorName}'s delivery radius.
                 </p>
               )}
               {!shop.slotAvailable && (
-                <p className="text-xs font-medium text-red-700">
+                <p className="text-xs font-medium text-bolder-danger">
                   The selected slot is no longer available for {shop.vendorName}.
                 </p>
               )}
             </div>
 
             {shop.warnings.length > 0 && (
-              <div className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-800">
+              <div className="mt-2 rounded-md border bolder-warning-border bg-bolder-warning-surface p-2 text-xs text-bolder-warning">
                 {shop.warnings.map((warning, i) => (
                   <p key={i} className="leading-relaxed">{warning}</p>
                 ))}
               </div>
             )}
             {shop.errors.length > 0 && (
-              <div className="mt-2 rounded-md bg-red-50 p-2 text-xs text-red-800">
+              <div className="mt-2 rounded-md border bolder-danger-border bg-bolder-danger-surface p-2 text-xs text-bolder-danger">
                 {shop.errors.map((error, i) => (
                   <p key={i} className="leading-relaxed">{error}</p>
                 ))}
@@ -711,15 +711,15 @@ function ReviewStep({
           </div>
         ))}
 
-        <div className="flex justify-between items-baseline pt-4 border-t border-glass-border-soft">
-          <span className="text-base font-semibold text-slate-900">Order total</span>
-          <span className="text-xl font-bold text-slate-900">{formatMoney(quote.total)}</span>
+        <div className="flex justify-between items-baseline pt-4 border-t bolder-line">
+          <span className="text-base font-semibold text-bolder-text">Order total</span>
+          <span className="text-xl font-bold text-bolder-text">{formatMoney(quote.total)}</span>
         </div>
 
         {quote.hasPriceChanges && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-            <p className="text-sm font-semibold text-amber-900">Some prices have changed</p>
-            <p className="mt-1 text-xs text-amber-800">
+          <div className="rounded-md border bolder-warning-border bg-bolder-warning-surface p-3">
+            <p className="text-sm font-semibold text-bolder-warning">Some prices have changed</p>
+            <p className="mt-1 text-xs text-bolder-warning">
               One or more items cost more now than when you added them to your cart. Confirm the updated
               prices to continue.
             </p>
@@ -730,7 +730,7 @@ function ReviewStep({
                 onChange={(e) => onConfirmPriceChange(e.target.checked)}
                 className={`${PRESSABLE} ${FOCUS_RING} mt-0.5`}
               />
-              <span className="text-sm text-amber-800 leading-none">
+              <span className="text-sm text-bolder-warning leading-none">
                 I confirm the updated prices and totals.
               </span>
             </label>
@@ -738,9 +738,9 @@ function ReviewStep({
         )}
 
         {!allPurchasable && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3">
-            <p className="text-sm font-semibold text-red-900">Some items are no longer available</p>
-            <p className="mt-1 text-xs text-red-800">
+          <div className="rounded-md border bolder-danger-border bg-bolder-danger-surface p-3">
+            <p className="text-sm font-semibold text-bolder-danger">Some items are no longer available</p>
+            <p className="mt-1 text-xs text-bolder-danger">
               Update your cart before placing this order.
             </p>
           </div>
@@ -750,7 +750,7 @@ function ReviewStep({
           <button
             type="button"
             onClick={onBack}
-            className={`rounded-md border border-glass-border bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 ${PRESSABLE} ${FOCUS_RING}`}
+            className={`rounded-md border border-bolder-line-control bg-bolder-surface px-4 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg ${PRESSABLE} ${FOCUS_RING}`}
           >
             Change slots
           </button>
@@ -758,7 +758,7 @@ function ReviewStep({
             type="button"
             disabled={!canProceed || isPlacing}
             onClick={onProceed}
-            className={`rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+          className={`rounded-md bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
           >
             {isPlacing ? "Placing order…" : "Place order"}
           </button>
@@ -794,8 +794,8 @@ function ConfirmationStep({
   return (
     <Card>
       <div className="text-center">
-        <p className="text-2xl font-bold text-slate-900">Order placed</p>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="text-2xl font-bold text-bolder-text">Order placed</p>
+        <p className="mt-2 text-sm text-bolder-muted">
           {result.idempotentReplay
             ? "This order was already placed — here are your existing orders."
             : "Your orders have been placed and stock has been reserved."}
@@ -813,16 +813,16 @@ function ConfirmationStep({
           ))}
         </div>
 
-        <div className="flex justify-between items-baseline pt-4 border-t border-glass-border-soft">
-          <span className="text-base font-semibold text-slate-900">Total</span>
-          <span className="text-xl font-bold text-slate-900">{formatMoney(result.total)}</span>
+        <div className="flex justify-between items-baseline pt-4 border-t bolder-line">
+          <span className="text-base font-semibold text-bolder-text">Total</span>
+          <span className="text-xl font-bold text-bolder-text">{formatMoney(result.total)}</span>
         </div>
 
         <div className="mt-6 flex justify-end">
           <button
             type="button"
             onClick={onDone}
-            className={`rounded-md bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+            className={`rounded-md bg-bolder-rose-action px-5 py-2.5 text-sm font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}`}
           >
             {paymentMethod === "ONLINE" ? "Track payment" : "View your orders"}
           </button>
@@ -847,20 +847,17 @@ function CheckoutStepper({ step }: { step: CheckoutStep }) {
             className="flex items-center gap-2"
           >
             <div
-              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${i <= current
-                ? "bg-brand-600 text-white"
-                : "border border-glass-border bg-white text-slate-400"
-              }`}
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${i <= current ? "bg-bolder-rose-action text-white" : "border border-bolder-line bg-bolder-surface text-bolder-muted"}`}
             >
               {i + 1}
             </div>
             {i < steps.length - 1 && (
               <div
                 aria-hidden="true"
-                className={`h-0.5 w-4 ${i < current ? "bg-brand-600" : "bg-slate-200"}`}
+                className={`h-0.5 w-4 ${i < current ? "bg-bolder-rose-action" : "bg-bolder-line-strong"}`}
               />
             )}
-            <span className={`font-medium ${i <= current ? "text-slate-900" : "text-slate-400"}`}>
+            <span className={`font-medium ${i <= current ? "text-bolder-text" : "text-bolder-muted"}`}>
               {name === "address" ? "Address" : name === "slots" ? "Slots" : name === "review" ? "Review" : "Done"}
             </span>
           </li>

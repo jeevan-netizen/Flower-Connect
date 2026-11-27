@@ -12,41 +12,41 @@ const TYPE_STYLES: Record<
   { bg: string; border: string; text: string; icon: React.ReactNode }
 > = {
   info: {
-    bg: "bg-blue-50",
-    border: "border-blue-200",
-    text: "text-blue-900",
+    bg: "bg-bolder-info-surface",
+    border: "border-bolder-info-border",
+    text: "text-bolder-info",
     icon: (
-      <svg className="shrink-0 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <svg className="shrink-0 text-bolder-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
   success: {
-    bg: "bg-green-50",
-    border: "border-green-200",
-    text: "text-green-900",
+    bg: "bg-bolder-success-surface",
+    border: "border-bolder-success-border",
+    text: "text-bolder-success",
     icon: (
-      <svg className="shrink-0 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <svg className="shrink-0 text-bolder-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
   warning: {
-    bg: "bg-amber-50",
-    border: "border-amber-200",
-    text: "text-amber-900",
+    bg: "bg-bolder-warning-surface",
+    border: "border-bolder-warning-border",
+    text: "text-bolder-warning",
     icon: (
-      <svg className="shrink-0 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <svg className="shrink-0 text-bolder-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     ),
   },
   error: {
-    bg: "bg-red-50",
-    border: "border-red-200",
-    text: "text-red-900",
+    bg: "bg-bolder-danger-surface",
+    border: "border-bolder-danger-border",
+    text: "text-bolder-danger",
     icon: (
-      <svg className="shrink-0 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+      <svg className="shrink-0 text-bolder-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m-2 2l-2 2m-2 2l2 2" />
       </svg>
     ),

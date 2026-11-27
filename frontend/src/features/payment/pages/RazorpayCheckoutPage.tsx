@@ -89,7 +89,7 @@ export default function RazorpayCheckoutPage() {
         order_id: razorpayOrderId,
         name: "FlowerConnect",
         description: "Flower order payment",
-        theme: { color: "#7C2E4E" },
+        theme: { color: "#8a3149" },
         handler: async (response) => {
           try {
             await verifyRazorpayPayment(orderIdNum, {
@@ -184,7 +184,7 @@ export default function RazorpayCheckoutPage() {
         <PageHeading title="Payment setup failed" description={error} />
         <button
           onClick={() => navigate("/orders")}
-          className="px-4 py-2 bg-rose-700 text-white rounded hover:bg-rose-800"
+          className="px-4 py-2 bg-bolder-rose-deep text-white rounded hover:bg-bolder-rose-strong"
         >
           Back to orders
         </button>
@@ -205,7 +205,7 @@ export default function RazorpayCheckoutPage() {
             setCheckoutDismissed(false);
             openCheckout();
           }}
-          className="mt-6 rounded-md bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-700"
+          className="mt-6 rounded-md bg-bolder-rose-action px-5 py-3 text-sm font-semibold text-white hover:bg-bolder-rose-deep"
         >
           Retry payment
         </button>

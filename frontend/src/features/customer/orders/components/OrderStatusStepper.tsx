@@ -41,19 +41,19 @@ function isCurrent(step: OrderStatus, current: OrderStatus): boolean {
 
 function stepTone(step: OrderStatus, current: OrderStatus): string {
   if (isCompleted(step, current)) {
-    return "text-brand-600 bg-brand-50 border-brand-200";
+    return "text-bolder-rose-strong bg-bolder-blush-light border-bolder-rose-action";
   }
   if (isCurrent(step, current)) {
-    return "text-slate-900 border-brand-600 bg-white";
+    return "text-bolder-text border-bolder-rose-action bg-bolder-surface";
   }
-  return "text-slate-400 border-slate-200 bg-slate-50";
+  return "text-bolder-muted border-bolder-line bg-bolder-bg";
 }
 
 export function OrderStatusStepper({ status, heading }: OrderStatusStepperProps) {
   return (
     <div>
       {heading && (
-        <h2 className="text-base font-semibold text-slate-900 mb-2">{heading}</h2>
+        <h2 className="text-base font-semibold text-bolder-text mb-2">{heading}</h2>
       )}
       <ol className="flex items-center gap-1 text-xs list-none p-0 m-0">
         {STEP_ORDER.map((step, i) => {
@@ -70,7 +70,7 @@ export function OrderStatusStepper({ status, heading }: OrderStatusStepperProps)
               </span>
               {i < STEP_ORDER.length - 1 && (
                 <div
-                  className={`h-0.5 w-4 ${completed ? "bg-brand-600" : "bg-slate-200"}`}
+                  className={`h-0.5 w-4 ${completed ? "bg-bolder-rose-action" : "bg-bolder-line-strong"}`}
                 />
               )}
               <span

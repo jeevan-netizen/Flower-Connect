@@ -45,15 +45,15 @@ function paymentStatusTone(status: CustomerOrderResponse["paymentStatus"]): stri
   switch (status) {
     case "COLLECTED":
     case "PAID":
-      return "text-green-800 bg-green-50 border-green-200";
+      return "text-bolder-success bg-bolder-success-surface border-bolder-success-border";
     case "PENDING":
-      return "text-amber-800 bg-amber-50 border-amber-200";
+      return "text-bolder-warning bg-bolder-warning-surface border-bolder-warning-border";
     case "FAILED":
     case "REFUND_PENDING":
     case "REFUNDED":
-      return "text-red-800 bg-red-50 border-red-200";
+      return "text-bolder-danger bg-bolder-danger-surface border-bolder-danger-border";
     default:
-      return "text-slate-800 bg-slate-50 border-slate-200";
+      return "text-bolder-neutral bg-bolder-neutral-surface border-bolder-neutral-border";
   }
 }
 
@@ -109,7 +109,7 @@ export function OrderDetailPage() {
         <p className="mt-4">
           <Link
             to="/orders"
-            className={`inline-flex items-center rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}`}
           >
             Back to your orders
           </Link>
@@ -121,7 +121,7 @@ export function OrderDetailPage() {
   if (isPending || !order) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+        <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
           Loading order…
         </div>
       </div>
@@ -138,7 +138,7 @@ export function OrderDetailPage() {
         <PageHeading title={`Order #${order.id}`} description={order.vendorName} />
         <Link
           to="/orders"
-          className={`inline-flex items-center rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}`}
         >
           Back to your orders
         </Link>
@@ -146,18 +146,18 @@ export function OrderDetailPage() {
 
       {/* Refund state banner */}
       {order.paymentStatus === "REFUND_PENDING" && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-lg border bolder-warning-border bg-bolder-warning-surface p-4 text-sm text-bolder-warning">
           <p className="font-semibold">Refund pending</p>
-          <p className="mt-1 text-xs text-amber-800">
+          <p className="mt-1 text-xs text-bolder-warning">
             This order has been cancelled and a refund has been requested. An
             administrator will mark the refund complete.
           </p>
         </div>
       )}
       {order.paymentStatus === "REFUNDED" && order.refundedAt && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+        <div className="rounded-lg border bolder-neutral-border bg-bolder-neutral-surface p-4 text-sm text-bolder-neutral">
           <p className="font-semibold">Refunded</p>
-          <p className="mt-1 text-xs text-slate-600">
+          <p className="mt-1 text-xs text-bolder-neutral">
             Refunded on {new Date(order.refundedAt).toLocaleDateString(undefined, {
               year: "numeric",
               month: "short",
@@ -175,7 +175,7 @@ export function OrderDetailPage() {
       {/* Cancel action */}
       {canCancel && !isTerminalStatus(order.status) && (
         <Card title="Cancel order">
-          <p className="text-sm text-slate-700 mb-4">
+          <p className="text-sm text-bolder-text mb-4">
             Canceling this order releases any reserved stock. A reason is
             optional and is stored on the order's status timeline.
           </p>
@@ -186,12 +186,12 @@ export function OrderDetailPage() {
               setCancelError(null);
               setCancelTarget(true);
             }}
-            className={`rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+            className={`rounded-md border border-transparent bg-bolder-danger px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
           >
             {isCancelling ? "Canceling…" : "Cancel order"}
           </button>
           {cancelError && (
-            <p className="mt-3 text-sm text-red-800 bg-red-50 rounded-lg p-2 border border-red-100">
+            <p className="mt-3 text-sm text-bolder-danger bg-bolder-danger-surface rounded-lg p-2 border bolder-danger-border">
               {cancelError.message}
             </p>
           )}
@@ -201,14 +201,14 @@ export function OrderDetailPage() {
       {/* Payment */}
       <Card title="Payment">
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Method</dt>
-            <dd className="text-sm font-medium text-slate-900">
+          <div className="border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Method</dt>
+            <dd className="text-sm font-medium text-bolder-text">
               {order.paymentMethod === "COD" ? "Cash on delivery" : "Online payment"}
             </dd>
           </div>
-          <div className="border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Status</dt>
+          <div className="border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Status</dt>
             <dd
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${paymentStatusTone(order.paymentStatus)}`}
             >
@@ -221,22 +221,22 @@ export function OrderDetailPage() {
       {/* Address and slot */}
       <Card title="Delivery">
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="col-span-full border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Address</dt>
-            <dd className="text-sm text-slate-900">{order.deliveryAddressLine1}</dd>
+          <div className="col-span-full border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Address</dt>
+            <dd className="text-sm text-bolder-text">{order.deliveryAddressLine1}</dd>
             {order.deliveryAddressLine2 && (
-              <dd className="text-sm text-slate-600">{order.deliveryAddressLine2}</dd>
+              <dd className="text-sm text-bolder-muted">{order.deliveryAddressLine2}</dd>
             )}
           </div>
-          <div className="border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Delivery slot</dt>
-            <dd className="text-sm text-slate-900">
+          <div className="border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Delivery slot</dt>
+            <dd className="text-sm text-bolder-text">
               {order.slotStart && order.slotEnd ? (
                 <>
                   {formatDateTime(order.slotStart)} – {formatDateTime(order.slotEnd)}
                 </>
               ) : (
-                <span className="text-slate-500">Not scheduled</span>
+                <span className="text-bolder-muted">Not scheduled</span>
               )}
             </dd>
           </div>
@@ -246,8 +246,8 @@ export function OrderDetailPage() {
       {/* Items */}
       <Card title="Items">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm divide-y divide-slate-100">
-          <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <table className="w-full text-left text-sm divide-y divide-bolder-line">
+          <thead className="text-xs uppercase tracking-wide text-bolder-muted">
             <tr>
               <th scope="col" className="py-3 pr-4 font-medium">
                 Item
@@ -267,16 +267,16 @@ export function OrderDetailPage() {
             {order.items.map((item) => (
               <tr key={item.productName} className="align-top">
                 <td className="py-3 pr-4">
-                  <p className="font-medium text-slate-900">{item.productName}</p>
+                  <p className="font-medium text-bolder-text">{item.productName}</p>
                   {item.note && (
-                    <p className="mt-1 text-xs text-slate-500">{item.note}</p>
+                    <p className="mt-1 text-xs text-bolder-muted">{item.note}</p>
                   )}
                 </td>
-                <td className="py-3 pr-4 text-right text-slate-900">
+                <td className="py-3 pr-4 text-right text-bolder-text">
                   {formatMoney(item.priceSnapshot)}
                 </td>
-                <td className="py-3 pr-4 text-right text-slate-900">{item.quantity}</td>
-                <td className="py-3 font-medium text-right text-slate-900">
+                <td className="py-3 pr-4 text-right text-bolder-text">{item.quantity}</td>
+                <td className="py-3 font-medium text-right text-bolder-text">
                   {formatMoney(item.subtotal)}
                 </td>
               </tr>
@@ -294,27 +294,27 @@ export function OrderDetailPage() {
       {/* Fee breakdown */}
       <Card title="Fees">
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="col-span-full border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Subtotal</dt>
-            <dd className="text-sm font-medium text-slate-900 text-right">
+          <div className="col-span-full border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Subtotal</dt>
+            <dd className="text-sm font-medium text-bolder-text text-right">
               {formatMoney(order.subtotal)}{TAX_INCLUSIVE}
             </dd>
           </div>
-          <div className="border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Delivery fee</dt>
-            <dd className="text-sm text-slate-900 text-right">
+          <div className="border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Delivery fee</dt>
+            <dd className="text-sm text-bolder-text text-right">
               {formatMoney(order.deliveryFee)}{TAX_INCLUSIVE}
             </dd>
           </div>
-          <div className="border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Platform fee</dt>
-            <dd className="text-sm text-slate-900 text-right">
+          <div className="border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Platform fee</dt>
+            <dd className="text-sm text-bolder-text text-right">
               {formatMoney(order.platformFee)}{TAX_INCLUSIVE}
             </dd>
           </div>
-          <div className="col-span-full pt-2 border-t border-slate-200">
-            <dt className="text-xs text-slate-500">Total</dt>
-            <dd className="text-sm font-bold text-slate-900 text-right">
+          <div className="col-span-full pt-2 border-t bolder-line">
+            <dt className="text-xs text-bolder-muted">Total</dt>
+            <dd className="text-sm font-bold text-bolder-text text-right">
               {formatMoney(order.total)}{TAX_INCLUSIVE}
             </dd>
           </div>
@@ -324,21 +324,21 @@ export function OrderDetailPage() {
       {/* Timeline */}
       <Card title="Status timeline">
         {order.timeline.length === 0 ? (
-          <p className="text-sm text-slate-600">No status changes yet.</p>
+          <p className="text-sm text-bolder-muted">No status changes yet.</p>
         ) : (
           <ul className="space-y-3">
             {order.timeline.map((entry, i) => (
-              <li key={i} className="flex gap-3 py-2 border-b border-slate-100 last:border-0">
-                <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-900 border border-slate-200">
+              <li key={i} className="flex gap-3 py-2 border-b bolder-line last:border-0">
+                <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-bolder-text border bolder-line">
                   {i + 1}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">
+                  <p className="text-sm font-medium text-bolder-text">
                     {entry.fromStatus == null
                       ? "Order created"
                       : `${ORDER_STATUS_LABELS[entry.fromStatus]} → ${ORDER_STATUS_LABELS[entry.toStatus]}`}
                   </p>
-                  <p className="text-xs text-slate-600">
+                  <p className="text-xs text-bolder-muted">
                     {entry.actorType}
                     {entry.actorName ? ` — ${entry.actorName}` : ""}
                     {entry.reason ? ` · ${entry.reason}` : ""}
@@ -369,7 +369,7 @@ export function OrderDetailPage() {
         <button
           type="button"
           onClick={onBack}
-          className={`rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`rounded-md border border-bolder-line-control bg-bolder-surface px-4 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg ${PRESSABLE} ${FOCUS_RING}`}
         >
           Back to your orders
         </button>
@@ -381,8 +381,8 @@ export function OrderDetailPage() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-900 mb-3">{title}</h2>
+    <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-bolder-text mb-3">{title}</h2>
       <div className="prose-sm max-w-none">{children}</div>
     </div>
   );

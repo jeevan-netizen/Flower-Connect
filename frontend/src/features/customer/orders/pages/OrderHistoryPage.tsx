@@ -26,15 +26,15 @@ import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 const PAGE_SIZE = 20;
 
 const STATUS_TONES: Record<CustomerOrderListItem["status"], string> = {
-  PLACED: "border-amber-200 bg-amber-50 text-amber-900",
-  PENDING_PAYMENT: "border-slate-200 bg-slate-50 text-slate-800",
-  CONFIRMED: "border-brand-100 bg-brand-50 text-brand-900",
-  PREPARING: "border-brand-100 bg-brand-50 text-brand-900",
-  OUT_FOR_DELIVERY: "border-blue-200 bg-blue-50 text-blue-900",
-  DELIVERED: "border-green-200 bg-green-50 text-green-900",
-  CANCELLED: "border-red-200 bg-red-50 text-red-900",
-  REJECTED: "border-red-200 bg-red-50 text-red-900",
-  REFUNDED: "border-slate-200 bg-slate-50 text-slate-800",
+  PLACED: "border-bolder-warning-border bg-bolder-warning-surface text-bolder-warning",
+  PENDING_PAYMENT: "border-bolder-neutral-border bg-bolder-neutral-surface text-bolder-neutral",
+  CONFIRMED: "border-bolder-rose-action bg-bolder-blush-light text-bolder-rose-strong",
+  PREPARING: "border-bolder-rose-action bg-bolder-blush-light text-bolder-rose-strong",
+  OUT_FOR_DELIVERY: "border-bolder-info-border bg-bolder-info-surface text-bolder-info",
+  DELIVERED: "border-bolder-success-border bg-bolder-success-surface text-bolder-success",
+  CANCELLED: "border-bolder-danger-border bg-bolder-danger-surface text-bolder-danger",
+  REJECTED: "border-bolder-danger-border bg-bolder-danger-surface text-bolder-danger",
+  REFUNDED: "border-bolder-neutral-border bg-bolder-neutral-surface text-bolder-neutral",
 };
 
 function statusLabel(status: CustomerOrderListItem["status"]): string {
@@ -92,7 +92,7 @@ export function OrderHistoryPage() {
   if (isPending || !data) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+        <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
           Loading your orders…
         </div>
       </div>
@@ -109,7 +109,7 @@ export function OrderHistoryPage() {
       <div className="flex flex-wrap items-end gap-3">
         <label
           htmlFor="order-status-filter"
-          className="block text-sm font-medium text-slate-700"
+          className="block text-sm font-medium text-bolder-text"
         >
           Filter by status
         </label>
@@ -121,7 +121,7 @@ export function OrderHistoryPage() {
             setStatusFilter(value === "" ? null : value);
             setPage(0);
           }}
-          className="mt-1 block rounded-md border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+          className="mt-1 block rounded-md border-bolder-line-control text-sm shadow-sm focus:border-bolder-rose focus:ring-bolder-rose"
         >
           <option value="">All statuses</option>
           {[...new Set(orders.map((o) => o.status))].map((status) => (
@@ -133,28 +133,28 @@ export function OrderHistoryPage() {
       </div>
 
       {orders.length === 0 ? (
-        <FadeIn className="rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">
+        <FadeIn className="rounded-lg border bolder-line bg-bolder-surface p-6 text-center shadow-sm">
+          <h2 className="text-base font-semibold text-bolder-text">
             {statusFilter ? `No ${statusFilter.toLowerCase()} orders` : "No orders yet"}
           </h2>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-bolder-muted">
             {statusFilter
               ? "Try another filter, or place an order to see it here."
               : "Place your first order and it will appear here."}
           </p>
           <Link
             to="/browse"
-            className={`mt-4 inline-flex items-center rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+            className={`mt-4 inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}`}
           >
             Start browsing
           </Link>
         </FadeIn>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-lg border bolder-line bg-bolder-surface shadow-sm">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">Customer order history</caption>
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
+              <thead className="text-xs uppercase tracking-wide text-bolder-muted">
                 <tr>
                   <th scope="col" className="py-3 pr-4 font-medium">
                     Order
@@ -176,34 +176,34 @@ export function OrderHistoryPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-bolder-line">
                 {orders.map((order) => (
                   <tr
                     key={order.id}
-                    className="align-top group hover:bg-slate-50"
+                    className="align-top group hover:bg-bolder-surface-muted"
                   >
                     <td className="py-3 pr-4">
                       <Link
                         to={`/orders/${order.id}`}
-                        className="font-medium text-slate-900 hover:text-brand-600"
+                        className="font-medium text-bolder-text hover:text-bolder-rose-action"
                       >
                         Order #{order.id}
                       </Link>
                     </td>
-                    <td className="py-3 pr-4 text-slate-700">{order.vendorName}</td>
+                    <td className="py-3 pr-4 text-bolder-text">{order.vendorName}</td>
                     <td className="py-3 pr-4">{statusBadge(order.status)}</td>
-                    <td className="py-3 pr-4 text-slate-700">
+                    <td className="py-3 pr-4 text-bolder-text">
                       {order.paymentMethod === "COD" ? "Cash on delivery" : "Online"}
                       {order.paymentStatus !== "PENDING" && (
-                        <span className="ml-1 text-xs text-slate-500">
+                        <span className="ml-1 text-xs text-bolder-muted">
                           ({paymentStatusLabel(order.paymentStatus)})
                         </span>
                       )}
                     </td>
-                    <td className="py-3 pr-4 text-right font-medium text-slate-900">
+                    <td className="py-3 pr-4 text-right font-medium text-bolder-text">
                       {formatMoney(order.total)}
                     </td>
-                    <td className="py-3 text-slate-600">{order.createdAt}</td>
+                    <td className="py-3 text-bolder-muted">{order.createdAt}</td>
                   </tr>
                 ))}
               </tbody>
@@ -217,7 +217,7 @@ export function OrderHistoryPage() {
               disabled={isPending || !hasNonTerminal}
             />
             {hasNonTerminal && (
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-bolder-muted">
                 Orders in progress refresh automatically while this tab is open.
               </p>
             )}

@@ -2376,3 +2376,29 @@ Auth screens restyled to the warm ivory / rose / muted green editorial palette u
 - `npm run lint`: PASS
 - `npm run build`: PASS (~34s)
 - `npm test`: **93 test files / 950 tests passed** (0 failures)
+
+## Frontend Visual Redesign — Customer Screens - COMPLETE (2026-11-27)
+
+Customer screens restyled to the warm ivory / rose / muted green editorial palette using existing `bolder-*` tokens from `src/app/styles/index.css` and shared classes from `src/motion/pressable.ts` and `src/shared/ui/classes.ts`. Styling only — no changes to fields, validation, payloads, routes, payment flows, polling/SSE, totals, or order status logic. Totals and order status stand out clearly via `text-bolder-text` and `text-bolder-rose-strong`.
+
+**Screens converted to token classes:**
+- `src/features/cart/pages/CartPage.tsx`: vendor cards, shop subtotal, item names/quantities/prices, price-change warnings, unavailable-item reasons, remove buttons, cart total, checkout button, empty-state link
+- `src/features/checkout/pages/CheckoutPage.tsx`: loading states, address and payment method sections, delivery slot selection, quote review, error/warning boxes, order total, confirmation step, stepper, back/place-order/done buttons
+- `src/features/payment/pages/PaymentStatusPage.tsx`: loading, payment group and order tables, status badges, resume button, next-steps card, back button
+- `src/features/payment/pages/RazorpayCheckoutPage.tsx`: Razorpay theme color, error/retry buttons
+- `src/features/customer/orders/pages/OrderHistoryPage.tsx`: loading, empty state, status filter, table headers/rows, order links, status badges, totals, pagination note
+- `src/features/customer/orders/pages/OrderDetailPage.tsx`: loading, error state, payment status badge, refund pending/refunded banners, cancel button, payment/delivery/items/fee breakdown sections, timeline entries, back button
+- `src/features/dispute/pages/DisputePages.tsx`: success/error states, form fields, cancel/submit buttons, dispute detail card, eligibility banner
+- `src/features/customer/pages/CustomerProfilePage.tsx`: account section border, email/role/member-since labels, change-password link, add-address button, log out button, address row labels/values/default badge, address form labels/select/error messages/cancel button
+
+**Shared order components converted to token classes:**
+- `src/features/customer/orders/components/StatusToast.tsx`: info/success/warning/error type styles
+- `src/features/customer/orders/components/ReviewForm.tsx`: submitted state, form card, labels, textarea, error message, submit button
+- `src/features/customer/orders/components/OrderStatusStepper.tsx`: completed/current/pending step tones, heading, connecting lines, labels
+- `src/features/customer/orders/components/CancelOrderDialog.tsx`: backdrop, dialog card, heading/description, error message, label, textarea, cancel/confirm buttons
+
+**Verification:**
+- `npm run typecheck`: PASS
+- `npm run lint`: PASS
+- `npm run build`: PASS (~12s)
+- `npm test`: **93 test files / 950 tests passed** (0 failures)

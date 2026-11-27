@@ -68,7 +68,7 @@ export function PaymentStatusPage() {
         <p className="mt-4">
           <Link
             to="/orders"
-            className={`inline-flex items-center rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}`}
           >
             Back to your orders
           </Link>
@@ -80,7 +80,7 @@ export function PaymentStatusPage() {
   if (isPending || !group) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+        <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
           Checking payment status…
         </div>
       </div>
@@ -101,58 +101,58 @@ export function PaymentStatusPage() {
         <PageHeading title="Payment status" description={group.paymentGroupId} />
         <Link
           to="/orders"
-          className={`inline-flex items-center rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}`}
         >
           Back to your orders
         </Link>
       </div>
 
       {/* Payment group status */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">Payment group</h2>
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-bolder-text mb-3">Payment group</h2>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Group id</dt>
-            <dd className="text-sm text-slate-900 truncate">{group.paymentGroupId}</dd>
+          <div className="border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Group id</dt>
+            <dd className="text-sm text-bolder-text truncate">{group.paymentGroupId}</dd>
           </div>
-          <div className="border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Intent</dt>
-            <dd className="text-sm text-slate-900 truncate">{group.intentReference}</dd>
+          <div className="border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Intent</dt>
+            <dd className="text-sm text-bolder-text truncate">{group.intentReference}</dd>
           </div>
-          <div className="border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Status</dt>
+          <div className="border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Status</dt>
             <dd
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${
                 group.status === "PAID"
-                  ? "text-green-800 bg-green-50 border-green-200"
+                  ? "text-bolder-success bg-bolder-success-surface border-bolder-success-border"
                   : group.status === "FAILED" || group.status === "EXPIRED"
-                    ? "text-red-800 bg-red-50 border-red-200"
-                    : "text-amber-800 bg-amber-50 border-amber-200"
+                    ? "text-bolder-danger bg-bolder-danger-surface border-bolder-danger-border"
+                    : "text-bolder-warning bg-bolder-warning-surface border-bolder-warning-border"
               }`}
             >
               {group.status === "CREATED" ? "Awaiting payment" : group.status}
             </dd>
           </div>
-          <div className="border-b border-glass-border-soft pb-2">
-            <dt className="text-xs text-slate-500">Total</dt>
-            <dd className="text-sm font-medium text-slate-900 text-right">
+          <div className="border-b bolder-line pb-2">
+            <dt className="text-xs text-bolder-muted">Total</dt>
+            <dd className="text-sm font-medium text-bolder-text text-right">
               {formatMoney(group.total)}
             </dd>
           </div>
           {group.expiresAt && (
-            <div className="border-b border-glass-border-soft pb-2">
-              <dt className="text-xs text-slate-500">Expires at</dt>
-              <dd className="text-sm text-slate-900">{group.expiresAt}</dd>
+            <div className="border-b bolder-line pb-2">
+              <dt className="text-xs text-bolder-muted">Expires at</dt>
+              <dd className="text-sm text-bolder-text">{group.expiresAt}</dd>
             </div>
           )}
         </dl>
       </div>
 
       {/* Orders in the group */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">Orders</h2>
-        <table className="w-full text-left text-sm divide-y divide-slate-100">
-          <thead className="text-xs uppercase tracking-wide text-slate-500">
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-bolder-text mb-3">Orders</h2>
+        <table className="w-full text-left text-sm divide-y divide-bolder-line">
+          <thead className="text-xs uppercase tracking-wide text-bolder-muted">
             <tr>
               <th scope="col" className="py-3 pr-4 font-medium">Order</th>
               <th scope="col" className="py-3 pr-4 font-medium">Vendor</th>
@@ -165,18 +165,18 @@ export function PaymentStatusPage() {
             {group.orders.map((entry) => (
               <tr key={entry.orderId} className="align-top">
                 <td className="py-3 pr-4">
-                  <p className="font-medium text-slate-900">#{entry.orderId}</p>
-                  <p className="text-xs text-slate-500">{entry.orderStatus}</p>
+                  <p className="font-medium text-bolder-text">#{entry.orderId}</p>
+                  <p className="text-xs text-bolder-muted">{entry.orderStatus}</p>
                 </td>
-                <td className="py-3 pr-4 text-slate-900">{entry.amount != null ? formatMoney(entry.amount) : "-"}</td>
+                <td className="py-3 pr-4 text-bolder-text">{entry.amount != null ? formatMoney(entry.amount) : "-"}</td>
                 <td className="py-3 pr-4 text-right">
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${
                       entry.paymentStatus === "PAID" || entry.paymentStatus === "COLLECTED"
-                        ? "text-green-800 bg-green-50 border-green-200"
+                        ? "text-bolder-success bg-bolder-success-surface border-bolder-success-border"
                         : entry.paymentStatus === "FAILED"
-                          ? "text-red-800 bg-red-50 border-red-200"
-                          : "text-amber-800 bg-amber-50 border-amber-200"
+                          ? "text-bolder-danger bg-bolder-danger-surface border-bolder-danger-border"
+                          : "text-bolder-warning bg-bolder-warning-surface border-bolder-warning-border"
                     }`}
                   >
                     {PAYMENT_STATUS_LABELS[entry.paymentStatus]}
@@ -188,12 +188,12 @@ export function PaymentStatusPage() {
                       type="button"
                       onClick={() => onResume(entry.orderId)}
                       disabled={resumePayment.isPending}
-                      className={`rounded-md border border-brand-600 bg-white px-3 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                      className={`rounded-md border bolder-rose-action bg-bolder-surface px-3 py-1 text-xs font-medium text-bolder-rose-action hover:bg-bolder-bg disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
                     >
                       {resumePayment.isPending ? "Resuming…" : "Resume"}
                     </button>
                   ) : (
-                    <span className="text-xs text-slate-400">—</span>
+                    <span className="text-xs text-bolder-muted">—</span>
                   )}
                 </td>
               </tr>
@@ -203,9 +203,9 @@ export function PaymentStatusPage() {
       </div>
 
       {terminal && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">What happens next</h2>
-          <p className="text-sm text-slate-600">
+        <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-bolder-text mb-3">What happens next</h2>
+          <p className="text-sm text-bolder-muted">
             {nextStepMessage}
           </p>
         </div>
@@ -215,7 +215,7 @@ export function PaymentStatusPage() {
         <button
           type="button"
           onClick={onBack}
-          className={`rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`rounded-md border border-bolder-line-control bg-bolder-surface px-4 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg ${PRESSABLE} ${FOCUS_RING}`}
         >
           Back to your orders
         </button>
