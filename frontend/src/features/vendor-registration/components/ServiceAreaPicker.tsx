@@ -3,11 +3,11 @@ import type { ServiceLocationOption } from "@/features/location/types";
 import { FieldMessage } from "@/motion/FieldMessage";
 import { FIELD_TRANSITION, FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
-const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
-const ERROR_BORDER = "border-red-500";
-const MENU_CLASS = `absolute z-50 mt-1 w-full rounded-md border border-slate-300 bg-white shadow-lg ${FIELD_TRANSITION}`;
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
+const ERROR_BORDER = "border-bolder-danger-border";
+const MENU_CLASS = `absolute z-50 mt-1 w-full rounded-md border border-bolder-line-control bg-bolder-surface shadow-lg ${FIELD_TRANSITION}`;
 const ITEM_CLASS = `px-3 py-2 text-sm cursor-pointer ${PRESSABLE}`;
-const ITEM_ACTIVE = "bg-brand-50 text-brand-700";
+const ITEM_ACTIVE = "bg-bolder-blush-light text-bolder-rose-deep";
 
 interface ServiceAreaPickerProps {
   /** Flattened existing service areas, each row's `id` is the `service_locations.id`. */
@@ -139,7 +139,7 @@ export function ServiceAreaPicker({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="block text-sm font-medium text-bolder-text">
         Service area
       </label>
       <div ref={containerRef} className="relative mt-1" role="none">

@@ -3,8 +3,8 @@ import type { UseFormRegisterReturn } from "react-hook-form";
 import { FieldMessage } from "@/motion/FieldMessage";
 import { FIELD_TRANSITION, FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
-const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
-const ERROR_BORDER = "border-red-500";
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
+const ERROR_BORDER = "border-bolder-danger-border";
 
 interface PasswordFieldProps {
   label: string;
@@ -38,7 +38,7 @@ export function PasswordField({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="block text-sm font-medium text-bolder-text">
         {label}
       </label>
       <div className="relative">
@@ -57,7 +57,7 @@ export function PasswordField({
           onClick={() => setVisible((v) => !v)}
           aria-pressed={visible}
           aria-label={visible ? "Hide password" : "Show password"}
-          className={`absolute inset-y-0 right-0 pr-3 flex items-center ${PRESSABLE} ${FOCUS_RING} text-slate-500 hover:text-slate-700`}
+          className={`absolute inset-y-0 right-0 pr-3 flex items-center ${PRESSABLE} ${FOCUS_RING} text-bolder-muted hover:text-bolder-text`}
         >
           <span className="sr-only">{visible ? "Hide password" : "Show password"}</span>
           {visible ? (

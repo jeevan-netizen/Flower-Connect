@@ -2351,3 +2351,28 @@ Visual redesign of the FlowerConnect frontend to a warm, editorial florist look 
 - `npm run lint`: PASS
 - `npm run build`: PASS (18.91s)
 - `npm test`: **93 test files / 950 tests passed** (was 99 files / 979 tests; 6 Three.js test files / 29 tests removed). No failures.
+
+## Frontend Visual Redesign — Authentication Screens - COMPLETE (2026-11-27)
+
+Auth screens restyled to the warm ivory / rose / muted green editorial palette using existing `bolder-*` tokens from `src/app/styles/index.css` and shared classes from `src/motion/pressable.ts` and `src/shared/ui/classes.ts`. Styling only — no changes to fields, validation, payloads, routes, or auth behavior. `FOCUS_RING` already uses `ring-bolder-rose` (set in prior session).
+
+**Auth screens converted to token classes:**
+- `src/features/auth/pages/LoginPage.tsx`: `bg-slate-50` → `bg-bolder-bg`; `text-brand-700/600` → `text-bolder-rose-strong`/`text-bolder-rose-action`; `text-slate-600/700` → `text-bolder-muted`/`text-bolder-text`; `bg-brand-50/600` → `bg-bolder-blush-light`/`bg-bolder-rose-action`; `border-red-500` → `border-bolder-danger-border`; `bg-red-50 text-red-700` → danger tokens; input `border-slate-300 focus:border-brand-500 focus:ring-brand-500` → `border-bolder-line-control focus:border-bolder-rose focus:ring-bolder-rose`; button `bg-brand-600 hover:bg-brand-700 focus:ring-brand-500` → `bg-bolder-rose-action hover:bg-bolder-rose-deep focus:ring-bolder-rose`.
+- `src/features/auth/pages/RegisterPage.tsx`: same token conversions as LoginPage.
+- `src/features/auth/pages/ForgotPasswordPage.tsx`: same token conversions; error text `text-red-600` → `text-bolder-danger`.
+- `src/features/auth/pages/ResetPasswordPage.tsx`: same token conversions.
+- `src/features/auth/pages/ChangePasswordPage.tsx`: same token conversions.
+- `src/features/vendor-registration/pages/VendorRegisterPage.tsx`: primary button `bg-brand-600` → `bg-bolder-rose-action`; secondary button `border-slate-300 bg-white text-slate-700 hover:bg-slate-50` → `border-bolder-line-control bg-bolder-surface text-bolder-text hover:bg-bolder-bg`; legends `text-slate-900` → `text-bolder-text`; `border-slate-200` → `border-bolder-line`; alerts `bg-red-50 text-red-700` / `bg-amber-50 text-amber-800` → danger/warning tokens; links `text-brand-600` → `text-bolder-rose-action`.
+- `src/features/vendor-registration/components/ServiceAreaPicker.tsx`: `CONTROL_CLASS` → token classes; `ERROR_BORDER` → `border-bolder-danger-border`; `MENU_CLASS` → `border-bolder-line-control bg-bolder-surface`; `ITEM_ACTIVE` → `bg-bolder-blush-light text-bolder-rose-deep`; label `text-slate-700` → `text-bolder-text`.
+- `src/features/vendor-registration/components/LocationPicker.tsx`: `CONTROL_CLASS` → token classes; `ERROR_BORDER` → `border-bolder-danger-border`; label `text-slate-700` → `text-bolder-text`.
+- `src/features/vendor-registration/components/TextInput.tsx`: `CONTROL_CLASS` → token classes; `ERROR_BORDER` → `border-bolder-danger-border`; label `text-slate-700` → `text-bolder-text`.
+- `src/features/farmer/pages/FarmerRegisterPage.tsx`: same token conversions as RegisterPage.
+- `src/features/auth/components/PasswordField.tsx`: `CONTROL_CLASS` → token classes; `ERROR_BORDER` → `border-bolder-danger-border`; label `text-slate-700` → `text-bolder-text`; toggle `text-slate-500 hover:text-slate-700` → `text-bolder-muted hover:text-bolder-text`.
+
+**FOCUS_RING:** Already set to `focus-visible:ring-bolder-rose` in `src/motion/pressable.ts` (prior session); confirmed used across all auth screens.
+
+**Verification:**
+- `npm run typecheck`: PASS
+- `npm run lint`: PASS
+- `npm run build`: PASS (~34s)
+- `npm test`: **93 test files / 950 tests passed** (0 failures)

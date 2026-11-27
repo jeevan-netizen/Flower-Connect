@@ -34,7 +34,7 @@ const farmerRegisterSchema = z
 
 type FarmerRegisterFormData = z.infer<typeof farmerRegisterSchema>;
 
-const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
 
 export function FarmerRegisterPage() {
   const navigate = useNavigate();
@@ -58,15 +58,15 @@ export function FarmerRegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-bolder-bg py-12 px-4 sm:px-6 lg:px-8">
       <SlideUp className="w-full max-w-md space-y-8">
         <div>
-          <h2 className="mt-6 text-3xl font-bold text-brand-700">Register as a Farmer</h2>
-          <p className="mt-2 text-sm text-slate-600">Create your farmer account to connect with local florists</p>
+          <h2 className="mt-6 text-3xl font-bold text-bolder-rose-strong">Register as a Farmer</h2>
+          <p className="mt-2 text-sm text-bolder-muted">Create your farmer account to connect with local florists</p>
         </div>
 
         {error && (
-          <FadeIn role="alert" className="rounded-md bg-red-50 p-4 text-sm text-red-700">
+          <FadeIn role="alert" className="rounded-md bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
             {error}
           </FadeIn>
         )}
@@ -74,7 +74,7 @@ export function FarmerRegisterPage() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="fullName" className="block text-sm font-medium text-bolder-text">
                 Full name
               </label>
               <input
@@ -84,14 +84,14 @@ export function FarmerRegisterPage() {
                 required
                 aria-invalid={errors.fullName ? true : undefined}
                 aria-describedby={errors.fullName ? "fullName-note" : undefined}
-                className={`${CONTROL_CLASS} ${errors.fullName ? "border-red-500" : ""}`}
+                className={`${CONTROL_CLASS} ${errors.fullName ? "border-bolder-danger-border" : ""}`}
                 {...register("fullName")}
               />
               <FieldMessage id="fullName-note" message={errors.fullName?.message} reserve />
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="email" className="block text-sm font-medium text-bolder-text">
                 Email address
               </label>
               <input
@@ -101,14 +101,14 @@ export function FarmerRegisterPage() {
                 required
                 aria-invalid={errors.email ? true : undefined}
                 aria-describedby={errors.email ? "email-note" : undefined}
-                className={`${CONTROL_CLASS} ${errors.email ? "border-red-500" : ""}`}
+                className={`${CONTROL_CLASS} ${errors.email ? "border-bolder-danger-border" : ""}`}
                 {...register("email")}
               />
               <FieldMessage id="email-note" message={errors.email?.message} reserve />
             </div>
 
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="phone" className="block text-sm font-medium text-bolder-text">
                 Phone number
               </label>
               <input
@@ -118,14 +118,14 @@ export function FarmerRegisterPage() {
                 placeholder="+1234567890"
                 aria-invalid={errors.phone ? true : undefined}
                 aria-describedby={errors.phone ? "phone-note" : undefined}
-                className={`${CONTROL_CLASS} ${errors.phone ? "border-red-500" : ""}`}
+                className={`${CONTROL_CLASS} ${errors.phone ? "border-bolder-danger-border" : ""}`}
                 {...register("phone")}
               />
               <FieldMessage id="phone-note" message={errors.phone?.message} reserve />
             </div>
 
             <div>
-              <label htmlFor="address" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="address" className="block text-sm font-medium text-bolder-text">
                 Address
               </label>
               <input
@@ -135,7 +135,7 @@ export function FarmerRegisterPage() {
                 placeholder="Your farm or residence address"
                 aria-invalid={errors.address ? true : undefined}
                 aria-describedby={errors.address ? "address-note" : undefined}
-                className={`${CONTROL_CLASS} ${errors.address ? "border-red-500" : ""}`}
+                className={`${CONTROL_CLASS} ${errors.address ? "border-bolder-danger-border" : ""}`}
                 {...register("address")}
               />
               <FieldMessage id="address-note" message={errors.address?.message} reserve />
@@ -163,17 +163,17 @@ export function FarmerRegisterPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full rounded-md border border-transparent bg-brand-600 py-2.5 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
+            className={`w-full rounded-md border border-transparent bg-bolder-rose-action py-2.5 px-4 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
           >
             {isLoading ? "Creating account..." : "Create account"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-600">
+        <p className="text-center text-sm text-bolder-muted">
           Already have an account?{" "}
           <Link
             to="/login"
-            className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+            className="font-medium text-bolder-rose-action transition-colors duration-micro ease-standard hover:text-bolder-rose-strong"
           >
             Sign in
           </Link>

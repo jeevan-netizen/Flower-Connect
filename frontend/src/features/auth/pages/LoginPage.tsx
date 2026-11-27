@@ -20,7 +20,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 const FARMER_ROLE = "FARMER";
 
 /** The two inputs share one control treatment; only the type and id differ. */
-const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -80,15 +80,15 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-bolder-bg py-12 px-4 sm:px-6 lg:px-8">
       <SlideUp className="w-full max-w-md space-y-8">
         <div>
-          <h2 className="mt-6 text-3xl font-bold text-brand-700">Welcome back</h2>
-          <p className="mt-2 text-sm text-slate-600">Sign in to your FlowerConnect account</p>
+          <h2 className="mt-6 text-3xl font-bold text-bolder-rose-strong">Welcome back</h2>
+          <p className="mt-2 text-sm text-bolder-muted">Sign in to your FlowerConnect account</p>
         </div>
 
         {error && (
-          <FadeIn role="alert" className="rounded-md bg-red-50 p-4 text-sm text-red-700">
+          <FadeIn role="alert" className="rounded-md bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
             {error}
           </FadeIn>
         )}
@@ -96,7 +96,7 @@ export function LoginPage() {
         {registeredEmail && (
           <FadeIn
             role="status"
-            className="rounded-md bg-brand-50 p-4 text-sm text-brand-900"
+            className="rounded-md bg-bolder-blush-light p-4 text-sm text-bolder-rose-deep"
           >
             Your florist application is in. Sign in with the email you registered and we will
             take you to your vendor dashboard.
@@ -106,7 +106,7 @@ export function LoginPage() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                <label htmlFor="email" className="block text-sm font-medium text-bolder-text">
                 Email address
               </label>
               <input
@@ -116,7 +116,7 @@ export function LoginPage() {
                 required
                 aria-invalid={errors.email ? true : undefined}
                 aria-describedby={errors.email ? "email-note" : undefined}
-                className={`${CONTROL_CLASS} ${errors.email ? "border-red-500" : ""}`}
+                className={`${CONTROL_CLASS} ${errors.email ? "border-bolder-danger-border" : ""}`}
                 {...register("email")}
               />
               <FieldMessage id="email-note" message={errors.email?.message} reserve />
@@ -132,7 +132,7 @@ export function LoginPage() {
               <p className="mt-1 text-right text-sm">
                 <Link
                   to="/forgot-password"
-                  className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+                  className="font-medium text-bolder-rose-action transition-colors duration-micro ease-standard hover:text-bolder-rose-strong"
                 >
                   Forgot password?
                 </Link>
@@ -143,37 +143,37 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full rounded-md border border-transparent bg-brand-600 py-2.5 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
+            className={`w-full rounded-md border border-transparent bg-bolder-rose-action py-2.5 px-4 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
           >
             {isLoading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-600">
+        <p className="text-center text-sm text-bolder-muted">
           New to FlowerConnect?{" "}
           <Link
             to="/register"
-            className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+            className="font-medium text-bolder-rose-action transition-colors duration-micro ease-standard hover:text-bolder-rose-strong"
           >
             Create an account
           </Link>
         </p>
 
-        <p className="text-center text-sm text-slate-600">
+        <p className="text-center text-sm text-bolder-muted">
           Growing flowers?{" "}
           <Link
             to="/farmer/register"
-            className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+            className="font-medium text-bolder-rose-action transition-colors duration-micro ease-standard hover:text-bolder-rose-strong"
           >
             Register as a Farmer
           </Link>
         </p>
 
-        <p className="text-center text-sm text-slate-600">
+        <p className="text-center text-sm text-bolder-muted">
           Own a flower shop?{" "}
           <Link
             to="/vendor/register"
-            className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+            className="font-medium text-bolder-rose-action transition-colors duration-micro ease-standard hover:text-bolder-rose-strong"
           >
             Register it on FlowerConnect
           </Link>

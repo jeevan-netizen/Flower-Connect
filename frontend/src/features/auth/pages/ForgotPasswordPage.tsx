@@ -15,7 +15,7 @@ const forgotPasswordSchema = z.object({
 
 type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
-const SUBMIT_CLASS = `rounded-md border border-transparent bg-brand-600 py-2.5 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE} ${FOCUS_RING}`;
+const SUBMIT_CLASS = `rounded-md border border-transparent bg-bolder-rose-action py-2.5 px-4 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE} ${FOCUS_RING}`;
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -50,10 +50,10 @@ export function ForgotPasswordPage() {
   if (success) {
     return (
       <SlideUp className="mx-auto max-w-md space-y-6">
-        <div className="rounded-md bg-brand-50 p-4 text-sm text-brand-900">
+        <div className="rounded-md bg-bolder-blush-light p-4 text-sm text-bolder-rose-deep">
           {success}
         </div>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-bolder-muted">
           The reset link is single-use and expires after 30 minutes.
         </p>
         <button
@@ -70,21 +70,21 @@ export function ForgotPasswordPage() {
   return (
     <SlideUp className="mx-auto max-w-md space-y-6">
       <div>
-        <h2 className="mt-6 text-3xl font-bold text-brand-700">Forgot password</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="mt-6 text-3xl font-bold text-bolder-rose-strong">Forgot password</h2>
+        <p className="mt-2 text-sm text-bolder-muted">
           Enter your email and we will send you a reset link.
         </p>
       </div>
 
       {submitError && (
-        <FadeIn role="alert" className="rounded-md bg-red-50 p-4 text-sm text-red-700">
+        <FadeIn role="alert" className="rounded-md bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
           {submitError.message}
         </FadeIn>
       )}
 
       <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="email" className="block text-sm font-medium text-bolder-text">
             Email address
           </label>
           <input
@@ -94,10 +94,10 @@ export function ForgotPasswordPage() {
             required
             aria-invalid={errors.email ? true : undefined}
             aria-describedby={errors.email ? "email-note" : undefined}
-            className={`mt-1 block w-full rounded-md border-slate-300 shadow-sm sm:text-sm focus:border-brand-500 focus:ring-brand-500 ${errors.email ? "border-red-500" : ""}`}
+            className={`mt-1 block w-full rounded-md border-bolder-line-control shadow-sm sm:text-sm focus:border-bolder-rose focus:ring-bolder-rose ${errors.email ? "border-bolder-danger-border" : ""}`}
             {...register("email")}
           />
-          <p id="email-note" className={`mt-1 text-xs text-red-600 ${errors.email ? "" : "hidden"}`}>
+          <p id="email-note" className={`mt-1 text-xs text-bolder-danger ${errors.email ? "" : "hidden"}`}>
             {errors.email?.message}
           </p>
         </div>
@@ -111,11 +111,11 @@ export function ForgotPasswordPage() {
         </button>
       </form>
 
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-bolder-muted">
         Remember your password?{" "}
         <Link
           to="/login"
-          className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+          className="font-medium text-bolder-rose-action transition-colors duration-micro ease-standard hover:text-bolder-rose-strong"
         >
           Sign in
         </Link>

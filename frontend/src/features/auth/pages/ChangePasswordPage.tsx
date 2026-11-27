@@ -27,7 +27,7 @@ const changePasswordSchema = z
 
 type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
 
-const SUBMIT_CLASS = `rounded-md border border-transparent bg-brand-600 py-2.5 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE} ${FOCUS_RING}`;
+const SUBMIT_CLASS = `rounded-md border border-transparent bg-bolder-rose-action py-2.5 px-4 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE} ${FOCUS_RING}`;
 
 export function ChangePasswordPage() {
   const navigate = useNavigate();
@@ -77,10 +77,10 @@ export function ChangePasswordPage() {
   if (success) {
     return (
       <SlideUp className="mx-auto max-w-md space-y-6">
-        <div className="rounded-md bg-brand-50 p-4 text-sm text-brand-900">
+        <div className="rounded-md bg-bolder-blush-light p-4 text-sm text-bolder-rose-deep">
           {success}
         </div>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-bolder-muted">
           Your current access token stays valid until it expires, but it cannot
           refresh — sign in again on any other device with your new password.
         </p>
@@ -98,14 +98,14 @@ export function ChangePasswordPage() {
   return (
     <SlideUp className="mx-auto max-w-md space-y-6">
       <div>
-        <h2 className="mt-6 text-3xl font-bold text-brand-700">Change password</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="mt-6 text-3xl font-bold text-bolder-rose-strong">Change password</h2>
+        <p className="mt-2 text-sm text-bolder-muted">
           Update your account password.
         </p>
       </div>
 
       {submitError && (
-        <FadeIn role="alert" className="rounded-md bg-red-50 p-4 text-sm text-red-700">
+        <FadeIn role="alert" className="rounded-md bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
           {submitError.message}
         </FadeIn>
       )}
@@ -141,11 +141,11 @@ export function ChangePasswordPage() {
         </button>
       </form>
 
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-bolder-muted">
         Back to{" "}
         <Link
           to="/"
-          className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+          className="font-medium text-bolder-rose-action transition-colors duration-micro ease-standard hover:text-bolder-rose-strong"
         >
           home
         </Link>

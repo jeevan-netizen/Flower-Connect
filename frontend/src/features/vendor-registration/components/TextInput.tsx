@@ -3,8 +3,8 @@ import type { UseFormRegisterReturn } from "react-hook-form";
 import { FieldMessage } from "@/motion/FieldMessage";
 import { FIELD_TRANSITION } from "@/motion/pressable";
 
-const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
-const ERROR_BORDER = "border-red-500";
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
+const ERROR_BORDER = "border-bolder-danger-border";
 
 type InputType = "text" | "email" | "tel" | "password";
 
@@ -47,7 +47,7 @@ export function TextInput({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="block text-sm font-medium text-bolder-text">
         {label}
       </label>
       {multiline ? (

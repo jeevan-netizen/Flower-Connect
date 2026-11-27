@@ -117,7 +117,7 @@ export function VendorRegisterPage() {
           <SuccessMessage
             message={`Thanks — ${registered.businessName} has been registered for ${registered.area}, ${registered.city} (${registered.pincode}).`}
           />
-          <p className="mt-3 text-sm text-slate-600">
+          <p className="mt-3 text-sm text-bolder-muted">
             Your profile is <span className="font-medium">{registered.status}</span> until an
             administrator approves it. Sign in now to follow your application in the vendor
             dashboard; listing products unlocks once you are approved.
@@ -127,7 +127,7 @@ export function VendorRegisterPage() {
             <Link
               to="/login"
               state={{ registeredEmail, from: "/vendor" }}
-              className={`rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE}`}
+              className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE}`}
             >
               Sign in to your vendor dashboard
             </Link>
@@ -137,7 +137,7 @@ export function VendorRegisterPage() {
                 setRegistered(null);
                 setRegisteredEmail(null);
               }}
-              className={`rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 ${PRESSABLE} ${FOCUS_RING}`}
+              className={`rounded-md border border-bolder-line-control bg-bolder-surface px-4 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg ${PRESSABLE} ${FOCUS_RING}`}
             >
               Register another shop
             </button>
@@ -167,7 +167,7 @@ export function VendorRegisterPage() {
           />
 
           <fieldset className="space-y-5">
-            <legend className="text-sm font-semibold text-slate-900">Your account</legend>
+            <legend className="text-sm font-semibold text-bolder-text">Your account</legend>
             <TextInput
               label="Full name"
               autoComplete="name"
@@ -203,8 +203,8 @@ export function VendorRegisterPage() {
             />
           </fieldset>
 
-          <fieldset className="space-y-5 border-t border-slate-200 pt-5">
-            <legend className="text-sm font-semibold text-slate-900">Your business</legend>
+          <fieldset className="space-y-5 border-t border-bolder-line pt-5">
+            <legend className="text-sm font-semibold text-bolder-text">Your business</legend>
             <TextInput
               label="Business name"
               error={errors.businessName?.message}
@@ -219,8 +219,8 @@ export function VendorRegisterPage() {
             />
           </fieldset>
 
-          <fieldset className="space-y-5 border-t border-slate-200 pt-5">
-            <legend className="text-sm font-semibold text-slate-900">Shop address</legend>
+          <fieldset className="space-y-5 border-t border-bolder-line pt-5">
+            <legend className="text-sm font-semibold text-bolder-text">Shop address</legend>
             <TextInput
               label="Address line 1"
               autoComplete="address-line1"
@@ -256,12 +256,12 @@ export function VendorRegisterPage() {
               registration={register("pincode")}
             />
 
-            {locationsPending && <p className="text-sm text-slate-600">Loading service areas...</p>}
+            {locationsPending && <p className="text-sm text-bolder-muted">Loading service areas...</p>}
 
             {locationsError && (
               <FadeIn
                 role="alert"
-                className="rounded-md bg-red-50 p-3 text-sm text-red-700"
+                className="rounded-md bg-bolder-danger-surface p-3 text-sm text-bolder-danger"
               >
                 <p>Could not load the service areas.</p>
                 <button
@@ -277,7 +277,7 @@ export function VendorRegisterPage() {
             {noServiceAreas && (
               <FadeIn
                 role="alert"
-                className="rounded-md bg-amber-50 p-3 text-sm text-amber-800"
+                className="rounded-md bg-bolder-warning-surface p-3 text-sm text-bolder-warning"
               >
                 No service areas are configured yet, so registration is unavailable. Please
                 contact FlowerConnect support.
@@ -313,7 +313,7 @@ export function VendorRegisterPage() {
             service-area rule, and the note below says why the field is missing.
           */}
           {pickerUnavailable && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-bolder-muted">
               Registration needs the service area list, so it cannot be completed until the areas
               load.
             </p>
@@ -321,18 +321,18 @@ export function VendorRegisterPage() {
         </form>
       </Card>
 
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-bolder-muted">
         Already registered?{" "}
         <Link
           to="/login"
-          className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+          className="font-medium text-bolder-rose-action transition-colors duration-micro ease-standard hover:text-bolder-rose-strong"
         >
           Sign in
         </Link>{" "}
         or{" "}
         <Link
           to="/register"
-          className="font-medium text-brand-600 transition-colors duration-micro ease-standard hover:text-brand-700"
+          className="font-medium text-bolder-rose-action transition-colors duration-micro ease-standard hover:text-bolder-rose-strong"
         >
           create a customer account
         </Link>
