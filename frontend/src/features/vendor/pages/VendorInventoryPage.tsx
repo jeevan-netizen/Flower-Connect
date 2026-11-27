@@ -24,9 +24,9 @@ import { toApiError } from "@/shared/lib/api-error";
 import { Pagination } from "@/shared/components/Pagination";
 import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
-const HEADING_CLASS = "px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500";
-const CELL_CLASS = "px-4 py-3 text-sm text-slate-700 align-middle";
-const ACTION_BUTTON_CLASS = `rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
+const HEADING_CLASS = "px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-bolder-muted";
+const CELL_CLASS = "px-4 py-3 text-sm text-bolder-text align-middle";
+const ACTION_BUTTON_CLASS = `rounded-md border bolder-line-control bg-bolder-surface px-2 py-1.5 text-xs font-medium text-bolder-text hover:bg-bolder-bg disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
 
 /**
  * `LowStockProductResponse` carries the same six stock figures as
@@ -137,8 +137,8 @@ export function VendorInventoryPage() {
         <CatalogLoader label="Loading your low-stock list..." />
       ) : rows.length === 0 ? (
         <Card>
-          <p className="text-sm font-medium text-slate-900">Nothing is running low</p>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="text-sm font-medium text-bolder-text">Nothing is running low</p>
+          <p className="mt-1 text-sm text-bolder-muted">
             No product is at or below its own threshold. Set a threshold on a product&apos;s stock
             settings to start tracking it here.
           </p>
@@ -146,9 +146,9 @@ export function VendorInventoryPage() {
       ) : (
         <Card>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
+            <table className="min-w-full divide-y divide-bolder-line">
               <caption className="sr-only">Low stock products</caption>
-              <thead className="bg-slate-50">
+              <thead className="bg-bolder-bg">
                 <tr>
                   <th scope="col" className={HEADING_CLASS}>
                     Product
@@ -167,13 +167,13 @@ export function VendorInventoryPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-bolder-line">
                 {rows.map((row) => (
                   <tr key={row.productId}>
                     <td className={CELL_CLASS}>
                       <Link
                         to={`/vendor/catalog/${row.productId}`}
-                        className={`font-medium text-brand-700 hover:text-brand-900 ${FOCUS_RING}`}
+                        className={`font-medium text-bolder-rose-strong hover:text-bolder-rose-deep ${FOCUS_RING}`}
                       >
                         {row.productName}
                       </Link>
@@ -184,11 +184,11 @@ export function VendorInventoryPage() {
                     <td className={`${CELL_CLASS} whitespace-nowrap`}>
                       {row.available}
                       {row.reservedQuantity > 0 && (
-                        <span className="text-xs text-slate-500"> ({row.reservedQuantity} reserved)</span>
+                        <span className="text-xs text-bolder-muted"> ({row.reservedQuantity} reserved)</span>
                       )}
                     </td>
                     <td className={`${CELL_CLASS} whitespace-nowrap`}>{row.lowStockThreshold}</td>
-                    <td className={`${CELL_CLASS} whitespace-nowrap text-slate-600`}>
+                    <td className={`${CELL_CLASS} whitespace-nowrap text-bolder-muted`}>
                       {formatLocalDate(row.expiryDate)}
                     </td>
                     <td className={`${CELL_CLASS} text-right`}>

@@ -4,7 +4,7 @@ import { formatFileSize } from "@/features/vendor/format";
 import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 import { StatusPill } from "@/motion/StatusPill";
 
-const ACTION_BUTTON_CLASS = `rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
+const ACTION_BUTTON_CLASS = `rounded-md border bolder-line-control bg-bolder-surface px-2 py-1 text-xs font-medium text-bolder-text hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
 
 interface ProductImageManagerProps {
   images: ProductImage[];
@@ -94,32 +94,32 @@ export function ProductImageManager({
   return (
     <section aria-labelledby="product-images-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="product-images-heading" className="text-sm font-semibold text-slate-900">
+        <h3 id="product-images-heading" className="text-sm font-semibold text-bolder-text">
           Images
         </h3>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-bolder-muted">
           {images.length} of {MAX_IMAGES_PER_PRODUCT} used
         </p>
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-bolder-muted">
         JPEG, PNG or WebP, up to 5&nbsp;MB. The server checks the file's contents, then resizes and
         re-encodes it — your original file is never stored as uploaded.
       </p>
 
       {errorMessage && (
-        <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <p role="alert" className="rounded-md bg-bolder-danger-surface p-3 text-sm text-bolder-danger">
           {errorMessage}
         </p>
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-slate-700">
+        <label className="flex items-center gap-2 text-sm text-bolder-text">
           <input
             type="checkbox"
             checked={makePrimary}
             onChange={(event) => setMakePrimary(event.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            className="h-4 w-4 rounded border-bolder-line-control text-bolder-rose-action focus:ring-bolder-rose"
           />
           Make the next upload the cover
         </label>
@@ -129,20 +129,20 @@ export function ProductImageManager({
           disabled={atLimit || isUploading || isMutating}
           aria-label="Upload a product image"
           onChange={handleFileChange}
-          className="text-sm text-slate-600 file:mr-3 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-50"
+          className="text-sm text-bolder-muted file:mr-3 file:rounded-md file:border file:border-bolder-line-control file:bg-bolder-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-bolder-text hover:file:bg-bolder-bg"
         />
-        {isUploading && <span className="text-xs text-slate-500">Uploading...</span>}
+        {isUploading && <span className="text-xs text-bolder-muted">Uploading...</span>}
       </div>
 
       {atLimit && (
-        <p className="text-xs text-amber-800">
+        <p className="text-xs text-bolder-warning">
           This product already holds the maximum of {MAX_IMAGES_PER_PRODUCT} images. Remove one to
           upload another.
         </p>
       )}
 
       {images.length === 0 ? (
-        <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+        <p className="rounded-md border border-dashed border-bolder-line-control p-4 text-sm text-bolder-muted">
           No images yet. The first image you upload becomes this product&rsquo;s cover automatically.
         </p>
       ) : (
@@ -150,20 +150,20 @@ export function ProductImageManager({
           {images.map((image, index) => (
             <li
               key={image.id}
-              className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-white p-3"
+              className="flex flex-wrap items-center gap-3 rounded-md border bolder-line bg-bolder-surface p-3"
             >
-              <span className="w-6 text-xs font-medium text-slate-400">{index + 1}</span>
+              <span className="w-6 text-xs font-medium text-bolder-muted">{index + 1}</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-slate-900">
+                <span className="block truncate text-sm font-medium text-bolder-text">
                   {image.originalFilename ?? image.storageKey}
                 </span>
-                <span className="block text-xs text-slate-500">
+                <span className="block text-xs text-bolder-muted">
                   {image.mimeType} · {formatFileSize(image.fileSize)}
                 </span>
               </span>
 
               {image.primary ? (
-                <StatusPill tone="bg-brand-100 text-brand-900" label="Cover" />
+                <StatusPill tone="bg-bolder-blush-light text-bolder-rose-deep" label="Cover" />
               ) : (
                 <button
                   type="button"
@@ -197,7 +197,7 @@ export function ProductImageManager({
                 type="button"
                 disabled={isMutating}
                 onClick={() => void run(() => onDelete(image.id))}
-                className={`rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+                className={`rounded-md border bolder-danger-border bg-bolder-danger-surface px-2 py-1 text-xs font-medium text-bolder-danger hover:bg-bolder-danger-surface disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
               >
                 Delete
               </button>

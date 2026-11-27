@@ -171,7 +171,7 @@ export function B2BStatementsPage() {
         description="Group delivered, unpaid B2B orders into statements and record payment."
       />
 
-      <div className="flex items-center gap-4 border-b border-slate-200">
+      <div className="flex items-center gap-4 border-b border-bolder-line">
         <button
           type="button"
           onClick={() => {
@@ -181,7 +181,7 @@ export function B2BStatementsPage() {
           className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
             view === "create"
               ? "border-brand-600 text-brand-900"
-              : "border-transparent text-slate-500 hover:text-slate-700"
+              : "border-transparent text-bolder-muted hover:text-slate-700"
           }`}
         >
           Generate statement
@@ -195,7 +195,7 @@ export function B2BStatementsPage() {
           className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
             view === "list" || view === "detail"
               ? "border-brand-600 text-brand-900"
-              : "border-transparent text-slate-500 hover:text-slate-700"
+              : "border-transparent text-bolder-muted hover:text-slate-700"
           }`}
         >
           Statements list
@@ -205,8 +205,8 @@ export function B2BStatementsPage() {
       {/* 1. Create statement (seller only) */}
       {view === "create" && (
         <>
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900 mb-4">
+          <div className="rounded-lg border border-bolder-line bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-bolder-text mb-4">
               Create a statement
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -220,7 +220,7 @@ export function B2BStatementsPage() {
                   onChange={(event) =>
                     setBuyerId(event.target.value === "" ? null : Number(event.target.value))
                   }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                  className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
                 >
                   <option value="">Select a buyer</option>
                   {sellerOptions.map((seller) => (
@@ -239,7 +239,7 @@ export function B2BStatementsPage() {
                   type="date"
                   value={fromDate}
                   onChange={(event) => setFromDate(event.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                  className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
                 />
               </div>
               <div>
@@ -251,7 +251,7 @@ export function B2BStatementsPage() {
                   type="date"
                   value={toDate}
                   onChange={(event) => setToDate(event.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                  className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
                 />
               </div>
             </div>
@@ -260,7 +260,7 @@ export function B2BStatementsPage() {
                 type="button"
                 onClick={handlePreview}
                 disabled={!buyerId || previewPending}
-                className={`rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
               >
                 {previewPending ? "Previewing…" : "Preview"}
               </button>
@@ -270,11 +270,11 @@ export function B2BStatementsPage() {
                   setFromDate(fifteenDaysAgo());
                   setToDate(todayLocal());
                 }}
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Reset range
               </button>
-              <p className="ml-auto text-xs text-slate-500">
+              <p className="ml-auto text-xs text-bolder-muted">
                 Defaults to the last 15 days.
               </p>
             </div>
@@ -282,20 +282,20 @@ export function B2BStatementsPage() {
 
           {/* Preview results */}
           {buyerId != null && (
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-slate-900 mb-3">
+            <div className="rounded-lg border border-bolder-line bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold text-bolder-text mb-3">
                 Eligible orders
               </h2>
               {previewPending ? (
-                <FadeIn className="rounded-lg border border-slate-200 bg-white p-12 text-center text-sm text-slate-600">
+                <FadeIn className="rounded-lg border border-bolder-line bg-white p-12 text-center text-sm text-bolder-muted">
                   Fetching eligible orders…
                 </FadeIn>
               ) : eligibleOrders.length === 0 ? (
-                <FadeIn className="rounded-lg border border-slate-200 bg-white p-8 text-center">
-                  <h2 className="text-base font-semibold text-slate-900">
+                <FadeIn className="rounded-lg border border-bolder-line bg-white p-8 text-center">
+                  <h2 className="text-base font-semibold text-bolder-text">
                     No eligible orders
                   </h2>
-                  <p className="mt-2 text-sm text-slate-600">
+                  <p className="mt-2 text-sm text-bolder-muted">
                     Delivered, unpaid orders for this buyer in the selected
                     range can be grouped into a statement.
                   </p>
@@ -304,7 +304,7 @@ export function B2BStatementsPage() {
                 <>
                   <table className="w-full text-left text-sm divide-y divide-slate-100 mb-4">
                     <thead>
-                      <tr className="text-xs uppercase tracking-wide text-slate-500">
+                      <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                         <th scope="col" className="py-3 pr-4 font-medium">
                           Order
                         </th>
@@ -320,14 +320,14 @@ export function B2BStatementsPage() {
                       {eligibleOrders.map((order) => (
                         <tr key={order.id} className="align-top">
                           <td className="py-3 pr-4">
-                            <p className="font-medium text-slate-900">
+                            <p className="font-medium text-bolder-text">
                               #{order.orderNo}
                             </p>
                           </td>
-                          <td className="py-3 font-medium text-right text-slate-900">
+                          <td className="py-3 font-medium text-right text-bolder-text">
                             {formatMoney(order.total)}
                           </td>
-                          <td className="py-3 text-right text-sm text-slate-600">
+                          <td className="py-3 text-right text-sm text-bolder-muted">
                             {formatLocalDate(order.deliveredAt ?? null)}
                           </td>
                         </tr>
@@ -335,7 +335,7 @@ export function B2BStatementsPage() {
                     </tbody>
                   </table>
                   <div className="flex justify-end">
-                    <span className="text-sm font-semibold text-slate-900">
+                    <span className="text-sm font-semibold text-bolder-text">
                       Total: {formatMoney(previewTotal)}
                     </span>
                   </div>
@@ -344,12 +344,12 @@ export function B2BStatementsPage() {
                       type="button"
                       disabled={!canCreate}
                       onClick={handleCreate}
-                      className={`w-full rounded-md border border-transparent bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                      className={`w-full rounded-md border border-transparent bg-bolder-rose-action px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
                     >
                       {isCreating ? "Creating statement…" : "Create statement"}
                     </button>
                     {!canCreate && eligibleOrders.length > 0 && (
-                      <p className="mt-2 text-xs text-slate-500">
+                      <p className="mt-2 text-xs text-bolder-muted">
                         Generate the statement to group these orders.
                       </p>
                     )}
@@ -376,7 +376,7 @@ export function B2BStatementsPage() {
                 className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
                   role === r.key
                     ? "border-brand-600 text-brand-900"
-                    : "border-transparent text-slate-500 hover:text-slate-700"
+                    : "border-transparent text-bolder-muted hover:text-slate-700"
                 }`}
               >
                 {r.label}
@@ -385,15 +385,15 @@ export function B2BStatementsPage() {
           </div>
 
           {statements.isPending && !statementList.content.length ? (
-            <FadeIn className="rounded-lg border border-slate-200 bg-white p-12 text-center text-sm text-slate-600">
+            <FadeIn className="rounded-lg border border-bolder-line bg-white p-12 text-center text-sm text-bolder-muted">
               Loading statements…
             </FadeIn>
           ) : statementList.content.length === 0 ? (
-            <FadeIn className="rounded-lg border border-slate-200 bg-white p-12 text-center">
-              <h2 className="text-base font-semibold text-slate-900">
+            <FadeIn className="rounded-lg border border-bolder-line bg-white p-12 text-center">
+              <h2 className="text-base font-semibold text-bolder-text">
                 No statements
               </h2>
-              <p className="mt-2 text-sm text-slate-600">
+              <p className="mt-2 text-sm text-bolder-muted">
                 {role === "SELLER"
                   ? "Statements you create for buyers will appear here."
                   : "Statements sellers create for you will appear here."}
@@ -403,7 +403,7 @@ export function B2BStatementsPage() {
             <>
               <table className="w-full text-left text-sm divide-y divide-slate-100">
                 <thead>
-                  <tr className="text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                     <th scope="col" className="py-3 pr-4 font-medium">
                       Statement
                     </th>
@@ -423,20 +423,20 @@ export function B2BStatementsPage() {
                       onClick={() => selectStatement(statement)}
                     >
                       <td className="py-3 pr-4">
-                        <p className="font-medium text-slate-900">
+                        <p className="font-medium text-bolder-text">
                           #{statement.statementNo}
                         </p>
                       </td>
                       <td className="py-3 pr-4">
-                        <p className="font-medium text-slate-900">
+                        <p className="font-medium text-bolder-text">
                           {role === "SELLER" ? statement.buyerName : statement.sellerName}
                         </p>
                       </td>
-                      <td className="py-3 pr-4 text-sm text-slate-600">
+                      <td className="py-3 pr-4 text-sm text-bolder-muted">
                         {formatLocalDate(statement.periodStart)} –
                         {formatLocalDate(statement.periodEnd)}
                       </td>
-                      <td className="py-3 font-medium text-right text-slate-900">
+                      <td className="py-3 font-medium text-right text-bolder-text">
                         {formatMoney(statement.totalAmount)}
                       </td>
                       <td className="py-3">
@@ -462,13 +462,13 @@ export function B2BStatementsPage() {
 
       {/* 3. Statement detail */}
       {view === "detail" && selectedStatement && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-lg border border-bolder-line bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">
+              <h2 className="text-sm font-semibold text-bolder-text">
                 Statement #{selectedStatement.statementNo}
               </h2>
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-bolder-muted">
                 {selectedStatement.sellerName} →{" "}
                 {selectedStatement.buyerName}
               </p>
@@ -476,7 +476,7 @@ export function B2BStatementsPage() {
             <button
               type="button"
               onClick={backToList}
-              className={`rounded-md border border-transparent bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+              className={`rounded-md border border-transparent bg-bolder-rose-action px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
             >
               Back to list
             </button>
@@ -484,44 +484,44 @@ export function B2BStatementsPage() {
 
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-full border-b border-slate-100 pb-2">
-              <dt className="text-xs text-slate-500">Period</dt>
-              <dd className="text-sm text-slate-900">
+              <dt className="text-xs text-bolder-muted">Period</dt>
+              <dd className="text-sm text-bolder-text">
                 {formatLocalDate(selectedStatement.periodStart)} –
                 {formatLocalDate(selectedStatement.periodEnd)}
               </dd>
             </div>
             <div className="border-b border-slate-100 pb-2">
-              <dt className="text-xs text-slate-500">Total</dt>
-              <dd className="text-sm font-medium text-slate-900">
+              <dt className="text-xs text-bolder-muted">Total</dt>
+              <dd className="text-sm font-medium text-bolder-text">
                 {formatMoney(selectedStatement.totalAmount)}
               </dd>
             </div>
             <div className="border-b border-slate-100 pb-2">
-              <dt className="text-xs text-slate-500">Status</dt>
-              <dd className="text-sm text-slate-900">
+              <dt className="text-xs text-bolder-muted">Status</dt>
+              <dd className="text-sm text-bolder-text">
                 {selectedStatement.status === "OPEN" ? "Open" : "Paid"}
               </dd>
             </div>
             {selectedStatement.paidAt && (
               <div className="border-b border-slate-100 pb-2">
-                <dt className="text-xs text-slate-500">Paid at</dt>
-                <dd className="text-sm text-slate-900">
+                <dt className="text-xs text-bolder-muted">Paid at</dt>
+                <dd className="text-sm text-bolder-text">
                   {formatLocalDate(selectedStatement.paidAt.split("T")[0])}
                 </dd>
               </div>
             )}
             {selectedStatement.paymentMode && (
               <div className="border-b border-slate-100 pb-2">
-                <dt className="text-xs text-slate-500">Payment mode</dt>
-                <dd className="text-sm text-slate-900">
+                <dt className="text-xs text-bolder-muted">Payment mode</dt>
+                <dd className="text-sm text-bolder-text">
                   {selectedStatement.paymentMode}
                 </dd>
               </div>
             )}
             {selectedStatement.paymentNote && (
               <div className="pb-2">
-                <dt className="text-xs text-slate-500">Note</dt>
-                <dd className="text-sm text-slate-900">
+                <dt className="text-xs text-bolder-muted">Note</dt>
+                <dd className="text-sm text-bolder-text">
                   {selectedStatement.paymentNote}
                 </dd>
               </div>
@@ -529,15 +529,15 @@ export function B2BStatementsPage() {
           </dl>
 
           <div className="mt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-bolder-muted mb-2">
               Orders
             </h3>
             {selectedStatement.orders.length === 0 ? (
-              <p className="text-sm text-slate-500">No orders in this statement.</p>
+              <p className="text-sm text-bolder-muted">No orders in this statement.</p>
             ) : (
               <table className="w-full text-left text-sm divide-y divide-slate-100">
                 <thead>
-                  <tr className="text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                     <th scope="col" className="py-3 pr-4 font-medium">Order</th>
                     <th scope="col" className="py-3 font-medium text-right">Total</th>
                     <th scope="col" className="py-3 font-medium text-right">Status</th>
@@ -547,12 +547,12 @@ export function B2BStatementsPage() {
                   {selectedStatement.orders.map((order) => (
                     <tr key={order.id} className="align-top">
                       <td className="py-3 pr-4">
-                        <p className="font-medium text-slate-900">#{order.orderNo}</p>
+                        <p className="font-medium text-bolder-text">#{order.orderNo}</p>
                       </td>
-                      <td className="py-3 font-medium text-right text-slate-900">
+                      <td className="py-3 font-medium text-right text-bolder-text">
                         {formatMoney(order.total)}
                       </td>
-                      <td className="py-3 text-right text-sm text-slate-600">
+                      <td className="py-3 text-right text-sm text-bolder-muted">
                         {order.status}
                       </td>
                     </tr>
@@ -565,11 +565,11 @@ export function B2BStatementsPage() {
           {/* Record payment (seller, OPEN only) */}
           {role === "SELLER" &&
             selectedStatement.status === "OPEN" && (
-              <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">
+              <div className="mt-6 rounded-lg border border-bolder-line bg-white p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-bolder-text mb-3">
                   Record payment
                 </h3>
-                <p className="text-xs text-slate-500 mb-3">
+                <p className="text-xs text-bolder-muted mb-3">
                   Full payment only. Marks this statement and every linked
                   order PAID.
                 </p>
@@ -596,7 +596,7 @@ export function B2BStatementsPage() {
                       <select
                         name="paymentMode"
                         defaultValue="CASH"
-                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                        className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
                       >
                         <option value="CASH">Cash</option>
                         <option value="UPI">UPI</option>
@@ -611,7 +611,7 @@ export function B2BStatementsPage() {
                         name="paymentNote"
                         rows={2}
                         placeholder="A reference for this payment"
-                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                        className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
                       />
                     </div>
                   </div>
@@ -619,7 +619,7 @@ export function B2BStatementsPage() {
                     <button
                       type="submit"
                       disabled={isPaying}
-                      className={`rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                      className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
                     >
                       {isPaying ? "Recording payment…" : "Record payment"}
                     </button>
@@ -634,7 +634,7 @@ export function B2BStatementsPage() {
               <button
                 type="button"
                 onClick={clearError}
-                className="mt-2 inline-flex items-center rounded-md border border-transparent bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700"
+                className="mt-2 inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700"
               >
                 Dismiss
               </button>

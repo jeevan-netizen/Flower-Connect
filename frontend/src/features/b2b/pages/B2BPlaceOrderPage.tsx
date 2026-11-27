@@ -118,19 +118,19 @@ export function B2BPlaceOrderPage() {
 
   return (
     <>
-      {actionError && (
-        <FadeIn role="alert" className="max-w-4xl mx-auto px-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <p className="font-semibold">Could not place the order</p>
-          <p className="mt-1">{actionError.message}</p>
-          <button
-            type="button"
-            onClick={clearError}
-            className="mt-3 inline-flex items-center rounded-md border border-transparent bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
-          >
-            Dismiss
-          </button>
-        </FadeIn>
-      )}
+        {actionError && (
+          <FadeIn role="alert" className="max-w-4xl mx-auto px-4 rounded-lg border bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
+            <p className="font-semibold">Could not place the order</p>
+            <p className="mt-1">{actionError.message}</p>
+            <button
+              type="button"
+              onClick={clearError}
+              className="mt-3 inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-3 py-1.5 text-xs font-medium text-white hover:bg-bolder-rose-deep"
+            >
+              Dismiss
+            </button>
+          </FadeIn>
+        )}
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         <PageHeading
           title="Place a B2B order"
@@ -138,8 +138,8 @@ export function B2BPlaceOrderPage() {
         />
 
         {/* 1. Seller search */}
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Choose a seller</h2>
+        <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-bolder-text mb-3">Choose a seller</h2>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="relative w-full sm:w-72">
               <input
@@ -147,14 +147,14 @@ export function B2BPlaceOrderPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search sellers by name, area or pincode"
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                className="w-full rounded-md border-bolder-line-control bg-bolder-surface px-3 py-2 text-sm shadow-sm focus:border-bolder-rose focus:ring-bolder-rose"
               />
             </div>
             <button
               type="button"
               disabled={!selectedSeller}
               onClick={() => setSelectedSeller(null)}
-              className={`rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+              className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
             >
               Clear selection
             </button>
@@ -166,42 +166,48 @@ export function B2BPlaceOrderPage() {
             </FadeIn>
           )}
 
+          {sellersPending && !sellers && (
+            <FadeIn className="rounded-lg border bolder-line bg-bolder-surface p-4 text-sm text-bolder-muted flex items-center gap-3">
+              Loading sellers…
+            </FadeIn>
+          )}
+
           {!sellersPending && sellers && sellers.length === 0 && (
-            <FadeIn className="rounded-lg border border-slate-200 bg-white p-4 text-center text-sm text-slate-500">
+            <FadeIn className="rounded-lg border bolder-line bg-bolder-surface p-4 text-center text-sm text-bolder-muted">
               No approved sellers match "{query}".
             </FadeIn>
           )}
 
           {!sellersPending && sellers && sellers.length > 0 && (
-            <ul className="mt-3 divide-y divide-slate-100 rounded-md border border-slate-200 bg-white max-h-60 overflow-y-auto">
+            <ul className="mt-3 divide-y divide-bolder-line rounded-md border bolder-line bg-bolder-surface max-h-60 overflow-y-auto">
               {sellers
                 .filter((seller) => sellerMatches(seller, query))
                 .slice(0, PAGE_SIZE)
                 .map((seller) => (
-                  <li key={seller.vendorId}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSeller(seller)}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors ${
-                        selectedSeller?.vendorId === seller.vendorId
-                          ? "bg-brand-50 text-brand-900"
-                          : "text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div>
-                        <p className="font-medium text-slate-900">
-                          {seller.businessName}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {seller.area}, {seller.pincode} ·
-                          delivery radius {seller.deliveryRadiusKm} km
-                        </p>
-                      </div>
-                      {selectedSeller?.vendorId === seller.vendorId && (
-                        <span className="rounded-md bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-800">
-                          Selected
-                        </span>
-                      )}
+                      <li key={seller.vendorId}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSeller(seller)}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors ${
+                            selectedSeller?.vendorId === seller.vendorId
+                              ? "bg-bolder-blush-light text-bolder-text"
+                              : "text-bolder-text hover:bg-bolder-bg"
+                          }`}
+                        >
+                          <div>
+                            <p className="font-medium text-bolder-text">
+                              {seller.businessName}
+                            </p>
+                            <p className="text-xs text-bolder-muted">
+                              {seller.area}, {seller.pincode} ·
+                              delivery radius {seller.deliveryRadiusKm} km
+                            </p>
+                          </div>
+                          {selectedSeller?.vendorId === seller.vendorId && (
+                            <span className="rounded-md bg-bolder-blush-light px-2 py-0.5 text-xs font-semibold text-bolder-rose-deep">
+                              Selected
+                            </span>
+                          )}
                     </button>
                   </li>
                 ))}
@@ -212,15 +218,15 @@ export function B2BPlaceOrderPage() {
         {/* 2. Product selection */}
         {selectedSeller && (
           <>
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="rounded-md bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-800">
-                  {selectedSeller.businessName}
-                </span>
-                <span className="text-xs text-slate-500 font-medium">
-                  {products.length} orderable product{products.length === 1 ? "" : "s"}
-                </span>
-              </div>
+              <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="rounded-md bg-bolder-blush-light px-2 py-0.5 text-xs font-semibold text-bolder-rose-deep">
+                    {selectedSeller.businessName}
+                  </span>
+                  <span className="text-xs text-bolder-muted font-medium">
+                    {products.length} orderable product{products.length === 1 ? "" : "s"}
+                  </span>
+                </div>
 
               {productsPending && !products.length && (
                 <FadeIn className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600 flex items-center gap-3">
@@ -234,10 +240,16 @@ export function B2BPlaceOrderPage() {
                 </FadeIn>
               )}
 
+              {!productsPending && products.length === 0 && (
+                <FadeIn className="rounded-lg border bolder-line bg-bolder-surface p-4 text-center text-sm text-bolder-muted">
+                  This seller has no orderable products right now.
+                </FadeIn>
+              )}
+
               {!productsPending && products.length > 0 && (
-                <table className="w-full text-left text-sm divide-y divide-slate-100">
-                  <thead>
-                    <tr className="text-xs uppercase tracking-wide text-slate-500">
+                <table className="w-full text-left text-sm divide-y divide-bolder-line">
+                  <thead className="bg-bolder-bg text-xs uppercase tracking-wider text-bolder-muted">
+                    <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                       <th scope="col" className="py-3 pr-4 font-medium">
                         Product
                       </th>
@@ -262,17 +274,17 @@ export function B2BPlaceOrderPage() {
                       return (
                         <tr key={product.productId} className="align-top group">
                           <td className="py-3 pr-4">
-                            <p className="font-medium text-slate-900">
+                            <p className="font-medium text-bolder-text">
                               {product.productName}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-bolder-muted">
                               {product.unit} • {formatMoney(product.unitPrice)} each
                             </p>
                           </td>
-                          <td className="py-3 pr-4 text-right text-slate-900">
+                          <td className="py-3 pr-4 text-right text-bolder-text">
                             {formatMoney(product.unitPrice)}
                           </td>
-                          <td className="py-3 pr-4 text-right text-slate-900">
+                          <td className="py-3 pr-4 text-right text-bolder-text">
                             {product.availableStock}
                           </td>
                           <td className="py-3 pr-4 text-right">
@@ -289,19 +301,19 @@ export function B2BPlaceOrderPage() {
                                 }));
                               }}
                               disabled={quantity > product.availableStock}
-                              className={`w-20 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-right shadow-sm focus:border-brand-500 focus:ring-brand-500 ${
+                              className={`w-20 rounded-md border-bolder-line-control bg-bolder-surface px-2 py-1.5 text-sm text-right shadow-sm focus:border-bolder-rose focus:ring-bolder-rose ${
                                 quantity > product.availableStock
-                                  ? "border-red-500 bg-red-50"
+                                  ? "border-bolder-danger-border bg-bolder-danger-surface"
                                   : ""
                               }`}
                             />
                             {quantity > product.availableStock && (
-                              <p className="mt-1 text-xs text-red-700">
+                              <p className="mt-1 text-xs text-bolder-danger">
                                 Only {product.availableStock} available.
                               </p>
                             )}
                           </td>
-                          <td className="py-3 font-medium text-right text-slate-900">
+                          <td className="py-3 font-medium text-right text-bolder-text">
                             {formatMoney(lineTotal)}
                           </td>
                         </tr>
@@ -313,14 +325,14 @@ export function B2BPlaceOrderPage() {
             </div>
 
             {/* 3. Review and submit */}
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <h2 className="text-sm font-semibold text-slate-900">Review</h2>
-                <span className="text-sm font-semibold text-slate-900">
+                <h2 className="text-sm font-semibold text-bolder-text">Review</h2>
+                <span className="text-sm font-semibold text-bolder-text">
                   Total: {formatMoney(subtotal)}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mb-4">
+              <p className="text-xs text-bolder-muted mb-4">
                 The seller confirms the final total when the order is placed;
                 prices and available stock are taken from their catalog at
                 submission time.
@@ -329,12 +341,12 @@ export function B2BPlaceOrderPage() {
                 type="button"
                 disabled={!canPlace}
                 onClick={submitPlaceOrder}
-                className={`w-full rounded-md border border-transparent bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                className={`w-full rounded-md border border-transparent bg-bolder-rose-action px-4 py-2.5 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
               >
                 Place order
               </button>
               {!canPlace && selectedSeller && (
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-bolder-muted">
                   Choose at least one product with a quantity greater than zero
                   to place the order.
                 </p>

@@ -31,7 +31,7 @@ const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
  * of empty space to all seven rows for a validation failure that can only happen
  * after a submit.
  */
-const TIME_CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 disabled:bg-slate-100 sm:text-sm`;
+const TIME_CONTROL_CLASS = `mt-1 block w-full rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose disabled:bg-bolder-bg sm:text-sm`;
 
 const daySchema = z.object({
   closed: z.boolean(),
@@ -181,7 +181,7 @@ export function VendorHoursPage() {
 
   if (isPending) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Loading your operating hours...
       </div>
     );
@@ -226,7 +226,7 @@ export function VendorHoursPage() {
           <SuccessMessage message={success} />
 
           <FadeIn>
-            <ul className="mt-4 divide-y divide-slate-100">
+            <ul className="mt-4 divide-y divide-bolder-line">
             {WEEKDAYS.map((weekday) => {
               const day = watchedDays?.[weekday];
               const closed = day ? day.closed : true;
@@ -244,7 +244,7 @@ export function VendorHoursPage() {
                   <div className="sm:w-40 sm:shrink-0">
                     <label
                       htmlFor={checkboxId}
-                      className="flex items-center gap-2 text-sm font-medium text-slate-700"
+                      className="flex items-center gap-2 text-sm font-medium text-bolder-text"
                     >
                       {/* The "day is open" checkbox is driven from the watched form
                           value rather than registered as an uncontrolled input:
@@ -254,7 +254,7 @@ export function VendorHoursPage() {
                       <input
                         id={checkboxId}
                         type="checkbox"
-                        className="h-4 w-4 rounded border-slate-300 text-brand-600 transition-colors duration-micro ease-standard focus:ring-brand-500"
+                        className="h-4 w-4 rounded border-bolder-line-control text-bolder-rose-action transition-colors duration-micro ease-standard focus:ring-bolder-rose"
                         checked={!closed}
                         onChange={(event) =>
                           setValue(`days.${weekday}.closed`, !event.target.checked, {
@@ -271,7 +271,7 @@ export function VendorHoursPage() {
                     <div className="sm:w-40">
                       <label
                         htmlFor={openId}
-                        className="block text-xs font-medium uppercase tracking-wide text-slate-500"
+                        className="block text-xs font-medium uppercase tracking-wide text-bolder-muted"
                       >
                         Opens
                       </label>
@@ -281,7 +281,7 @@ export function VendorHoursPage() {
                         disabled={closed}
                         aria-invalid={openError ? true : undefined}
                         aria-describedby={openError ? openId : undefined}
-                        className={`${TIME_CONTROL_CLASS} ${openError ? "border-red-500" : ""}`}
+                        className={`${TIME_CONTROL_CLASS} ${openError ? "border-bolder-danger-border" : ""}`}
                         {...register(`days.${weekday}.openTime`)}
                       />
                       <FieldMessage id={openId} message={openError} />
@@ -290,7 +290,7 @@ export function VendorHoursPage() {
                     <div className="sm:w-40">
                       <label
                         htmlFor={closeId}
-                        className="block text-xs font-medium uppercase tracking-wide text-slate-500"
+                        className="block text-xs font-medium uppercase tracking-wide text-bolder-muted"
                       >
                         Closes
                       </label>
@@ -300,7 +300,7 @@ export function VendorHoursPage() {
                         disabled={closed}
                         aria-invalid={closeError ? true : undefined}
                         aria-describedby={closeError ? closeId : undefined}
-                        className={`${TIME_CONTROL_CLASS} ${closeError ? "border-red-500" : ""}`}
+                        className={`${TIME_CONTROL_CLASS} ${closeError ? "border-bolder-danger-border" : ""}`}
                         {...register(`days.${weekday}.closeTime`)}
                       />
                       <FieldMessage id={closeId} message={closeError} />

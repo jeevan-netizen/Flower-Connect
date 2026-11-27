@@ -6,8 +6,8 @@ import { STOCK_ACTION_LABELS } from "@/features/vendor/components/StockActionDia
 import { ReadOnlyRow } from "@/features/vendor/components/FormFields";
 import { FOCUS_RING, PRESSABLE } from "@/motion/pressable";
 
-const ACTION_BUTTON_CLASS = `rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
-const SETTING_BUTTON_CLASS = `rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
+const ACTION_BUTTON_CLASS = `rounded-md border bolder-line-control bg-bolder-surface px-3 py-1.5 text-sm font-medium text-bolder-text hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
+const SETTING_BUTTON_CLASS = `rounded-md bg-bolder-rose-action px-3 py-1.5 text-xs font-medium text-white hover:bg-bolder-rose-deep disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`;
 
 const STOCK_ACTIONS: StockActionKind[] = ["stock-in", "stock-out", "adjustment", "write-off"];
 
@@ -66,12 +66,12 @@ export function InventoryPanel({
   }, [inventory]);
 
   if (isPending) {
-    return <p className="text-sm text-slate-600">Loading stock levels...</p>;
+    return <p className="text-sm text-bolder-muted">Loading stock levels...</p>;
   }
 
   if (!inventory) {
     return (
-      <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+      <p className="rounded-md border border-dashed border-bolder-line-control p-4 text-sm text-bolder-muted">
         This product has no inventory row yet.
       </p>
     );
@@ -83,16 +83,16 @@ export function InventoryPanel({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold text-slate-900">Stock</h3>
+        <h3 className="text-sm font-semibold text-bolder-text">Stock</h3>
         <LowStockBadge inventory={inventory} />
         {inventory.expiryDate && isPastExpiryDate(inventory.expiryDate, new Date()) && (
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+          <span className="rounded-full bg-bolder-danger-surface px-2 py-0.5 text-xs font-medium text-bolder-danger">
             Past its expiry date
           </span>
         )}
       </div>
 
-      <dl className="rounded-md border border-slate-200 bg-slate-50 p-3">
+      <dl className="rounded-md border bolder-line bg-bolder-bg p-3">
         <ReadOnlyRow label="On hand" value={String(inventory.quantity)} />
         <ReadOnlyRow label="Reserved for placed orders" value={String(inventory.reservedQuantity)} />
         <ReadOnlyRow label="Available to sell" value={String(inventory.available)} />
@@ -113,20 +113,20 @@ export function InventoryPanel({
         ))}
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-bolder-muted">
         Every change writes one movement record, visible in the history below. Stock reserved for a
         placed order cannot be removed by hand.
       </p>
 
-      <div className="grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 border-t bolder-line pt-4 sm:grid-cols-2">
         <div>
           <label
             htmlFor="low-stock-threshold"
-            className="block text-sm font-medium text-slate-700"
+            className="block text-sm font-medium text-bolder-text"
           >
             Low stock threshold
           </label>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-bolder-muted">
             The product is flagged low stock when available units reach this number.
           </p>
           <div className="mt-1 flex gap-2">
@@ -138,7 +138,7 @@ export function InventoryPanel({
               step="1"
               value={threshold}
               onChange={(event) => setThreshold(event.target.value)}
-              className="w-28 rounded-md border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+              className="w-28 rounded-md border-bolder-line-control text-sm shadow-sm focus:border-bolder-rose focus:ring-bolder-rose"
             />
             <button
               type="button"
@@ -152,10 +152,10 @@ export function InventoryPanel({
         </div>
 
         <div>
-          <label htmlFor="expiry-date" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="expiry-date" className="block text-sm font-medium text-bolder-text">
             Expiry date
           </label>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-bolder-muted">
             The last day this stock may be used. The nightly sweep writes off anything past it and
             delists the product.
           </p>
@@ -165,7 +165,7 @@ export function InventoryPanel({
               type="date"
               value={expiryDate}
               onChange={(event) => setExpiryDate(event.target.value)}
-              className="rounded-md border-slate-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+              className="rounded-md border-bolder-line-control text-sm shadow-sm focus:border-bolder-rose focus:ring-bolder-rose"
             />
             <button
               type="button"

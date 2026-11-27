@@ -33,23 +33,23 @@ export function OutstandingBalanceCard({ balance = 0, isLoading }: OutstandingBa
       data-testid="outstanding-balance-card"
       className={`relative overflow-hidden rounded-2xl border p-6 shadow-sm transition-all duration-300 ${
         isPositive
-          ? "border-emerald-200 bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/30 text-emerald-950"
+          ? "border-bolder-success-border bg-gradient-to-br from-bolder-success-surface/80 via-white to-bolder-success-surface/30 text-bolder-success"
           : isNegative
-          ? "border-amber-200 bg-gradient-to-br from-amber-50/80 via-white to-amber-50/30 text-amber-950"
-          : "border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-50/30 text-slate-800"
+          ? "border-bolder-warning-border bg-gradient-to-br from-bolder-warning-surface/80 via-white to-bolder-warning-surface/30 text-bolder-warning"
+          : "border-bolder-line bg-gradient-to-br from-bolder-bg via-white to-bolder-bg/30 text-bolder-text"
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <span className="text-xs font-semibold uppercase tracking-wider text-bolder-muted">
           Unattached Balance
         </span>
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
             isPositive
-              ? "bg-emerald-100 text-emerald-800"
+              ? "bg-bolder-success-surface text-bolder-success"
               : isNegative
-              ? "bg-amber-100 text-amber-800"
-              : "bg-slate-100 text-slate-700"
+              ? "bg-bolder-warning-surface text-bolder-warning"
+              : "bg-bolder-bg text-bolder-text"
           }`}
         >
           {isPositive ? "Platform Owes You" : isNegative ? "Remittance Due" : "Settled"}
@@ -58,18 +58,18 @@ export function OutstandingBalanceCard({ balance = 0, isLoading }: OutstandingBa
 
       <div className="mt-4 flex items-baseline gap-2">
         {isLoading ? (
-          <div className="h-9 w-36 animate-pulse rounded bg-slate-200" />
+          <div className="h-9 w-36 animate-pulse rounded bg-bolder-bg" />
         ) : (
           <>
             <span className="text-3xl font-extrabold tracking-tight">
               {isNegative ? "-" : isPositive ? "+" : ""}₹{formattedAmount}
             </span>
-            <span className="text-xs font-medium text-slate-500">INR</span>
+            <span className="text-xs font-medium text-bolder-muted">INR</span>
           </>
         )}
       </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-slate-600">
+      <p className="mt-3 text-xs leading-relaxed text-bolder-muted">
         {isPositive
           ? "Accumulated online order credits minus COD commissions. Netted and paid out weekly."
           : isNegative

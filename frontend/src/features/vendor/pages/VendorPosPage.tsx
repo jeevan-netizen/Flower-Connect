@@ -264,27 +264,27 @@ export function VendorPosPage() {
   const hasItems = ticket.items.length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-bolder-bg">
       {/* Sidebar toggle button for mobile */}
       {showSidebar && (
         <button
           onClick={() => setShowSidebar(false)}
-          className="fixed top-4 left-4 z-10 p-2 rounded-md bg-slate-800 text-white"
+          className="fixed top-4 left-4 z-10 p-2 rounded-md bg-bolder-surface text-white"
         >
           ←
         </button>
       )}
 
       {/* Fullscreen POS overlay */}
-      <div className="relative w-full max-w-full md:max-w-full bg-slate-950 min-h-screen">
+      <div className="relative w-full max-w-full md:max-w-full bg-bolder-bg min-h-screen">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-600">
-          <h1 className="text-2xl font-bold text-slate-100">POS</h1>
+          <h1 className="text-2xl font-bold text-bolder-text">POS</h1>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400">FLORIST</span>
+            <span className="text-sm text-bolder-muted">FLORIST</span>
             <button
               onClick={handleLogout}
-              className="text-sm text-slate-400 hover:text-slate-200"
+              className="text-sm text-bolder-muted hover:text-slate-200"
             >
               Logout
             </button>
@@ -309,7 +309,7 @@ export function VendorPosPage() {
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-2 text-slate-400 text-sm select-none"
+                  className="absolute right-2 top-2 text-bolder-muted text-sm select-none"
                   title="Clear search"
                 >
                   ×
@@ -328,7 +328,7 @@ export function VendorPosPage() {
               return (
                 <div
                   key={product.productId}
-                  className={`group rounded border border-slate-400 p-2 hover:bg-slate-800 transition-colors ${
+                  className={`group rounded border border-slate-400 p-2 hover:bg-bolder-surface transition-colors ${
                     disabled ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
@@ -337,24 +337,24 @@ export function VendorPosPage() {
                       {product.name.split(" ")[0].charAt(0)}
                     </span>
                   </div>
-                  <div className="pt-2 text-sm text-slate-100">
+                  <div className="pt-2 text-sm text-bolder-text">
                     <span className="font-medium">{product.name}</span>
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-slate-100">
+                    <span className="font-bold text-bolder-text">
                       ${product.basePrice.toFixed(2)}
                     </span>
-                    <span className="text-xs text-slate-400">/{available} avail</span>
+                    <span className="text-xs text-bolder-muted">/{available} avail</span>
                   </div>
                   {isExpired && (
-                    <span className="text-xs text-slate-400 block mt-1">
+                    <span className="text-xs text-bolder-muted block mt-1">
                       {product.expiredReason || "Expired"}
                     </span>
                   )}
                   <button
                     onClick={() => addItem(product.productId, product.name, product.basePrice)}
                     disabled={disabled || isSubmitting}
-                    className={`mt-1 w-full rounded border border-slate-400 px-2 py-2 text-sm text-slate-100 hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
+                    className={`mt-1 w-full rounded border border-slate-400 px-2 py-2 text-sm text-bolder-text hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
                   >
                     Quick Add
                   </button>
@@ -368,7 +368,7 @@ export function VendorPosPage() {
         <div className="p-4 border-t border-slate-600">
           <div className="flex justify-between items-center">
             <span className="text-sm text-slate-300">Ticket</span>
-            <span className="text-sm font-medium text-slate-100">
+            <span className="text-sm font-medium text-bolder-text">
               ${ticket.subtotal.toFixed(2)}
             </span>
           </div>
@@ -411,7 +411,7 @@ export function VendorPosPage() {
               <span>Subtotal</span>
               <span>${ticket.subtotal.toFixed(2)}</span>
             </div>
-            <div className="font-bold text-slate-100">
+            <div className="font-bold text-bolder-text">
               Total: ${ticket.total.toFixed(2)}
             </div>
           </div>
@@ -455,7 +455,7 @@ export function VendorPosPage() {
           <button
             onClick={handleSale}
             disabled={isSubmitting || !isKeyValid() || !hasItems}
-            className={`w-full rounded border border-slate-300 px-4 py-2 text-lg font-medium text-slate-100 hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
+            className={`w-full rounded border border-slate-300 px-4 py-2 text-lg font-medium text-bolder-text hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
           >
             {isSubmitting ? "Processing..." : "Charge"}
           </button>
@@ -471,8 +471,8 @@ export function VendorPosPage() {
         {/* Print Receipt State */}
         {showPrint && printReceipt && (
           <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="rounded-md bg-slate-800 p-6 max-w-sm w-full">
-              <h2 className="text-xl font-bold text-slate-100 mb-4">Receipt</h2>
+            <div className="rounded-md bg-bolder-surface p-6 max-w-sm w-full">
+              <h2 className="text-xl font-bold text-bolder-text mb-4">Receipt</h2>
               <pre className="text-xs text-slate-300 whitespace-pre">
                 {JSON.stringify(printReceipt, null, 2)}
               </pre>
@@ -500,8 +500,8 @@ export function VendorPosPage() {
         {/* Sidebar (mobile) - hidden on larger screens */}
         {showSidebar && (
           <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-40">
-            <div className="h-full w-64 bg-slate-800 p-4 flex flex-col">
-              <h2 className="text-xl font-bold text-slate-100 mb-4">POS</h2>
+            <div className="h-full w-64 bg-bolder-surface p-4 flex flex-col">
+              <h2 className="text-xl font-bold text-bolder-text mb-4">POS</h2>
               <button
                 onClick={() => setShowSidebar(false)}
                 className="mt-4 rounded border border-slate-400 px-2 py-1 text-sm text-slate-300"

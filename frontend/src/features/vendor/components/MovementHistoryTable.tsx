@@ -7,8 +7,8 @@ import {
 } from "@/features/vendor/format";
 import { Pagination } from "@/shared/components/Pagination";
 
-const HEADING_CLASS = "px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500";
-const CELL_CLASS = "px-4 py-3 text-sm text-slate-700 align-middle";
+const HEADING_CLASS = "px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-bolder-muted";
+const CELL_CLASS = "px-4 py-3 text-sm text-bolder-text align-middle";
 
 interface MovementHistoryTableProps {
   movements: StockMovementPageResponse | undefined;
@@ -49,12 +49,12 @@ export function MovementHistoryTable({
   disabled = false,
 }: MovementHistoryTableProps) {
   if (isPending) {
-    return <p className="text-sm text-slate-600">Loading movement history...</p>;
+    return <p className="text-sm text-bolder-muted">Loading movement history...</p>;
   }
 
   if (!movements || movements.content.length === 0) {
     return (
-      <p className="rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-600">
+      <p className="rounded-md border border-dashed border-bolder-line-control p-4 text-sm text-bolder-muted">
         No stock movements recorded yet. Every change to this product&rsquo;s stock will appear here.
       </p>
     );
@@ -62,10 +62,10 @@ export function MovementHistoryTable({
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-md border border-slate-200">
-        <table className="min-w-full divide-y divide-slate-200">
+      <div className="overflow-x-auto rounded-md border bolder-line">
+        <table className="min-w-full divide-y divide-bolder-line">
           <caption className="sr-only">Stock movements</caption>
-          <thead className="bg-slate-50">
+          <thead className="bg-bolder-bg">
             <tr>
               <th scope="col" className={HEADING_CLASS}>
                 When
@@ -84,10 +84,10 @@ export function MovementHistoryTable({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-bolder-line">
             {movements.content.map((movement) => (
               <tr key={movement.id}>
-                <td className={`${CELL_CLASS} whitespace-nowrap text-slate-500`}>
+                <td className={`${CELL_CLASS} whitespace-nowrap text-bolder-muted`}>
                   {formatDateTime(movement.createdAt)}
                 </td>
                 <td className={`${CELL_CLASS} whitespace-nowrap`}>
@@ -95,15 +95,15 @@ export function MovementHistoryTable({
                 </td>
                 <td
                   className={`${CELL_CLASS} whitespace-nowrap text-right font-medium ${
-                    movement.quantityDelta < 0 ? "text-red-700" : "text-brand-700"
+                    movement.quantityDelta < 0 ? "text-bolder-danger" : "text-bolder-rose-strong"
                   }`}
                 >
                   {formatQuantityDelta(movement.quantityDelta)}
                 </td>
                 <td className={CELL_CLASS}>
-                  {movement.reason ?? <span className="text-slate-400">—</span>}
+                  {movement.reason ?? <span className="text-bolder-muted">—</span>}
                 </td>
-                <td className={`${CELL_CLASS} whitespace-nowrap text-slate-600`}>
+                <td className={`${CELL_CLASS} whitespace-nowrap text-bolder-muted`}>
                   {formatMovementActor(movement)}
                 </td>
               </tr>

@@ -106,12 +106,12 @@ export function VendorProductFormPage() {
     return (
       <div className="space-y-4">
         <PageHeading title="Product" />
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <p role="alert" className="rounded-lg border bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
           That product link is not valid. Open a product from your catalog instead.
         </p>
         <Link
           to="/vendor/catalog"
-          className={`text-sm font-medium text-brand-700 hover:text-brand-900 ${FOCUS_RING}`}
+          className={`text-sm font-medium text-bolder-rose-strong hover:text-bolder-rose-deep ${FOCUS_RING}`}
         >
           Back to catalog
         </Link>
@@ -195,7 +195,7 @@ export function VendorProductFormPage() {
           category list would silently look like "no categories exist".
         */}
         {categories.error && (
-          <p role="alert" className="mb-4 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+          <p role="alert" className="mb-4 rounded-md bg-bolder-warning-surface p-3 text-sm text-bolder-warning">
             Categories could not be loaded, so a category cannot be chosen and the product cannot be
             saved.
           </p>
@@ -298,7 +298,7 @@ export function VendorProductFormPage() {
           </Card>
 
           <Card title="Remove product">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-bolder-muted">
               Deactivating hides the product from customers while keeping the row, its images and its
               full movement history. You can bring it back from the catalog at any time.
             </p>
@@ -309,9 +309,9 @@ export function VendorProductFormPage() {
                   role="dialog"
                   aria-modal="true"
                   aria-label="Deactivate this product"
-                  className="mt-3 rounded-md border border-red-200 bg-red-50 p-3"
+                  className="mt-3 rounded-md border bolder-danger-border bg-bolder-danger-surface p-3"
                 >
-                  <p className="text-sm text-red-900">
+                  <p className="text-sm text-bolder-danger">
                     Deactivate &ldquo;{current.name}&rdquo;? It will stop appearing in customer search.
                   </p>
                   <div className="mt-3 flex gap-2">
@@ -319,7 +319,7 @@ export function VendorProductFormPage() {
                       type="button"
                       disabled={deactivate.isPending}
                       onClick={() => void confirmDeactivate()}
-                      className={`rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+                      className={`rounded-md border bolder-danger-border bg-bolder-danger-surface px-3 py-1.5 text-sm font-medium text-bolder-danger hover:bg-bolder-danger-surface disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
                     >
                       {deactivate.isPending ? "Deactivating..." : "Yes, deactivate"}
                     </button>
@@ -327,7 +327,7 @@ export function VendorProductFormPage() {
                       type="button"
                       disabled={deactivate.isPending}
                       onClick={() => setConfirmingDeactivate(false)}
-                      className={`rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+                      className={`rounded-md border bolder-line-control bg-bolder-surface px-3 py-1.5 text-sm font-medium text-bolder-text hover:bg-bolder-bg disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
                     >
                       Cancel
                     </button>
@@ -337,7 +337,7 @@ export function VendorProductFormPage() {
                 <button
                   type="button"
                   onClick={() => setConfirmingDeactivate(true)}
-                  className={`mt-3 rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 ${PRESSABLE} ${FOCUS_RING}`}
+                  className={`mt-3 rounded-md border bolder-danger-border bg-bolder-danger-surface px-3 py-2 text-sm font-medium text-bolder-danger hover:bg-bolder-danger-surface ${PRESSABLE} ${FOCUS_RING}`}
                 >
                   Deactivate product
                 </button>

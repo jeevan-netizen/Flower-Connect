@@ -70,8 +70,8 @@ export function VendorReviewsPage() {
 
       {/* Summary */}
       {hasData && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900 mb-4">Your rating</h2>
+        <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+          <h2 className="text-base font-semibold text-bolder-text mb-4">Your rating</h2>
           <div className="flex items-start gap-4">
             <div className="flex-1">
               <StarRating
@@ -80,10 +80,10 @@ export function VendorReviewsPage() {
               />
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-slate-900">
+              <p className="text-2xl font-bold text-bolder-text">
                 {summaryData?.avgRating?.toFixed(1) ?? "—"}
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-bolder-muted">
                 {summaryData?.reviewCount ?? 0} review
                 {summaryData?.reviewCount !== 1 ? "s" : ""}
               </p>
@@ -96,14 +96,14 @@ export function VendorReviewsPage() {
               const pct = total > 0 ? (count / total) * 100 : 0;
               return (
                 <div key={star} className="flex flex-col items-center gap-1">
-                  <div className="text-[10px] text-slate-500">{star}</div>
+                  <div className="text-[10px] text-bolder-muted">{star}</div>
                   <div
-                    className="w-full bg-slate-100 rounded-full h-1.5"
+                    className="w-full bg-bolder-bg rounded-full h-1.5"
                     style={{ width: `${pct}%` }}
                   >
-                    <div className="bg-amber-500 rounded-full h-1.5" style={{ width: `${pct}%` }} />
+                    <div className="bg-bolder-gold rounded-full h-1.5" style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="text-[10px] font-medium text-slate-700">{count}</span>
+                  <span className="text-[10px] font-medium text-bolder-text">{count}</span>
                 </div>
               );
             })}
@@ -112,17 +112,17 @@ export function VendorReviewsPage() {
       )}
 
       {/* Review list */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-bolder-text mb-4">
           Your reviews
         </h2>
 
         {reviews.isPending ? (
-          <FadeIn role="status" aria-busy="true" className="text-sm text-slate-600">
+          <FadeIn role="status" aria-busy="true" className="text-sm text-bolder-muted">
             Loading reviews…
           </FadeIn>
         ) : hasData && reviewData.length === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-bolder-muted">
             No reviews yet. Reviews appear here after customers receive a
             delivered order.
           </p>
@@ -131,7 +131,7 @@ export function VendorReviewsPage() {
             {reviewData.map((review) => (
               <li
                 key={review.id}
-                className="flex flex-col gap-2 pt-4 border-t border-slate-100 first:pt-0 first:border-0"
+                className="flex flex-col gap-2 pt-4 border-t border-bolder-line first:pt-0 first:border-0"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -140,16 +140,16 @@ export function VendorReviewsPage() {
                       reviewCount={1}
                       className="text-sm"
                     />
-                    <span className="text-xs font-medium text-slate-900">
+                    <span className="text-xs font-medium text-bolder-text">
                       {review.customerName}
                     </span>
                     {review.hidden && (
-                      <span className="text-[10px] font-medium text-amber-600 bg-amber-50 rounded px-2 py-0.5 border border-amber-100">
+                      <span className="text-[10px] font-medium text-bolder-warning bg-bolder-warning-surface rounded px-2 py-0.5 border bolder-warning-border">
                         Hidden
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-bolder-muted">
                     {new Date(review.createdAt).toLocaleDateString(undefined, {
                       year: "numeric",
                       month: "short",
@@ -159,16 +159,16 @@ export function VendorReviewsPage() {
                 </div>
 
                 {review.comment && (
-                  <p className="text-sm text-slate-700">{review.comment}</p>
+                  <p className="text-sm text-bolder-text">{review.comment}</p>
                 )}
 
                 {review.vendorReply && (
-                  <div className="mt-1 rounded-lg border border-brand-100 bg-brand-50 p-2 text-sm">
-                    <p className="text-xs font-semibold text-brand-900">
+                  <div className="mt-1 rounded-lg border border-bolder-blush-light bg-bolder-blush-light p-2 text-sm">
+                    <p className="text-xs font-semibold text-bolder-rose-deep">
                       Your reply:
                     </p>
-                    <p className="mt-0.5 text-brand-700">{review.vendorReply}</p>
-                    <p className="mt-0.5 text-[10px] text-brand-500">
+                    <p className="mt-0.5 text-bolder-rose-strong">{review.vendorReply}</p>
+                    <p className="mt-0.5 text-[10px] text-bolder-rose-action">
                       {new Date(review.vendorRepliedAt!).toLocaleDateString(undefined, {
                         year: "numeric",
                         month: "short",
@@ -204,7 +204,7 @@ export function VendorReviewsPage() {
                         maxLength={1000}
                         rows={2}
                         placeholder="Write a reply…"
-                        className="w-full rounded-md border border-slate-300 bg-white pl-8 pr-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        className="w-full rounded-md border-bolder-line-control bg-bolder-surface pl-8 pr-3 py-2 text-sm text-bolder-text focus:outline-none focus:ring-2 focus:ring-bolder-rose"
                       />
                     </div>
                     <div className="flex items-center justify-between gap-2">
@@ -217,8 +217,8 @@ export function VendorReviewsPage() {
                         }
                         className={`text-xs font-medium rounded-md border border-transparent px-2.5 py-1.5 ${
                           isReplying
-                            ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                            : "bg-brand-600 text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}"
+                            ? "bg-bolder-bg text-bolder-muted cursor-not-allowed"
+                            : "bg-bolder-rose-action text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}"
                         }`}
                       >
                         {isReplying ? "Posting…" : "Post reply"}
@@ -230,13 +230,13 @@ export function VendorReviewsPage() {
                           setReplyText("");
                           setReplyError(null);
                         }}
-                        className="text-xs text-slate-500 hover:text-slate-700"
+                        className="text-xs text-bolder-muted hover:text-bolder-text"
                       >
                         Cancel
                       </button>
                     </div>
                     {replyError && (
-                      <p className="text-xs text-red-600 bg-red-50 rounded-lg p-1.5 border border-red-100">
+                      <p className="text-xs text-bolder-danger bg-bolder-danger-surface rounded-lg p-1.5 border bolder-danger-border">
                         {replyError}
                       </p>
                     )}

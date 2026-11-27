@@ -36,7 +36,7 @@ export function ApprovedVendorGate({ children }: ApprovedVendorGateProps) {
 
   if (isPending) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Loading your catalog...
       </div>
     );
@@ -59,9 +59,9 @@ export function ApprovedVendorGate({ children }: ApprovedVendorGateProps) {
         <VendorStatusBanner status={profile.status} />
         <FadeIn role="status">
           <Card>
-            <p className="text-sm font-semibold text-slate-900">Catalog unavailable</p>
-            <p className="mt-1 text-sm text-slate-600">{VENDOR_NOT_APPROVED_MESSAGE}</p>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="text-sm font-semibold text-bolder-text">Catalog unavailable</p>
+            <p className="mt-1 text-sm text-bolder-muted">{VENDOR_NOT_APPROVED_MESSAGE}</p>
+            <p className="mt-2 text-sm text-bolder-muted">
               No products, stock or movement history is available until an administrator approves your
               account. You can keep editing your business details, delivery settings and opening hours
               while you wait.
@@ -81,8 +81,8 @@ export function ApprovedVendorGate({ children }: ApprovedVendorGateProps) {
  */
 export function CatalogLoader({ label }: { label: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6">
-      <FlowerLoader label={label} showLabel className="flex items-center gap-3 text-sm text-slate-600" />
+    <div className="rounded-lg border bolder-line bg-bolder-surface p-6">
+      <FlowerLoader label={label} showLabel className="flex items-center gap-3 text-sm text-bolder-muted" />
     </div>
   );
 }

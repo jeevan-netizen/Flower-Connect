@@ -31,21 +31,21 @@ interface OrderCardProps {
 }
 
 const STATUS_TONES: Record<VendorOrderResponse["status"], string> = {
-  PLACED: "border-amber-200 bg-amber-50 text-amber-900",
-  PENDING_PAYMENT: "border-slate-200 bg-slate-50 text-slate-800",
-  CONFIRMED: "border-brand-100 bg-brand-50 text-brand-900",
-  PREPARING: "border-brand-100 bg-brand-50 text-brand-900",
-  OUT_FOR_DELIVERY: "border-blue-200 bg-blue-50 text-blue-900",
-  DELIVERED: "border-green-200 bg-green-50 text-green-900",
-  CANCELLED: "border-red-200 bg-red-50 text-red-900",
-  REJECTED: "border-red-200 bg-red-50 text-red-900",
-  REFUNDED: "border-slate-200 bg-slate-50 text-slate-800",
+  PLACED: "border-bolder-warning-border bg-bolder-warning-surface text-bolder-warning",
+  PENDING_PAYMENT: "border-bolder-neutral-border bg-bolder-neutral-surface text-bolder-neutral",
+  CONFIRMED: "border-bolder-blush-light bg-bolder-blush-light text-bolder-rose-deep",
+  PREPARING: "border-bolder-blush-light bg-bolder-blush-light text-bolder-rose-deep",
+  OUT_FOR_DELIVERY: "border-bolder-info-border bg-bolder-info-surface text-bolder-info",
+  DELIVERED: "border-bolder-success-border bg-bolder-success-surface text-bolder-success",
+  CANCELLED: "border-bolder-danger-border bg-bolder-danger-surface text-bolder-danger",
+  REJECTED: "border-bolder-danger-border bg-bolder-danger-surface text-bolder-danger",
+  REFUNDED: "border-bolder-neutral-border bg-bolder-neutral-surface text-bolder-neutral",
 };
 
 function actionButtonClass(disabled: boolean): string {
   return [
-    "rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700",
-    "hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed",
+    "rounded-md border bolder-line-control bg-bolder-surface px-2.5 py-1.5 text-xs font-medium text-bolder-text",
+    "hover:bg-bolder-bg disabled:opacity-50 disabled:cursor-not-allowed",
     disabled ? "" : `${PRESSABLE} ${FOCUS_RING}`,
   ].join(" ");
 }
@@ -79,12 +79,12 @@ export function OrderCard({
   const insufficientStock = error?.status === 409 && order.status === "PLACED";
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border bolder-line bg-bolder-surface p-4 shadow-sm">
       <div className="flex justify-between items-start mb-2">
-        <span className="text-sm font-medium text-slate-900">
+        <span className="text-sm font-medium text-bolder-text">
           Order #{order.id}
         </span>
-        <span className="text-xs font-bold text-slate-900">
+        <span className="text-xs font-bold text-bolder-text">
           {formatMoney(order.total)}
         </span>
       </div>
@@ -95,9 +95,9 @@ export function OrderCard({
         </span>
       </div>
 
-      <p className="text-sm text-slate-700 mb-3 truncate">{order.deliveryAddressLine1}</p>
+      <p className="text-sm text-bolder-text mb-3 truncate">{order.deliveryAddressLine1}</p>
 
-      <div className="text-xs text-slate-500 mb-3">
+      <div className="text-xs text-bolder-muted mb-3">
         {order.slotStart && order.slotEnd
           ? `${formatDateTime(order.slotStart)} – ${formatDateTime(order.slotEnd)}`
           : "Slot not scheduled"}
@@ -130,7 +130,7 @@ export function OrderCard({
       )}
 
       {insufficientStock && (
-        <p className="mt-3 text-xs text-red-800 bg-red-50 rounded-lg p-2 border border-red-100">
+        <p className="mt-3 text-xs text-bolder-danger bg-bolder-danger-surface rounded-lg p-2 border bolder-danger-border">
           Insufficient stock to accept this order — it may have been written off
           or adjusted since checkout. {order.status === "PLACED" ? "Reject the order instead." : ""}
         </p>

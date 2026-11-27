@@ -30,9 +30,9 @@ export function NewOrderToast({ orderName, onDismiss }: NewOrderToastProps) {
       role="alert"
       aria-live="polite"
     >
-      <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-lg min-w-[280px] max-w-md">
+      <div className="flex items-center gap-3 rounded-lg border bolder-warning-border bg-bolder-warning-surface p-4 shadow-lg min-w-[280px] max-w-md">
         <svg
-          className="shrink-0 text-amber-600"
+          className="shrink-0 text-bolder-warning"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -42,13 +42,13 @@ export function NewOrderToast({ orderName, onDismiss }: NewOrderToastProps) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.381C7.72 5.48 6 7.562 6 10v11a2 2 0 002 2h5" />
         </svg>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-amber-900">New order received</p>
-          <p className="mt-0.5 text-sm text-amber-800 truncate">{orderName}</p>
+          <p className="text-sm font-semibold text-bolder-warning">New order received</p>
+          <p className="mt-0.5 text-sm text-bolder-warning truncate">{orderName}</p>
         </div>
         <button
           type="button"
           onClick={() => onDismiss()}
-          className={`shrink-0 inline-flex items-center justify-center rounded-md p-1.5 text-amber-600 hover:bg-amber-100 transition-colors ${PRESSABLE}`}
+          className={`shrink-0 inline-flex items-center justify-center rounded-md p-1.5 text-bolder-warning hover:bg-bolder-warning-surface transition-colors ${PRESSABLE}`}
           aria-label="Dismiss"
         >
           <svg

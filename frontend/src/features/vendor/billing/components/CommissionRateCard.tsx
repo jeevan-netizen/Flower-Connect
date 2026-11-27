@@ -23,33 +23,33 @@ export function CommissionRateCard({ rate = 0, isLoading }: CommissionRateCardPr
   return (
     <div
       data-testid="commission-rate-card"
-      className="relative overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50/60 via-white to-brand-50/20 p-6 shadow-sm"
+      className="relative overflow-hidden rounded-2xl border bolder-line-control bg-gradient-to-br from-bolder-blush-light/60 via-white to-bolder-blush-light/20 p-6 shadow-sm"
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <span className="text-xs font-semibold uppercase tracking-wider text-bolder-muted">
           Marketplace Commission
         </span>
-        <span className="inline-flex items-center rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-800">
+        <span className="inline-flex items-center rounded-full bg-bolder-blush-light px-2.5 py-0.5 text-xs font-medium text-bolder-rose-deep">
           Effective Rate
         </span>
       </div>
 
       <div className="mt-4 flex items-baseline gap-2">
         {isLoading ? (
-          <div className="h-9 w-28 animate-pulse rounded bg-slate-200" />
+          <div className="h-9 w-28 animate-pulse rounded bg-bolder-bg" />
         ) : (
           <>
-            <span className="text-3xl font-extrabold tracking-tight text-slate-900">
+            <span className="text-3xl font-extrabold tracking-tight text-bolder-text">
               {rate.toFixed(2)}%
             </span>
-            <span className="text-xs font-medium text-slate-500">per order subtotal</span>
+            <span className="text-xs font-medium text-bolder-muted">per order subtotal</span>
           </>
         )}
       </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-slate-600">
+      <p className="mt-3 text-xs leading-relaxed text-bolder-muted">
         Applied exclusively to order subtotal when orders are delivered. Delivery fees and POS walk-in
-        sales carry <span className="font-semibold text-slate-800">0% commission</span>.
+        sales carry <span className="font-semibold text-bolder-text">0% commission</span>.
       </p>
     </div>
   );

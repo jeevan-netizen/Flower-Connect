@@ -17,7 +17,7 @@ import {
 
 /** The four "edit" affordances under the dashboard cards read as one set. */
 const CARD_LINK_CLASS =
-  "mt-4 inline-block text-sm font-medium text-brand-700 transition-colors duration-micro ease-standard hover:text-brand-900";
+  "mt-4 inline-block text-sm font-medium text-bolder-rose-strong transition-colors duration-micro ease-standard hover:text-bolder-rose-deep";
 
 /**
  * Vendor dashboard (plan task 2.9: "sidebar navigation, stats cards").
@@ -31,7 +31,7 @@ export function VendorDashboardPage() {
 
   if (isPending) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Loading your dashboard...
       </div>
     );
@@ -119,7 +119,7 @@ export function VendorDashboardPage() {
 
         {profile.status === "APPROVED" && (
           <Card title="Catalog">
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-bolder-muted">
               Products, photos and stock live in the catalog. Nothing is listed to customers until a
               product is active and its stock is above zero.
             </p>
@@ -139,12 +139,12 @@ export function VendorDashboardPage() {
         )}
 
         <Card title="Profile completeness">
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-bolder-muted">
             Everything a customer sees about your shop is editable from the profile and settings
             pages. Commission rate, approval status and ratings are set by FlowerConnect.
           </p>
           <FadeIn>
-            <ul className="mt-3 space-y-1 text-sm text-slate-600">
+            <ul className="mt-3 space-y-1 text-sm text-bolder-muted">
               <li>✓ Business name and description</li>
               <li>✓ Address and service location</li>
               <li>✓ Delivery settings and operating hours</li>

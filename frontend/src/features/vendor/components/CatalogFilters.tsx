@@ -3,7 +3,7 @@ import { PRODUCT_STATUSES, type Category, type ProductStatus } from "@/features/
 import { formatProductStatus } from "@/features/vendor/format";
 import { FOCUS_RING, FIELD_TRANSITION, PRESSABLE } from "@/motion/pressable";
 
-const CONTROL_CLASS = `mt-1 block rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
+const CONTROL_CLASS = `mt-1 block rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
 
 interface CatalogFiltersProps {
   /** The raw search box value, untrimmed: trimming while typing eats spaces. */
@@ -56,7 +56,7 @@ export function CatalogFilters({
   const hasFilters = search.trim() !== "" || status !== null || categoryId !== null;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border bolder-line bg-bolder-surface p-4 shadow-sm">
       <form
         className="grid grid-cols-1 gap-4 md:grid-cols-3"
         onSubmit={(event) => {
@@ -65,7 +65,7 @@ export function CatalogFilters({
         }}
       >
         <div>
-          <label htmlFor={searchId} className="block text-sm font-medium text-slate-700">
+          <label htmlFor={searchId} className="block text-sm font-medium text-bolder-text">
             Search products
           </label>
           <div className="mt-1 flex gap-2">
@@ -82,7 +82,7 @@ export function CatalogFilters({
             <button
               type="submit"
               disabled={disabled}
-              className={`rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+              className={`rounded-md bg-bolder-rose-action px-3 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
             >
               Search
             </button>
@@ -90,7 +90,7 @@ export function CatalogFilters({
         </div>
 
         <div>
-          <label htmlFor={statusId} className="block text-sm font-medium text-slate-700">
+          <label htmlFor={statusId} className="block text-sm font-medium text-bolder-text">
             Status
           </label>
           <select
@@ -112,7 +112,7 @@ export function CatalogFilters({
         </div>
 
         <div>
-          <label htmlFor={categoryId_} className="block text-sm font-medium text-slate-700">
+          <label htmlFor={categoryId_} className="block text-sm font-medium text-bolder-text">
             Category
           </label>
           <select
@@ -140,7 +140,7 @@ export function CatalogFilters({
           type="button"
           onClick={onClear}
           disabled={disabled}
-          className={`mt-3 text-sm font-medium text-brand-700 hover:text-brand-900 disabled:opacity-50 ${FOCUS_RING}`}
+          className={`mt-3 text-sm font-medium text-bolder-rose-strong hover:text-bolder-rose-deep disabled:opacity-50 ${FOCUS_RING}`}
         >
           Clear filters
         </button>

@@ -12,8 +12,8 @@ import { FIELD_TRANSITION, PRESSABLE } from "@/motion/pressable";
  * every feature composes one definition; the focus ring stays out of it, because
  * press feedback must not cost a keyboard user the visible indicator.
  */
-const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm ${FIELD_TRANSITION} focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
-const ERROR_BORDER = "border-red-500";
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-bolder-line-control shadow-sm ${FIELD_TRANSITION} focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
+const ERROR_BORDER = "border-bolder-danger-border";
 
 interface TextFieldProps {
   label: string;
@@ -43,7 +43,7 @@ export function TextField({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="block text-sm font-medium text-bolder-text">
         {label}
       </label>
       {multiline ? (
@@ -86,7 +86,7 @@ export function NumberField({ label, error, hint, step = "0.01", min = "0", regi
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="block text-sm font-medium text-bolder-text">
         {label}
       </label>
       <input
@@ -117,17 +117,17 @@ export function CheckboxField({ label, hint, registration }: CheckboxFieldProps)
 
   return (
     <div className="flex items-start gap-2">
-      <input
-        id={id}
-        type="checkbox"
-        className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 transition-colors duration-micro ease-standard focus:ring-brand-500"
-        {...props}
-      />
+        <input
+          id={id}
+          type="checkbox"
+          className="mt-1 h-4 w-4 rounded border-bolder-line-control text-bolder-rose transition-colors duration-micro ease-standard focus:ring-bolder-rose"
+          {...props}
+        />
       <div>
-        <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+        <label htmlFor={id} className="block text-sm font-medium text-bolder-text">
           {label}
         </label>
-        {hint && <p className="text-xs text-slate-500">{hint}</p>}
+        {hint && <p className="text-xs text-bolder-muted">{hint}</p>}
       </div>
     </div>
   );
@@ -144,7 +144,7 @@ export function SubmitButton({ isSubmitting, idleLabel, busyLabel }: SubmitButto
     <button
       type="submit"
       disabled={isSubmitting}
-      className={`rounded-md border border-transparent bg-brand-600 py-2 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
+      className={`rounded-md border border-transparent bg-bolder-rose-action py-2 px-4 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${PRESSABLE}`}
     >
       {isSubmitting ? busyLabel : idleLabel}
     </button>
@@ -156,7 +156,7 @@ export function FormErrorSummary({ message }: { message: string | null }) {
     return null;
   }
   return (
-    <FadeIn role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+    <FadeIn role="alert" className="rounded-md bg-bolder-danger-surface p-3 text-sm text-bolder-danger">
       {message}
     </FadeIn>
   );
@@ -172,7 +172,7 @@ export function SuccessMessage({ message }: { message: string | null }) {
     return null;
   }
   return (
-    <div className="fc-fade-in rounded-md bg-brand-50 p-3 text-sm text-brand-900">
+    <div className="fc-fade-in rounded-md bg-bolder-blush-light p-3 text-sm text-bolder-rose-deep">
       <FlowerSuccess message={message} />
     </div>
   );
@@ -181,9 +181,9 @@ export function SuccessMessage({ message }: { message: string | null }) {
 /** A value the backend controls; rendered, never editable. */
 export function ReadOnlyRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5 border-b border-slate-100 py-2 last:border-b-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-      <dt className="text-sm text-slate-500">{label}</dt>
-      <dd className="text-sm font-medium text-slate-900">{value}</dd>
+    <div className="flex flex-col gap-0.5 border-b bolder-line py-2 last:border-b-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+      <dt className="text-sm text-bolder-muted">{label}</dt>
+      <dd className="text-sm font-medium text-bolder-text">{value}</dd>
     </div>
   );
 }

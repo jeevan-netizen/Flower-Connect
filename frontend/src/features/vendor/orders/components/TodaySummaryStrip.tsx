@@ -17,7 +17,7 @@ interface TodaySummaryStripProps {
 export function TodaySummaryStrip({ summary, isPending }: TodaySummaryStripProps) {
   if (isPending) {
     return (
-      <FadeIn className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+      <FadeIn className="rounded-lg border bolder-line bg-bolder-surface p-4 text-sm text-bolder-muted">
         Loading today's summary…
       </FadeIn>
     );
@@ -27,48 +27,48 @@ export function TodaySummaryStrip({ summary, isPending }: TodaySummaryStripProps
     return null;
   }
 
-  const statusRows = Object.entries(summary.ordersByStatus).map(
-    ([status, count]) => (
-      <div key={status} className="flex justify-between text-sm">
-        <span className="text-slate-600">{status.replace(/_/g, " ")}</span>
-        <span className="font-medium text-slate-900">{count}</span>
-      </div>
-    ),
-  );
+    const statusRows = Object.entries(summary.ordersByStatus).map(
+      ([status, count]) => (
+        <div key={status} className="flex justify-between text-sm">
+          <span className="text-bolder-muted">{status.replace(/_/g, " ")}</span>
+          <span className="font-medium text-bolder-text">{count}</span>
+        </div>
+      ),
+    );
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-900 mb-2">
-        Today's summary <span className="text-xs font-normal text-slate-500">{summary.today}</span>
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
-        <div className="border border-slate-200 rounded-lg p-3">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Orders today</p>
-          <p className="text-base font-bold text-slate-900">{summary.todayOrderCount}</p>
-        </div>
-        <div className="border border-slate-200 rounded-lg p-3">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Total value</p>
-          <p className="text-base font-bold text-slate-900">{formatMoney(summary.todayTotalValue)}</p>
-        </div>
-        <div className="border border-slate-200 rounded-lg p-3">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">COD cash to collect</p>
-          <p className="text-base font-bold text-slate-900">{formatMoney(summary.expectedCodCash)}</p>
-        </div>
-        <div className="border border-slate-200 rounded-lg p-3">
-          <p className="text-xs text-slate-500 uppercase tracking-wide">Delivered</p>
-          <p className="text-base font-bold text-slate-900">
-            {summary.ordersByStatus.DELIVERED ?? 0}
-          </p>
-        </div>
-      </div>
-      {statusRows.length > 0 && (
-        <div className="mt-3 border-t border-slate-100 pt-3">
-          <p className="text-xs font-medium text-slate-700 mb-1">By status</p>
-          <div className="flex flex-wrap gap-4 text-sm">
-            {statusRows}
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-bolder-text mb-2">
+          Today's summary <span className="text-xs font-normal text-bolder-muted">{summary.today}</span>
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
+          <div className="border bolder-line rounded-lg p-3">
+            <p className="text-xs text-bolder-muted uppercase tracking-wide">Orders today</p>
+            <p className="text-base font-bold text-bolder-text">{summary.todayOrderCount}</p>
+          </div>
+          <div className="border bolder-line rounded-lg p-3">
+            <p className="text-xs text-bolder-muted uppercase tracking-wide">Total value</p>
+            <p className="text-base font-bold text-bolder-text">{formatMoney(summary.todayTotalValue)}</p>
+          </div>
+          <div className="border bolder-line rounded-lg p-3">
+            <p className="text-xs text-bolder-muted uppercase tracking-wide">COD cash to collect</p>
+            <p className="text-base font-bold text-bolder-text">{formatMoney(summary.expectedCodCash)}</p>
+          </div>
+          <div className="border bolder-line rounded-lg p-3">
+            <p className="text-xs text-bolder-muted uppercase tracking-wide">Delivered</p>
+            <p className="text-base font-bold text-bolder-text">
+              {summary.ordersByStatus.DELIVERED ?? 0}
+            </p>
           </div>
         </div>
-      )}
-    </div>
+        {statusRows.length > 0 && (
+          <div className="mt-3 border-t bolder-line pt-3">
+            <p className="text-xs font-medium text-bolder-text mb-1">By status</p>
+            <div className="flex flex-wrap gap-4 text-sm">
+              {statusRows}
+            </div>
+          </div>
+        )}
+      </div>
   );
 }

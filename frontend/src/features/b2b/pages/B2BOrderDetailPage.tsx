@@ -179,7 +179,7 @@ export function B2BOrderDetailPage() {
   if (isPending || !order) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+        <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
           Loading order…
         </div>
       </div>
@@ -191,13 +191,13 @@ export function B2BOrderDetailPage() {
   return (
     <>
       {actionError && (
-        <FadeIn role="alert" className="max-w-4xl mx-auto px-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <FadeIn role="alert" className="max-w-4xl mx-auto px-4 rounded-lg border bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
           <p className="font-semibold">Action failed</p>
           <p className="mt-1">{actionError.message}</p>
           <button
             type="button"
             onClick={() => setActionError(null)}
-            className="mt-3 inline-flex items-center rounded-md border border-transparent bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+            className="mt-3 inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-3 py-1.5 text-xs font-medium text-white hover:bg-bolder-rose-deep"
           >
             Dismiss
           </button>
@@ -209,38 +209,38 @@ export function B2BOrderDetailPage() {
           <button
             type="button"
             onClick={() => navigate("/vendor/b2b/orders")}
-            className={`rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+            className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}`}
           >
             Back to orders
           </button>
         </div>
 
         {/* Status */}
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Status</h2>
+        <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-bolder-text mb-3">Status</h2>
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${statusTone(order.status)}`}
           >
             {B2B_ORDER_STATUS_LABELS[order.status]}
           </span>
           {order.paymentStatus === "PAID" && (
-            <span className="ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border text-green-800 bg-green-50 border-green-200">
+            <span className="ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border text-bolder-success bg-bolder-success-surface border-bolder-success-border">
               Payment paid
             </span>
           )}
           {order.paymentStatus === "UNPAID" && (
-            <span className="ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border text-amber-800 bg-amber-50 border-amber-200">
+            <span className="ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border text-bolder-warning bg-bolder-warning-surface border-bolder-warning-border">
               Payment unpaid
             </span>
           )}
         </div>
 
         {/* Items */}
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Items</h2>
-          <table className="w-full text-left text-sm divide-y divide-slate-100">
+        <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-bolder-text mb-3">Items</h2>
+          <table className="w-full text-left text-sm divide-y divide-bolder-line">
             <thead>
-              <tr className="text-xs uppercase tracking-wide text-slate-500">
+              <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                 <th scope="col" className="py-3 pr-4 font-medium">Item</th>
                 <th scope="col" className="py-3 pr-4 font-medium text-right">Price</th>
                 <th scope="col" className="py-3 pr-4 font-medium text-right">Qty</th>
@@ -251,16 +251,16 @@ export function B2BOrderDetailPage() {
               {order.items.map((item) => (
                 <tr key={item.id} className="align-top">
                   <td className="py-3 pr-4">
-                    <p className="font-medium text-slate-900">{item.productName}</p>
-                    <p className="text-xs text-slate-500">{item.unit}</p>
+                    <p className="font-medium text-bolder-text">{item.productName}</p>
+                    <p className="text-xs text-bolder-muted">{item.unit}</p>
                   </td>
-                  <td className="py-3 pr-4 text-right text-slate-900">
+                  <td className="py-3 pr-4 text-right text-bolder-text">
                     {formatMoney(item.unitPrice)}
                   </td>
-                  <td className="py-3 pr-4 text-right text-slate-900">
+                  <td className="py-3 pr-4 text-right text-bolder-text">
                     {item.quantity}
                   </td>
-                  <td className="py-3 font-medium text-right text-slate-900">
+                  <td className="py-3 font-medium text-right text-bolder-text">
                     {formatMoney(item.lineTotal)}
                   </td>
                 </tr>
@@ -271,39 +271,39 @@ export function B2BOrderDetailPage() {
 
         {/* Totals and shipment */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900 mb-3">Total</h2>
-            <p className="text-sm font-medium text-slate-900">
+          <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-bolder-text mb-3">Total</h2>
+            <p className="text-sm font-medium text-bolder-text">
               {formatMoney(order.total)}
             </p>
             {order.orderNote && (
-              <p className="mt-2 text-xs text-slate-600">
+              <p className="mt-2 text-xs text-bolder-muted">
                 <span className="font-semibold">Note:</span>{" "}
                 {order.orderNote}
               </p>
             )}
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900 mb-3">Shipment</h2>
+          <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-bolder-text mb-3">Shipment</h2>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="col-span-full border-b border-slate-100 pb-2">
-                <dt className="text-xs text-slate-500">Reference</dt>
-                <dd className="text-sm text-slate-900">
+              <div className="col-span-full border-b bolder-line pb-2">
+                <dt className="text-xs text-bolder-muted">Reference</dt>
+                <dd className="text-sm text-bolder-text">
                   {order.shipmentReference ?? "—"}
                 </dd>
               </div>
               {order.shippedAt && (
-                <div className="border-b border-slate-100 pb-2">
-                  <dt className="text-xs text-slate-500">Shipped at</dt>
-                  <dd className="text-sm text-slate-900">
+                <div className="border-b bolder-line pb-2">
+                  <dt className="text-xs text-bolder-muted">Shipped at</dt>
+                  <dd className="text-sm text-bolder-text">
                     {formatDateTime(order.shippedAt)}
                   </dd>
                 </div>
               )}
               {order.deliveredAt && (
                 <div className="pb-2">
-                  <dt className="text-xs text-slate-500">Delivered at</dt>
-                  <dd className="text-sm text-slate-900">
+                  <dt className="text-xs text-bolder-muted">Delivered at</dt>
+                  <dd className="text-sm text-bolder-text">
                     {formatDateTime(order.deliveredAt)}
                   </dd>
                 </div>
@@ -319,13 +319,13 @@ export function B2BOrderDetailPage() {
           </h2>
           {order.items.length > 0 && (
             <ul className="space-y-3">
-              <li key="placed" className="flex gap-3 py-2 border-b border-slate-100 last:border-0">
-                <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-900 border border-slate-200">
+              <li key="placed" className="flex gap-3 py-2 border-b border-bolder-line last:border-0">
+                <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-bolder-text border bolder-line">
                   1
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">Order placed</p>
-                  <p className="text-xs text-slate-600">
+                  <p className="text-sm font-medium text-bolder-text">Order placed</p>
+                  <p className="text-xs text-bolder-muted">
                     {order.placedAt}
                   </p>
                 </div>
@@ -335,18 +335,18 @@ export function B2BOrderDetailPage() {
                 return (
                   <li
                     key={status}
-                    className={`flex gap-3 py-2 border-b border-slate-100 last:border-0 ${
+                    className={`flex gap-3 py-2 border-b border-bolder-line last:border-0 ${
                       reached ? "" : "opacity-50"
                     }`}
                   >
-                    <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-900 border border-slate-200">
+                    <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-bolder-text border bolder-line">
                       {i + 2}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900">
+                      <p className="text-sm font-medium text-bolder-text">
                         {B2B_ORDER_STATUS_LABELS[status]}
                       </p>
-                      <p className="text-xs text-slate-600">
+                      <p className="text-xs text-bolder-muted">
                         {reached ? order.updatedAt : "Not yet"}
                       </p>
                     </div>
@@ -359,9 +359,9 @@ export function B2BOrderDetailPage() {
 
         {/* Actions */}
         {allowedActions.length > 0 && (
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900 mb-3">Actions</h2>
-            <p className="text-xs text-slate-500 mb-4">
+          <div className="rounded-lg border bolder-line bg-bolder-surface p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-bolder-text mb-3">Actions</h2>
+            <p className="text-xs text-bolder-muted mb-4">
               Only the next valid action(s) for this status are shown; every
               change goes to the backend state machine.
             </p>
@@ -378,10 +378,10 @@ export function B2BOrderDetailPage() {
             }
             className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
               action === "accept"
-                ? "border-brand-600 bg-brand-50 text-brand-900 hover:bg-brand-100"
+                ? "border-bolder-rose-action bg-bolder-blush-light text-bolder-rose-deep hover:bg-bolder-rose-action"
                 : action === "reject" || action === "cancel"
-                ? "border-red-600 bg-red-50 text-red-900 hover:bg-red-100"
-                : "border-slate-600 bg-slate-50 text-slate-900 hover:bg-slate-100"
+                ? "border-bolder-danger-border bg-bolder-danger-surface text-bolder-danger hover:bg-bolder-danger-surface"
+                : "border-bolder-line-control bg-bolder-surface text-bolder-text hover:bg-bolder-bg"
             } disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
           >
             {isActing ? "Working…" : actionLabel(action)}
@@ -392,13 +392,13 @@ export function B2BOrderDetailPage() {
   )}
 
         {allowedActions.length === 0 && !isTerminalStatus(order.status) && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-bolder-muted">
             No action is available to you on this order right now.
           </p>
         )}
 
   {isTerminalStatus(order.status) && (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+    <div className="rounded-lg border bolder-line bg-bolder-surface p-4 text-sm text-bolder-muted">
       <p className="font-semibold">Order complete</p>
       <p className="mt-1 text-sm">
         {`This order is ${B2B_ORDER_STATUS_LABELS[order.status]}`}{" "}
@@ -410,7 +410,7 @@ export function B2BOrderDetailPage() {
             type="button"
             disabled={isActing}
             onClick={downloadEbill}
-            className="rounded-md border border-brand-600 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-900 hover:bg-brand-100 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="rounded-md border bolder-rose-action bg-bolder-blush-light px-3 py-2 text-sm font-medium text-bolder-rose-deep hover:bg-bolder-rose-action disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isActing ? "Downloading…" : "Download e-bill"}
           </button>
@@ -423,7 +423,7 @@ export function B2BOrderDetailPage() {
           <button
             type="button"
             onClick={() => navigate("/vendor/b2b/orders")}
-            className={`rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 ${PRESSABLE} ${FOCUS_RING}`}
+            className={`rounded-md border bolder-line-control bg-bolder-surface px-4 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg ${PRESSABLE} ${FOCUS_RING}`}
           >
             Back to orders
           </button>

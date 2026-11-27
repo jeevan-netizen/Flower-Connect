@@ -25,7 +25,7 @@ export function VendorErrorState({ error, onRetry }: VendorErrorStateProps) {
 
   if (isVendorNotApproved(error)) {
     return (
-      <FadeIn role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <FadeIn role="alert" className="rounded-lg border bolder-warning-border bg-bolder-warning-surface p-4 text-sm text-bolder-warning">
         <p className="font-semibold">Approval required</p>
         <p className="mt-1">{VENDOR_NOT_APPROVED_MESSAGE}</p>
       </FadeIn>
@@ -34,7 +34,7 @@ export function VendorErrorState({ error, onRetry }: VendorErrorStateProps) {
 
   if (isMissingVendorProfile(error)) {
     return (
-      <FadeIn role="alert" className="rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800">
+      <FadeIn role="alert" className="rounded-lg border bolder-line-control bg-bolder-bg p-4 text-sm text-bolder-text">
         <p className="font-semibold">No vendor profile</p>
         <p className="mt-1">
           This account does not have a vendor profile yet. Contact FlowerConnect support to have one
@@ -46,7 +46,7 @@ export function VendorErrorState({ error, onRetry }: VendorErrorStateProps) {
 
   if (info.status === 403) {
     return (
-      <FadeIn role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+      <FadeIn role="alert" className="rounded-lg border bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
         <p className="font-semibold">Not permitted</p>
         <p className="mt-1">Your account does not have permission to use the vendor area.</p>
       </FadeIn>
@@ -54,14 +54,14 @@ export function VendorErrorState({ error, onRetry }: VendorErrorStateProps) {
   }
 
   return (
-    <FadeIn role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    <FadeIn role="alert" className="rounded-lg border bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
       <p className="font-semibold">Something went wrong</p>
       <p className="mt-1">{info.message}</p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className={`mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`mt-3 rounded-md border bolder-danger-border bg-bolder-danger-surface px-3 py-1.5 text-xs font-medium text-bolder-danger hover:bg-bolder-danger-surface ${PRESSABLE} ${FOCUS_RING}`}
         >
           Try again
         </button>

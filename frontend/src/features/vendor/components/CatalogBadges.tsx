@@ -27,8 +27,8 @@ export function LowStockBadge({ inventory }: { inventory: InventorySummary | nul
 
   const tone =
     inventory.available === 0
-      ? "bg-red-100 text-red-800"
-      : "bg-amber-100 text-amber-800";
+      ? "bg-bolder-danger-surface text-bolder-danger"
+      : "bg-bolder-warning-surface text-bolder-warning";
 
   return (
     <StatusPill
@@ -41,5 +41,5 @@ export function LowStockBadge({ inventory }: { inventory: InventorySummary | nul
 
 /** Available units, with the reserved count named when there is one. */
 export function StockSummary({ inventory }: { inventory: InventorySummary | null }) {
-  return <span className="text-sm text-slate-700">{formatStockSummary(inventory)}</span>;
+  return <span className="text-sm text-bolder-text">{formatStockSummary(inventory)}</span>;
 }

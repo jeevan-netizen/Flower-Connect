@@ -52,22 +52,22 @@ export function StatementDownloadCard() {
   return (
     <div
       data-testid="statement-download-card"
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      className="rounded-2xl border bolder-line bg-bolder-surface p-6 shadow-sm"
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-bold text-slate-900">Download Account Statement</h3>
-        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+        <h3 className="text-base font-bold text-bolder-text">Download Account Statement</h3>
+        <span className="rounded-full bg-bolder-bg px-2.5 py-0.5 text-xs font-medium text-bolder-muted">
           CSV Export
         </span>
       </div>
 
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-bolder-muted">
         Generate an official ledger statement for your accounting and tax records.
       </p>
 
       <form onSubmit={handleDownload} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label htmlFor="periodStart" className="block text-xs font-medium text-slate-700">
+          <label htmlFor="periodStart" className="block text-xs font-medium text-bolder-text">
             From Date
           </label>
           <input
@@ -75,13 +75,13 @@ export function StatementDownloadCard() {
             type="date"
             value={periodStart}
             onChange={(e) => setPeriodStart(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="mt-1 w-full rounded-lg border-bolder-line-control px-3 py-2 text-sm shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
             required
           />
         </div>
 
         <div className="flex-1">
-          <label htmlFor="periodEnd" className="block text-xs font-medium text-slate-700">
+          <label htmlFor="periodEnd" className="block text-xs font-medium text-bolder-text">
             To Date
           </label>
           <input
@@ -89,7 +89,7 @@ export function StatementDownloadCard() {
             type="date"
             value={periodEnd}
             onChange={(e) => setPeriodEnd(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="mt-1 w-full rounded-lg border-bolder-line-control px-3 py-2 text-sm shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
             required
           />
         </div>
@@ -97,7 +97,7 @@ export function StatementDownloadCard() {
         <button
           type="submit"
           disabled={isDownloading}
-          className="inline-flex items-center justify-center rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center rounded-lg bg-bolder-rose-action px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isDownloading ? (
             <span className="flex items-center gap-2">
@@ -110,10 +110,10 @@ export function StatementDownloadCard() {
         </button>
       </form>
 
-      {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs font-medium text-bolder-danger">{error}</p>}
 
-      <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-400">
-        <svg className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="mt-4 flex items-center gap-2 text-[11px] text-bolder-muted">
+        <svg className="h-3.5 w-3.5 shrink-0 text-bolder-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
         </svg>
         <span>Protected against formula injection attacks according to OWASP guidelines.</span>

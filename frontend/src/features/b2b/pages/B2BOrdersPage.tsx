@@ -83,8 +83,8 @@ export function B2BOrdersPage() {
             }}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               tab === t.key
-                ? "border-brand-600 text-brand-900"
-                : "border-transparent text-slate-500 hover:text-slate-700"
+                ? "border-bolder-rose-action text-bolder-rose-deep"
+                : "border-transparent text-bolder-muted hover:text-bolder-text"
             }`}
           >
             {t.label}
@@ -93,17 +93,17 @@ export function B2BOrdersPage() {
       </div>
 
       {isPending && !data && (
-        <FadeIn className="rounded-lg border border-slate-200 bg-white p-12 text-center text-sm text-slate-600">
+        <FadeIn className="rounded-lg border bolder-line bg-bolder-surface p-12 text-center text-sm text-bolder-muted">
           Loading orders…
         </FadeIn>
       )}
 
       {!isPending && data && orders.length === 0 && (
-        <FadeIn className="rounded-lg border border-slate-200 bg-white p-12 text-center">
-          <h2 className="text-base font-semibold text-slate-900">
+        <FadeIn className="rounded-lg border bolder-line bg-bolder-surface p-12 text-center">
+          <h2 className="text-base font-semibold text-bolder-text">
             No {tab === "BUYER" ? "placed" : "received"} orders yet
           </h2>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-bolder-muted">
             {tab === "BUYER"
               ? "Place an order with a seller and it will appear here."
               : "When a buyer places an order with your shop, it will appear here."}
@@ -115,7 +115,7 @@ export function B2BOrdersPage() {
         <>
           {/* Status filter */}
           <div className="flex items-center gap-4 mb-4">
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-medium text-bolder-muted uppercase tracking-wider">
               Filter by status
             </span>
             {B2B_ORDER_STATUSES.map((status) => (
@@ -128,8 +128,8 @@ export function B2BOrdersPage() {
                 }}
                 className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                   statusFilter === status
-                    ? "border-brand-600 bg-brand-50 text-brand-900"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    ? "border-bolder-rose-action bg-bolder-blush-light text-bolder-rose-deep"
+                    : "border-bolder-line-control bg-bolder-surface text-bolder-text hover:bg-bolder-bg"
                 }`}
               >
                 {B2B_ORDER_STATUS_LABELS[status]}
@@ -140,8 +140,8 @@ export function B2BOrdersPage() {
               onClick={() => setStatusFilter(null)}
               className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                 statusFilter === null
-                  ? "border-brand-600 bg-brand-50 text-brand-900"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "border-bolder-rose-action bg-bolder-blush-light text-bolder-rose-deep"
+                  : "border-bolder-line-control bg-bolder-surface text-bolder-text hover:bg-bolder-bg"
               }`}
             >
               All
@@ -150,7 +150,7 @@ export function B2BOrdersPage() {
 
           <table className="w-full text-left text-sm divide-y divide-slate-100">
             <thead>
-              <tr className="text-xs uppercase tracking-wide text-slate-500">
+              <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                 <th scope="col" className="py-3 pr-4 font-medium">Order</th>
                 <th scope="col" className="py-3 pr-4 font-medium">Counterparty</th>
                 <th scope="col" className="py-3 pr-4 font-medium">Status</th>
@@ -160,25 +160,25 @@ export function B2BOrdersPage() {
             </thead>
             <tbody>
               {orders.map((order) => (
-                <tr key={order.id} className="align-top group hover:bg-slate-50">
+                <tr key={order.id} className="align-top group hover:bg-bolder-bg/80">
                   <td className="py-3 pr-4">
                     <Link
                       to={`/vendor/b2b/orders/${order.id}`}
-                      className={`font-medium text-slate-900 hover:underline ${PRESSABLE} ${FOCUS_RING}`}
+                      className={`font-medium text-bolder-text hover:underline ${PRESSABLE} ${FOCUS_RING}`}
                     >
                       #{order.orderNo}
                     </Link>
                     {order.orderNote && (
-                      <p className="mt-1 text-xs text-slate-500 truncate">
+                      <p className="mt-1 text-xs text-bolder-muted truncate">
                         "{order.orderNote}"
                       </p>
                     )}
                   </td>
                   <td className="py-3 pr-4">
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-bolder-text">
                       {tab === "BUYER" ? order.sellerName : order.buyerName}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-bolder-muted">
                       {tab === "BUYER" ? order.sellerName : order.buyerName}
                     </p>
                   </td>
@@ -189,10 +189,10 @@ export function B2BOrdersPage() {
                       {B2B_ORDER_STATUS_LABELS[order.status]}
                     </span>
                   </td>
-                  <td className="py-3 font-medium text-right text-slate-900">
+                  <td className="py-3 font-medium text-right text-bolder-text">
                     {formatMoney(order.total)}
                   </td>
-                  <td className="py-3 text-right text-sm text-slate-600">
+                  <td className="py-3 text-right text-sm text-bolder-muted">
                     {formatDateTime(order.placedAt)}
                   </td>
                 </tr>
@@ -213,16 +213,16 @@ export function B2BOrdersPage() {
 function statusTone(status: string): string {
   switch (status) {
     case "PLACED":
-      return "text-amber-800 bg-amber-50 border-amber-200";
+      return "text-bolder-warning bg-bolder-warning-surface border-bolder-warning-border";
     case "ACCEPTED":
     case "SHIPPED":
-      return "text-blue-800 bg-blue-50 border-blue-200";
+      return "text-bolder-info bg-bolder-info-surface border-bolder-info-border";
     case "DELIVERED":
-      return "text-green-800 bg-green-50 border-green-200";
+      return "text-bolder-success bg-bolder-success-surface border-bolder-success-border";
     case "REJECTED":
     case "CANCELLED":
-      return "text-red-800 bg-red-50 border-red-200";
+      return "text-bolder-danger bg-bolder-danger-surface border-bolder-danger-border";
     default:
-      return "text-slate-800 bg-slate-50 border-slate-200";
+      return "text-bolder-text bg-bolder-bg border-bolder-line";
   }
 }

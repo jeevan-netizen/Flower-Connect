@@ -33,22 +33,22 @@ const TYPE_CONFIG: Record<
 > = {
   ONLINE_ORDER_CREDIT: {
     label: "Online Order Credit",
-    badgeClass: "bg-emerald-100 text-emerald-800",
+    badgeClass: "bg-bolder-success-surface text-bolder-success",
     isCredit: true,
   },
   COD_DUES: {
     label: "COD Commission Due",
-    badgeClass: "bg-amber-100 text-amber-800",
+    badgeClass: "bg-bolder-warning-surface text-bolder-warning",
     isCredit: false,
   },
   DISPUTE_ADJUSTMENT: {
     label: "Dispute Adjustment",
-    badgeClass: "bg-purple-100 text-purple-800",
+    badgeClass: "bg-bolder-bg text-bolder-text",
     isCredit: false,
   },
   SETTLEMENT_PAYMENT: {
     label: "Settlement Payout",
-    badgeClass: "bg-blue-100 text-blue-800",
+    badgeClass: "bg-bolder-info-surface text-bolder-info",
     isCredit: true,
   },
 };
@@ -66,26 +66,26 @@ export function LedgerTransactionTable({
   return (
     <div
       data-testid="ledger-transaction-table"
-      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      className="overflow-hidden rounded-2xl border bolder-line bg-bolder-surface shadow-sm"
     >
-      <div className="border-b border-slate-100 px-6 py-4">
+      <div className="border-b bolder-line px-6 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Ledger Transactions</h3>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <h3 className="text-base font-bold text-bolder-text">Ledger Transactions</h3>
+            <p className="mt-0.5 text-xs text-bolder-muted">
               Immutable double-entry log of all delivery credits, commission dues, and adjustments.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <label htmlFor="filter-entry-type" className="text-xs font-medium text-slate-600">
+            <label htmlFor="filter-entry-type" className="text-xs font-medium text-bolder-muted">
               Filter by type:
             </label>
             <select
               id="filter-entry-type"
               value={selectedType}
               onChange={(e) => onTypeChange?.(e.target.value as SettlementEntryType | "")}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="rounded-lg border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-xs font-medium text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
             >
               <option value="">All Transactions</option>
               <option value="ONLINE_ORDER_CREDIT">Online Order Credit</option>
@@ -100,13 +100,13 @@ export function LedgerTransactionTable({
       {isLoading ? (
         <div className="p-6 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
+            <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-bolder-bg" />
           ))}
         </div>
       ) : entries.length === 0 ? (
         <div className="px-6 py-12 text-center">
-          <p className="text-sm font-medium text-slate-600">No ledger transactions found.</p>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="text-sm font-medium text-bolder-muted">No ledger transactions found.</p>
+          <p className="mt-1 text-xs text-bolder-muted">
             {selectedType
               ? "No entries match the selected filter."
               : "Transactions appear automatically as orders are delivered and completed."}
@@ -115,7 +115,7 @@ export function LedgerTransactionTable({
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+            <thead className="bg-bolder-bg text-xs uppercase tracking-wider text-bolder-muted">
               <tr>
                 <th scope="col" className="px-6 py-3 font-semibold">Date & Time</th>
                 <th scope="col" className="px-6 py-3 font-semibold">Type</th>
@@ -125,11 +125,11 @@ export function LedgerTransactionTable({
                 <th scope="col" className="px-6 py-3 font-semibold text-right">Signed Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-bolder-line text-bolder-text">
               {entries.map((entry) => {
                 const config = TYPE_CONFIG[entry.type] || {
                   label: entry.type,
-                  badgeClass: "bg-slate-100 text-slate-700",
+                  badgeClass: "bg-bolder-bg text-bolder-text",
                   isCredit: entry.amount >= 0,
                 };
                 const isPositive = entry.amount > 0;
@@ -140,8 +140,8 @@ export function LedgerTransactionTable({
                 });
 
                 return (
-                  <tr key={entry.id} className="transition hover:bg-slate-50/80">
-                    <td className="whitespace-nowrap px-6 py-3.5 text-xs text-slate-600">
+                  <tr key={entry.id} className="transition hover:bg-bolder-bg/80">
+                    <td className="whitespace-nowrap px-6 py-3.5 text-xs text-bolder-muted">
                       {formattedDate}
                     </td>
                     <td className="whitespace-nowrap px-6 py-3.5">
@@ -151,10 +151,10 @@ export function LedgerTransactionTable({
                         {config.label}
                       </span>
                     </td>
-                    <td className="max-w-xs truncate px-6 py-3.5 text-xs font-mono text-slate-700">
+                    <td className="max-w-xs truncate px-6 py-3.5 text-xs font-mono text-bolder-text">
                       {entry.reference || "—"}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-3.5 text-xs text-slate-600">
+                    <td className="whitespace-nowrap px-6 py-3.5 text-xs text-bolder-muted">
                       {entry.orderId ? (
                         <span className="font-mono">Order #{entry.orderId}</span>
                       ) : entry.disputeId ? (
@@ -165,16 +165,16 @@ export function LedgerTransactionTable({
                     </td>
                     <td className="whitespace-nowrap px-6 py-3.5 text-xs">
                       {entry.settlementId ? (
-                        <span className="font-mono text-slate-600">Cycle #{entry.settlementId}</span>
+                        <span className="font-mono text-bolder-muted">Cycle #{entry.settlementId}</span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        <span className="inline-flex items-center rounded-full bg-bolder-bg px-2 py-0.5 text-[11px] font-medium text-bolder-muted">
                           Open
                         </span>
                       )}
                     </td>
                     <td
                       className={`whitespace-nowrap px-6 py-3.5 text-right font-bold ${
-                        isPositive ? "text-emerald-600" : "text-amber-600"
+                        isPositive ? "text-bolder-success" : "text-bolder-warning"
                       }`}
                     >
                       {isPositive ? "+" : "-"}₹{formattedAmount}
@@ -189,10 +189,10 @@ export function LedgerTransactionTable({
 
       {/* Pagination Bar */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-6 py-3">
-          <span className="text-xs text-slate-500">
-            Showing Page <span className="font-semibold text-slate-800">{page + 1}</span> of{" "}
-            <span className="font-semibold text-slate-800">{totalPages}</span> ({totalElements} total entries)
+        <div className="flex items-center justify-between border-t bolder-line bg-bolder-bg/50 px-6 py-3">
+          <span className="text-xs text-bolder-muted">
+            Showing Page <span className="font-semibold text-bolder-text">{page + 1}</span> of{" "}
+            <span className="font-semibold text-bolder-text">{totalPages}</span> ({totalElements} total entries)
           </span>
 
           <div className="flex items-center gap-2">
@@ -200,7 +200,7 @@ export function LedgerTransactionTable({
               type="button"
               disabled={page <= 0}
               onClick={() => onPageChange?.(page - 1)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border bolder-line-control bg-bolder-surface px-3 py-1 text-xs font-medium text-bolder-text shadow-sm hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50"
             >
               Previous
             </button>
@@ -208,7 +208,7 @@ export function LedgerTransactionTable({
               type="button"
               disabled={page >= totalPages - 1}
               onClick={() => onPageChange?.(page + 1)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border bolder-line-control bg-bolder-surface px-3 py-1 text-xs font-medium text-bolder-text shadow-sm hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50"
             >
               Next
             </button>

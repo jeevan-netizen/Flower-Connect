@@ -31,25 +31,25 @@ export function SettlementDetailModal({ settlementId, onClose }: SettlementDetai
   return (
     <div
       data-testid="settlement-detail-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bolder-overlay backdrop-blur-sm p-4 animate-in fade-in"
     >
-      <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div className="relative w-full max-w-3xl rounded-2xl bg-bolder-surface shadow-2xl overflow-hidden border bolder-line">
+        <div className="flex items-center justify-between border-b bolder-line px-6 py-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900">
+            <h3 className="text-base font-bold text-bolder-text">
               Settlement Cycle #{settlementId} Details
             </h3>
             {data && (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-bolder-muted">
                 Period: {data.settlement.periodStart} → {data.settlement.periodEnd} • Status:{" "}
-                <span className="font-semibold text-slate-700">{data.settlement.status}</span>
+                <span className="font-semibold text-bolder-text">{data.settlement.status}</span>
               </p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none"
+            className="rounded-lg p-1.5 text-bolder-muted hover:bg-bolder-bg hover:text-bolder-text focus:outline-none"
           >
             <span className="sr-only">Close</span>
             ✕
@@ -60,30 +60,30 @@ export function SettlementDetailModal({ settlementId, onClose }: SettlementDetai
           {isLoading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
+                <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-bolder-bg" />
               ))}
             </div>
           ) : !data ? (
-            <p className="text-sm text-slate-500">Unable to load settlement details.</p>
+            <p className="text-sm text-bolder-muted">Unable to load settlement details.</p>
           ) : (
             <div className="space-y-6">
               {/* Summary Stats */}
-              <div className="grid grid-cols-3 gap-4 rounded-xl bg-slate-50 p-4 text-center">
+              <div className="grid grid-cols-3 gap-4 rounded-lg bg-bolder-bg p-4 text-center">
                 <div>
-                  <span className="text-xs text-slate-500">Gross Credits</span>
-                  <p className="text-sm font-bold text-emerald-600">
+                  <span className="text-xs text-bolder-muted">Gross Credits</span>
+                  <p className="text-sm font-bold text-bolder-success">
                     +₹{data.settlement.totalCredits.toFixed(2)}
                   </p>
                 </div>
                 <div>
-                  <span className="text-xs text-slate-500">Total Dues</span>
-                  <p className="text-sm font-bold text-amber-600">
+                  <span className="text-xs text-bolder-muted">Total Dues</span>
+                  <p className="text-sm font-bold text-bolder-warning">
                     -₹{data.settlement.totalDues.toFixed(2)}
                   </p>
                 </div>
                 <div>
-                  <span className="text-xs text-slate-500">Net Amount</span>
-                  <p className="text-sm font-extrabold text-slate-900">
+                  <span className="text-xs text-bolder-muted">Net Amount</span>
+                  <p className="text-sm font-extrabold text-bolder-text">
                     ₹{Math.abs(data.settlement.netAmount).toFixed(2)}
                   </p>
                 </div>
@@ -91,14 +91,14 @@ export function SettlementDetailModal({ settlementId, onClose }: SettlementDetai
 
               {/* Entries list */}
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-bolder-muted mb-2">
                   Attached Transactions ({data.entries.length})
                 </h4>
                 {data.entries.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">No entries attached.</p>
+                  <p className="text-xs text-bolder-muted italic">No entries attached.</p>
                 ) : (
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-100 text-slate-600">
+                    <thead className="bg-bolder-bg text-bolder-muted">
                       <tr>
                         <th className="px-3 py-2 font-semibold">Date</th>
                         <th className="px-3 py-2 font-semibold">Type</th>
@@ -106,21 +106,21 @@ export function SettlementDetailModal({ settlementId, onClose }: SettlementDetai
                         <th className="px-3 py-2 font-semibold text-right">Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-bolder-line">
                       {data.entries.map((entry) => {
                         const isPositive = entry.amount >= 0;
                         return (
                           <tr key={entry.id}>
-                            <td className="px-3 py-2 text-slate-600">
+                            <td className="px-3 py-2 text-bolder-muted">
                               {new Date(entry.createdAt).toLocaleDateString("en-IN")}
                             </td>
-                            <td className="px-3 py-2 font-medium text-slate-800">{entry.type}</td>
-                            <td className="px-3 py-2 font-mono text-slate-500">
+                            <td className="px-3 py-2 font-medium text-bolder-text">{entry.type}</td>
+                            <td className="px-3 py-2 font-mono text-bolder-muted">
                               {entry.reference || `Entry #${entry.id}`}
                             </td>
                             <td
                               className={`px-3 py-2 text-right font-bold ${
-                                isPositive ? "text-emerald-600" : "text-amber-600"
+                                isPositive ? "text-bolder-success" : "text-bolder-warning"
                               }`}
                             >
                               {isPositive ? "+" : "-"}₹{Math.abs(entry.amount).toFixed(2)}
@@ -136,11 +136,11 @@ export function SettlementDetailModal({ settlementId, onClose }: SettlementDetai
           )}
         </div>
 
-        <div className="border-t border-slate-100 bg-slate-50 px-6 py-3 text-right">
+        <div className="border-t bolder-line bg-bolder-bg px-6 py-3 text-right">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-300 focus:outline-none"
+            className="rounded-lg bg-bolder-bg px-4 py-2 text-xs font-semibold text-bolder-text hover:bg-bolder-bg-muted focus:outline-none"
           >
             Close
           </button>

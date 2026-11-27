@@ -76,7 +76,7 @@ export function VendorCatalogPage() {
         />
         <Link
           to="/vendor/catalog/new"
-          className={`rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`rounded-md bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}`}
         >
           Add product
         </Link>
@@ -88,7 +88,7 @@ export function VendorCatalogPage() {
         short note rather than a full-page error.
       */}
       {categoriesError && (
-        <p role="alert" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+        <p role="alert" className="rounded-md bg-bolder-warning-surface p-3 text-sm text-bolder-warning">
           Categories could not be loaded, so the category filter and the product form&rsquo;s category
           list are unavailable. Products still list normally.
         </p>
@@ -124,7 +124,7 @@ export function VendorCatalogPage() {
         </Card>
       )}
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-bolder-muted">
         Showing up to {PRODUCT_PAGE_SIZE} products per page. Removing a product hides it from the
         storefront and keeps its stock history.
       </p>

@@ -21,29 +21,29 @@ const STATUS_CONTENT: Record<
   { tone: string; badgeTone: string; headline: string; detail: string }
 > = {
   PENDING_APPROVAL: {
-    tone: "bg-amber-50 border-amber-200 text-amber-900",
-    badgeTone: "bg-amber-100 text-amber-800",
+    tone: "bg-bolder-warning-surface border-bolder-warning-border text-bolder-warning",
+    badgeTone: "bg-bolder-warning-surface text-bolder-warning",
     headline: "Your application is awaiting approval",
     detail:
       "A FlowerConnect administrator has not reviewed your application yet. You can keep editing your profile, delivery settings and opening hours while you wait.",
   },
   APPROVED: {
-    tone: "bg-brand-50 border-brand-100 text-brand-900",
-    badgeTone: "bg-brand-100 text-brand-900",
+    tone: "bg-bolder-blush-light border-bolder-line-control text-bolder-rose-deep",
+    badgeTone: "bg-bolder-blush-light text-bolder-rose-deep",
     headline: "Your vendor account is approved",
     detail:
       "Customers can discover your shop. Keep your delivery settings and opening hours up to date so slots are accurate.",
   },
   REJECTED: {
-    tone: "bg-red-50 border-red-200 text-red-900",
-    badgeTone: "bg-red-100 text-red-800",
+    tone: "bg-bolder-danger-surface border-bolder-danger-border text-bolder-danger",
+    badgeTone: "bg-bolder-danger-surface text-bolder-danger",
     headline: "Your application was rejected",
     detail:
       "Review your business details, address and service location below, then contact FlowerConnect support if you believe this is a mistake.",
   },
   SUSPENDED: {
-    tone: "bg-slate-100 border-slate-300 text-slate-900",
-    badgeTone: "bg-slate-200 text-slate-800",
+    tone: "bg-bolder-bg border-bolder-line text-bolder-text",
+    badgeTone: "bg-bolder-bg text-bolder-text",
     headline: "Your vendor account is suspended",
     detail:
       "Your shop is hidden from customer discovery and vendor features are unavailable. Contact FlowerConnect support to have the suspension reviewed.",

@@ -152,10 +152,10 @@ export function VendorOrderBoardPage() {
       <TodaySummaryStrip summary={summary.data ?? null} isPending={summary.isPending} />
 
       {actionError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <div className="rounded-lg border bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
           <p className="font-semibold">{actionError.message}</p>
           {actionError.code === "INSUFFICIENT_STOCK" && (
-            <p className="mt-1 text-xs text-red-700">
+            <p className="mt-1 text-xs text-bolder-danger">
               Stock was written off or adjusted since this order was placed.
               Open the order and reject it instead.
             </p>
@@ -163,7 +163,7 @@ export function VendorOrderBoardPage() {
           <button
             type="button"
             onClick={() => setActionError(null)}
-            className="mt-3 inline-flex items-center rounded-md border border-transparent bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+            className="mt-3 inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-3 py-1.5 text-xs font-medium text-white hover:bg-bolder-rose-deep"
           >
             Dismiss
           </button>
@@ -171,9 +171,9 @@ export function VendorOrderBoardPage() {
       )}
 
       {!isPending && !error && !hasOrders && (
-        <FadeIn className="rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">No orders yet</h2>
-          <p className="mt-2 text-sm text-slate-600">
+        <FadeIn className="rounded-lg border bolder-line bg-bolder-surface p-6 text-center shadow-sm">
+          <h2 className="text-base font-semibold text-bolder-text">No orders yet</h2>
+          <p className="mt-2 text-sm text-bolder-muted">
             When a customer places an order with your shop, it appears here.
           </p>
         </FadeIn>
@@ -186,14 +186,14 @@ export function VendorOrderBoardPage() {
             return (
               <div key={column.key} className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900">{column.label}</h3>
-                  <span className="text-xs font-medium text-slate-500">{columnOrders.length}</span>
+                  <h3 className="text-sm font-semibold text-bolder-text">{column.label}</h3>
+                  <span className="text-xs font-medium text-bolder-muted">{columnOrders.length}</span>
                 </div>
                 <div
-                  className="flex-1 rounded-lg border border-slate-200 bg-slate-50 min-h-[300px] flex flex-col"
+                  className="flex-1 rounded-lg border bolder-line bg-bolder-bg min-h-[300px] flex flex-col"
                 >
                   {columnOrders.length === 0 && (
-                    <div className="flex-1 flex items-center justify-center text-sm text-slate-400">
+                    <div className="flex-1 flex items-center justify-center text-sm text-bolder-muted">
                       —
                     </div>
                   )}
@@ -252,7 +252,7 @@ export function VendorOrderBoardPage() {
       )}
 
       {hasNonTerminal && (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-bolder-muted">
           Orders refresh automatically while this tab is open.
         </p>
       )}

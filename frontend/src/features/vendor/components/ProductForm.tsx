@@ -21,7 +21,7 @@ import {
 
 const MAX_DESCRIPTION = 2000;
 const CONTROL_CLASS =
-  "mt-1 block w-full rounded-md border-slate-300 shadow-sm transition-[border-color,box-shadow] duration-micro ease-standard focus:border-brand-500 focus:ring-brand-500 sm:text-sm";
+  "mt-1 block w-full rounded-md border-bolder-line-control shadow-sm transition-[border-color,box-shadow] duration-micro ease-standard focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm";
 
 interface ProductFormProps {
   /** The product being edited, or `null` when creating a new one. */
@@ -145,14 +145,14 @@ export function ProductForm({
       />
 
       <div>
-        <label htmlFor="product-category" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="product-category" className="block text-sm font-medium text-bolder-text">
           Category
         </label>
         <select
           id="product-category"
           aria-invalid={errors.categoryId ? true : undefined}
           aria-describedby="product-category-hint"
-          className={`${CONTROL_CLASS} ${errors.categoryId ? "border-red-500" : ""}`}
+          className={`${CONTROL_CLASS} ${errors.categoryId ? "border-bolder-danger-border" : ""}`}
           {...register("categoryId")}
         >
           <option value="">Choose a category</option>
@@ -162,11 +162,11 @@ export function ProductForm({
             </option>
           ))}
         </select>
-        <p id="product-category-hint" className="mt-1 text-xs text-slate-500">
+        <p id="product-category-hint" className="mt-1 text-xs text-bolder-muted">
           Only active categories are listed, and a product must sit in one.
         </p>
         {errors.categoryId?.message && (
-          <p className="mt-1 text-xs text-red-600">{errors.categoryId.message}</p>
+          <p className="mt-1 text-xs text-bolder-danger">{errors.categoryId.message}</p>
         )}
       </div>
 
@@ -180,7 +180,7 @@ export function ProductForm({
       />
 
       <div>
-        <label htmlFor="product-status" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="product-status" className="block text-sm font-medium text-bolder-text">
           Status
         </label>
         <select
@@ -195,13 +195,13 @@ export function ProductForm({
             </option>
           ))}
         </select>
-        <p id="product-status-hint" className="mt-1 text-xs text-slate-500">
+        <p id="product-status-hint" className="mt-1 text-xs text-bolder-muted">
           {PRODUCT_STATUS_HINTS[status]}
         </p>
       </div>
 
       <div>
-        <label htmlFor="product-description" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="product-description" className="block text-sm font-medium text-bolder-text">
           Description
         </label>
         <textarea
@@ -209,30 +209,30 @@ export function ProductForm({
           rows={6}
           aria-invalid={errors.description ? true : undefined}
           aria-describedby="product-description-counter"
-          className={`${CONTROL_CLASS} ${errors.description ? "border-red-500" : ""}`}
+          className={`${CONTROL_CLASS} ${errors.description ? "border-bolder-danger-border" : ""}`}
           {...register("description")}
         />
         <p
           id="product-description-counter"
           className={`mt-1 text-xs ${
-            description.length > MAX_DESCRIPTION ? "text-red-600" : "text-slate-500"
+            description.length > MAX_DESCRIPTION ? "text-bolder-danger" : "text-bolder-muted"
           }`}
         >
           {description.length} / {MAX_DESCRIPTION} characters. Leave blank for no description.
         </p>
         {errors.description?.message && (
-          <p className="mt-1 text-xs text-red-600">{errors.description.message}</p>
+          <p className="mt-1 text-xs text-bolder-danger">{errors.description.message}</p>
         )}
       </div>
 
       {isEdit && product && (
-        <dl className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+        <dl className="rounded-md border bolder-line bg-bolder-bg p-3 text-xs text-bolder-muted">
           <div className="flex gap-2">
-            <dt className="font-medium text-slate-700">Product id</dt>
+            <dt className="font-medium text-bolder-text">Product id</dt>
             <dd>{product.id}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="font-medium text-slate-700">Slug</dt>
+            <dt className="font-medium text-bolder-text">Slug</dt>
             <dd className="truncate">{product.slug}</dd>
           </div>
           <p className="mt-2">

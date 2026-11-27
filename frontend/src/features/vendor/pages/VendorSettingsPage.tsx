@@ -134,7 +134,7 @@ export function VendorSettingsPage() {
 
   if (isPending) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Loading your delivery settings...
       </div>
     );
