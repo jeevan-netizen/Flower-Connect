@@ -66,8 +66,18 @@ services:
       # Empty by default so the bootstrap stays a no-op unless explicitly supplied.
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Spring profile activation (e.g. "dev" to enable the B2B demo seeder).
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+
+      # B2B demo seed (opt-in; credentials supplied only at runtime, never committed).
+      APP_B2B_DEMO_SEED_ENABLED: ${APP_B2B_DEMO_SEED_ENABLED:-false}
+      DEMO_FARMER_EMAIL: ${DEMO_FARMER_EMAIL:-}
+      DEMO_FARMER_PASSWORD: ${DEMO_FARMER_PASSWORD:-}
+      DEMO_SELLER_EMAIL: ${DEMO_SELLER_EMAIL:-}
+      DEMO_SELLER_PASSWORD: ${DEMO_SELLER_PASSWORD:-}
+      DEMO_BUYER_EMAIL: ${DEMO_BUYER_EMAIL:-}
+      DEMO_BUYER_PASSWORD: ${DEMO_BUYER_PASSWORD:-}
     ports:
       - "8080:8080"
     volumes:

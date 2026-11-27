@@ -42,5 +42,11 @@ public enum ErrorCode {
      * A shop's subtotal is below the vendor's {@code min_order_amount}.
      * HTTP 400 because the request is valid but the business rule is not met.
      */
-    MINIMUM_ORDER
+    MINIMUM_ORDER,
+    /**
+     * An e-bill can only be generated for a {@code DELIVERED} B2B order.
+     * HTTP 409, because the order exists but is not in a state that allows
+     * e-bill generation.
+     */
+    E_BILL_NOT_AVAILABLE
 }

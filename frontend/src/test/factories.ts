@@ -54,6 +54,14 @@ import type {
   PaymentStateResponse,
 } from "@/features/payment/types";
 import type { PageResponse } from "@/shared/types";
+import type { B2BOrderResponse, B2BOrderPageResponse, B2BOrderStatus, B2BOrderItemResponse } from "@/features/b2b/types";
+import type {
+  B2BStatementResponse,
+  B2BStatementPageResponse,
+  B2BStatementPreviewResponse,
+  B2BStatementOrderSummary,
+} from "@/features/b2b/types";
+import type { SellerSummary, B2BProductSummary } from "@/features/b2b/types";
 
 /**
  * A profile fixture shaped exactly like `VendorProfileResponse`, so tests exercise
@@ -798,3 +806,197 @@ export function makeVendorOrderSummaryResponse(
     ...overrides,
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* B2B fixtures (Stage 4 of the B2B module)                                   */
+/* -------------------------------------------------------------------------- */
+
+export function makeSellerSummary(
+  overrides: Partial<SellerSummary> = {},
+): SellerSummary {
+  return {
+    vendorId: 7,
+    businessName: "Petal & Stem",
+    addressLine1: "12 MG Road",
+    city: "Bengaluru",
+    area: "Indiranagar",
+    pincode: "560038",
+    deliveryRadiusKm: 5,
+    ...overrides,
+  };
+}
+
+export function makeB2BProductSummary(
+  overrides: Partial<B2BProductSummary> = {},
+): B2BProductSummary {
+  return {
+    productId: 101,
+    productName: "Red Rose Bouquet",
+    unitPrice: 899,
+    unit: "bunch",
+    availableStock: 24,
+    ...overrides,
+  };
+}
+
+export function makeB2BOrderItemResponse(
+  overrides: Partial<{
+    id: number;
+    productId: number;
+    productName: string;
+    unit: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+  }> = {},
+) {
+  return {
+    id: 1,
+    productId: 101,
+    productName: "Red Rose Bouquet",
+    unit: "bunch",
+    quantity: 2,
+    unitPrice: 899,
+    lineTotal: 1798,
+    ...overrides,
+  };
+}
+
+export function makeB2BOrderResponse(
+  overrides: Partial<{
+    id: number;
+    orderNo: string;
+    buyerId: number;
+    buyerName: string;
+    sellerId: number;
+    sellerName: string;
+    status: B2BOrderStatus;
+    paymentStatus: "UNPAID" | "PAID";
+    total: number;
+    orderNote: string | null;
+    shipmentReference: string | null;
+    shippedAt: string | null;
+    deliveredAt: string | null;
+    billNumber: string | null;
+    items: B2BOrderItemResponse[];
+  }> = {},
+): B2BOrderResponse {
+  return {
+    id: 5001,
+    orderNo: "B2B-1001",
+    buyerId: 7,
+    buyerName: "Buyer Florist",
+    sellerId: 11,
+    sellerName: "Seller Florist",
+    status: "PLACED" as B2BOrderStatus,
+    paymentStatus: "UNPAID",
+    total: 1823,
+    orderNote: null,
+    shipmentReference: null,
+    shippedAt: null,
+    deliveredAt: null,
+    billNumber: null,
+    placedAt: "2026-11-25T10:00:00",
+    updatedAt: "2026-11-25T10:00:00",
+    items: [makeB2BOrderItemResponse()],
+    ...overrides,
+  };
+}
+
+export function makeB2BOrderPageResponse(
+  overrides: Partial<B2BOrderPageResponse> = {},
+): B2BOrderPageResponse {
+  const content = overrides.content ?? [makeB2BOrderResponse()];
+  return {
+    content,
+    page: 0,
+    size: 20,
+    totalElements: content.length,
+    totalPages: 1,
+    first: true,
+    last: true,
+    empty: content.length === 0,
+    ...overrides,
+  };
+}
+
+export function makeB2BStatementOrderSummary(
+  overrides: Partial<B2BStatementOrderSummary> = {},
+): B2BStatementOrderSummary {
+  return {
+    id: 5001,
+    orderNo: "B2B-1001",
+    status: "DELIVERED" as B2BOrderStatus,
+    paymentStatus: "UNPAID",
+    total: 1823,
+    deliveredAt: "2026-11-24T10:00:00",
+    buyerId: 7,
+    sellerId: 11,
+    ...overrides,
+  };
+}
+
+export function makeB2BStatementPreviewResponse(
+  overrides: Partial<{
+    orders: B2BStatementOrderSummary[];
+    totalAmount: number;
+  }> = {},
+): B2BStatementPreviewResponse {
+  return {
+    orders: [makeB2BStatementOrderSummary()],
+    totalAmount: 1823,
+    ...overrides,
+  };
+}
+
+export function makeB2BStatementResponse(
+  overrides: Partial<{
+    id: number;
+    statementNo: string;
+    sellerId: number;
+    sellerName: string;
+    buyerId: number;
+    buyerName: string;
+    status: "OPEN" | "PAID";
+    totalAmount: number;
+    orders: B2BStatementOrderSummary[];
+  }> = {},
+): B2BStatementResponse {
+  return {
+    id: 101,
+    statementNo: "STM-1001",
+    sellerId: 11,
+    sellerName: "Seller Florist",
+    buyerId: 7,
+    buyerName: "Buyer Florist",
+    periodStart: "2026-11-10T00:00:00",
+    periodEnd: "2026-11-24T23:59:59.999999",
+    totalAmount: 1823,
+    status: "OPEN" as "OPEN" | "PAID",
+    paidAt: null,
+    paymentMode: null,
+    paymentNote: null,
+    createdAt: "2026-11-25T10:00:00",
+    updatedAt: "2026-11-25T10:00:00",
+    orders: [makeB2BStatementOrderSummary()],
+    ...overrides,
+  };
+}
+
+export function makeB2BStatementPageResponse(
+  overrides: Partial<B2BStatementPageResponse> = {},
+): B2BStatementPageResponse {
+  const content = overrides.content ?? [makeB2BStatementResponse()];
+  return {
+    content,
+    page: 0,
+    size: 20,
+    totalElements: content.length,
+    totalPages: 1,
+    first: true,
+    last: true,
+    empty: content.length === 0,
+    ...overrides,
+  };
+}
+

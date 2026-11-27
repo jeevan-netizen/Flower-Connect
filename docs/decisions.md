@@ -2109,10 +2109,13 @@ and unit-tests the state machine only.
   scalar-only OrderStatusChanged plus OrderCancelled (cancellations) or
   OrderDelivered (delivery) after the transaction commits.
 - Stock side effects go through InventoryService (commitReservedStock,
-  eleaseReservedStock, estockCancelledOrder), with inventory rows locked
+  
+eleaseReservedStock, 
+estockCancelledOrder), with inventory rows locked
   in ascending product-id order after the order lock:
   PLACED -> CONFIRMED commits reserved stock (quantity -= q,
-  eserved_quantity -= q, SALE_ONLINE) and re-checks quantity >= q (409
+  
+eserved_quantity -= q, SALE_ONLINE) and re-checks quantity >= q (409
   otherwise); PLACED -> REJECTED/CANCELLED releases the reservation
   (RELEASE); CONFIRMED -> CANCELLED restocks (RESTOCK); cancellations from
   PREPARING/OUT_FOR_DELIVERY do not restock; OUT_FOR_DELIVERY -> DELIVERED
@@ -2747,6 +2750,27 @@ so the transport choice and the delivery guarantees had to be settled before imp
 - The heartbeat cron is disabled in the test profile (`"-"`); delivery is driven directly in tests
   for determinism.
 - No secrets or tokens are logged or placed in URLs.
+
+---
+
+## D-63: Pass `null` (not `undefined`) to `useSellers` for unrestricted buyer/seller fetch
+
+**Status:** Accepted
+**Date:** B2B Demo Verification (2026-11-26)
+
+### Context
+
+`useSellers(query)` enables the TanStack Query call only when `query !== undefined`. Calling `useSellers()` with no argument on `B2BStatementsPage` left `query` as `undefined`, disabling the query so the buyer dropdown stayed empty.
+
+### Decision
+
+Keep `query === undefined` as the disabled sentinel (used when a search input is not yet active) and pass `null` (`useSellers(null)`) when an unrestricted list of approved vendors is needed immediately on mount.
+
+### Consequences
+
+- `B2BStatementsPage` loads all eligible buyers immediately without requiring a search keystroke.
+- Callers that intentionally defer fetching until user input can still pass `undefined`.
+
 
 
 

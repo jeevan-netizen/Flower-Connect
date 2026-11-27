@@ -35,3 +35,6 @@ dbhub.toml
 
 # Uploads
 uploads/
+
+# Local TLS dev certificates
+certs/

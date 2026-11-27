@@ -27,7 +27,9 @@ class RoleRepositoryIT extends AbstractIntegrationTest {
 
     @Test
     void shouldFindAllRoles() {
-        assertEquals(3, roleRepository.findAll().size());
+        // CUSTOMER, FLORIST, ADMIN are seeded by V3, and FARMER is seeded by V35
+        // (Phase 11 farmer module). The count is therefore 4, not 3.
+        assertEquals(4, roleRepository.findAll().size());
     }
 
     @Test

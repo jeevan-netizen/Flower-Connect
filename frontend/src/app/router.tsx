@@ -42,6 +42,15 @@ import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
 import { AdminVendorsPage } from "@/features/admin/pages/AdminVendorsPage";
 import { AdminUsersPage } from "@/features/admin/pages/AdminUsersPage";
 import { AdminBillingPage } from "@/features/admin/pages/AdminBillingPage";
+import { FarmerDashboardPage } from "@/features/farmer/pages/FarmerDashboardPage";
+import { FarmerVendorBrowsePage } from "@/features/farmer/pages/FarmerVendorBrowsePage";
+import { FarmerPassbookPage } from "@/features/farmer/pages/FarmerPassbookPage";
+import { VendorFarmersListPage } from "@/features/vendor/pages/VendorFarmersListPage";
+import { VendorFarmerPassbookPage } from "@/features/vendor/pages/VendorFarmerPassbookPage";
+import { B2BPlaceOrderPage } from "@/features/b2b/pages/B2BPlaceOrderPage";
+import { B2BOrdersPage } from "@/features/b2b/pages/B2BOrdersPage";
+import { B2BOrderDetailPage } from "@/features/b2b/pages/B2BOrderDetailPage";
+import { B2BStatementsPage } from "@/features/b2b/pages/B2BStatementsPage";
 import { AdminReviewsPage } from "@/features/admin/pages/AdminReviewsPage";
 import { AdminAnalyticsPage } from "@/features/admin/pages/AdminAnalyticsPage";
 
@@ -50,6 +59,9 @@ const CUSTOMER_ROLE = "CUSTOMER";
 
 /** Seeded role name for vendors. The plan calls this role "VENDOR"; the seeded role is FLORIST and is not renamed (docs/decisions.md, D-11). */
 const VENDOR_ROLE = "FLORIST";
+
+/** Seeded role name for farmers (V35 migration). */
+const FARMER_ROLE = "FARMER";
 
 /** Seeded role name for administrators (`roles` row 3, V3__seed_roles.sql). */
 const ADMIN_ROLE = "ADMIN";
@@ -217,6 +229,21 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // Phase 11 farmer dashboard shell. Guarded by FARMER role; the backend
+        // re-checks the role on every request.
+        path: "farmer",
+        element: (
+          <ProtectedRoute roles={[FARMER_ROLE]}>
+            <VendorLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <FarmerDashboardPage /> },
+          { path: "vendors", element: <FarmerVendorBrowsePage /> },
+          { path: "links/:linkId/passbook", element: <FarmerPassbookPage /> },
+        ],
+      },
+      {
         // Phase 2 vendor dashboard shell. The guard is UX gating only — the
         // backend re-checks ROLE_FLORIST (and, for approved-only vendor
         // features, the approval state) on every request.
@@ -245,6 +272,19 @@ export const router = createBrowserRouter([
           { path: "orders", element: <VendorOrderBoardPage /> },
           { path: "disputes", element: <VendorDisputesPage /> },
           { path: "billing", element: <VendorBillingPage /> },
+          // Phase 3 Stage 3 B2B module (Stage 4 of the B2B module): place an
+          // order, list and detail orders, and statements with payment
+          // recording. Place-order and statements are vendor transactions, so
+          // they are approval-gated at the UX layer; orders list/detail are
+          // read-only over the caller's own orders like the vendor order board
+          // (D-6).
+          { path: "b2b/place-order", element: gated(<B2BPlaceOrderPage />) },
+          { path: "b2b/orders", element: <B2BOrdersPage /> },
+          { path: "b2b/orders/:orderId", element: <B2BOrderDetailPage /> },
+          { path: "b2b/statements", element: gated(<B2BStatementsPage />) },
+          // Phase 11 vendor farmer management (Stage 3 of the farmer module).
+          { path: "farmers", element: <VendorFarmersListPage /> },
+          { path: "farmer-links/:linkId/passbook", element: <VendorFarmerPassbookPage /> },
           { path: "pos", element: gated(<VendorPosPage />) },
           // Phase 12 vendor analytics (task 12.5): marketplace and POS metrics
           // for the vendor's own date range. FLORIST role only; suspended

@@ -29,6 +29,7 @@
         <caffeine.version>3.1.8</caffeine.version>
         <springdoc.version>2.3.0</springdoc.version>
         <twelvemonkeys.version>3.15.2</twelvemonkeys.version>
+        <pdfbox.version>2.0.33</pdfbox.version>
     </properties>
 
     <dependencies>
@@ -139,6 +140,15 @@
             <groupId>com.twelvemonkeys.imageio</groupId>
             <artifactId>imageio-webp</artifactId>
             <version>${twelvemonkeys.version}</version>
+        </dependency>
+
+        <!-- PDF generation: Apache PDFBox for B2B e-bills (Stage 2).
+             Apache 2.0 licensed, pure Java, no native dependencies, well maintained,
+             and ships PDFTextStripper for reliable text extraction in tests. -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
         </dependency>
 
         <!-- API Documentation: springdoc-openapi -->

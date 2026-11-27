@@ -20,6 +20,9 @@ const VENDOR_ROLE = "FLORIST";
 /** Seeded role name for administrators (`roles` row 3, V3__seed_roles.sql). */
 const ADMIN_ROLE = "ADMIN";
 
+/** Seeded role name for farmers (V35 migration). */
+const FARMER_ROLE = "FARMER";
+
 /** Seeded role name for customers (V3__seed_roles.sql). */
 const CUSTOMER_ROLE = "CUSTOMER";
 
@@ -200,6 +203,11 @@ export function SiteHeader() {
           {user?.role === VENDOR_ROLE && (
             <Link className={NAV_LINK} to="/vendor">
               Vendor
+            </Link>
+          )}
+          {user?.role === FARMER_ROLE && (
+            <Link className={NAV_LINK} to="/farmer">
+              Farmer
             </Link>
           )}
           {user?.role === ADMIN_ROLE && (

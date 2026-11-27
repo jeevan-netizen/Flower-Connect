@@ -377,6 +377,32 @@ public class InventoryService {
     }
 
     /**
+     * Restocks a cancelled accepted order with a custom reason.
+     */
+    @Transactional
+    public void restockCancelledOrder(List<StockDelta> deltas, User actor, String reason) {
+        Map<Long, Inventory> locked = lockInventoriesAscending(deltas);
+        applyStockChanges(locked, deltas, MovementType.RESTOCK, actor, reason);
+    }
+
+    /**
+     * Deducts seller stock when a B2B order is accepted
+     * ({@code PLACED &#8594; ACCEPTED}): for every item,
+     * {@code quantity -= q} with a {@code SALE_POS} movement.
+     * {@code reserved_quantity} is untouched because B2B orders do not
+     * reserve stock at placement. Re-checks {@code quantity >= q} under
+     * the lock and refuses with 409 `INSUFFICIENT_STOCK` if stock was
+     * consumed since placement. Inventory rows are locked in ascending
+     * product-id order to avoid deadlocks.
+     */
+    @Transactional
+    public void deductForB2BAccept(List<StockDelta> deltas, User actor, String reason) {
+        Map<Long, Inventory> locked = lockInventoriesAscending(deltas);
+        validateQuantityForB2B(locked, deltas);
+        applyB2BDeductions(locked, deltas, actor, reason);
+    }
+
+    /**
      * Deducts available stock for a POS walk-in sale (plan Phase 11, task 11.3).
      * For every item, {@code quantity -= q} with a {@code SALE_POS} movement.
      * Validates {@code available = quantity - reserved_quantity >= q} under the
@@ -579,6 +605,44 @@ public class InventoryService {
                                 "': only " + inventory.getReservedQuantity() + " unit(s) reserved, " +
                                 delta.quantity() + " requested");
             }
+        }
+    }
+
+    /**
+     * Validates that each locked inventory has enough on-hand quantity
+     * for a B2B acceptance. Unlike the customer order path, B2B orders
+     * do not reserve stock at placement, so {@code reserved_quantity}
+     * is zero and the check is simply {@code quantity >= q}.
+     */
+    private void validateQuantityForB2B(Map<Long, Inventory> locked, List<StockDelta> deltas) {
+        for (StockDelta delta : deltas) {
+            Inventory inventory = locked.get(delta.productId());
+            if (inventory.getQuantity() < delta.quantity()) {
+                Product product = requireProduct(delta.productId());
+                throw BusinessException.insufficientStock(
+                        "Cannot accept B2B order for product '" + product.getName() +
+                                "': " + inventory.getQuantity() + " unit(s) on hand, " +
+                                delta.quantity() + " required");
+            }
+        }
+    }
+
+    private void applyB2BDeductions(Map<Long, Inventory> locked, List<StockDelta> deltas,
+                                    User actor, String reason) {
+        for (StockDelta delta : deltas) {
+            Inventory inventory = locked.get(delta.productId());
+            Product product = requireProduct(delta.productId());
+
+            inventory.setQuantity(inventory.getQuantity() - delta.quantity());
+            inventoryRepository.saveAndFlush(inventory);
+
+            stockMovementRepository.save(StockMovement.builder()
+                    .product(product)
+                    .movementType(StockMovement.MovementType.SALE_POS)
+                    .quantityDelta(-delta.quantity())
+                    .reason(reason)
+                    .actor(actor)
+                    .build());
         }
     }
 
