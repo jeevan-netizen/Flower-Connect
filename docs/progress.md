@@ -2322,3 +2322,32 @@ Added an admin-only Farmer Management section to the existing Admin area. Backen
 - Focused frontend run: **136/136 passed** across the affected auth, router, admin farmer, vendor registration/layout, farmer overview, and admin layout files. Follow-up focused checks: **59/59 passed** for SiteHeader, AdminVendorsPage, and ProductDetailPage; the AdminVendorsPage file also passed **24/24** after replacing slow character-by-character typing in its 501-character validation test.
 - Frontend full suite: **978/979 passed** (98/99 files) on the first full rerun. Its sole failure was that character-by-character 501-character test hitting Vitest's 30-second timeout under suite load. The direct input-change replacement passed in the focused 24-test rerun; the entire suite was not rerun after that test-only speed improvement.
 - Frontend typecheck and lint passed. Production build passed (819 modules; Vite reported the existing large-chunk warning for the main bundles).
+
+## Frontend Visual Redesign — Shared Foundation & Public Pages - COMPLETE (2026-11-27)
+
+Visual redesign of the FlowerConnect frontend to a warm, editorial florist look (warm ivory backgrounds, rose primary actions, muted green accents, Fraunces headings, DM Sans body). Reuses existing tokens in `src/app/styles/index.css`; no new dependencies added. No backend, API, route, validation, or calculation changes.
+
+**Shared foundation fixes:**
+- `src/shared/ui/classes.ts`: CONTROL recipe focus ring changed from `brand-600`/`brand-500` to `bolder-rose` tokens.
+- `src/motion/pressable.ts`: `FOCUS_RING` changed from `ring-brand-500` to `ring-bolder-rose`.
+- `src/features/review/components/StarRating.tsx`: `slate-500`/`slate-300`/`amber-400`/`amber-500`/`slate-600` → `bolder-muted`/`bolder-rose-deep`/`bolder-rose`.
+- `src/shared/components/Pagination.tsx`: `slate-300`/`slate-700`/`slate-200`/`slate-600`/`slate-500` → `bolder-line-control`/`bolder-surface`/`bolder-text`/`bolder-surface-muted`/`bolder-line`/`bolder-muted`.
+- `src/shared/components/ProtectedRoute.tsx`: `slate-50`/`slate-200`/`white`/`slate-900`/`slate-600` → `bolder-bg`/`bolder-line`/`bolder-surface`/`bolder-text`/`bolder-muted`.
+- `src/motion/FlowerSuccess.tsx`: `brand-600` → `bolder-rose-action`.
+- `src/motion/FlowerLoader.tsx`: `brand-500` → `bolder-rose-action`.
+- `src/motion/StatusPill.test.tsx`: test tone classes updated to match new tokens.
+
+**Public pages converted to token classes:**
+- `src/features/customer/components/ProductCard.tsx`: fixed unused `BUTTON_PRIMARY` import, added `PRESSABLE` import, converted all raw `slate-*`/`brand-*`/`amber-*` to `bolder-*`.
+- `src/features/customer/components/CustomerErrorState.tsx`, `AddToCartButton.tsx`, `ProductGrid.tsx`, `LocationPrompt.tsx`, `ProductImage.tsx`, `ProductImagePlaceholder.tsx`, `StorefrontHours.tsx`, `SearchFilters.tsx`: raw `slate-*`/`brand-*`/`green-*`/`red-*` → `bolder-*`.
+- `src/features/customer/pages/ProductDetailPage.tsx`: `brand-700`/`brand-900` → `bolder-rose-strong`/`bolder-rose-deep`.
+
+**Three.js removal:**
+- Removed entire dead `src/features/home/hero/` directory (17 files: `Bouquet.tsx`, `BouquetScene.tsx`, `BouquetHero.tsx`, `HeroFallback.tsx`, `bouquet-layout.ts`, `useSceneActivity.ts`, `bouquet-palette.ts`, plus their tests). `HomePage` already used the static `BotanicalHero` SVG; nothing imported `BouquetHero` except its own test.
+- Removed `@react-three/fiber`, `three`, `@types/three` from `frontend/package.json`; `package-lock.json` synced via `npm install`.
+
+**Verification:**
+- `npm run typecheck`: PASS
+- `npm run lint`: PASS
+- `npm run build`: PASS (18.91s)
+- `npm test`: **93 test files / 950 tests passed** (was 99 files / 979 tests; 6 Three.js test files / 29 tests removed). No failures.
