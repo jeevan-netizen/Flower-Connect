@@ -92,6 +92,30 @@ public class AppProperties {
      */
     private int webhookMaxBodyBytes = 65_536;
 
+    /**
+     * Razorpay test-mode Key ID. Public identifier used to initialise Razorpay
+     * Standard Checkout on the frontend. Configured from
+     * {@code RAZORPAY_KEY_ID} / {@code app.razorpay.key-id}. There is no
+     * default; Razorpay order creation fails with a clear error when absent.
+     */
+    private String razorpayKeyId;
+
+    /**
+     * Razorpay test-mode Key Secret. Used server-side only to create Razorpay
+     * orders and verify checkout/webhook signatures. Never sent to the frontend.
+     * Configured from {@code RAZORPAY_KEY_SECRET} / {@code app.razorpay.key-secret}.
+     */
+    private String razorpayKeySecret;
+
+    /**
+     * Razorpay webhook secret. Used to verify {@code X-Razorpay-Signature} on
+     * {@code POST /api/v1/payments/razorpay/webhook}. Not required at startup;
+     * the webhook endpoint rejects all requests when absent (fail-safe).
+     * Configured from {@code RAZORPAY_WEBHOOK_SECRET} /
+     * {@code app.razorpay.webhook-secret}.
+     */
+    private String razorpayWebhookSecret;
+
     public String getBaseUrl() {
         return baseUrl;
     }
@@ -293,5 +317,29 @@ public class AppProperties {
 
     public void setOverdueDays(int overdueDays) {
         this.overdueDays = overdueDays;
+    }
+
+    public String getRazorpayKeyId() {
+        return razorpayKeyId;
+    }
+
+    public void setRazorpayKeyId(String razorpayKeyId) {
+        this.razorpayKeyId = razorpayKeyId;
+    }
+
+    public String getRazorpayKeySecret() {
+        return razorpayKeySecret;
+    }
+
+    public void setRazorpayKeySecret(String razorpayKeySecret) {
+        this.razorpayKeySecret = razorpayKeySecret;
+    }
+
+    public String getRazorpayWebhookSecret() {
+        return razorpayWebhookSecret;
+    }
+
+    public void setRazorpayWebhookSecret(String razorpayWebhookSecret) {
+        this.razorpayWebhookSecret = razorpayWebhookSecret;
     }
 }

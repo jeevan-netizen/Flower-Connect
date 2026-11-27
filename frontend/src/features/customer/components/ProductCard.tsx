@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import type { PublicProduct } from "@/features/customer/types";
 import { formatAvailability, formatMoney } from "@/features/customer/format";
-import { ProductImagePlaceholder } from "@/features/customer/components/ProductImagePlaceholder";
+import { ProductImage } from "@/features/customer/components/ProductImage";
 import { createOverlayState } from "@/features/customer/navigation";
 import { AnimatedCard } from "@/motion/AnimatedCard";
 import { PRESSABLE } from "@/motion/pressable";
@@ -16,6 +16,8 @@ interface ProductCardProps {
    * product opened from the results keeps the results behind it.
    */
   detailPathBase?: string;
+  /** The selected delivery location, needed to serve the product image. */
+  locationId?: number | null;
   /** Hides the add-to-cart control, for contexts that render their own. */
   showAddToCart?: boolean;
   onAddToCart?: (product: PublicProduct) => void;
@@ -39,6 +41,7 @@ export function ProductCard({
   product,
   vendorId,
   detailPathBase,
+  locationId,
   showAddToCart = false,
   onAddToCart,
   isAdding = false,
@@ -63,7 +66,12 @@ export function ProductCard({
           state={overlayState}
           className="block focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 rounded-lg"
         >
-          <ProductImagePlaceholder image={image} productName={product.name} />
+          <ProductImage
+            productId={product.id}
+            image={image}
+            productName={product.name}
+            locationId={locationId ?? null}
+          />
         </Link>
 
         <div className="flex-1">

@@ -24,6 +24,21 @@ import type { PageResponse } from "@/shared/types";
 
 export const FARMER_ROLE = "FARMER";
 
+export interface FarmerRegisterRequest {
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string | null;
+  address?: string;
+}
+
+export interface FarmerRegisterResponse {
+  id: number;
+  email: string;
+  fullName: string;
+  role: string;
+}
+
 export const LINK_STATUSES = ["PENDING", "ACTIVE", "REJECTED", "SUSPENDED"] as const;
 export type LinkStatus = (typeof LINK_STATUSES)[number];
 
@@ -64,6 +79,16 @@ export interface FarmerVendor {
   businessName: string;
   vendorStatus: string;
   linkStatus: LinkStatus | null;
+}
+
+/** Mirrors `FarmerProfileResponse` (GET /api/v1/farmer/profile). */
+export interface FarmerProfile {
+  id: number;
+  email: string;
+  fullName: string;
+  phone: string | null;
+  address: string | null;
+  role: string;
 }
 
 /** Mirrors `FarmerCollectionRequest`. */

@@ -4,6 +4,8 @@ import type {
   AdminRole,
   AdminUser,
   AdminUserPageResponse,
+  ApproveServiceLocationProposalRequest,
+  ServiceLocationProposal,
   UserStatus,
   UserStatusUpdateRequest,
   VendorAdminReasonRequest,
@@ -94,6 +96,51 @@ export async function suspendVendor(
  */
 export async function reinstateVendor(profileId: number): Promise<VendorProfile> {
   const response = await api.post<VendorProfile>(`/admin/vendors/${profileId}/reinstate`);
+  return response.data;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Service location proposals (Phase 14 vendor registration)                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `GET /api/v1/locations/proposals` — pending proposals awaiting administrator
+ * review, oldest first. No pagination parameters are sent: the backend returns
+ * every PENDING proposal in one list (the volume is low by design).
+ */
+export async function fetchServiceLocationProposals(): Promise<ServiceLocationProposal[]> {
+  const response = await api.get<ServiceLocationProposal[]>("/locations/proposals");
+  return response.data;
+}
+
+/**
+ * `POST /api/v1/locations/proposals/{id}/approve` — flips a PENDING proposal to
+ * APPROVED and creates the real service location with administrator-supplied
+ * coordinates and timezone.
+ */
+export async function approveServiceLocationProposal(
+  proposalId: number,
+  payload: ApproveServiceLocationProposalRequest,
+): Promise<ServiceLocationProposal> {
+  const response = await api.post<ServiceLocationProposal>(
+    `/locations/proposals/${proposalId}/approve`,
+    payload,
+  );
+  return response.data;
+}
+
+/**
+ * `POST /api/v1/locations/proposals/{id}/reject` — flips a PENDING proposal to
+ * REJECTED and records the reason.
+ */
+export async function rejectServiceLocationProposal(
+  proposalId: number,
+  payload: VendorAdminReasonRequest,
+): Promise<ServiceLocationProposal> {
+  const response = await api.post<ServiceLocationProposal>(
+    `/locations/proposals/${proposalId}/reject`,
+    payload,
+  );
   return response.data;
 }
 

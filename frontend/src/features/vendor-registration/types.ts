@@ -40,6 +40,9 @@ export interface VendorRegisterRequest {
   addressLine1: string;
   addressLine2: string | null;
   logoUrl: string | null;
+  city: string;
+  area: string;
+  pincode: string;
   serviceLocationId: number;
 }
 
@@ -55,6 +58,9 @@ export interface VendorRegisterFormValues {
   addressLine1: string;
   addressLine2: string;
   logoUrl: string;
+  city: string;
+  area: string;
+  pincode: string;
   serviceLocationId: string;
 }
 
@@ -69,6 +75,9 @@ export const VENDOR_REGISTER_DEFAULTS: VendorRegisterFormValues = {
   addressLine1: "",
   addressLine2: "",
   logoUrl: "",
+  city: "",
+  area: "",
+  pincode: "",
   serviceLocationId: "",
 };
 
@@ -77,7 +86,10 @@ export const VENDOR_REGISTER_DEFAULTS: VendorRegisterFormValues = {
  *
  * `confirmPassword` is client-only and is dropped; blank optional text becomes
  * `null` so it is not sent as an empty string; the picker's string id becomes the
- * numeric `serviceLocationId` the backend's `@Positive Long` expects.
+ * numeric `serviceLocationId` the backend's `@Positive Long` expects. The shop's
+ * city, area and pincode are sent as the shop address; when that area is not yet a
+ * seeded service location the backend persists it as a PENDING service-area proposal
+ * for administrator review.
  */
 export function buildVendorRegisterRequest(
   values: VendorRegisterFormValues,
@@ -94,6 +106,9 @@ export function buildVendorRegisterRequest(
     addressLine1: values.addressLine1.trim(),
     addressLine2: text(values.addressLine2),
     logoUrl: text(values.logoUrl),
+    city: values.city.trim(),
+    area: values.area.trim(),
+    pincode: values.pincode.trim(),
     serviceLocationId: Number(values.serviceLocationId),
   };
 }

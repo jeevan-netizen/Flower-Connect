@@ -28,8 +28,9 @@ import type {
   OrderItemSummary,
   SlotResponse,
 } from "@/features/checkout/types";
+import type { UserResponse } from "@/features/auth/types";
 import type { ServiceLocationGroup } from "@/features/location/types";
-import type { AdminRole, AdminUser, UserStatus } from "@/features/admin/types";
+import type { AdminRole, AdminUser, ServiceLocationProposal, UserStatus } from "@/features/admin/types";
 import type {
   DiscoveryVendor,
   PublicProduct,
@@ -133,6 +134,22 @@ export function makeAdminUser(overrides: Partial<AdminUser> = {}): AdminUser {
 }
 
 /**
+ * A customer user fixture shaped exactly like `UserResponse`: id, email,
+ * fullName, phone, role, createdAt — and deliberately no credential material.
+ */
+export function makeUserResponse(overrides: Partial<UserResponse> = {}): UserResponse {
+  return {
+    id: 42,
+    email: "buyer@example.com",
+    fullName: "Bea Buyer",
+    phone: "+919876543210",
+    role: "CUSTOMER",
+    createdAt: "2026-09-02T09:15:00",
+    ...overrides,
+  };
+}
+
+/**
  * A page fixture shaped exactly like `VendorProfilePageResponse` /
  * `AdminUserPageResponse`, which are the same shape. Defaults are derived from
  * `content` so `first`/`last`/`totalPages` stay consistent unless a test
@@ -168,6 +185,29 @@ export function makeServiceLocations(
       ...overrides,
     },
   ];
+}
+
+/**
+ * A service-location proposal fixture shaped exactly like
+ * `ServiceLocationProposalResponse`, as `GET /api/v1/locations/proposals` sends it.
+ */
+export function makeServiceLocationProposal(
+  overrides: Partial<ServiceLocationProposal> = {},
+): ServiceLocationProposal {
+  return {
+    id: 1,
+    city: "Bengaluru",
+    area: "Bommanahalli",
+    pincode: "560068",
+    addressLine1: "12 MG Road",
+    addressLine2: null,
+    status: "PENDING",
+    proposedByEmail: "vendor@example.com",
+    rejectionReason: null,
+    createdAt: "2026-11-24T10:00:00",
+    reviewedAt: null,
+    ...overrides,
+  };
 }
 
 export function makePage<T>(

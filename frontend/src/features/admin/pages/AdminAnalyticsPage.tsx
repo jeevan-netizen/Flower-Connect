@@ -148,11 +148,22 @@ function DailyTrendTable({ trends }: { trends: AnalyticsDailyTrend[] }) {
 }
 
 export function AdminAnalyticsPage() {
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+  const defaultTo = new Date();
+  const defaultFrom = addDays(defaultTo, -(DEFAULT_RANGE_DAYS - 1));
+  const defaultFromStr = formatDateInput(defaultFrom);
+  const defaultToStr = formatDateInput(defaultTo);
+  const minDate = addDays(defaultTo, -(MAX_RANGE_DAYS - 1));
 
-  const overview = useAnalyticsOverview(fromDate || undefined, toDate || undefined);
-  const trends = useAnalyticsDailyTrends(fromDate || undefined, toDate || undefined);
+  // `draft*` dates are what the user is typing; `applied*` dates are what is
+  // actually sent to the analytics API. Keeping them separate lets the user edit
+  // a draft range without re-fetching, and only applies on an explicit Apply.
+  const [draftFromDate, setDraftFromDate] = useState(defaultFromStr);
+  const [draftToDate, setDraftToDate] = useState(defaultToStr);
+  const [appliedFromDate, setAppliedFromDate] = useState(defaultFromStr);
+  const [appliedToDate, setAppliedToDate] = useState(defaultToStr);
+
+  const overview = useAnalyticsOverview(appliedFromDate || undefined, appliedToDate || undefined);
+  const trends = useAnalyticsDailyTrends(appliedFromDate || undefined, appliedToDate || undefined);
 
   if (overview.isError || trends.isError) {
     return (
@@ -169,9 +180,40 @@ export function AdminAnalyticsPage() {
   const data = overview.data;
   const trendData = trends.data ?? [];
 
-  const defaultTo = new Date();
-  const defaultFrom = addDays(defaultTo, -(DEFAULT_RANGE_DAYS - 1));
-  const minDate = addDays(defaultTo, -(MAX_RANGE_DAYS - 1));
+  function validateRange(from: string, to: string): string | null {
+    if (from && !to) return "Please enter both start and end dates.";
+    if (!from && to) return "Please enter both start and end dates.";
+    if (from && to && from > to) return "Start date must be on or before end date.";
+    return null;
+  }
+
+  // Recompute the validation message from the draft so the user sees it while
+  // editing, but never re-fetch until Apply is pressed with a valid range.
+  const draftRangeError =
+    (draftFromDate || draftToDate) ? validateRange(draftFromDate, draftToDate) : null;
+
+  const handleApply = () => {
+    const error = validateRange(draftFromDate, draftToDate);
+    if (error) {
+      return;
+    }
+    setAppliedFromDate(draftFromDate);
+    setAppliedToDate(draftToDate);
+  };
+
+  const handleReset = () => {
+    setDraftFromDate(defaultFromStr);
+    setDraftToDate(defaultToStr);
+    setAppliedFromDate(defaultFromStr);
+    setAppliedToDate(defaultToStr);
+  };
+
+  const handleClear = () => {
+    setDraftFromDate("");
+    setDraftToDate("");
+    setAppliedFromDate("");
+    setAppliedToDate("");
+  };
 
   return (
     <div className="space-y-6">
@@ -189,38 +231,48 @@ export function AdminAnalyticsPage() {
         <label className="text-xs font-medium text-slate-700">Date range</label>
         <div className="flex items-center gap-2">
           <input
+            data-testid="from-date-input"
             type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
+            value={draftFromDate}
+            onChange={(e) => setDraftFromDate(e.target.value)}
             min={formatDateInput(minDate)}
             max={formatDateInput(defaultTo)}
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
           <span className="text-slate-500">to</span>
           <input
+            data-testid="to-date-input"
             type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
+            value={draftToDate}
+            onChange={(e) => setDraftToDate(e.target.value)}
             min={formatDateInput(minDate)}
             max={formatDateInput(defaultTo)}
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
+        {draftRangeError ? (
+          <span data-testid="range-error" className="text-xs text-red-600 font-medium ml-2">
+            {draftRangeError}
+          </span>
+        ) : null}
         <button
-          onClick={() => {
-            setFromDate(formatDateInput(defaultFrom));
-            setToDate(formatDateInput(defaultTo));
-          }}
+          data-testid="apply-range-button"
+          onClick={handleApply}
+          className="text-xs font-medium rounded-md border border-brand-600 bg-brand-600 px-3 py-1.5 text-white hover:bg-brand-700 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          Apply
+        </button>
+        <button
+          data-testid="reset-range-button"
+          onClick={handleReset}
           className="text-xs font-medium rounded-md border border-slate-300 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-100"
         >
           Reset to 30 days
         </button>
-        {fromDate || toDate ? (
+        {(draftFromDate || draftToDate || appliedFromDate || appliedToDate) ? (
           <button
-            onClick={() => {
-              setFromDate("");
-              setToDate("");
-            }}
+            data-testid="clear-range-button"
+            onClick={handleClear}
             className="text-xs font-medium rounded-md border border-slate-300 bg-white px-3 py-1.5 text-slate-700 hover:bg-slate-100"
           >
             Clear range

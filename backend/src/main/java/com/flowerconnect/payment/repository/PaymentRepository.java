@@ -35,6 +35,12 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findByOrderIdForUpdate(@Param("orderId") Long orderId);
 
     /**
+     * Finds a payment by its provider reference (e.g. a Razorpay order id).
+     * Used to look up the payment row for a Razorpay checkout or webhook event.
+     */
+    Optional<Payment> findByProviderReference(String providerReference);
+
+    /**
      * One page of payments matching the given status and optional filters,
      * ordered by {@code created_at} desc (newest first). Used by the admin
      * refund queue to list {@code REFUND_PENDING} payments.

@@ -171,6 +171,7 @@ export function VendorStorefrontPage() {
             <ProductGrid
               products={shop.products.content}
               vendorId={shop.id}
+              locationId={selected?.id ?? null}
               emptyMessage="This shop has nothing available right now."
             />
           </div>

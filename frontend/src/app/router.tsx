@@ -6,12 +6,13 @@ import { SiteHeader } from "@/app/components/SiteHeader";
 import { HomePage } from "@/features/home/pages/HomePage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
+import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
 import { VendorRegisterPage } from "@/features/vendor-registration/pages/VendorRegisterPage";
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { VendorLayout } from "@/features/vendor/components/VendorLayout";
 import { ApprovedVendorGate } from "@/features/vendor/components/ApprovedVendorGate";
 import { VendorDashboardPage } from "@/features/vendor/pages/VendorDashboardPage";
-import { VendorProfilePage } from "@/features/vendor/pages/VendorProfilePage";
 import { VendorSettingsPage } from "@/features/vendor/pages/VendorSettingsPage";
 import { VendorHoursPage } from "@/features/vendor/pages/VendorHoursPage";
 import { VendorCatalogPage } from "@/features/vendor/pages/VendorCatalogPage";
@@ -31,11 +32,15 @@ import { VendorStorefrontPage } from "@/features/customer/pages/VendorStorefront
 import { ProductDetailPage } from "@/features/customer/pages/ProductDetailPage";
 import { OrderHistoryPage } from "@/features/customer/orders/pages/OrderHistoryPage";
 import { OrderDetailPage } from "@/features/customer/orders/pages/OrderDetailPage";
+import { ProfilePage } from "@/features/customer/pages/ProfilePage";
+import { ChangePasswordPage } from "@/features/auth/pages/ChangePasswordPage";
 import { RaiseDisputePage, DisputeDetailPage } from "@/features/dispute/pages/DisputePages";
 import { PRODUCT_ROUTE_IDS } from "@/features/customer/navigation";
 import { PaymentStatusPage } from "@/features/payment/pages/PaymentStatusPage";
+import RazorpayCheckoutPage from "@/features/payment/pages/RazorpayCheckoutPage";
 import { AdminRefundsPage } from "@/features/admin/pages/AdminRefundsPage";
 import { AdminOrderLookupPage } from "@/features/admin/pages/AdminOrderLookupPage";
+import { AdminLocationProposalsPage } from "@/features/admin/pages/AdminLocationProposalsPage";
 import { AdminDisputesPage } from "@/features/admin/pages/AdminDisputesPage";
 import { AdminLayout } from "@/features/admin/components/AdminLayout";
 import { AdminDashboardPage } from "@/features/admin/pages/AdminDashboardPage";
@@ -45,6 +50,9 @@ import { AdminBillingPage } from "@/features/admin/pages/AdminBillingPage";
 import { FarmerDashboardPage } from "@/features/farmer/pages/FarmerDashboardPage";
 import { FarmerVendorBrowsePage } from "@/features/farmer/pages/FarmerVendorBrowsePage";
 import { FarmerPassbookPage } from "@/features/farmer/pages/FarmerPassbookPage";
+import { FarmerLayout } from "@/features/farmer/components/FarmerLayout";
+import { FarmerLedgerPage } from "@/features/farmer/pages/FarmerLedgerPage";
+import { FarmerRegisterPage } from "@/features/farmer/pages/FarmerRegisterPage";
 import { VendorFarmersListPage } from "@/features/vendor/pages/VendorFarmersListPage";
 import { VendorFarmerPassbookPage } from "@/features/vendor/pages/VendorFarmerPassbookPage";
 import { B2BPlaceOrderPage } from "@/features/b2b/pages/B2BPlaceOrderPage";
@@ -183,10 +191,36 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "payment/razorpay/:orderId",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE]}>
+            <RazorpayCheckoutPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: "orders",
         element: (
           <ProtectedRoute roles={[CUSTOMER_ROLE]}>
             <OrderHistoryPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        // The shared profile destination: customers see their account and
+        // address profile, vendors see their vendor profile, farmers see their
+        // farmer account, and administrators see their administrator account.
+        // `ProfilePage` dispatches purely on
+        // the authenticated role, so customer account data is never exposed to
+        // vendors or admins, vendor profile management is never exposed to
+        // customers or admins, and admin account data is never exposed to
+        // customers or vendors. The route is guarded to CUSTOMER, VENDOR,
+        // FARMER and ADMIN; other roles are refused by the guard, and unauthenticated
+        // visitors are redirected to login.
+        path: "profile",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE, VENDOR_ROLE, FARMER_ROLE, ADMIN_ROLE]}>
+            <ProfilePage />
           </ProtectedRoute>
         ),
       },
@@ -214,8 +248,28 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      {
+        // Change password is available to every authenticated role — customer,
+        // florist and admin alike — because the endpoint verifies the caller's
+        // own session and revokes their other refresh tokens on success.
+        path: "settings/password",
+        element: (
+          <ProtectedRoute roles={[CUSTOMER_ROLE, VENDOR_ROLE, FARMER_ROLE, ADMIN_ROLE]}>
+            <ChangePasswordPage />
+          </ProtectedRoute>
+        ),
+      },
       { path: "login", element: <RequireUnauth><LoginPage /></RequireUnauth> },
       { path: "register", element: <RequireUnauth><RegisterPage /></RequireUnauth> },
+      {
+        // Password reset is public: no session is needed to request or complete one.
+        path: "forgot-password",
+        element: <RequireUnauth><ForgotPasswordPage /></RequireUnauth>,
+      },
+      {
+        path: "reset-password",
+        element: <RequireUnauth><ResetPasswordPage /></RequireUnauth>,
+      },
       {
         // The vendor entry point (plan task 1.7). Public, because
         // `POST /api/v1/vendors/register` creates the account itself, and
@@ -229,17 +283,30 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // Farmer registration entry point. Public, because
+        // `POST /api/v1/farmer/register` creates the FARMER account itself, and
+        // `RequireUnauth` because it must not be reachable with an existing session:
+        // submitting while signed in would create a second, orphaned account.
+        path: "farmer/register",
+        element: (
+          <RequireUnauth>
+            <FarmerRegisterPage />
+          </RequireUnauth>
+        ),
+      },
+      {
         // Phase 11 farmer dashboard shell. Guarded by FARMER role; the backend
         // re-checks the role on every request.
         path: "farmer",
         element: (
           <ProtectedRoute roles={[FARMER_ROLE]}>
-            <VendorLayout />
+            <FarmerLayout />
           </ProtectedRoute>
         ),
         children: [
           { index: true, element: <FarmerDashboardPage /> },
           { path: "vendors", element: <FarmerVendorBrowsePage /> },
+          { path: "ledger", element: <FarmerLedgerPage /> },
           { path: "links/:linkId/passbook", element: <FarmerPassbookPage /> },
         ],
       },
@@ -255,7 +322,6 @@ export const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <VendorDashboardPage /> },
-          { path: "profile", element: <VendorProfilePage /> },
           { path: "settings", element: <VendorSettingsPage /> },
           { path: "hours", element: <VendorHoursPage /> },
           // Phase 3g catalog and inventory (plan tasks 3.5–3.9). `new` is declared
@@ -311,6 +377,7 @@ export const router = createBrowserRouter([
           { index: true, element: <AdminDashboardPage /> },
           { path: "vendors", element: <AdminVendorsPage /> },
           { path: "users", element: <AdminUsersPage /> },
+          { path: "proposals", element: <AdminLocationProposalsPage /> },
           { path: "refunds", element: <AdminRefundsPage /> },
           { path: "orders/lookup", element: <AdminOrderLookupPage /> },
           { path: "disputes", element: <AdminDisputesPage /> },

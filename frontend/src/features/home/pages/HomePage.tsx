@@ -121,6 +121,30 @@ export function HomePage() {
                   Selling flowers? Open your shop in minutes.
                 </p>
               </div>
+
+              <div className="flex flex-col gap-2">
+                <Link
+                  className={FLORIST_CTA}
+                  to="/login"
+                  state={{ from: "/farmer", farmerEntry: true }}
+                >
+                  Farmer sign-in
+                  <span aria-hidden="true">&rarr;</span>
+                </Link>
+                <p className="text-[14px] text-bolder-muted">
+                  Supplying florists? Track your deposits and collections.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Link className={FLORIST_CTA} to="/farmer/register">
+                  Register as a Farmer
+                  <span aria-hidden="true">&rarr;</span>
+                </Link>
+                <p className="text-[14px] text-bolder-muted">
+                  Growing flowers? Join the network and sell to local florists.
+                </p>
+              </div>
             </AnimatedList>
 
             <div className="relative min-w-0">

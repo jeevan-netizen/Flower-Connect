@@ -20,6 +20,7 @@ import com.flowerconnect.billing.domain.SettlementEntry;
 import com.flowerconnect.billing.domain.SettlementEntryType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -50,6 +51,7 @@ public interface SettlementEntryRepository extends JpaRepository<SettlementEntry
     Page<SettlementEntry> findByVendorIdAndCreatedAtBetweenOrderByCreatedAtDesc(
             Long vendorId, LocalDateTime from, LocalDateTime to, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"vendor", "order", "dispute", "settlement"})
     List<SettlementEntry> findBySettlementIdOrderByCreatedAtAsc(Long settlementId);
 
     /**

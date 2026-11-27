@@ -4,9 +4,11 @@ import type {
   FarmerCollectionRequest,
   FarmerDeposit,
   FarmerLink,
+  FarmerProfile,
   FarmerVendor,
   Passbook,
 } from "@/features/farmer/types";
+import type { FarmerRegisterRequest, FarmerRegisterResponse } from "@/features/farmer/types";
 
 /* -------------------------------------------------------------------------- */
 /* Farmer self-service                                                        */
@@ -18,6 +20,15 @@ import type {
  */
 export async function fetchFarmerLinks(): Promise<FarmerLink[]> {
   const response = await api.get<FarmerLink[]>("/farmer/links");
+  return response.data;
+}
+
+/**
+ * `GET /api/v1/farmer/profile` — the authenticated farmer's own profile: name,
+ * mobile number and address. Requires `ROLE_FARMER`.
+ */
+export async function fetchFarmerProfile(): Promise<FarmerProfile> {
+  const response = await api.get<FarmerProfile>("/farmer/profile");
   return response.data;
 }
 
@@ -64,6 +75,22 @@ export async function requestCollection(
   const response = await api.post<FarmerCollection>(`/farmer/links/${linkId}/collections`, payload);
   return response.data;
 }
+
+/**
+ * `POST /api/v1/farmer/register` — registers a farmer account.
+ * Public endpoint; returns the created farmer profile (no tokens).
+ * The client then signs in through `POST /api/v1/auth/login`.
+ */
+export async function registerFarmer(
+  data: FarmerRegisterRequest,
+): Promise<FarmerRegisterResponse> {
+  const response = await api.post<FarmerRegisterResponse>("/farmer/register", data);
+  return response.data;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Vendor farmer management                                                   */
+/* -------------------------------------------------------------------------- */
 
 /**
  * `GET /api/v1/vendor/farmer-links?status=` — links on the caller's vendor's

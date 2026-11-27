@@ -6,6 +6,7 @@ import {
   fetchEligibleVendors,
   fetchFarmerLinks,
   fetchFarmerPassbook,
+  fetchFarmerProfile,
   fetchVendorCollections,
   fetchVendorFarmerLinks,
   fetchVendorPassbook,
@@ -16,7 +17,7 @@ import {
   suspendLink,
   reactivateLink,
 } from "@/features/farmer/api";
-import type { FarmerCollection, FarmerCollectionRequest, FarmerLink, FarmerVendor, Passbook } from "@/features/farmer/types";
+import type { FarmerCollection, FarmerCollectionRequest, FarmerLink, FarmerProfile, FarmerVendor, Passbook } from "@/features/farmer/types";
 
 export const farmerKeys = {
   all: ["farmer"] as const,
@@ -24,12 +25,13 @@ export const farmerKeys = {
   vendorLinks: ["vendor", "farmer-links"] as const,
   eligibleVendors: ["farmer", "vendors"] as const,
   passbook: (linkId: number) => ["farmer", "passbook", linkId] as const,
+  profile: ["farmer", "profile"] as const,
   vendorCollections: (status: string) => ["vendor", "collections", status] as const,
 };
 
 /**
  * Drops every cached farmer query on logout so a different account signing in on
- * the same tab never sees the previous farmer's links or passbook.
+ * the same tab never sees the previous farmer's links, passbook or profile.
  */
 export function clearFarmerCache(queryClient: QueryClient): void {
   queryClient.removeQueries({ queryKey: farmerKeys.all });
@@ -44,6 +46,14 @@ export function useFarmerLinks() {
   return useQuery({
     queryKey: farmerKeys.links,
     queryFn: fetchFarmerLinks,
+  });
+}
+
+/** `GET /api/v1/farmer/profile` — the authenticated farmer's own profile. */
+export function useFarmerProfile() {
+  return useQuery<FarmerProfile>({
+    queryKey: farmerKeys.profile,
+    queryFn: fetchFarmerProfile,
   });
 }
 

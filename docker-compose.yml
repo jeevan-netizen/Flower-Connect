@@ -58,6 +58,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_JWT_SECRET_256_BITS}
       APP_CHECKOUT_QUOTE_SIGNING_SECRET: ${APP_CHECKOUT_QUOTE_SIGNING_SECRET:-dev-only-insecure-default-change-in-production-min-32-chars}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
+      # Optional Razorpay integration. Secrets stay in the local environment;
+      # the application disables online Razorpay checkout until configured.
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
       # Local-disk upload root. The runtime image runs as a non-root user, so
       # the directory is created in the Dockerfile under /var/lib rather than
       # /app, where the app user has no write permission.

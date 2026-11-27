@@ -39,7 +39,6 @@ import { VendorErrorState } from "@/features/vendor/components/VendorErrorState"
 import { Card, PageHeading } from "@/features/vendor/components/StatCard";
 import { FOCUS_RING, FIELD_TRANSITION, PRESSABLE } from "@/motion/pressable";
 import { FlowerLoader } from "@/motion/FlowerLoader";
-import { toApiError, type ApiErrorInfo } from "@/shared/lib/api-error";
 
 /**
  * Browser-local date as `YYYY-MM-DD`.
@@ -76,7 +75,7 @@ export function CheckoutPage() {
   const [orderResult, setOrderResult] = useState<CheckoutResponse | null>(null);
   const [placing, setPlacing] = useState(false);
   const placingRef = useRef(false);
-  const [placementError, setPlacementError] = useState<ApiErrorInfo | null>(null);
+  const [placementError, setPlacementError] = useState<unknown>(null);
 
   /** Stable idempotency key for the current checkout attempt. */
   const [clientOrderId] = useState(() => crypto.randomUUID());
@@ -171,16 +170,27 @@ export function CheckoutPage() {
       });
       setOrderResult(result);
       clearCartCache(queryClient);
-      setStep("confirmation");
+      if (paymentMethod === "ONLINE" && result.orders?.[0]?.orderId != null) {
+        navigate(`/payment/razorpay/${result.orders[0].orderId}`);
+      } else {
+        setStep("confirmation");
+      }
     } catch (error) {
-      setPlacementError(toApiError(error));
+      // Keep the original Axios error so VendorErrorState can normalize it
+      // once and show the backend's actual message.
+      setPlacementError(error);
     } finally {
       placingRef.current = false;
       setPlacing(false);
     }
-  }, [addressId, quoteData, slotSelections, clientOrderId, confirmPriceChanges, paymentMethod, placeCheckout, queryClient]);
+  }, [addressId, quoteData, slotSelections, clientOrderId, confirmPriceChanges, paymentMethod, placeCheckout, queryClient, navigate]);
 
-  if (cartError || addressesError) {
+  const retryReview = useCallback(() => {
+    setPlacementError(null);
+    void handleQuote();
+  }, [handleQuote]);
+
+  if (step !== "confirmation" && (cartError || addressesError)) {
     return (
       <VendorErrorState
         error={cartError ?? addressesError}
@@ -192,7 +202,7 @@ export function CheckoutPage() {
     );
   }
 
-  if (cartPending || addressesPending || !cart) {
+  if (step !== "confirmation" && (cartPending || addressesPending || !cart)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <FlowerLoader label="Preparing checkout" showLabel className="text-sm text-slate-600" />
@@ -200,7 +210,7 @@ export function CheckoutPage() {
     );
   }
 
-  if (cart.items.length === 0) {
+  if (step !== "confirmation" && cart?.items.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
         <PageHeading title="Your cart is empty" description="Add some flowers before checking out." />
@@ -273,7 +283,7 @@ export function CheckoutPage() {
           allPurchasable={allPurchasable}
           confirmPriceChanges={confirmPriceChanges}
           onConfirmPriceChange={setConfirmPriceChanges}
-          onRetry={handleQuote}
+          onRetry={retryReview}
           onBack={() => setStep("slots")}
           onProceed={handlePlaceOrder}
           isPlacing={placing}
@@ -290,8 +300,8 @@ export function CheckoutPage() {
           result={orderResult}
           paymentMethod={paymentMethod}
           onDone={() => {
-            if (paymentMethod === "ONLINE" && orderResult?.paymentGroupId) {
-              navigate(`/payment/${orderResult.paymentGroupId}`);
+            if (paymentMethod === "ONLINE" && orderResult?.orders?.[0]?.orderId != null) {
+              navigate(`/payment/razorpay/${orderResult.orders[0].orderId}`);
             } else {
               navigate("/orders");
             }
@@ -601,7 +611,7 @@ interface ReviewStepProps {
   quote: CheckoutQuoteResponse | null;
   isPending: boolean;
   error: unknown;
-  placementError: ApiErrorInfo | null;
+  placementError: unknown;
   allPurchasable: boolean;
   confirmPriceChanges: boolean;
   onConfirmPriceChange: (value: boolean) => void;

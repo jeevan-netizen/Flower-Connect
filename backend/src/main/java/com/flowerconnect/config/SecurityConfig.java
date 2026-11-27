@@ -79,6 +79,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                // Service-area proposals (Phase 14 vendor registration): submission is
+                // open to any authenticated account; approval/rejection is administrator-only.
+                // Declared before the broad /api/v1/locations/** permitAll rule below so it
+                // matches first.
+                .requestMatchers(HttpMethod.POST, "/api/v1/locations/proposals")
+                    .hasAnyRole("CUSTOMER", "FLORIST", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/locations/proposals/**")
+                    .hasRole("ADMIN")
                 .requestMatchers("/api/v1/locations/**").permitAll()
                 .requestMatchers("/api/v1/discover/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/search/**").permitAll()
@@ -107,6 +115,9 @@ public class SecurityConfig {
                  // Phase 7 public webhook: signature-authenticated, no JWT. Must be declared
                  // before the broader /api/v1/payments/** CUSTOMER rule below so it matches first.
                  .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()
+                 // Razorpay test-mode webhook: signature-authenticated, no JWT. Must be declared
+                 // before the broader /api/v1/payments/** CUSTOMER rule below so it matches first.
+                 .requestMatchers(HttpMethod.POST, "/api/v1/payments/razorpay/webhook").permitAll()
                  // Customer payments (Phase 7, task 7.4): fetch/resume payment state for the authenticated customer's own orders/groups.
                  .requestMatchers("/api/v1/payments/**").hasRole("CUSTOMER")
                  // Customer order history and detail (plan Phase 6, task 6.3):
@@ -165,6 +176,7 @@ public class SecurityConfig {
                 // These exceptions must precede the /api/v1/vendors/** FLORIST rule.
                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{id}/storefront").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/products/{id}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/products/{id}/images/{imageId}").permitAll()
                 // Phase 12 public vendor reviews (task 12.2): readable without
                 // authentication for approved vendors; hidden reviews excluded.
                 .requestMatchers(HttpMethod.GET, "/api/v1/vendors/{vendorId}/reviews").permitAll()

@@ -10,6 +10,8 @@ interface ProductGridProps {
    * product's own florist — the search surface uses `/search/products`.
    */
   detailPathBase?: string;
+  /** The selected delivery location, needed to serve product images. */
+  locationId?: number | null;
   showAddToCart?: boolean;
   onAddToCart?: (product: PublicProduct) => void;
   isAdding?: boolean;
@@ -28,6 +30,7 @@ export function ProductGrid({
   products,
   vendorId,
   detailPathBase,
+  locationId,
   showAddToCart = false,
   onAddToCart,
   isAdding = false,
@@ -45,6 +48,7 @@ export function ProductGrid({
             product={product}
             vendorId={vendorId}
             detailPathBase={detailPathBase}
+            locationId={locationId ?? null}
             showAddToCart={showAddToCart}
             onAddToCart={onAddToCart}
             isAdding={isAdding}

@@ -57,6 +57,19 @@ public class VendorRegisterRequest {
     @Size(max = 255, message = "Address line 2 must not exceed 255 characters")
     private String addressLine2;
 
+    @NotBlank(message = "City is required")
+    @Size(max = 128, message = "City must not exceed 128 characters")
+    private String city;
+
+    @NotBlank(message = "Area is required")
+    @Size(max = 128, message = "Area must not exceed 128 characters")
+    private String area;
+
+    @NotBlank(message = "Pincode is required")
+    @Size(max = 10, message = "Pincode must not exceed 10 characters")
+    @Pattern(regexp = "^[0-9]{6}$", message = "Pincode must be a 6-digit number")
+    private String pincode;
+
     @NotNull(message = "Service location is required")
     @Positive(message = "Service location must be a positive identifier")
     private Long serviceLocationId;

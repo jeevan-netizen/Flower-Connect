@@ -3,6 +3,9 @@ import type {
   PaymentGroupStateResponse,
   PaymentResumeResponse,
   PaymentStateResponse,
+  RazorpayKeyResponse,
+  RazorpayVerifyRequest,
+  RazorpayVerifyResponse,
 } from "@/features/payment/types";
 
 /**
@@ -53,6 +56,38 @@ export async function resumePayment(
   const response = await api.post<PaymentResumeResponse>(
     `/payments/${orderId}/resume`,
     undefined,
+    { signal },
+  );
+  return response.data;
+}
+
+/**
+ * `GET /api/v1/payments/razorpay/key` — public Razorpay Key ID for
+ * initialising Razorpay Standard Checkout. Never returns the Key Secret.
+ */
+export async function fetchRazorpayKey(
+  signal?: AbortSignal,
+): Promise<RazorpayKeyResponse> {
+  const response = await api.get<RazorpayKeyResponse>(
+    `/payments/razorpay/key`,
+    { signal },
+  );
+  return response.data;
+}
+
+/**
+ * `POST /api/v1/payments/razorpay/{orderId}/verify` — verify a Razorpay
+ * checkout signature and, if valid, mark the payment `PAID` and transition
+ * the order to `PLACED`.
+ */
+export async function verifyRazorpayPayment(
+  orderId: number,
+  payload: RazorpayVerifyRequest,
+  signal?: AbortSignal,
+): Promise<RazorpayVerifyResponse> {
+  const response = await api.post<RazorpayVerifyResponse>(
+    `/payments/razorpay/${orderId}/verify`,
+    payload,
     { signal },
   );
   return response.data;

@@ -19,8 +19,9 @@ import {
   hasNoServiceLocations,
   toServiceLocationOptions,
 } from "@/features/location/types";
-import { LocationPicker } from "@/features/vendor-registration/components/LocationPicker";
+import { ServiceAreaPicker } from "@/features/vendor-registration/components/ServiceAreaPicker";
 import { TextInput } from "@/features/vendor-registration/components/TextInput";
+import { PasswordField } from "@/features/auth/components/PasswordField";
 import {
   FormErrorSummary,
   SubmitButton,
@@ -150,7 +151,7 @@ export function VendorRegisterPage() {
     <SlideUp className="mx-auto max-w-2xl space-y-6">
       <PageHeading
         title="Register your flower shop"
-        description="Create a florist account and tell us where you deliver. An administrator approves every new shop before it can list products."
+        description="Create a florist account and give us your shop's address and service area. An administrator approves every new shop before it can list products."
       />
 
       <Card>
@@ -188,16 +189,14 @@ export function VendorRegisterPage() {
               error={errors.phone?.message}
               registration={register("phone")}
             />
-            <TextInput
+            <PasswordField
               label="Password"
-              type="password"
               autoComplete="new-password"
               error={errors.password?.message}
               registration={register("password")}
             />
-            <TextInput
+            <PasswordField
               label="Confirm password"
-              type="password"
               autoComplete="new-password"
               error={errors.confirmPassword?.message}
               registration={register("confirmPassword")}
@@ -221,7 +220,7 @@ export function VendorRegisterPage() {
           </fieldset>
 
           <fieldset className="space-y-5 border-t border-slate-200 pt-5">
-            <legend className="text-sm font-semibold text-slate-900">Where you deliver</legend>
+            <legend className="text-sm font-semibold text-slate-900">Shop address</legend>
             <TextInput
               label="Address line 1"
               autoComplete="address-line1"
@@ -234,6 +233,27 @@ export function VendorRegisterPage() {
               hint="Optional."
               error={errors.addressLine2?.message}
               registration={register("addressLine2")}
+            />
+            <TextInput
+              label="City"
+              autoComplete="address-level2"
+              error={errors.city?.message}
+              registration={register("city")}
+            />
+            <TextInput
+              label="Area / locality"
+              autoComplete="address-level1"
+              hint="Your shop's area, e.g. Indiranagar."
+              error={errors.area?.message}
+              registration={register("area")}
+            />
+            <TextInput
+              label="Pincode"
+              type="tel"
+              autoComplete="postal-code"
+              hint="6-digit pincode."
+              error={errors.pincode?.message}
+              registration={register("pincode")}
             />
 
             {locationsPending && <p className="text-sm text-slate-600">Loading service areas...</p>}
@@ -268,8 +288,7 @@ export function VendorRegisterPage() {
               control={control}
               name="serviceLocationId"
               render={({ field }) => (
-                <LocationPicker
-                  cities={cities}
+                <ServiceAreaPicker
                   options={options}
                   value={field.value}
                   hint={pickerHint}

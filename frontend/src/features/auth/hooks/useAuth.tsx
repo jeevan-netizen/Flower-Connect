@@ -57,16 +57,34 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 export function RequireUnauth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, hasLoadedInitial } = useAuthStore();
+  const { isAuthenticated, hasLoadedInitial, justLoggedIn } = useAuthStore();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (hasLoadedInitial && isAuthenticated) {
+    // Only redirect a visitor who arrived with an already-valid session (page
+    // load). A user who just signed in through this form is handled by
+    // LoginPage itself (role-based redirect or inline refusal). justLoggedIn is
+    // read live so the guard does not redirect while a login is in progress;
+    // LoginPage resets it after completing the navigation, so a later revisit
+    // to /login by an authenticated user is redirected home instead of being
+    // shown the login form again.
+    if (hasLoadedInitial && isAuthenticated && !justLoggedIn) {
       navigate("/", { replace: true });
     }
-  }, [isAuthenticated, hasLoadedInitial, navigate]);
+  }, [isAuthenticated, hasLoadedInitial, justLoggedIn, navigate]);
 
-  if (!hasLoadedInitial || isAuthenticated) {
+  // Session not restored yet → loader. A just-logged-in user stays on this
+  // page so LoginPage can finish its own navigation or show its error; an
+  // unauthenticated user sees the form. Only a session-restored user is shown
+  // a loader while the guard sends them home.
+  if (!hasLoadedInitial) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <FlowerLoader label="Checking your session" />
+      </div>
+    );
+  }
+  if (isAuthenticated && !justLoggedIn) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <FlowerLoader label="Checking your session" />

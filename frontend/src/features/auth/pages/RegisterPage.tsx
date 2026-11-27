@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
+import { PasswordField } from "@/features/auth/components/PasswordField";
 import { FadeIn } from "@/motion/FadeIn";
 import { FieldMessage } from "@/motion/FieldMessage";
 import { SlideUp } from "@/motion/SlideUp";
@@ -123,40 +124,20 @@ export function RegisterPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
+              <PasswordField
+                label="Password"
                 autoComplete="new-password"
-                required
-                aria-invalid={errors.password ? true : undefined}
-                aria-describedby={errors.password ? "password-note" : undefined}
-                className={`${CONTROL_CLASS} ${errors.password ? "border-red-500" : ""}`}
-                {...register("password")}
+                error={errors.password?.message}
+                registration={register("password")}
               />
-              <FieldMessage id="password-note" message={errors.password?.message} reserve />
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700">
-                Confirm password
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
+              <PasswordField
+                label="Confirm password"
                 autoComplete="new-password"
-                required
-                aria-invalid={errors.confirmPassword ? true : undefined}
-                aria-describedby={errors.confirmPassword ? "confirmPassword-note" : undefined}
-                className={`${CONTROL_CLASS} ${errors.confirmPassword ? "border-red-500" : ""}`}
-                {...register("confirmPassword")}
-              />
-              <FieldMessage
-                id="confirmPassword-note"
-                message={errors.confirmPassword?.message}
-                reserve
+                error={errors.confirmPassword?.message}
+                registration={register("confirmPassword")}
               />
             </div>
           </div>

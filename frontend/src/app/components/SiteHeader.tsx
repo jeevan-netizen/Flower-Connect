@@ -1,11 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/features/auth/stores/auth-store";
-import { useCart, clearCartCache } from "@/features/cart/queries";
-import { clearNotificationCache } from "@/features/notification/queries";
-import { clearVendorCache } from "@/features/vendor/queries";
-import { clearAdminCache } from "@/features/admin/queries";
+import { useCart } from "@/features/cart/queries";
 import { LocationMenu } from "@/features/location/components/LocationMenu";
 import { NotificationBell } from "@/features/notification/components/NotificationBell";
 import { FOCUS_RING_DARK, PRESSABLE } from "@/motion/pressable";
@@ -115,10 +111,8 @@ function MenuIcon({ open }: { open: boolean }) {
  * assistive technology has to reason around.
  */
 export function SiteHeader() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const location = useLocation();
-  const { isAuthenticated, user, logout } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   // The cart link below is rendered only for a customer, so the cart is
   // fetched only for a customer. An anonymous visitor, a florist and an admin
   // would each get a refusal the app has no use for — a 401 for the first two
@@ -154,19 +148,6 @@ export function SiteHeader() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [menuOpen]);
 
-  const handleLogout = () => {
-    // Vendor and admin data are each cached under their own query key; drop both
-    // so the next account to sign in on this tab never sees the previous user's
-    // profile, user list or vendor list.
-    clearVendorCache(queryClient);
-    clearAdminCache(queryClient);
-    clearCartCache(queryClient);
-    clearNotificationCache(queryClient);
-    logout();
-    setMenuOpen(false);
-    navigate("/", { replace: true });
-  };
-
   /**
    * The links themselves, so the bar and the panel cannot drift apart. Each
    * caller decides the wrapper; a link closes the panel on the way through.
@@ -176,11 +157,26 @@ export function SiteHeader() {
       <Link className={NAV_LINK} to="/">
         Home
       </Link>
-      <Link className={NAV_LINK} to="/browse">
-        Browse
-      </Link>
-      <Link className={NAV_LINK} to="/orders">
-        Orders
+      {/* Customer-facing catalogue links. Browsing is public, so an
+          unauthenticated visitor still sees Browse; a signed-in customer sees
+          Browse and Orders. A vendor or admin must not see customer browsing
+          or customer order history in the shared header. */}
+      {!isAuthenticated ? (
+        <Link className={NAV_LINK} to="/browse">
+          Browse
+        </Link>
+      ) : user?.role === CUSTOMER_ROLE ? (
+        <>
+          <Link className={NAV_LINK} to="/browse">
+            Browse
+          </Link>
+          <Link className={NAV_LINK} to="/orders">
+            Orders
+          </Link>
+        </>
+      ) : null}
+      <Link className={NAV_LINK} to="/profile">
+        Profile
       </Link>
 
       {isAuthenticated ? (
@@ -218,9 +214,6 @@ export function SiteHeader() {
           <span className="relative">
             <NotificationBell enabled={isAuthenticated} />
           </span>
-          <button type="button" onClick={handleLogout} className={NAV_PILL}>
-            Log out
-          </button>
         </>
       ) : (
         <>

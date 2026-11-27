@@ -6,6 +6,7 @@ import com.flowerconnect.domain.User;
 import com.flowerconnect.domain.VendorHours;
 import com.flowerconnect.domain.VendorProfile;
 import com.flowerconnect.exception.BusinessException;
+import com.flowerconnect.geo.service.LocationProposalService;
 import com.flowerconnect.repository.RoleRepository;
 import com.flowerconnect.repository.ServiceLocationRepository;
 import com.flowerconnect.repository.UserRepository;
@@ -79,6 +80,7 @@ public class VendorService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final ServiceLocationRepository serviceLocationRepository;
+    private final LocationProposalService proposalService;
     private final VendorMapper mapper;
     private final PasswordEncoder passwordEncoder;
 
@@ -146,8 +148,30 @@ public class VendorService {
         vendorProfileRepository.save(profile);
         replaceHours(profile, request.getHours());
 
+        maybeProposeServiceLocation(vendor.getId(), request);
+
         return mapper.toResponse(profile, vendorHoursRepository
                 .findByVendorProfileIdOrderByWeekdayAsc(profile.getId()));
+    }
+
+    /**
+     * If the shop's area is not yet a seeded service location, propose it so it
+     * can be reviewed by an administrator and, once approved, appear in the
+     * customer "Set your delivery location" picker. The vendor's own profile is
+     * bound to the (existing) service location they selected, so registration
+     * never depends on unreviewed location data and a proposed area never
+     * becomes publicly discoverable or deliverable before approval.
+     */
+    private void maybeProposeServiceLocation(Long userId, VendorRegisterRequest request) {
+        boolean exists = serviceLocationRepository
+                .findByCityAndAreaIgnoreCase(request.getCity(), request.getArea())
+                .isPresent();
+        if (!exists) {
+            proposalService.submitProposal(
+                    request.getCity(), request.getArea(), request.getPincode(),
+                    request.getAddressLine1(), request.getAddressLine2(),
+                    userId, request.getEmail());
+        }
     }
 
     /**

@@ -19,6 +19,7 @@ interface AuthState {
   loadCurrentUser: () => Promise<void>;
   setAuth: (auth: unknown) => void;
   setError: (error: string | null) => void;
+  setJustLoggedIn: (value: boolean) => void;
 }
 
 const mockAuthStore = vi.hoisted(() => vi.fn());
@@ -47,6 +48,7 @@ function setMockState(overrides: Partial<AuthState>) {
     loadCurrentUser: vi.fn(),
     setAuth: vi.fn(),
     setError: vi.fn(),
+    setJustLoggedIn: vi.fn(),
     ...overrides,
   };
 
@@ -56,7 +58,6 @@ function setMockState(overrides: Partial<AuthState>) {
   mockGetState.mockReturnValue(state);
   return state;
 }
-
 describe("LoginPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -210,5 +211,65 @@ describe("LoginPage", () => {
 
     expect(screen.getByLabelText(/email address/i)).toHaveValue("");
     expect(screen.queryByText(/florist application is in/i)).not.toBeInTheDocument();
+  });
+
+  it("refuses a non-farmer who signs in through the farmer entry point", async () => {
+    const mockLogin = vi.fn().mockResolvedValueOnce(undefined);
+    const state = setMockState({
+      login: mockLogin,
+      isAuthenticated: true,
+      user: { role: "CUSTOMER" },
+    });
+    const mockSetError = state.setError;
+    const mockLogout = state.logout;
+
+    render(
+      <MemoryRouter
+        initialEntries={[{ pathname: "/login", state: { from: "/farmer", farmerEntry: true } }]}
+      >
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    await userEvent.type(screen.getByLabelText(/email address/i), "user@test.com");
+    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith("user@test.com", "password123");
+    });
+    // The refusal goes through the shared error path without sending the customer
+    // to the farmer portal.
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+    expect(mockSetError).toHaveBeenCalledWith(
+      expect.stringContaining("Farmer sign-in is for farmer accounts"),
+    );
+    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+  });
+
+  it("sends a farmer who signs in through the farmer entry point to the farmer portal", async () => {
+    const mockLogin = vi.fn().mockResolvedValueOnce(undefined);
+    setMockState({
+      login: mockLogin,
+      isAuthenticated: true,
+      user: { role: "FARMER" },
+    });
+
+    render(
+      <MemoryRouter
+        initialEntries={[{ pathname: "/login", state: { from: "/farmer", farmerEntry: true } }]}
+      >
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    await userEvent.type(screen.getByLabelText(/email address/i), "user@test.com");
+    await userEvent.type(screen.getByLabelText(/password/i), "password123");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith("user@test.com", "password123");
+    });
+    expect(screen.queryByText(/farmer sign-in is for farmer accounts/i)).not.toBeInTheDocument();
   });
 });

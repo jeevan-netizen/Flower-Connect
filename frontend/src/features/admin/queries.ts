@@ -7,12 +7,15 @@ import {
 import {
   approveVendor,
   adminCancelOrder,
+  approveServiceLocationProposal,
   fetchAdminUsers,
   fetchAdminVendors,
   fetchRefundQueue,
+  fetchServiceLocationProposals,
   markRefunded,
-  reinstateVendor,
+  rejectServiceLocationProposal,
   rejectVendor,
+  reinstateVendor,
   suspendVendor,
   updateUserStatus,
 } from "@/features/admin/api";
@@ -59,6 +62,10 @@ export const adminKeys = {
         filters.toDate ?? null,
         filters.page,
       ] as const,
+  },
+  proposals: {
+    all: ["admin", "proposals"] as const,
+    list: ["admin", "proposals", "list"] as const,
   },
 };
 
@@ -119,6 +126,61 @@ export function useVendorAdminAction() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.vendors.all });
+    },
+  });
+}
+
+/**
+ * `GET /api/v1/locations/proposals` — all PENDING proposals, oldest first.
+ * No filters or pagination: every pending proposal fits on one screen.
+ */
+export function useServiceLocationProposals() {
+  return useQuery({
+    queryKey: adminKeys.proposals.list,
+    queryFn: () => fetchServiceLocationProposals(),
+  });
+}
+
+/**
+ * Approves a PENDING proposal. Requires administrator-supplied coordinates and
+ * timezone — data the registration form cannot provide. On success the whole
+ * proposal listing is invalidated so the approved proposal drops out of view.
+ */
+export function useApproveServiceLocationProposal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (variables: {
+      proposalId: number;
+      latitude: number;
+      longitude: number;
+      timezone: string;
+    }) =>
+      approveServiceLocationProposal(variables.proposalId, {
+        latitude: variables.latitude,
+        longitude: variables.longitude,
+        timezone: variables.timezone,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.proposals.all });
+    },
+  });
+}
+
+/**
+ * Rejects a PENDING proposal with a mandatory reason. On success the whole
+ * proposal listing is invalidated so the rejected proposal drops out of view.
+ */
+export function useRejectServiceLocationProposal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (variables: { proposalId: number; reason: string }) =>
+      rejectServiceLocationProposal(variables.proposalId, {
+        reason: variables.reason,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.proposals.all });
     },
   });
 }

@@ -112,7 +112,7 @@ export function VendorDashboardPage() {
             <ReadOnlyRow label="Service location" value={`${profile.area}, ${profile.city}`} />
             <ReadOnlyRow label="Rating" value={formatRating(profile.avgRating, profile.reviewCount)} />
           </dl>
-          <Link to="/vendor/profile" className={CARD_LINK_CLASS}>
+          <Link to="/profile" className={CARD_LINK_CLASS}>
             Edit profile
           </Link>
         </Card>

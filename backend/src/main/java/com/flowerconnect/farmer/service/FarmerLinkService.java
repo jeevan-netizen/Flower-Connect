@@ -73,6 +73,7 @@ public class FarmerLinkService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .phone(normalizedPhone)
+                .address(request.getAddress())
                 .role(farmerRole)
                 .status(User.Status.ACTIVE)
                 .build());
@@ -82,6 +83,8 @@ public class FarmerLinkService {
                 .email(farmer.getEmail())
                 .fullName(farmer.getFullName())
                 .role(FARMER_ROLE)
+                .address(farmer.getAddress())
+                .phone(farmer.getPhone())
                 .build();
     }
 

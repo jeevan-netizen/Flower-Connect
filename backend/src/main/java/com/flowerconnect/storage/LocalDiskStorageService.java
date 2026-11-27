@@ -12,6 +12,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Optional;
 
 /**
  * Local-disk {@link StorageService}, active whenever the {@code s3} profile is
@@ -80,6 +81,19 @@ public class LocalDiskStorageService implements StorageService {
     public void delete(String key) {
         Path target = resolve(key);
         deleteQuietly(target);
+    }
+
+    @Override
+    public Optional<byte[]> read(String key) {
+        Path target = resolve(key);
+        if (!Files.isRegularFile(target)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Files.readAllBytes(target));
+        } catch (IOException e) {
+            throw new StorageException("Failed to read object at " + key, e);
+        }
     }
 
     @Override
