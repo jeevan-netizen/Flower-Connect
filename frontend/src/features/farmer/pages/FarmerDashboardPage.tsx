@@ -81,7 +81,7 @@ export function FarmerDashboardPage() {
       />
 
       <Card title="Join a florist">
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-bolder-muted">
           Send a join request to any approved florist. Once they accept, you are
           linked and they can record flower deposits against you.
         </p>

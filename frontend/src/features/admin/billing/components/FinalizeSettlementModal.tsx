@@ -54,51 +54,51 @@ export function FinalizeSettlementModal({ settlement, onClose }: FinalizeSettlem
   return (
     <div
       data-testid="finalize-settlement-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bolder-overlay backdrop-blur-sm p-4 animate-in fade-in"
     >
-      <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-base font-bold text-slate-900">
+      <div className="relative w-full max-w-md rounded-2xl bg-bolder-surface p-6 shadow-2xl border border-bolder-line">
+        <div className="flex items-center justify-between border-b border-bolder-line pb-3">
+          <h3 className="text-base font-bold text-bolder-text">
             Finalize Settlement #{settlement.id}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-1 text-bolder-muted hover:bg-bolder-bg hover:text-bolder-text"
           >
             ✕
           </button>
         </div>
 
-        <div className="mt-4 rounded-xl bg-slate-50 p-4 space-y-2 text-xs">
+        <div className="mt-4 rounded-xl bg-bolder-bg p-4 space-y-2 text-xs">
           <div className="flex justify-between">
-            <span className="text-slate-500">Vendor:</span>
-            <span className="font-semibold text-slate-800">
+            <span className="text-bolder-muted">Vendor:</span>
+            <span className="font-semibold text-bolder-text">
               {settlement.vendorBusinessName || `Vendor #${settlement.vendorId}`}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">Period:</span>
-            <span className="font-medium text-slate-700">
+            <span className="text-bolder-muted">Period:</span>
+            <span className="font-medium text-bolder-text">
               {settlement.periodStart} → {settlement.periodEnd}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">Net Payable:</span>
-            <span className="font-extrabold text-slate-900">
+            <span className="text-bolder-muted">Net Payable:</span>
+            <span className="font-extrabold text-bolder-text">
               ₹{Math.abs(settlement.netAmount).toFixed(2)}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-500">Direction:</span>
-            <span className="font-medium text-slate-700">{settlement.direction}</span>
+            <span className="text-bolder-muted">Direction:</span>
+            <span className="font-medium text-bolder-text">{settlement.direction}</span>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
-            <label htmlFor="adminReferenceNoteInput" className="block text-xs font-semibold text-slate-700">
-              Admin Reference Note <span className="text-red-500">*</span>
+            <label htmlFor="adminReferenceNoteInput" className="block text-xs font-medium text-bolder-text">
+              Admin Reference Note <span className="text-bolder-danger">*</span>
             </label>
             <textarea
               id="adminReferenceNoteInput"
@@ -106,28 +106,28 @@ export function FinalizeSettlementModal({ settlement, onClose }: FinalizeSettlem
               placeholder="e.g., Bank NEFT UTR #45920392, or manual voucher #FC-2026-004"
               value={adminReferenceNote}
               onChange={(e) => setAdminReferenceNote(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 w-full rounded-lg border border-bolder-line-control px-2.5 text-xs text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
               required
             />
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-bolder-muted">
               Mandatory reference note recorded into immutable audit logs.
             </span>
           </div>
 
-          {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+          {error && <p className="text-xs font-medium text-bolder-danger">{error}</p>}
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-bolder-line">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-bolder-line-control bg-bolder-surface px-4 py-2 text-xs font-medium text-bolder-text hover:bg-bolder-bg"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={finalizeMutation.isPending}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+              className="rounded-lg bg-bolder-success-surface px-4 py-2 text-xs font-semibold text-bolder-success shadow-sm hover:bg-bolder-success-surface disabled:opacity-50"
             >
               {finalizeMutation.isPending ? "Finalizing..." : "Confirm Finalization"}
             </button>

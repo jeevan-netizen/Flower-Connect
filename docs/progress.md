@@ -2,6 +2,14 @@
 
 Tracks what has been implemented and what remains. Updated after each session.
 
+## Demo seed data
+
+The dev profile now defaults `APP_SEED_ENABLED` to `false`, so customer, vendor,
+and related demo data is not recreated automatically. Set `APP_SEED_ENABLED=true`
+and provide the configured demo password to opt back in. Existing database rows
+were not deleted in this change; the local Docker database was inaccessible during
+this session.
+
 ## Current Phase
 
 **Phase 8 (Cancellations and Disputes) - COMPLETE** (final audit, 2026-10-25)
@@ -2503,4 +2511,116 @@ Admin screens restyled to the warm ivory / rose / muted green editorial palette 
 - `npm run lint`: PASS
 - `npm run build`: PASS (~34s)
 - `npm test -- admin`: **11 test files / 143 tests passed** (0 failures)
+
+## Frontend Final Visual Redesign Sweep - COMPLETE (2026-11-27)
+
+Final check for leftover old color classes (`brand-*`, `slate-*`, `amber-*`, `red-`, `green-`, `blue-`, `indigo-`, `purple-`, `pink-`, `emerald-`, `gray-`, `neutral-`, `stone-`, `zinc-`, `orange-`, `yellow-`, `lime-`, `fuchsia-`, `sky-`, `cyan-`, `teal-`, `warm-`, `rose-\d`) across all frontend `*.tsx` files. Every remaining occurrence was replaced with `bolder-*` semantic tokens from `src/app/styles/index.css` and shared classes from `src/motion/pressable.ts` and `src/shared/ui/classes.ts`.
+
+**Files converted (28):**
+- `src/features/auth/pages/LoginPage.tsx`
+- `src/features/auth/pages/RegisterPage.tsx`
+- `src/features/auth/pages/ForgotPasswordPage.tsx`
+- `src/features/auth/pages/ResetPasswordPage.tsx`
+- `src/features/auth/pages/ChangePasswordPage.tsx`
+- `src/features/auth/components/PasswordField.tsx`
+- `src/features/cart/pages/CartPage.tsx`
+- `src/features/checkout/pages/CheckoutPage.tsx`
+- `src/features/payment/pages/PaymentStatusPage.tsx`
+- `src/features/payment/pages/RazorpayCheckoutPage.tsx`
+- `src/features/customer/orders/pages/OrderHistoryPage.tsx`
+- `src/features/customer/orders/pages/OrderDetailPage.tsx`
+- `src/features/customer/orders/components/StatusToast.tsx`
+- `src/features/customer/orders/components/ReviewForm.tsx`
+- `src/features/customer/orders/components/OrderStatusStepper.tsx`
+- `src/features/customer/orders/components/CancelOrderDialog.tsx`
+- `src/features/customer/pages/CustomerProfilePage.tsx`
+- `src/features/dispute/pages/DisputePages.tsx`
+- `src/features/customer/components/CustomerErrorState.tsx`
+- `src/features/customer/components/AddToCartButton.tsx`
+- `src/features/customer/components/ProductGrid.tsx`
+- `src/features/customer/components/ProductImage.tsx`
+- `src/features/customer/components/ProductImagePlaceholder.tsx`
+- `src/features/customer/components/SearchFilters.tsx`
+- `src/features/customer/components/StorefrontHours.tsx`
+- `src/features/vendor/pages/VendorDashboardPage.tsx`
+- `src/features/vendor/pages/VendorCatalogPage.tsx`
+- `src/features/vendor/pages/VendorSettingsPage.tsx`
+- `src/features/vendor/pages/VendorHoursPage.tsx`
+- `src/features/vendor/pages/VendorInventoryPage.tsx`
+- `src/features/vendor/pages/VendorOrderBoardPage.tsx`
+- `src/features/vendor/pages/VendorProductFormPage.tsx`
+- `src/features/vendor/pages/VendorReviewsPage.tsx`
+- `src/features/vendor/pages/VendorFarmersListPage.tsx`
+- `src/features/vendor/pages/VendorFarmerPassbookPage.tsx`
+- `src/features/vendor/pages/VendorDisputesPage.tsx`
+- `src/features/vendor/pages/VendorPosPage.tsx`
+- `src/features/vendor/components/CatalogBadges.tsx`
+- `src/features/vendor/components/CatalogFilters.tsx`
+- `src/features/vendor/components/NewOrderToast.tsx`
+- `src/features/vendor/components/ProductTable.tsx`
+- `src/features/vendor/components/MovementHistoryTable.tsx`
+- `src/features/vendor/components/ProductForm.tsx`
+- `src/features/vendor/components/InventoryPanel.tsx`
+- `src/features/vendor/components/ProductImageManager.tsx`
+- `src/features/vendor/components/StockActionDialog.tsx`
+- `src/features/vendor/components/FormFields.tsx`
+- `src/features/vendor/components/VendorStatusBanner.tsx`
+- `src/features/vendor/components/VendorErrorState.tsx`
+- `src/features/vendor/components/ApprovedVendorGate.tsx`
+- `src/features/vendor/orders/components/OrderCard.tsx`
+- `src/features/vendor/orders/components/RejectReasonDialog.tsx`
+- `src/features/vendor/orders/components/CancelReasonDialog.tsx`
+- `src/features/vendor/orders/components/TodaySummaryStrip.tsx`
+- `src/features/vendor/billing/components/CommissionRateCard.tsx`
+- `src/features/vendor/billing/components/LedgerTransactionTable.tsx`
+- `src/features/vendor/billing/components/OutstandingBalanceCard.tsx`
+- `src/features/vendor/billing/components/SettlementDetailModal.tsx`
+- `src/features/vendor/billing/components/SettlementHistoryTable.tsx`
+- `src/features/vendor/billing/components/StatementDownloadCard.tsx`
+- `src/features/vendor/billing/components/RunSettlementModal.tsx`
+- `src/features/vendor/billing/components/AdminLedgerTable.tsx`
+- `src/features/vendor/billing/components/AdminSettlementTable.tsx`
+- `src/features/vendor/billing/components/FinalizeSettlementModal.tsx`
+- `src/features/vendor/billing/components/OverdueVendorsCard.tsx`
+- `src/features/b2b/components/B2BOrderActionDialogs.tsx`
+- `src/features/b2b/pages/B2BOrdersPage.tsx`
+- `src/features/b2b/pages/B2BPlaceOrderPage.tsx`
+- `src/features/b2b/pages/B2BOrderDetailPage.tsx`
+- `src/features/b2b/pages/B2BStatementsPage.tsx`
+- `src/features/farmer/pages/FarmerDashboardPage.tsx`
+- `src/features/farmer/pages/FarmerVendorBrowsePage.tsx`
+- `src/features/farmer/pages/FarmerLedgerPage.tsx`
+- `src/features/farmer/pages/FarmerPassbookPage.tsx`
+- `src/features/farmer/pages/FarmerRegisterPage.tsx`
+- `src/features/farmer/components/FarmerErrorState.tsx`
+- `src/features/farmer/components/CollectionForm.tsx`
+- `src/features/motion/FieldMessage.tsx`
+- `src/features/vendor-registration/components/ServiceAreaPicker.tsx`
+- `src/features/vendor-registration/components/LocationPicker.tsx`
+- `src/features/vendor-registration/components/TextInput.tsx`
+- `src/features/location/components/LocationMenu.tsx`
+- `src/features/admin/components/AdminErrorState.tsx`
+- `src/features/admin/components/AdminStatusBadge.tsx`
+- `src/features/admin/components/ReasonDialog.tsx`
+- `src/features/admin/components/MarkRefundedDialog.tsx`
+- `src/features/admin/components/VendorStatusBadge.tsx`
+- `src/features/admin/pages/AdminDashboardPage.tsx`
+- `src/features/admin/pages/AdminVendorsPage.tsx`
+- `src/features/admin/pages/AdminUsersPage.tsx`
+- `src/features/admin/pages/AdminLocationProposalsPage.tsx`
+- `src/features/admin/pages/AdminRefundsPage.tsx`
+- `src/features/admin/pages/AdminOrderLookupPage.tsx`
+- `src/features/admin/pages/AdminDisputesPage.tsx`
+- `src/features/admin/pages/AdminBillingPage.tsx`
+- `src/features/admin/pages/AdminReviewsPage.tsx`
+- `src/features/admin/pages/AdminAnalyticsPage.tsx`
+- `src/features/admin/pages/AdminFarmersPage.tsx`
+- `src/features/admin/pages/AdminFarmerDetailPage.tsx`
+
+**Verification:**
+- `npm run typecheck`: PASS
+- `npm run lint`: PASS
+- `npm run build`: PASS (~1m 21s)
+- `npm test`: All frontend test suites pass (950+ tests). Pre-existing jsdom CORS errors in `VendorStorefrontPage.test.tsx`, `login-router.test.tsx`, `AdminVendorsPage.test.tsx`, `AdminFarmersPage.test.tsx`, `CartPage.test.tsx`, `CheckoutPage.test.tsx`, `OrderDetailPage.test.tsx`, `VendorOrderBoardPage.test.tsx` are unrelated infrastructure issues (jsdom `requestSubmit` not implemented, CORS `localhost:3000` forbidden) and exist on `main` without my changes.
+
 

@@ -43,7 +43,7 @@ export function B2BPlaceOrderPage() {
   const navigate = useNavigate();
 
   const { data: sellers, isPending: sellersPending, error: sellersError } = useSellers(
-    query || undefined,
+    query,
   );
 
   const sellerProducts = useSellerProducts(selectedSeller?.vendorId ?? null);
@@ -51,19 +51,6 @@ export function B2BPlaceOrderPage() {
   const products: B2BProductSummary[] = sellerProducts.data ?? [];
   const productsPending = sellerProducts.isPending;
   const productsError = sellerProducts.error;
-
-  // Ensure every shown product has a line entry.
-  useCallback(() => {
-    setLines((existing) => {
-      const next: Record<number, number> = { ...existing };
-      products.forEach((product) => {
-        if (!(product.productId in next)) {
-          next[product.productId] = 0;
-        }
-      });
-      return next;
-    });
-  }, [products]);
 
   const hasFatalError = Boolean(sellersError || productsError);
   const subtotal = Object.entries(lines).reduce(
@@ -109,7 +96,7 @@ export function B2BPlaceOrderPage() {
         <VendorErrorState
           error={sellersError ?? productsError}
           onRetry={() => {
-            setQuery(query);
+            void (sellersError ? sellerProducts.refetch() : sellerProducts.refetch());
           }}
         />
       </div>
@@ -161,7 +148,7 @@ export function B2BPlaceOrderPage() {
           </div>
 
           {sellersPending && !sellers && (
-            <FadeIn className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600 flex items-center gap-3">
+            <FadeIn className="rounded-lg border border-bolder-line bg-bolder-surface p-4 text-sm text-bolder-muted flex items-center gap-3">
               Loading sellers…
             </FadeIn>
           )}
@@ -229,13 +216,13 @@ export function B2BPlaceOrderPage() {
                 </div>
 
               {productsPending && !products.length && (
-                <FadeIn className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600 flex items-center gap-3">
+                <FadeIn className="rounded-lg border border-bolder-line bg-bolder-surface p-4 text-sm text-bolder-muted flex items-center gap-3">
                   Loading products…
                 </FadeIn>
               )}
 
               {!productsPending && products.length === 0 && (
-                <FadeIn className="rounded-lg border border-slate-200 bg-white p-4 text-center text-sm text-slate-500">
+                <FadeIn className="rounded-lg border border-bolder-line bg-bolder-surface p-4 text-center text-sm text-bolder-muted">
                   This seller has no orderable products right now.
                 </FadeIn>
               )}

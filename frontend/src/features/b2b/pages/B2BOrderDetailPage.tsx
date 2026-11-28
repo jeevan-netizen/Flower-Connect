@@ -313,8 +313,8 @@ export function B2BOrderDetailPage() {
         </div>
 
         {/* Timeline */}
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">
+        <div className="rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-bolder-text mb-3">
             Status timeline
           </h2>
           {order.items.length > 0 && (
@@ -467,16 +467,16 @@ function actionLabel(action: string): string {
 function statusTone(status: string): string {
   switch (status) {
     case "PLACED":
-      return "text-amber-800 bg-amber-50 border-amber-200";
+      return "text-bolder-warning bg-bolder-warning-surface border-bolder-warning-border";
     case "ACCEPTED":
     case "SHIPPED":
-      return "text-blue-800 bg-blue-50 border-blue-200";
+      return "text-bolder-info bg-bolder-info-surface border-bolder-info-border";
     case "DELIVERED":
-      return "text-green-800 bg-green-50 border-green-200";
+      return "text-bolder-success bg-bolder-success-surface border-bolder-success-border";
     case "REJECTED":
     case "CANCELLED":
-      return "text-red-800 bg-red-50 border-red-200";
+      return "text-bolder-danger bg-bolder-danger-surface border-bolder-danger-border";
     default:
-      return "text-slate-800 bg-slate-50 border-slate-200";
+      return "text-bolder-text bg-bolder-bg border-bolder-line";
   }
 }

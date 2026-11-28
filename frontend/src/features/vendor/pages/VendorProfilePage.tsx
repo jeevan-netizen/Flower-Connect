@@ -107,7 +107,7 @@ export function VendorProfilePage() {
 
   if (isPending) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border border-bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Loading your profile...
       </div>
     );
@@ -203,7 +203,7 @@ export function VendorProfilePage() {
       </Card>
 
       <Card title="Managed by FlowerConnect">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-bolder-muted">
           These values come from the platform and cannot be edited here.
         </p>
         <dl className="mt-3">
@@ -223,7 +223,7 @@ export function VendorProfilePage() {
       <div className="flex items-center gap-3">
         <Link
           to="/settings/password"
-          className="inline-flex items-center rounded-md border border-transparent bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+          className="inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-4 py-2.5 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2"
         >
           Change password
         </Link>

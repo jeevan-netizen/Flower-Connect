@@ -180,8 +180,8 @@ export function B2BStatementsPage() {
           }}
           className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
             view === "create"
-              ? "border-brand-600 text-brand-900"
-              : "border-transparent text-bolder-muted hover:text-slate-700"
+              ? "border-bolder-rose-action text-bolder-rose-deep"
+              : "border-transparent text-bolder-muted hover:text-bolder-muted"
           }`}
         >
           Generate statement
@@ -194,8 +194,8 @@ export function B2BStatementsPage() {
           }}
           className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
             view === "list" || view === "detail"
-              ? "border-brand-600 text-brand-900"
-              : "border-transparent text-bolder-muted hover:text-slate-700"
+              ? "border-bolder-rose-action text-bolder-rose-deep"
+              : "border-transparent text-bolder-muted hover:text-bolder-muted"
           }`}
         >
           Statements list
@@ -211,7 +211,7 @@ export function B2BStatementsPage() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="col-span-full sm:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="statement-buyer-select">
+                <label className="block text-sm font-medium text-bolder-text mb-1" htmlFor="statement-buyer-select">
                   Buyer
                 </label>
                 <select
@@ -220,7 +220,7 @@ export function B2BStatementsPage() {
                   onChange={(event) =>
                     setBuyerId(event.target.value === "" ? null : Number(event.target.value))
                   }
-                  className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                  className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-bolder-rose focus:ring-bolder-rose"
                 >
                   <option value="">Select a buyer</option>
                   {sellerOptions.map((seller) => (
@@ -231,7 +231,7 @@ export function B2BStatementsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="statement-from-date">
+                <label className="block text-sm font-medium text-bolder-text mb-1" htmlFor="statement-from-date">
                   From
                 </label>
                 <input
@@ -239,11 +239,11 @@ export function B2BStatementsPage() {
                   type="date"
                   value={fromDate}
                   onChange={(event) => setFromDate(event.target.value)}
-                  className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                  className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-bolder-rose focus:ring-bolder-rose"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="statement-to-date">
+                <label className="block text-sm font-medium text-bolder-text mb-1" htmlFor="statement-to-date">
                   To
                 </label>
                 <input
@@ -251,7 +251,7 @@ export function B2BStatementsPage() {
                   type="date"
                   value={toDate}
                   onChange={(event) => setToDate(event.target.value)}
-                  className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                  className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-bolder-rose focus:ring-bolder-rose"
                 />
               </div>
             </div>
@@ -260,7 +260,7 @@ export function B2BStatementsPage() {
                 type="button"
                 onClick={handlePreview}
                 disabled={!buyerId || previewPending}
-                className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
               >
                 {previewPending ? "Previewing…" : "Preview"}
               </button>
@@ -270,7 +270,7 @@ export function B2BStatementsPage() {
                   setFromDate(fifteenDaysAgo());
                   setToDate(todayLocal());
                 }}
-                className="rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg"
               >
                 Reset range
               </button>
@@ -302,7 +302,7 @@ export function B2BStatementsPage() {
                 </FadeIn>
               ) : (
                 <>
-                  <table className="w-full text-left text-sm divide-y divide-slate-100 mb-4">
+                  <table className="w-full text-left text-sm divide-y divide-bolder-line mb-4">
                     <thead>
                       <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                         <th scope="col" className="py-3 pr-4 font-medium">
@@ -344,7 +344,7 @@ export function B2BStatementsPage() {
                       type="button"
                       disabled={!canCreate}
                       onClick={handleCreate}
-                      className={`w-full rounded-md border border-transparent bg-bolder-rose-action px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                      className={`w-full rounded-md border border-transparent bg-bolder-rose-action px-4 py-2.5 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
                     >
                       {isCreating ? "Creating statement…" : "Create statement"}
                     </button>
@@ -375,8 +375,8 @@ export function B2BStatementsPage() {
                 }}
                 className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
                   role === r.key
-                    ? "border-brand-600 text-brand-900"
-                    : "border-transparent text-bolder-muted hover:text-slate-700"
+                    ? "border-bolder-rose-action text-bolder-rose-deep"
+                    : "border-transparent text-bolder-muted hover:text-bolder-muted"
                 }`}
               >
                 {r.label}
@@ -401,7 +401,7 @@ export function B2BStatementsPage() {
             </FadeIn>
           ) : (
             <>
-              <table className="w-full text-left text-sm divide-y divide-slate-100">
+              <table className="w-full text-left text-sm divide-y divide-bolder-line">
                 <thead>
                   <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                     <th scope="col" className="py-3 pr-4 font-medium">
@@ -417,11 +417,11 @@ export function B2BStatementsPage() {
                 </thead>
                 <tbody>
                   {statementList.content.map((statement) => (
-                    <tr
-                      key={statement.id}
-                      className="align-top group cursor-pointer hover:bg-slate-50"
-                      onClick={() => selectStatement(statement)}
-                    >
+                      <tr
+                        key={statement.id}
+                        className="align-top group cursor-pointer hover:bg-bolder-bg"
+                        onClick={() => selectStatement(statement)}
+                      >
                       <td className="py-3 pr-4">
                         <p className="font-medium text-bolder-text">
                           #{statement.statementNo}
@@ -476,42 +476,42 @@ export function B2BStatementsPage() {
             <button
               type="button"
               onClick={backToList}
-              className={`rounded-md border border-transparent bg-bolder-rose-action px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 ${PRESSABLE} ${FOCUS_RING}`}
+              className={`rounded-md border border-transparent bg-bolder-rose-action px-3 py-1.5 text-xs font-medium text-white hover:bg-bolder-rose-deep ${PRESSABLE} ${FOCUS_RING}`}
             >
               Back to list
             </button>
           </div>
 
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="col-span-full border-b border-slate-100 pb-2">
+            <div className="col-span-full border-b border-bolder-line pb-2">
               <dt className="text-xs text-bolder-muted">Period</dt>
               <dd className="text-sm text-bolder-text">
                 {formatLocalDate(selectedStatement.periodStart)} –
                 {formatLocalDate(selectedStatement.periodEnd)}
               </dd>
             </div>
-            <div className="border-b border-slate-100 pb-2">
+            <div className="border-b border-bolder-line pb-2">
               <dt className="text-xs text-bolder-muted">Total</dt>
               <dd className="text-sm font-medium text-bolder-text">
                 {formatMoney(selectedStatement.totalAmount)}
               </dd>
             </div>
-            <div className="border-b border-slate-100 pb-2">
+            <div className="border-b border-bolder-line pb-2">
               <dt className="text-xs text-bolder-muted">Status</dt>
               <dd className="text-sm text-bolder-text">
                 {selectedStatement.status === "OPEN" ? "Open" : "Paid"}
               </dd>
             </div>
             {selectedStatement.paidAt && (
-              <div className="border-b border-slate-100 pb-2">
-                <dt className="text-xs text-bolder-muted">Paid at</dt>
+            <div className="border-b border-bolder-line pb-2">
+              <dt className="text-xs text-bolder-muted">Paid at</dt>
                 <dd className="text-sm text-bolder-text">
                   {formatLocalDate(selectedStatement.paidAt.split("T")[0])}
                 </dd>
               </div>
             )}
             {selectedStatement.paymentMode && (
-              <div className="border-b border-slate-100 pb-2">
+              <div className="border-b border-bolder-line pb-2">
                 <dt className="text-xs text-bolder-muted">Payment mode</dt>
                 <dd className="text-sm text-bolder-text">
                   {selectedStatement.paymentMode}
@@ -535,7 +535,7 @@ export function B2BStatementsPage() {
             {selectedStatement.orders.length === 0 ? (
               <p className="text-sm text-bolder-muted">No orders in this statement.</p>
             ) : (
-              <table className="w-full text-left text-sm divide-y divide-slate-100">
+              <table className="w-full text-left text-sm divide-y divide-bolder-line">
                 <thead>
                   <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                     <th scope="col" className="py-3 pr-4 font-medium">Order</th>
@@ -590,13 +590,13 @@ export function B2BStatementsPage() {
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label className="block text-sm font-medium text-bolder-text mb-1">
                         Payment mode
                       </label>
                       <select
                         name="paymentMode"
                         defaultValue="CASH"
-                        className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                        className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-bolder-rose focus:ring-bolder-rose"
                       >
                         <option value="CASH">Cash</option>
                         <option value="UPI">UPI</option>
@@ -604,14 +604,14 @@ export function B2BStatementsPage() {
                       </select>
                     </div>
                     <div className="col-span-full sm:col-span-2">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label className="block text-sm font-medium text-bolder-text mb-1">
                         Note (optional)
                       </label>
                       <textarea
                         name="paymentNote"
                         rows={2}
                         placeholder="A reference for this payment"
-                        className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                        className="w-full rounded-md border border-bolder-line-control bg-white px-3 py-2 text-sm shadow-sm focus:border-bolder-rose focus:ring-bolder-rose"
                       />
                     </div>
                   </div>
@@ -619,7 +619,7 @@ export function B2BStatementsPage() {
                     <button
                       type="submit"
                       disabled={isPaying}
-                      className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+                      className={`rounded-md border border-transparent bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-60 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
                     >
                       {isPaying ? "Recording payment…" : "Record payment"}
                     </button>
@@ -629,12 +629,12 @@ export function B2BStatementsPage() {
             )}
 
           {actionError && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className="mt-4 rounded-lg border border-bolder-danger-border bg-bolder-danger-surface p-3 text-sm text-bolder-danger">
               <p className="font-semibold">{actionError.message}</p>
               <button
                 type="button"
                 onClick={clearError}
-                className="mt-2 inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700"
+                className="mt-2 inline-flex items-center rounded-md border border-transparent bg-bolder-rose-action px-2.5 py-1 text-xs font-medium text-white hover:bg-bolder-rose-deep"
               >
                 Dismiss
               </button>
@@ -648,6 +648,6 @@ export function B2BStatementsPage() {
 
 function statementStatusTone(status: string): string {
   return status === "PAID"
-    ? "text-green-800 bg-green-50 border-green-200"
-    : "text-amber-800 bg-amber-50 border-amber-200";
+    ? "text-bolder-success bg-bolder-success-surface border-bolder-success-border"
+    : "text-bolder-warning bg-bolder-warning-surface border-bolder-warning-border";
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { PublicProductImage } from "@/features/customer/types";
+import { API_BASE_URL } from "@/shared/lib/api";
 
 interface ProductImageProps {
   productId: number;
@@ -16,10 +17,9 @@ interface ProductImageProps {
  * fallback when the product has no image, when no delivery location is
  * selected (the image endpoint requires one), or when the image fails to load.
  *
- * The URL is built from the product and image ids plus the selected location,
- * so no storage key ever reaches the client. The request goes through the
- * same /api proxy as every other API call, so it is same-origin in both dev
- * (Vite proxy) and prod (server reverse proxy) and satisfies img-src 'self'.
+ * The URL uses the configured API origin because images are loaded by the
+ * browser rather than Axios. The backend checks delivery distance and serves
+ * the stored bytes; no storage key reaches the client.
  */
 export function ProductImage({
   productId,
@@ -32,7 +32,7 @@ export function ProductImage({
 
   const src =
     locationId !== null && image !== undefined
-      ? `/api/v1/products/${productId}/images/${image.id}?locationId=${locationId}`
+      ? `${API_BASE_URL.replace(/\/+$/, "")}/products/${productId}/images/${image.id}?locationId=${locationId}`
       : null;
 
   const alt = `Photo of ${productName}: ${image?.originalFilename ?? "unnamed file"}`;

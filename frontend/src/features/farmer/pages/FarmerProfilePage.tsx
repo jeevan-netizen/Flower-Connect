@@ -27,7 +27,7 @@ export function FarmerProfilePage() {
 
   if (isPending) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">
+      <div className="rounded-lg border border-bolder-line bg-bolder-surface p-6 text-sm text-bolder-muted">
         Loading your profile…
       </div>
     );
@@ -49,12 +49,12 @@ export function FarmerProfilePage() {
       </AnimatedList>
 
       <Card title="Account">
-        <dl className="divide-y divide-slate-200 text-sm">
+        <dl className="divide-y divide-bolder-line text-sm">
           <div className="grid grid-cols-2 gap-4 py-3 sm:py-4">
-            <dt className="font-medium text-slate-600">Role</dt>
-            <dd className="font-medium text-slate-900 capitalize">{profile.role}</dd>
-            <dt className="font-medium text-slate-600">Account id</dt>
-            <dd className="font-mono font-medium text-slate-900">{String(profile.id)}</dd>
+            <dt className="font-medium text-bolder-muted">Role</dt>
+            <dd className="font-medium text-bolder-text capitalize">{profile.role}</dd>
+            <dt className="font-medium text-bolder-muted">Account id</dt>
+            <dd className="font-mono font-medium text-bolder-text">{String(profile.id)}</dd>
           </div>
         </dl>
       </Card>
@@ -63,7 +63,7 @@ export function FarmerProfilePage() {
         <button
           type="button"
           onClick={handleLogout}
-          className={`w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-bolder-rose focus-visible:ring-offset-2 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`w-full rounded-md border border-bolder-line-control bg-bolder-surface px-4 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-bolder-rose focus-visible:ring-offset-2 ${PRESSABLE} ${FOCUS_RING}`}
         >
           Log out
         </button>

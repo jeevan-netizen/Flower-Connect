@@ -71,7 +71,7 @@ export function B2BOrdersPage() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-slate-200 pb-2">
+      <div className="flex gap-1 border-b border-bolder-line pb-2">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -148,7 +148,7 @@ export function B2BOrdersPage() {
             </button>
           </div>
 
-          <table className="w-full text-left text-sm divide-y divide-slate-100">
+          <table className="w-full text-left text-sm divide-y divide-bolder-line">
             <thead>
               <tr className="text-xs uppercase tracking-wide text-bolder-muted">
                 <th scope="col" className="py-3 pr-4 font-medium">Order</th>

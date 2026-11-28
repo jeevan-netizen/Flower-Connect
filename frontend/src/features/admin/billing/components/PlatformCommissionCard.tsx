@@ -55,33 +55,33 @@ export function PlatformCommissionCard() {
   return (
     <div
       data-testid="platform-commission-card"
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      className="rounded-2xl border border-bolder-line bg-bolder-surface p-6 shadow-sm"
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <span className="text-xs font-semibold uppercase tracking-wider text-bolder-muted">
           Platform Global Settings
         </span>
-        <span className="inline-flex items-center rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-800">
+        <span className="inline-flex items-center rounded-full bg-bolder-blush-light px-2.5 py-0.5 text-xs font-medium text-bolder-rose-deep">
           Default Rate
         </span>
       </div>
 
       <div className="mt-4 flex items-baseline gap-2">
         {isLoading ? (
-          <div className="h-9 w-28 animate-pulse rounded bg-slate-200" />
+          <div className="h-9 w-28 animate-pulse rounded bg-bolder-bg" />
         ) : (
           <>
-            <span className="text-3xl font-extrabold tracking-tight text-slate-900">
+            <span className="text-3xl font-extrabold tracking-tight text-bolder-text">
               {data ? data.rate.toFixed(2) : "10.00"}%
             </span>
-            <span className="text-xs font-medium text-slate-500">
+            <span className="text-xs font-medium text-bolder-muted">
               applied to subtotal when vendor has no custom rate
             </span>
           </>
         )}
       </div>
 
-      <p className="mt-2 text-xs leading-relaxed text-slate-600">
+      <p className="mt-2 text-xs leading-relaxed text-bolder-muted">
         This platform default is snapshotted into commission records upon order delivery.
         Updates are audit-logged with before and after values.
       </p>
@@ -96,24 +96,24 @@ export function PlatformCommissionCard() {
               max="100"
               value={rateInput}
               onChange={(e) => setRateInput(e.target.value)}
-              className="w-32 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="w-32 rounded-lg border border-bolder-line-control px-3 py-1.5 text-xs font-medium text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
               required
             />
-            <span className="absolute right-3 top-2 text-xs text-slate-400">%</span>
+            <span className="absolute right-3 top-2 text-xs text-bolder-muted">%</span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="submit"
               disabled={updateMutation.isPending}
-              className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
+              className="rounded-lg bg-bolder-rose-action px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-bolder-rose-deep disabled:opacity-50"
             >
               {updateMutation.isPending ? "Saving..." : "Save Rate"}
             </button>
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-xs font-medium text-bolder-text hover:bg-bolder-bg"
             >
               Cancel
             </button>
@@ -124,15 +124,16 @@ export function PlatformCommissionCard() {
           <button
             type="button"
             onClick={handleStartEdit}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            className="rounded-lg border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-xs font-medium text-bolder-text shadow-sm hover:bg-bolder-bg"
           >
             Change Default Rate
           </button>
         </div>
       )}
 
-      {errorMessage && <p className="mt-2 text-xs font-medium text-red-600">{errorMessage}</p>}
-      {successMessage && <p className="mt-2 text-xs font-medium text-emerald-600">{successMessage}</p>}
+      {errorMessage && <p className="mt-2 text-xs font-medium text-bolder-danger">{errorMessage}</p>}
+      {successMessage && <p className="mt-2 text-xs font-medium text-bolder-success">{successMessage}</p>}
     </div>
   );
 }
+

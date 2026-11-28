@@ -264,7 +264,7 @@ export function VendorPosPage() {
   const hasItems = ticket.items.length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-bolder-bg">
+    <div className="min-h-screen bg-bolder-bg">
       {/* Sidebar toggle button for mobile */}
       {showSidebar && (
         <button
@@ -278,13 +278,13 @@ export function VendorPosPage() {
       {/* Fullscreen POS overlay */}
       <div className="relative w-full max-w-full md:max-w-full bg-bolder-bg min-h-screen">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-600">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-bolder-line">
           <h1 className="text-2xl font-bold text-bolder-text">POS</h1>
           <div className="flex items-center gap-2">
             <span className="text-sm text-bolder-muted">FLORIST</span>
             <button
               onClick={handleLogout}
-              className="text-sm text-bolder-muted hover:text-slate-200"
+              className="text-sm text-bolder-muted hover:text-bolder-text"
             >
               Logout
             </button>
@@ -300,11 +300,11 @@ export function VendorPosPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products..."
-                className="w-full px-3 py-2 rounded-md border border-slate-400 focus:ring-slate-300"
+                className="w-full px-3 py-2 rounded-md border border-bolder-line-control shadow-sm focus:ring-bolder-rose focus:border-bolder-rose"
                 disabled={isLoading}
               />
               {isLoading && (
-                <span className="absolute right-2 text-slate-500 text-xs">Loading...</span>
+                <span className="absolute right-2 text-bolder-muted text-xs">Loading...</span>
               )}
               {searchQuery && (
                 <button
@@ -328,12 +328,12 @@ export function VendorPosPage() {
               return (
                 <div
                   key={product.productId}
-                  className={`group rounded border border-slate-400 p-2 hover:bg-bolder-surface transition-colors ${
+                  className={`group rounded border border-bolder-line-control p-2 hover:bg-bolder-surface transition-colors ${
                     disabled ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
                   <div className="h-24 flex items-center justify-center">
-                    <span className="text-sm text-slate-300">
+                    <span className="text-sm text-bolder-muted">
                       {product.name.split(" ")[0].charAt(0)}
                     </span>
                   </div>
@@ -354,7 +354,7 @@ export function VendorPosPage() {
                   <button
                     onClick={() => addItem(product.productId, product.name, product.basePrice)}
                     disabled={disabled || isSubmitting}
-                    className={`mt-1 w-full rounded border border-slate-400 px-2 py-2 text-sm text-bolder-text hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
+                    className={`mt-1 w-full rounded border border-bolder-line-control px-2 py-2 text-sm text-bolder-text hover:bg-bolder-bg disabled:opacity-50 ${PRESSABLE}`}
                   >
                     Quick Add
                   </button>
@@ -365,9 +365,9 @@ export function VendorPosPage() {
         </div>
 
         {/* Running Ticket */}
-        <div className="p-4 border-t border-slate-600">
+        <div className="p-4 border-t border-bolder-line">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-300">Ticket</span>
+            <span className="text-sm text-bolder-muted">Ticket</span>
             <span className="text-sm font-medium text-bolder-text">
               ${ticket.subtotal.toFixed(2)}
             </span>
@@ -376,11 +376,11 @@ export function VendorPosPage() {
           <div className="grid grid-cols-2 gap-2 mt-2">
             {ticket.items.map((item) => (
               <div key={item.productId} className="flex items-center">
-                <span className="text-xs text-slate-300">{item.productName}</span>
+                <span className="text-xs text-bolder-muted">{item.productName}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setQuantity(item.productId, item.quantity + 1)}
-                    className={`${PRESSABLE} rounded border border-slate-300 px-1 py-0.5 text-xs`}
+                    className={`${PRESSABLE} rounded border border-bolder-line-control px-1 py-0.5 text-xs`}
                   >
                     +
                   </button>
@@ -392,11 +392,11 @@ export function VendorPosPage() {
                     onChange={(e) =>
                       setQuantity(item.productId, Number(e.target.value))
                     }
-                    className="w-10 rounded border border-slate-300 px-1 text-center text-sm"
+                    className="w-10 rounded border border-bolder-line-control px-1 text-center text-sm"
                   />
                   <button
                     onClick={() => removeItem(item.productId)}
-                    className={`${PRESSABLE} rounded border border-slate-300 px-1 py-0.5 text-xs`}
+                    className={`${PRESSABLE} rounded border border-bolder-line-control px-1 py-0.5 text-xs`}
                   >
                     −
                   </button>
@@ -406,8 +406,8 @@ export function VendorPosPage() {
           </div>
 
           {/* Total */}
-          <div className="mt-3 pt-3 border-t border-slate-500">
-            <div className="flex justify-between text-sm text-slate-300">
+          <div className="mt-3 pt-3 border-t border-bolder-line">
+            <div className="flex justify-between text-sm text-bolder-muted">
               <span>Subtotal</span>
               <span>${ticket.subtotal.toFixed(2)}</span>
             </div>
@@ -418,44 +418,44 @@ export function VendorPosPage() {
         </div>
 
         {/* Payment Selection */}
-        <div className="p-4 border-t border-slate-600">
+        <div className="p-4 border-t border-bolder-line">
           <div className="flex gap-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 checked={ticket.payment === "CASH"}
                 onChange={() => handlePaymentChange("CASH")}
-                className="w-4 h-4 rounded border-slate-400 focus:ring-slate-300"
+                className="w-4 h-4 rounded border-bolder-line-control focus:ring-bolder-rose"
               />
-              <span className="text-slate-200">CASH</span>
+              <span className="text-bolder-muted">CASH</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 checked={ticket.payment === "CARD"}
                 onChange={() => handlePaymentChange("CARD")}
-                className="w-4 h-4 rounded border-slate-400 focus:ring-slate-300"
+                className="w-4 h-4 rounded border-bolder-line-control focus:ring-bolder-rose"
               />
-              <span className="text-slate-200">CARD</span>
+              <span className="text-bolder-muted">CARD</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 checked={ticket.payment === "UPI"}
                 onChange={() => handlePaymentChange("UPI")}
-                className="w-4 h-4 rounded border-slate-400 focus:ring-slate-300"
+                className="w-4 h-4 rounded border-bolder-line-control focus:ring-bolder-rose"
               />
-              <span className="text-slate-200">UPI</span>
+              <span className="text-bolder-muted">UPI</span>
             </label>
           </div>
         </div>
 
         {/* Charge Button */}
-        <div className="p-4 border-t border-slate-600">
+        <div className="p-4 border-t border-bolder-line">
           <button
             onClick={handleSale}
             disabled={isSubmitting || !isKeyValid() || !hasItems}
-            className={`w-full rounded border border-slate-300 px-4 py-2 text-lg font-medium text-bolder-text hover:bg-slate-700 disabled:opacity-50 ${PRESSABLE}`}
+            className={`w-full rounded border border-bolder-line-control px-4 py-2 text-lg font-medium text-bolder-text hover:bg-bolder-bg disabled:opacity-50 ${PRESSABLE}`}
           >
             {isSubmitting ? "Processing..." : "Charge"}
           </button>
@@ -463,17 +463,17 @@ export function VendorPosPage() {
 
         {/* Error State */}
         {error && (
-          <div className="p-4 rounded border border-red-400 bg-red-50 text-red-600 mt-2">
+          <div className="p-4 rounded border border-bolder-danger-border bg-bolder-danger-surface text-bolder-danger mt-2">
             <p>{error}</p>
           </div>
         )}
 
         {/* Print Receipt State */}
         {showPrint && printReceipt && (
-          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-bolder-overlay backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="rounded-md bg-bolder-surface p-6 max-w-sm w-full">
               <h2 className="text-xl font-bold text-bolder-text mb-4">Receipt</h2>
-              <pre className="text-xs text-slate-300 whitespace-pre">
+              <pre className="text-xs text-bolder-muted whitespace-pre">
                 {JSON.stringify(printReceipt, null, 2)}
               </pre>
               <div className="mt-4 flex justify-end gap-2">
@@ -482,13 +482,13 @@ export function VendorPosPage() {
                     setShowPrint(false);
                     setPrintWindow(null);
                   }}
-                  className="rounded border border-slate-400 px-3 py-1 text-sm text-slate-300"
+                  className="rounded border border-bolder-line-control px-3 py-1 text-sm text-bolder-muted"
                 >
                   Close
                 </button>
                 <button
                   onClick={handlePrint}
-                  className="rounded border border-slate-400 px-3 py-1 text-sm text-slate-300"
+                  className="rounded border border-bolder-line-control px-3 py-1 text-sm text-bolder-text"
                 >
                   Print
                 </button>
@@ -499,26 +499,26 @@ export function VendorPosPage() {
 
         {/* Sidebar (mobile) - hidden on larger screens */}
         {showSidebar && (
-          <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-40">
+          <div className="fixed inset-0 bg-bolder-overlay backdrop-blur-sm z-40">
             <div className="h-full w-64 bg-bolder-surface p-4 flex flex-col">
               <h2 className="text-xl font-bold text-bolder-text mb-4">POS</h2>
               <button
                 onClick={() => setShowSidebar(false)}
-                className="mt-4 rounded border border-slate-400 px-2 py-1 text-sm text-slate-300"
+                className="mt-4 rounded border border-bolder-line-control px-2 py-1 text-sm text-bolder-muted"
               >
                 Close
               </button>
               <nav className="mt-4 space-y-2">
-                <a href="/vendor" className="block rounded border border-slate-400 px-3 py-1 text-sm text-slate-300">
+                <a href="/vendor" className="block rounded border border-bolder-line-control px-3 py-1 text-sm text-bolder-muted">
                   Dashboard
                 </a>
-                <a href="#" className="block rounded border border-slate-400 px-3 py-1 text-sm text-slate-300">
+                <a href="#" className="block rounded border border-bolder-line-control px-3 py-1 text-sm text-bolder-muted">
                   Catalog
                 </a>
-                <a href="#" className="block rounded border border-slate-400 px-3 py-1 text-sm text-slate-300">
+                <a href="#" className="block rounded border border-bolder-line-control px-3 py-1 text-sm text-bolder-muted">
                   Inventory
                 </a>
-                <a href="#" className="block rounded border border-slate-400 px-3 py-1 text-sm text-slate-300">
+                <a href="#" className="block rounded border border-bolder-line-control px-3 py-1 text-sm text-bolder-muted">
                   Orders
                 </a>
               </nav>

@@ -14,7 +14,7 @@ const DEPOSIT_SCHEMA = z.object({
   depositedAt: z.string().optional(),
 });
 
-const CONTROL_CLASS = `mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm`;
+const CONTROL_CLASS = `mt-1 block w-full rounded-md border-bolder-line-control shadow-sm focus:border-bolder-rose focus:ring-bolder-rose sm:text-sm`;
 
 type DepositFormValues = z.infer<typeof DEPOSIT_SCHEMA>;
 
@@ -87,7 +87,7 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label htmlFor="flowerType" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="flowerType" className="block text-sm font-medium text-bolder-text">
             Flower type
           </label>
           <input
@@ -97,13 +97,13 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
             required
             aria-invalid={errors.flowerType ? true : undefined}
             aria-describedby={errors.flowerType ? "flowerType-note" : undefined}
-            className={`${CONTROL_CLASS} ${errors.flowerType ? "border-red-500" : ""}`}
+            className={`${CONTROL_CLASS} ${errors.flowerType ? "border-bolder-danger-border" : ""}`}
             {...register("flowerType")}
           />
           <FieldMessage id="flowerType-note" message={errors.flowerType?.message} reserve />
         </div>
         <div>
-          <label htmlFor="grossKg" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="grossKg" className="block text-sm font-medium text-bolder-text">
             Gross (kg)
           </label>
           <input
@@ -114,13 +114,13 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
             required
             aria-invalid={errors.grossKg ? true : undefined}
             aria-describedby={errors.grossKg ? "grossKg-note" : undefined}
-            className={`${CONTROL_CLASS} ${errors.grossKg ? "border-red-500" : ""}`}
+            className={`${CONTROL_CLASS} ${errors.grossKg ? "border-bolder-danger-border" : ""}`}
             {...register("grossKg", { valueAsNumber: true })}
           />
           <FieldMessage id="grossKg-note" message={errors.grossKg?.message} reserve />
         </div>
         <div>
-          <label htmlFor="pricePerKg" className="block text-sm font-medium text-slate-700">
+          <label htmlFor="pricePerKg" className="block text-sm font-medium text-bolder-text">
             Price (/kg)
           </label>
           <input
@@ -131,21 +131,21 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
             required
             aria-invalid={errors.pricePerKg ? true : undefined}
             aria-describedby={errors.pricePerKg ? "pricePerKg-note" : undefined}
-            className={`${CONTROL_CLASS} ${errors.pricePerKg ? "border-red-500" : ""}`}
+            className={`${CONTROL_CLASS} ${errors.pricePerKg ? "border-bolder-danger-border" : ""}`}
             {...register("pricePerKg", { valueAsNumber: true })}
           />
           <FieldMessage id="pricePerKg-note" message={errors.pricePerKg?.message} reserve />
         </div>
       </div>
       <div>
-        <label htmlFor="depositedAt" className="block text-sm font-medium text-slate-700">
+        <label htmlFor="depositedAt" className="block text-sm font-medium text-bolder-text">
           Deposited at (optional)
         </label>
         <input
           id="depositedAt"
           type="datetime-local"
           aria-describedby={errors.depositedAt ? "depositedAt-note" : undefined}
-          className={`${CONTROL_CLASS} ${errors.depositedAt ? "border-red-500" : ""}`}
+          className={`${CONTROL_CLASS} ${errors.depositedAt ? "border-bolder-danger-border" : ""}`}
           {...register("depositedAt")}
         />
         <FieldMessage id="depositedAt-note" message={errors.depositedAt?.message} reserve />
@@ -160,14 +160,14 @@ export function DepositForm({ linkId, onSuccess }: DepositFormProps) {
       />
 
       {submitError && (
-        <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div role="alert" className="rounded-md border-bolder-danger-border bg-bolder-danger-surface p-3 text-sm text-bolder-danger">
           {submitError}
         </div>
       )}
       <button
         type="submit"
         disabled={isPending || !isValid}
-        className={`w-full rounded-md border border-transparent bg-brand-600 py-2.5 px-4 text-sm font-medium text-white hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE}`}
+        className={`w-full rounded-md border border-transparent bg-bolder-rose-action py-2.5 px-4 text-sm font-medium text-white hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE}`}
       >
         {isPending ? "Recording…" : "Record deposit"}
       </button>

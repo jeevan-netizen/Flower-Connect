@@ -3,7 +3,6 @@ import { AnimatedList } from "@/motion/AnimatedList";
 import { FOCUS_RING_DARK } from "@/motion/pressable";
 import { FeatureRow } from "@/features/home/components/FeatureRow";
 import { HeroBackdrop } from "@/features/home/components/HeroBackdrop";
-import { HeroFloatingCards } from "@/features/home/components/HeroFloatingCards";
 import { HeroSearch } from "@/features/home/components/HeroSearch";
 import { MapPinIcon } from "@/features/home/components/icons";
 import { BotanicalHero } from "@/shared/ui/Botanical";
@@ -22,8 +21,8 @@ const FLORIST_CTA =
 /**
  * The public landing page.
  *
- * The hero is a static inline still-life illustration rather than a product
- * photograph or 3D scene. The layout is one column below `lg` and text-first at
+ * The hero uses the flower artwork cropped from the supplied design reference.
+ * The layout is one column below `lg` and text-first at
  * every width, so the heading, delivery picker, and account entry points remain
  * readable before the decorative bouquet.
  */
@@ -100,7 +99,6 @@ export function HomePage() {
 
             <div className="relative min-w-0">
               <BotanicalHero className="fc-slide-up-in" />
-              <HeroFloatingCards />
 
               <p className="sr-only">{BOUQUET_DESCRIPTION}</p>
             </div>

@@ -13,10 +13,10 @@ import { StatusPill } from "@/motion/StatusPill";
  * keeps a page of twenty rows from animating twenty pills on first paint.
  */
 const VENDOR_STATUS_TONES: Record<VendorStatus, string> = {
-  PENDING_APPROVAL: "bg-amber-100 text-amber-800",
-  APPROVED: "bg-brand-100 text-brand-900",
-  REJECTED: "bg-red-100 text-red-800",
-  SUSPENDED: "bg-slate-200 text-slate-800",
+  PENDING_APPROVAL: "bg-bolder-warning-surface text-bolder-warning",
+  APPROVED: "bg-bolder-blush-light text-bolder-rose-deep",
+  REJECTED: "bg-bolder-danger-surface text-bolder-danger",
+  SUSPENDED: "bg-bolder-bg text-bolder-text",
 };
 
 export function AdminVendorStatusBadge({ status }: { status: VendorStatus }) {

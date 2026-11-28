@@ -66,21 +66,21 @@ export function RunSettlementModal({ isOpen, onClose }: RunSettlementModalProps)
   return (
     <div
       data-testid="run-settlement-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bolder-overlay backdrop-blur-sm p-4 animate-in fade-in"
     >
-      <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-base font-bold text-slate-900">Run Weekly Settlement Cycle</h3>
+      <div className="relative w-full max-w-lg rounded-2xl bg-bolder-surface p-6 shadow-2xl border border-bolder-line">
+        <div className="flex items-center justify-between border-b border-bolder-line pb-3">
+          <h3 className="text-base font-bold text-bolder-text">Run Weekly Settlement Cycle</h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-1 text-bolder-muted hover:bg-bolder-bg hover:text-bolder-text"
           >
             ✕
           </button>
         </div>
 
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-bolder-muted">
           Aggregates all unattached online credits, COD commission dues, and dispute adjustments for the
           selected period into a PENDING weekly settlement.
         </p>
@@ -88,7 +88,7 @@ export function RunSettlementModal({ isOpen, onClose }: RunSettlementModalProps)
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="periodStartInput" className="block text-xs font-medium text-slate-700">
+              <label htmlFor="periodStartInput" className="block text-xs font-medium text-bolder-text">
                 Period Start
               </label>
               <input
@@ -96,13 +96,13 @@ export function RunSettlementModal({ isOpen, onClose }: RunSettlementModalProps)
                 type="date"
                 value={periodStart}
                 onChange={(e) => setPeriodStart(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="mt-1 w-full rounded-lg border border-bolder-line-control px-3 py-1.5 text-xs text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="periodEndInput" className="block text-xs font-medium text-slate-700">
+              <label htmlFor="periodEndInput" className="block text-xs font-medium text-bolder-text">
                 Period End
               </label>
               <input
@@ -110,14 +110,14 @@ export function RunSettlementModal({ isOpen, onClose }: RunSettlementModalProps)
                 type="date"
                 value={periodEnd}
                 onChange={(e) => setPeriodEnd(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="mt-1 w-full rounded-lg border border-bolder-line-control px-3 py-1.5 text-xs text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="vendorIdInput" className="block text-xs font-medium text-slate-700">
+            <label htmlFor="vendorIdInput" className="block text-xs font-medium text-bolder-text">
               Vendor ID (Optional)
             </label>
             <input
@@ -126,32 +126,32 @@ export function RunSettlementModal({ isOpen, onClose }: RunSettlementModalProps)
               placeholder="Leave blank to run for all vendors"
               value={vendorId}
               onChange={(e) => setVendorId(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="mt-1 w-full rounded-lg border border-bolder-line-control px-3 py-1.5 text-xs text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
             />
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-bolder-muted">
               If left blank, settlement is generated for every active vendor.
             </span>
           </div>
 
-          {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+          {error && <p className="mt-3 text-xs font-medium text-bolder-danger">{error}</p>}
           {successCount !== null && (
-            <p className="text-xs font-medium text-emerald-600">
+            <p className="mt-3 text-xs font-medium text-bolder-success">
               Settlement cycle completed: {successCount} settlement(s) generated/replayed.
             </p>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-bolder-line">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-bolder-line-control bg-bolder-surface px-4 py-2 text-xs font-medium text-bolder-text hover:bg-bolder-bg"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={runMutation.isPending}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
+              className="rounded-lg bg-bolder-rose-action px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-bolder-rose-deep disabled:opacity-50"
             >
               {runMutation.isPending ? "Generating..." : "Generate Settlement"}
             </button>

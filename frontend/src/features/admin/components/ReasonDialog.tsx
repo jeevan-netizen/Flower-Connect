@@ -81,7 +81,7 @@ export function ReasonDialog({
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bolder-overlay p-4"
       variants={backdropVariants}
       initial={enterState}
       animate="visible"
@@ -92,16 +92,16 @@ export function ReasonDialog({
         aria-modal="true"
         aria-labelledby={headingId}
         aria-describedby={descriptionId}
-        className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
+        className="w-full max-w-md rounded-lg border border-bolder-line bg-bolder-surface p-5 shadow-lg"
         variants={dialogVariants}
         initial={enterState}
         animate="visible"
         exit={exitState}
       >
-        <h2 id={headingId} className="text-base font-semibold text-slate-900">
+        <h2 id={headingId} className="text-base font-semibold text-bolder-text">
           {heading}
         </h2>
-        <p id={descriptionId} className="mt-1 text-sm text-slate-600">
+        <p id={descriptionId} className="mt-1 text-sm text-bolder-muted">
           {description}
         </p>
 
@@ -128,14 +128,14 @@ export function ReasonDialog({
           )}
 
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isSubmitting}
-              className={`rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
-            >
-              Cancel
-            </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={isSubmitting}
+                className={`rounded-md border border-bolder-line-control bg-bolder-surface px-3 py-2 text-sm font-medium text-bolder-text hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50 ${PRESSABLE} ${FOCUS_RING}`}
+              >
+                Cancel
+              </button>
             <SubmitButton
               isSubmitting={isSubmitting}
               idleLabel={confirmLabel}

@@ -440,27 +440,6 @@
   top: 68%;
 }
 
-.fc-ring {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  border-radius: 9999px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.fc-ring-solid {
-  width: 520px;
-  height: 520px;
-  border: 1px solid var(--glass-border-soft);
-}
-
-.fc-ring-dashed {
-  width: 620px;
-  height: 620px;
-  border: 1px dashed var(--glass-border-soft);
-}
-
 /*
  * The only `backdrop-filter` in the app (the two floating hero cards): a
  * full-page blur would be repainted on every scroll frame. Browsers without

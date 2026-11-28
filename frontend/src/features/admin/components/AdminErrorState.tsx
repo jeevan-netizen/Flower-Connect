@@ -29,7 +29,7 @@ export function AdminErrorState({ error, onRetry }: AdminErrorStateProps) {
 
   if (info.status === 403) {
     return (
-      <FadeIn role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+      <FadeIn role="alert" className="rounded-lg border border-bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
         <p className="font-semibold">Not permitted</p>
         <p className="mt-1">
           Your account does not have administrator access. Sign in as an administrator to manage
@@ -41,7 +41,7 @@ export function AdminErrorState({ error, onRetry }: AdminErrorStateProps) {
 
   if (info.status === 404) {
     return (
-      <FadeIn role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <FadeIn role="alert" className="rounded-lg border border-bolder-warning-border bg-bolder-warning-surface p-4 text-sm text-bolder-warning">
         <p className="font-semibold">Not found</p>
         <p className="mt-1">{info.message}</p>
       </FadeIn>
@@ -50,17 +50,17 @@ export function AdminErrorState({ error, onRetry }: AdminErrorStateProps) {
 
   if (info.status === 409) {
     return (
-      <FadeIn role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <FadeIn role="alert" className="rounded-lg border border-bolder-warning-border bg-bolder-warning-surface p-4 text-sm text-bolder-warning">
         <p className="font-semibold">Not allowed from the current status</p>
         <p className="mt-1">{info.message}</p>
-        <p className="mt-1 text-amber-800">
+        <p className="mt-1 text-bolder-warning">
           Someone may have changed this record already. Refresh the list and try again.
         </p>
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className={`mt-3 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 ${PRESSABLE} ${FOCUS_RING}`}
+            className={`mt-3 rounded-md border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-xs font-medium text-bolder-text hover:bg-bolder-bg ${PRESSABLE} ${FOCUS_RING}`}
           >
             Refresh the list
           </button>
@@ -70,14 +70,14 @@ export function AdminErrorState({ error, onRetry }: AdminErrorStateProps) {
   }
 
   return (
-    <FadeIn role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+    <FadeIn role="alert" className="rounded-lg border border-bolder-danger-border bg-bolder-danger-surface p-4 text-sm text-bolder-danger">
       <p className="font-semibold">Something went wrong</p>
       <p className="mt-1">{info.message}</p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className={`mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 ${PRESSABLE} ${FOCUS_RING}`}
+          className={`mt-3 rounded-md border border-bolder-danger-border bg-bolder-danger-surface px-3 py-1.5 text-xs font-medium text-bolder-danger hover:bg-bolder-danger-surface ${PRESSABLE} ${FOCUS_RING}`}
         >
           Try again
         </button>

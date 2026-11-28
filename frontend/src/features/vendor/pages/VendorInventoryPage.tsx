@@ -233,7 +233,7 @@ export function VendorInventoryPage() {
         title={selection ? `Movement history — ${selection.productName}` : "Movement history"}
       >
         {selection === null ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-bolder-muted">
             Choose a stock action above to read that product&apos;s movement history, or open the
             product editor for its full stock panel.
           </p>

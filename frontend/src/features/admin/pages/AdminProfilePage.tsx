@@ -47,7 +47,7 @@ export function AdminProfilePage() {
             description="Your name and email are your account identity. Role and member-since are read-only."
           />
 
-          <dl className="space-y-3 pt-2 border-t border-slate-200">
+          <dl className="space-y-3 pt-2 border-t border-bolder-line">
             <ReadOnlyRow label="Full name" value={user?.fullName ?? "—"} />
             <ReadOnlyRow label="Email" value={user?.email ?? "—"} />
             <ReadOnlyRow label="Role" value={user?.role ?? "—"} />
@@ -55,7 +55,7 @@ export function AdminProfilePage() {
             <ReadOnlyRow label="Member since" value={user?.createdAt ?? "—"} />
           </dl>
 
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-bolder-muted">
             Want to change your password?{" "}
             <Link
               to="/settings/password"

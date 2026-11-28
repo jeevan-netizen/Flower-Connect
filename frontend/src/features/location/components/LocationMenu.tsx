@@ -11,7 +11,7 @@ import { FOCUS_RING_DARK, PRESSABLE } from "@/motion/pressable";
 const BUTTON_CLASS = `inline-flex items-center gap-2 rounded-sm text-[15px] font-medium text-bolder-text transition-colors duration-micro ease-standard hover:text-bolder-blush ${PRESSABLE} ${FOCUS_RING_DARK}`;
 
 const PANEL_CLASS =
-  "absolute inset-x-0 top-full z-50 border-t border-slate-200 bg-white px-5 py-4 shadow-glass sm:px-8";
+  "absolute inset-x-0 top-full z-50 border-t border-bolder-line bg-bolder-surface px-5 py-4 shadow-glass sm:px-8";
 
 interface LocationMenuProps {
   /**
@@ -121,7 +121,7 @@ export function LocationMenu({ onOpen }: LocationMenuProps) {
               <button
                 type="button"
                 onClick={refetch}
-                className={`mt-2 inline-flex rounded-md text-sm font-medium text-brand-700 underline underline-offset-2 ${PRESSABLE} ${FOCUS_RING_DARK}`}
+                className={`mt-2 inline-flex rounded-md text-sm font-medium text-bolder-rose-strong underline underline-offset-2 ${PRESSABLE} ${FOCUS_RING_DARK}`}
               >
                 Try again
               </button>

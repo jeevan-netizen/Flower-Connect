@@ -30,48 +30,48 @@ export function OverdueVendorsCard({
   return (
     <div
       data-testid="overdue-vendors-card"
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      className="rounded-2xl border border-bolder-line bg-bolder-surface p-6 shadow-sm"
     >
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-bolder-line pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-slate-900">Overdue Dues Notice</h2>
+            <h2 className="text-base font-semibold text-bolder-text">Overdue Dues Notice</h2>
             {overdueVendors.length > 0 && (
-              <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800">
+              <span className="inline-flex items-center rounded-full bg-bolder-warning-surface px-2.5 py-0.5 text-xs font-bold text-bolder-warning">
                 {overdueVendors.length} Overdue
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-bolder-muted">
             Vendors with unsettled negative balances outstanding past 30 days. Flag-and-review policy (v1).
           </p>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="py-8 text-center text-xs text-slate-400">Loading overdue accounts...</div>
+        <div className="py-8 text-center text-xs text-bolder-muted">Loading overdue accounts...</div>
       ) : overdueVendors.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-xl bg-emerald-50/70 p-4 mt-4 border border-emerald-100">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 font-bold text-sm">
+        <div className="flex items-center gap-3 rounded-xl bg-bolder-success-surface p-4 mt-4 border border-bolder-success-border">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-bolder-success-surface text-bolder-success font-bold text-sm">
             ✓
           </div>
           <div>
-            <div className="text-xs font-semibold text-emerald-900">All vendor accounts in good standing</div>
-            <div className="text-[11px] text-emerald-700">
+            <div className="text-xs font-semibold text-bolder-success">All vendor accounts in good standing</div>
+            <div className="text-[11px] text-bolder-success">
               No vendors currently have unattached or pending negative balances older than 30 days.
             </div>
           </div>
         </div>
       ) : (
         <div className="mt-4 space-y-3">
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+          <div className="rounded-lg bg-bolder-warning-surface border border-bolder-warning-border p-3 text-xs text-bolder-warning">
             <strong>Advisory Notice:</strong> The following vendors have accumulated unpaid platform dues or clawbacks
             outstanding beyond the 30-day threshold. Review ledger activity before taking administrative action.
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-bolder-line">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 font-semibold text-slate-600 border-b border-slate-200">
+              <thead className="bg-bolder-bg font-semibold text-bolder-muted border-b border-bolder-line">
                 <tr>
                   <th scope="col" className="px-4 py-3">Vendor</th>
                   <th scope="col" className="px-4 py-3">Outstanding Dues</th>
@@ -81,25 +81,25 @@ export function OverdueVendorsCard({
                   <th scope="col" className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
+              <tbody className="divide-y divide-bolder-line text-bolder-text">
                 {overdueVendors.map((item) => (
-                  <tr key={item.vendorId} className="hover:bg-slate-50/80 transition">
+                  <tr key={item.vendorId} className="hover:bg-bolder-surface/80 transition">
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">{item.vendorBusinessName}</div>
-                      <div className="text-[11px] font-mono text-slate-400">ID: {item.vendorId}</div>
+                      <div className="font-semibold text-bolder-text">{item.vendorBusinessName}</div>
+                      <div className="text-[11px] font-mono text-bolder-muted">ID: {item.vendorId}</div>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-rose-600">
+                    <td className="px-4 py-3 font-semibold text-bolder-text">
                       ₹{item.outstandingDues.toFixed(2)}
                     </td>
-                    <td className="px-4 py-3 font-mono text-slate-700">
+                    <td className="px-4 py-3 font-mono text-bolder-text">
                       -₹{Math.abs(item.outstandingBalance).toFixed(2)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                      <span className="inline-flex items-center rounded-full bg-bolder-warning-surface px-2.5 py-0.5 text-xs font-semibold text-bolder-warning ring-1 ring-inset ring-bolder-warning/20">
                         {item.daysOverdue} days
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">
+                    <td className="px-4 py-3 text-bolder-text">
                       {new Date(item.oldestDuesDate).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -107,7 +107,7 @@ export function OverdueVendorsCard({
                         <button
                           type="button"
                           onClick={() => onFilterVendor(item.vendorId)}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                          className="rounded-lg border border-bolder-line-control bg-bolder-surface px-2.5 py-1 text-xs font-semibold text-bolder-text shadow-sm transition hover:bg-bolder-bg"
                         >
                           View Ledger
                         </button>

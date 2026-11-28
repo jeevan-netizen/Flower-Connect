@@ -50,13 +50,13 @@ export function AdminSettlementTable({
   return (
     <div
       data-testid="admin-settlement-table"
-      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      className="overflow-hidden rounded-2xl border border-bolder-line bg-bolder-surface shadow-sm"
     >
-      <div className="border-b border-slate-100 px-6 py-4">
+      <div className="border-b border-bolder-line px-6 py-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Weekly Settlement Cycles</h3>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <h3 className="text-base font-bold text-bolder-text">Weekly Settlement Cycles</h3>
+            <p className="mt-0.5 text-xs text-bolder-muted">
               Manage weekly netting settlements across all marketplace vendors.
             </p>
           </div>
@@ -67,13 +67,13 @@ export function AdminSettlementTable({
               placeholder="Filter by Vendor ID"
               value={vendorIdFilter}
               onChange={(e) => onVendorIdFilterChange?.(e.target.value)}
-              className="w-36 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="w-36 rounded-lg border border-bolder-line-control px-2.5 py-1.5 text-xs font-medium text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
             />
 
             <select
               value={selectedStatus}
               onChange={(e) => onStatusChange?.(e.target.value as SettlementStatus | "")}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="rounded-lg border border-bolder-line-control bg-bolder-surface px-3 py-1.5 text-xs font-medium text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
             >
               <option value="">All Statuses</option>
               <option value="PENDING">PENDING</option>
@@ -83,7 +83,7 @@ export function AdminSettlementTable({
             <button
               type="button"
               onClick={onOpenRunModal}
-              className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="rounded-lg bg-bolder-rose-action px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-bolder-rose-deep focus:outline-none focus:ring-2 focus:ring-bolder-rose"
             >
               + Run Settlement
             </button>
@@ -94,20 +94,21 @@ export function AdminSettlementTable({
       {isLoading ? (
         <div className="p-6 space-y-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
+            <div key={i} className="h-10 w-full animate-pulse rounded-lg bg-bolder-bg" />
           ))}
         </div>
       ) : settlements.length === 0 ? (
         <div className="px-6 py-12 text-center">
-          <p className="text-sm font-medium text-slate-600">No settlement cycles found.</p>
-          <p className="mt-1 text-xs text-slate-400">
-            Use the "Run Settlement" button to generate a cycle for a specific vendor or across all vendors.
+          <p className="text-sm font-medium text-bolder-muted">No settlement cycles found.</p>
+          <p className="mt-1 text-xs text-bolder-muted">
+            Use the "Run Settlement" button to generate a cycle for a specific vendor or across all
+            vendors.
           </p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+            <thead className="bg-bolder-bg text-xs uppercase tracking-wide text-bolder-muted">
               <tr>
                 <th scope="col" className="px-6 py-3 font-semibold">Cycle</th>
                 <th scope="col" className="px-6 py-3 font-semibold">Vendor</th>
@@ -120,44 +121,44 @@ export function AdminSettlementTable({
                 <th scope="col" className="px-6 py-3 font-semibold text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-bolder-line text-bolder-text">
               {settlements.map((s) => {
                 const isSettled = s.status === "SETTLED";
                 return (
-                  <tr key={s.id} className="transition hover:bg-slate-50/80">
-                    <td className="whitespace-nowrap px-6 py-4 font-mono text-xs font-semibold text-slate-900">
+                  <tr key={s.id} className="transition hover:bg-bolder-surface/80">
+                    <td className="whitespace-nowrap px-6 py-4 font-mono text-xs font-bold text-bolder-text">
                       #{s.id}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
-                      <div className="text-xs font-semibold text-slate-900">
+                      <div className="text-xs font-semibold text-bolder-text">
                         {s.vendorBusinessName || `Vendor #${s.vendorId}`}
                       </div>
-                      <div className="text-[11px] text-slate-400 font-mono">ID: {s.vendorId}</div>
+                      <div className="text-[11px] text-bolder-muted font-mono">ID: {s.vendorId}</div>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-xs font-medium text-slate-700">
+                    <td className="whitespace-nowrap px-6 py-4 text-xs text-bolder-text">
                       {s.periodStart} → {s.periodEnd}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-xs text-emerald-600 font-medium">
+                    <td className="whitespace-nowrap px-6 py-4 text-xs text-bolder-success font-medium">
                       +₹{s.totalCredits.toFixed(2)}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-xs text-amber-600 font-medium">
+                    <td className="whitespace-nowrap px-6 py-4 text-xs text-bolder-warning font-medium">
                       -₹{s.totalDues.toFixed(2)}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-xs font-bold text-slate-900">
+                    <td className="whitespace-nowrap px-6 py-4 text-xs font-bold text-bolder-text">
                       ₹{Math.abs(s.netAmount).toFixed(2)}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           isSettled
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-amber-100 text-amber-800"
+                            ? "bg-bolder-success-surface text-bolder-success"
+                            : "bg-bolder-warning-surface text-bolder-warning"
                         }`}
                       >
                         {s.status}
                       </span>
                     </td>
-                    <td className="max-w-xs truncate px-6 py-4 text-xs text-slate-500 font-mono">
+                    <td className="max-w-xs truncate px-6 py-4 text-xs text-bolder-muted">
                       {s.adminReferenceNote || "—"}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-right text-xs">
@@ -165,7 +166,7 @@ export function AdminSettlementTable({
                         <button
                           type="button"
                           onClick={() => onSelectSettlement(s.id)}
-                          className="font-medium text-brand-600 hover:text-brand-800 focus:outline-none"
+                          className="font-medium text-bolder-rose-strong hover:text-bolder-rose-deep focus:outline-none"
                         >
                           Entries
                         </button>
@@ -173,7 +174,7 @@ export function AdminSettlementTable({
                           <button
                             type="button"
                             onClick={() => onOpenFinalizeModal(s)}
-                            className="rounded bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 focus:outline-none"
+                            className="rounded bg-bolder-success-surface px-2.5 py-1 text-xs font-semibold text-bolder-success shadow-sm hover:bg-bolder-success-surface focus:outline-none focus:ring-2 focus:ring-bolder-rose"
                           >
                             Finalize
                           </button>
@@ -190,10 +191,12 @@ export function AdminSettlementTable({
 
       {/* Pagination Bar */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-6 py-3">
-          <span className="text-xs text-slate-500">
-            Showing Page <span className="font-semibold text-slate-800">{page + 1}</span> of{" "}
-            <span className="font-semibold text-slate-800">{totalPages}</span> ({totalElements} total settlements)
+        <div className="flex items-center justify-between border-t border-bolder-line bg-bolder-bg/50 px-6 py-3">
+          <span className="text-xs text-bolder-muted">
+            Showing Page <span className="font-semibold text-bolder-text">{page + 1}</span> of{" "}
+            <span className="font-semibold text-bolder-text">{totalPages}</span> ({
+              totalElements
+            } total settlements)
           </span>
 
           <div className="flex items-center gap-2">
@@ -201,7 +204,7 @@ export function AdminSettlementTable({
               type="button"
               disabled={page <= 0}
               onClick={() => onPageChange?.(page - 1)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-bolder-line-control bg-bolder-surface px-3 py-1 text-xs font-medium text-bolder-text shadow-sm hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50"
             >
               Previous
             </button>
@@ -209,7 +212,7 @@ export function AdminSettlementTable({
               type="button"
               disabled={page >= totalPages - 1}
               onClick={() => onPageChange?.(page + 1)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-bolder-line-control bg-bolder-surface px-3 py-1 text-xs font-medium text-bolder-text shadow-sm hover:bg-bolder-bg disabled:cursor-not-allowed disabled:opacity-50"
             >
               Next
             </button>

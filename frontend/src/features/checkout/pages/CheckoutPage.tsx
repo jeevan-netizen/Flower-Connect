@@ -433,7 +433,7 @@ function AddressStep({
           type="button"
           disabled={!canProceed}
           onClick={onProceed}
-          className={`rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+          className={`rounded-md bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
         >
           Choose delivery slots
         </button>
@@ -486,7 +486,7 @@ function SlotRow({
 
   return (
     <fieldset key={vendorId} className="border border-glass-border rounded-lg p-4 m-0">
-      <legend className="text-sm font-semibold text-slate-900">{vendorName}</legend>
+      <legend className="text-sm font-semibold text-bolder-text">{vendorName}</legend>
       {slotsPending && (
         <p className="mt-2 text-xs text-bolder-muted">Loading slots for {deliveryDate}...</p>
       )}
@@ -584,7 +584,7 @@ function SlotStep({
           type="button"
           disabled={!allSlotsSelected || isPending}
           onClick={onProceed}
-          className={`rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
+          className={`rounded-md bg-bolder-rose-action px-4 py-2 text-sm font-medium text-white hover:bg-bolder-rose-deep disabled:opacity-50 disabled:cursor-not-allowed ${PRESSABLE} ${FOCUS_RING}`}
         >
           {isPending ? "Preparing quote..." : "Review order"}
         </button>
@@ -786,7 +786,7 @@ function ConfirmationStep({
   if (!result) {
     return (
       <Card>
-        <FlowerLoader label="Placing your order" showLabel className="text-sm text-slate-600" />
+        <FlowerLoader label="Placing your order" showLabel className="text-sm text-bolder-muted" />
       </Card>
     );
   }
@@ -804,11 +804,11 @@ function ConfirmationStep({
         <div className="mt-6 space-y-4">
           {result.orders.map((order) => (
             <div key={order.orderId} className="text-left">
-              <p className="text-sm font-semibold text-slate-900">{order.vendorName}</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm font-semibold text-bolder-text">{order.vendorName}</p>
+              <p className="text-xs text-bolder-muted">
                 Order #{order.orderId} • {order.status} • {order.paymentMethod} • Slot {formatSlotTime(order.slotStart)}
               </p>
-              <p className="text-sm text-slate-900">{formatMoney(order.total)}</p>
+              <p className="text-sm text-bolder-text">{formatMoney(order.total)}</p>
             </div>
           ))}
         </div>

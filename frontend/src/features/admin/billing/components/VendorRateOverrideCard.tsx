@@ -61,18 +61,18 @@ export function VendorRateOverrideCard() {
   return (
     <div
       data-testid="vendor-rate-override-card"
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      className="rounded-2xl border border-bolder-line bg-bolder-surface p-6 shadow-sm"
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <span className="text-xs font-semibold uppercase tracking-wider text-bolder-muted">
           Vendor Rate & Balance Control
         </span>
-        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+        <span className="rounded-full bg-bolder-bg px-2.5 py-0.5 text-xs font-medium text-bolder-muted">
           Per-Vendor Override
         </span>
       </div>
 
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-bolder-muted">
         Lookup specific vendor to inspect unattached balance and configure custom commission rates.
       </p>
 
@@ -83,32 +83,32 @@ export function VendorRateOverrideCard() {
           placeholder="Enter Vendor ID"
           value={vendorIdInput}
           onChange={(e) => setVendorIdInput(e.target.value)}
-          className="w-40 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="w-40 rounded-lg border border-bolder-line-control px-3 py-1.5 text-xs font-medium text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
           required
         />
         <button
           type="submit"
-          className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-900"
+              className="rounded-lg bg-bolder-bg px-3 py-1.5 text-xs font-semibold text-bolder-text shadow-sm hover:bg-bolder-bg"
         >
           Inspect Vendor
         </button>
       </form>
 
       {activeVendorId !== null && (
-        <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50/70 p-4 space-y-4">
+          <div className="mt-5 rounded-xl border border-bolder-line bg-bolder-bg/70 p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-800">{`Vendor #${activeVendorId}`}</span>
+            <span className="text-xs font-bold text-bolder-text">{`Vendor #${activeVendorId}`}</span>
             <div className="text-right">
-              <span className="text-[11px] text-slate-500 block">Unattached Balance</span>
+              <span className="text-[11px] text-bolder-muted block">Unattached Balance</span>
               {balanceLoading ? (
-                <div className="h-5 w-20 animate-pulse rounded bg-slate-200" />
+                <div className="h-5 w-20 animate-pulse rounded bg-bolder-bg" />
               ) : (
                 <span
-                  className={`text-sm font-extrabold ${
-                    (balanceData?.outstandingBalance ?? 0) >= 0
-                      ? "text-emerald-600"
-                      : "text-amber-600"
-                  }`}
+                    className={`text-sm font-extrabold ${
+                      (balanceData?.outstandingBalance ?? 0) >= 0
+                        ? "text-bolder-success"
+                        : "text-bolder-warning"
+                    }`}
                 >
                   {`${(balanceData?.outstandingBalance ?? 0) >= 0 ? "+" : "-"}₹${Math.abs(
                     balanceData?.outstandingBalance ?? 0,
@@ -119,8 +119,8 @@ export function VendorRateOverrideCard() {
           </div>
 
           {/* Rate Override Form */}
-          <form onSubmit={handleSetRate} className="flex items-center gap-2 pt-2 border-t border-slate-200/60">
-            <label htmlFor="vendorRate" className="text-xs text-slate-600 whitespace-nowrap">
+          <form onSubmit={handleSetRate} className="flex items-center gap-2 pt-2 border-t border-bolder-line/60">
+            <label htmlFor="vendorRate" className="text-xs text-bolder-muted whitespace-nowrap">
               Override Rate:
             </label>
             <div className="relative w-28">
@@ -133,15 +133,15 @@ export function VendorRateOverrideCard() {
                 placeholder="10.00"
                 value={rateOverrideInput}
                 onChange={(e) => setRateOverrideInput(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="w-full rounded-lg border border-bolder-line-control px-2.5 py-1 text-xs font-medium text-bolder-text shadow-sm focus:border-bolder-rose focus:outline-none focus:ring-1 focus:ring-bolder-rose"
                 required
               />
-              <span className="absolute right-2.5 top-1.5 text-xs text-slate-400">%</span>
+              <span className="absolute right-2.5 top-1.5 text-xs text-bolder-muted">%</span>
             </div>
             <button
               type="submit"
               disabled={updateRateMutation.isPending}
-              className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
+              className="rounded-lg bg-bolder-rose-action px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-bolder-rose-deep disabled:opacity-50"
             >
               {updateRateMutation.isPending ? "Applying..." : "Set Rate"}
             </button>
@@ -152,7 +152,7 @@ export function VendorRateOverrideCard() {
       {statusMessage && (
         <p
           className={`mt-3 text-xs font-medium ${
-            statusMessage.isError ? "text-red-600" : "text-emerald-600"
+            statusMessage.isError ? "text-bolder-danger" : "text-bolder-success"
           }`}
         >
           {statusMessage.text}

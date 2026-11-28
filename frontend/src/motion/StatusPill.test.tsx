@@ -4,10 +4,10 @@ import { StatusPill } from "@/motion/StatusPill";
 
 describe("StatusPill", () => {
   it("renders the label inside the pill's tone classes", () => {
-    const { container } = render(<StatusPill tone="bg-amber-100 text-amber-800" label="Awaiting approval" />);
+    const { container } = render(<StatusPill tone="bg-bolder-warning-surface text-bolder-warning" label="Awaiting approval" />);
 
     expect(screen.getByText("Awaiting approval")).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveClass("bg-amber-100", "text-amber-800");
+    expect(container.firstElementChild).toHaveClass("bg-bolder-warning-surface", "text-bolder-warning");
   });
 
   it("forwards rest props so a screen can keep its own test hook", () => {
@@ -23,7 +23,7 @@ describe("StatusPill", () => {
    * approval" here.
    */
   it("shows the new label and not the old one when the status changes", () => {
-    const { rerender } = render(<StatusPill tone="bg-amber-100 text-amber-800" label="Awaiting approval" />);
+    const { rerender } = render(<StatusPill tone="bg-bolder-warning-surface text-bolder-warning" label="Awaiting approval" />);
 
     rerender(<StatusPill tone="bg-bolder-blush-light text-bolder-rose-deep" label="Approved" />);
 
