@@ -74,7 +74,7 @@ app:
     max-pixels: 40000000
     jpeg-quality: 0.85
   seed:
-    enabled: ${APP_SEED_ENABLED:true}
+    enabled: ${APP_SEED_ENABLED:false}
     demo-password: ${DEMO_USER_PASSWORD:${DEMO_PASSWORD:}}
     admin-email: ${ADMIN_EMAIL:}
 
