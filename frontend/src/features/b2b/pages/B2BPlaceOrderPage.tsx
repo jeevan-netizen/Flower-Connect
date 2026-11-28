@@ -12,7 +12,7 @@
  * cannot double-submit.
  */
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSellers, useSellerProducts } from "@/features/b2b/queries";
 import { placeB2BOrder } from "@/features/b2b/api";
@@ -42,7 +42,12 @@ export function B2BPlaceOrderPage() {
   const [actionError, setActionError] = useState<{ message: string } | null>(null);
   const navigate = useNavigate();
 
-  const { data: sellers, isPending: sellersPending, error: sellersError } = useSellers(
+  const {
+    data: sellers,
+    isPending: sellersPending,
+    error: sellersError,
+    refetch: refetchSellers,
+  } = useSellers(
     query,
   );
 
@@ -96,7 +101,10 @@ export function B2BPlaceOrderPage() {
         <VendorErrorState
           error={sellersError ?? productsError}
           onRetry={() => {
-            void (sellersError ? sellerProducts.refetch() : sellerProducts.refetch());
+            void refetchSellers();
+            if (selectedSeller) {
+              void sellerProducts.refetch();
+            }
           }}
         />
       </div>
@@ -174,7 +182,11 @@ export function B2BPlaceOrderPage() {
                       <li key={seller.vendorId}>
                         <button
                           type="button"
-                          onClick={() => setSelectedSeller(seller)}
+                          onClick={() => {
+                            setSelectedSeller(seller);
+                            setLines({});
+                            clearError();
+                          }}
                           className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors ${
                             selectedSeller?.vendorId === seller.vendorId
                               ? "bg-bolder-blush-light text-bolder-text"
